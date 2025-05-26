@@ -1,0 +1,14 @@
+# Python virtual environment
+.venv
+
+# Python
+__pycache__/
+
+# Jupyter
+.virtual_documents/
+
+# Logs
+*.log
+
+# Special files
+TODO.next

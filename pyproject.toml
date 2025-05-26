@@ -1,0 +1,26 @@
+[project]
+name = "suite_trading"
+version = "0.0.1"
+description = "Simple, Understandable, Intuitive Trading Engine (SUITE)"
+readme = "README.md"
+requires-python = "==3.13.*"
+dependencies = [
+    "pytest>=8.3.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit==4.2.0",
+    "pytest==8.3.5",
+]
+
+# Configuration for Pytest
+[tool.pytest.ini_options]
+pythonpath = ["src", ]
+testpaths = ["tests", ]
+
+# Configuration for Ruff
+[tool.ruff]
+fix = true
+show-fixes = true
+line-length = 150

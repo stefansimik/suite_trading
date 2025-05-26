@@ -1,0 +1,39 @@
+repos: # List of pre-commit hook repositories to use
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.8
+    hooks:
+      - id: ruff  # Ruff linter - checks code for errors, style issues and can automatically fix them
+      - id: ruff-format  # Ruff formatter - formats code to ensure consistent style
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0  # Use the ref you want to point at
+    hooks:
+      # Check spaces
+      - id: trailing-whitespace  # removes trailing whitespace at the end of lines
+      - id: end-of-file-fixer  # ensures files end with a newline
+      - id: mixed-line-ending  # ensures consistent line endings
+
+      # Common code
+      - id: debug-statements  # checks for debugger imports and py37+ breakpoint() calls
+      - id: check-ast  # checks whether files parse as valid python
+
+      # Check common type
+      - id: check-yaml  # validates yaml syntax
+      - id: check-json  # validates json syntax
+      - id: check-toml  # validates toml syntax
+
+      # File checks
+      - id: check-added-large-files  # prevents giant files from being committed
+      - id: check-merge-conflict  # checks for files with merge conflict strings
+      - id: check-case-conflict  # checks for files with names that would conflict on case-insensitive filesystems
+      - id: check-executables-have-shebangs  # ensures executable files have a shebang
+      - id: check-symlinks  # checks for symlinks which do not point to anything
+      - id: check-illegal-windows-names  # checks for filenames that would be illegal on Windows
+
+      # Security
+      - id: detect-private-key  # detects the presence of private keys
+
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v3.1.0
+    hooks:
+      - id: add-trailing-comma  # automatically adds trailing commas to calls and literals
