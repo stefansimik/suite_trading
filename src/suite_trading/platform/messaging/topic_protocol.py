@@ -1,5 +1,5 @@
-from suite_trading.data import Bar, BarType
-from suite_trading.messaging.message_bus import MessageBus
+from suite_trading.domain.market_data.bar import Bar, BarType
+from suite_trading.platform.messaging.message_bus import MessageBus
 
 
 class TopicProtocol:

@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from suite_trading.data import BarUnit, Bar, BarType, PriceType
-from suite_trading.data.instrument import Instrument
+from suite_trading.domain.market_data.bar import BarUnit, Bar, BarType
+from suite_trading.domain.market_data.price_type import PriceType
+from suite_trading.domain.instrument import Instrument
 
 # Constants
 INSTRUMENT = Instrument(name="EURUSD", exchange="FOREX", price_increment=Decimal("0.00001"))

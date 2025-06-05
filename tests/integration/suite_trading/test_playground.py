@@ -1,6 +1,6 @@
 from suite_trading import Strategy, TradingEngine
-from suite_trading.data import BarUnit
-from suite_trading.demo.generators.bars import create_bar_type, create_bar
+from suite_trading.domain.market_data.bar import BarUnit
+from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
 
 
 class DemoStrategy(Strategy):

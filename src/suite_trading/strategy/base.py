@@ -1,10 +1,12 @@
-from suite_trading.data import Bar, BarType, TradeTick, QuoteTick
-from suite_trading.data.instrument import Instrument
-from suite_trading.messaging import TopicProtocol
+from suite_trading.domain.market_data.bar import Bar, BarType
+from suite_trading.domain.market_data.tick.trade_tick import TradeTick
+from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
+from suite_trading.domain.instrument import Instrument
+from suite_trading.platform.messaging.topic_protocol import TopicProtocol
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from suite_trading.trading_engine import TradingEngine
+    from suite_trading.platform.engine.trading_engine import TradingEngine
 
 
 class Strategy:

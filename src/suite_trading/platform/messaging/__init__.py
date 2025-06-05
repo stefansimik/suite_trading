@@ -1,0 +1,1 @@
+"""Messaging infrastructure for communication between components."""

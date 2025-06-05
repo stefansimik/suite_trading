@@ -1,8 +1,9 @@
 import pytest
-from suite_trading.data import BarUnit, PriceType, BarType
-from suite_trading.messaging import TopicProtocol
-from suite_trading.trading_engine import TradingEngine
-from suite_trading.demo.generators.bars import create_bar_type, create_bar
+from suite_trading.domain.market_data.bar import BarUnit, BarType
+from suite_trading.domain.market_data.price_type import PriceType
+from suite_trading.platform.messaging.topic_protocol import TopicProtocol
+from suite_trading.platform.engine.trading_engine import TradingEngine
+from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
 
 
 def test_topic_protocol_create_bar_topic():

@@ -1,8 +1,8 @@
 from decimal import Decimal
 
-from suite_trading.data.bar import BarType, BarUnit
-from suite_trading.data.price_type import PriceType
-from suite_trading.data.instrument import Instrument
+from suite_trading.domain.market_data.bar import BarType, BarUnit
+from suite_trading.domain.market_data.price_type import PriceType
+from suite_trading.domain.instrument import Instrument
 
 
 def test_bar_type_string_representation():

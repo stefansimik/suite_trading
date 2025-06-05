@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import ClassVar
 
-from suite_trading.data.bar.bar_unit import BarUnit
-from suite_trading.data.instrument import Instrument
-from suite_trading.data.price_type import PriceType
+from suite_trading.domain.market_data.bar.bar_unit import BarUnit
+from suite_trading.domain.instrument import Instrument
+from suite_trading.domain.market_data.price_type import PriceType
 
 
 @dataclass(frozen=True)

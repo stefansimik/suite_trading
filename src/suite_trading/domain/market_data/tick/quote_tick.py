@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from suite_trading.data.instrument import Instrument
+from suite_trading.domain.instrument import Instrument
 
 @dataclass(frozen=True)
 class QuoteTick:
