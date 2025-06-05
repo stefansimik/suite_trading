@@ -35,3 +35,14 @@ We are building a modern algorithmic trading framework in Python that allows:
 - Organize tests in `tests/unit/` and `tests/integration/`
 - Mirror the package structure of the code they test
 - Keep only the root `tests/__init__.py` file
+
+# Git Commit Guidelines
+
+- Write commits in **imperative mood** (like giving a command)
+  - **✅ Good:** "Add user authentication" 
+  - **❌ Avoid:** "Added user authentication"
+- Keep subject line concise (50 chars or less)
+- Start with capital letter, no period at end
+- Use present tense imperative verbs: Add, Fix, Remove, Update
+- Be descriptive about what and why
+- For longer commits, add body separated by blank line
