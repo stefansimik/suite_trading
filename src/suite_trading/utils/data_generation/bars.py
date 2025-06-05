@@ -9,12 +9,32 @@ from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.data_generation.price_patterns import monotonic_trend
 
+# Default values for bar generation
+DEFAULT_INSTRUMENT = Instrument("EURUSD", "FOREX", "0.00001", "1")
+DEFAULT_BAR_VALUE = 1
+DEFAULT_BAR_UNIT = BarUnit.MINUTE
+DEFAULT_PRICE_TYPE = PriceType.LAST
+DEFAULT_END_DT = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc)
+DEFAULT_OPEN_PRICE = Decimal("1.1000")
+DEFAULT_HIGH_PRICE = Decimal("1.1010")
+DEFAULT_LOW_PRICE = Decimal("1.0990")
+DEFAULT_CLOSE_PRICE = Decimal("1.1005")
+DEFAULT_VOLUME = Decimal("1000")
+
+# Create default bar type using constants
+DEFAULT_BAR_TYPE = BarType(
+    instrument=DEFAULT_INSTRUMENT,
+    value=DEFAULT_BAR_VALUE,
+    unit=DEFAULT_BAR_UNIT,
+    price_type=DEFAULT_PRICE_TYPE
+)
+
 
 def create_bar_type(
-    instrument=Instrument("EURUSD", "FOREX", "0.00001", "1"),
-    value=1,
-    unit=BarUnit.MINUTE,
-    price_type=PriceType.LAST
+    instrument=DEFAULT_INSTRUMENT,
+    value=DEFAULT_BAR_VALUE,
+    unit=DEFAULT_BAR_UNIT,
+    price_type=DEFAULT_PRICE_TYPE
 ) -> BarType:
     """
     Create a bar type for demo purposes.
@@ -22,7 +42,7 @@ def create_bar_type(
     Args:
         instrument: The instrument for the bar type
         value: The value component of the bar type (e.g., 1 for 1-minute bars)
-        unit: The time unit of the bar (e.g., MINUTE, HOUR)
+        unit: The time unit of the bar (e.g. MINUTE, HOUR)
         price_type: The type of price used for the bar (e.g., LAST, BID, ASK)
 
     Returns:
@@ -37,13 +57,13 @@ def create_bar_type(
 
 
 def create_bar(
-    bar_type: BarType,
-    end_dt: datetime,
-    open_price: Decimal,
-    high_price: Decimal,
-    low_price: Decimal,
-    close_price: Decimal,
-    volume: Decimal = Decimal("1000")
+    bar_type: BarType = DEFAULT_BAR_TYPE,
+    end_dt: datetime = DEFAULT_END_DT,
+    open_price: Decimal = DEFAULT_OPEN_PRICE,
+    high_price: Decimal = DEFAULT_HIGH_PRICE,
+    low_price: Decimal = DEFAULT_LOW_PRICE,
+    close_price: Decimal = DEFAULT_CLOSE_PRICE,
+    volume: Decimal = DEFAULT_VOLUME
 ) -> Bar:
     """
     Create a single demo bar with the given parameters.
@@ -60,6 +80,7 @@ def create_bar(
     Returns:
         A Bar instance with the specified properties
     """
+
     # Calculate start_dt based on bar_type and end_dt
     if bar_type.unit == BarUnit.SECOND:
         start_dt = end_dt - timedelta(seconds=bar_type.value)
@@ -98,13 +119,13 @@ def create_bar(
 
 def create_bar_series(
     count: int = 20,
-    instrument: Instrument = Instrument("EURUSD", "FOREX", "0.00001"),
-    bar_value: int = 1,
-    bar_unit: BarUnit = BarUnit.MINUTE,
-    price_type: PriceType = PriceType.LAST,
+    instrument: Instrument = DEFAULT_INSTRUMENT,
+    bar_value: int = DEFAULT_BAR_VALUE,
+    bar_unit: BarUnit = DEFAULT_BAR_UNIT,
+    price_type: PriceType = DEFAULT_PRICE_TYPE,
     end_dt: Optional[datetime] = None,
-    base_price: Decimal = Decimal("1.1000"),
-    volume: Decimal = Decimal("1000"),
+    base_price: Decimal = DEFAULT_OPEN_PRICE,
+    volume: Decimal = DEFAULT_VOLUME,
     pattern_func: Callable = monotonic_trend,
     pattern_args: Optional[Dict] = None
 ) -> List[Bar]:
@@ -114,10 +135,10 @@ def create_bar_series(
     Args:
         count: Number of bars to generate
         instrument: The financial instrument
-        bar_value: Value component of bar type (e.g., 1 for 1-minute bars)
+        bar_value: Value component of bar type
         bar_unit: Time unit of the bar
         price_type: Type of price used
-        end_dt: End datetime of the last bar (defaults to now)
+        end_dt: End datetime of the last bar (None means current time)
         base_price: Starting price for the series
         volume: Volume for each bar
         pattern_func: Function that determines price pattern
