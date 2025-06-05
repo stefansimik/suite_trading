@@ -164,23 +164,29 @@ def create_bar_series(first_bar: Bar = DEFAULT_FIRST_BAR, count: int = 20, patte
 
     # Generate remaining bars
     current_end_dt = end_dt + time_delta
+    previous_close = first_bar.close  # Store the close price of the previous bar
 
     for i in range(1, count):
         # Get prices from pattern function
         prices = pattern_func(base_price=base_price, index=i, price_increment=bar_type.instrument.price_increment)
 
+        # Override the open price with the close price of the previous bar
+        # to ensure continuity between bars
+        open_price = previous_close
+
         # Create bar
         bar = create_bar(
             bar_type=bar_type,
             end_dt=current_end_dt,
-            open_price=prices["open"],
-            high_price=prices["high"],
-            low_price=prices["low"],
+            open_price=open_price,
+            high_price=max(open_price, prices["high"]),  # Ensure high is at least as high as open
+            low_price=min(open_price, prices["low"]),  # Ensure low is at most as low as open
             close_price=prices["close"],
             volume=volume,
         )
 
         bars.append(bar)  # Append to maintain chronological order
+        previous_close = bar.close  # Update previous_close for the next iteration
         current_end_dt += time_delta
 
     return bars
