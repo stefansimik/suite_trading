@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 
 class Strategy:
-
     def __init__(self, name: str):
         """Initialize a new strategy.
 
@@ -28,7 +27,7 @@ class Strategy:
         self._trading_engine = None
         self._subscribed_bar_types = set()  # Track subscribed bar types
 
-    def _set_trading_engine(self, trading_engine: 'TradingEngine'):
+    def _set_trading_engine(self, trading_engine: "TradingEngine"):
         """Set the trading engine reference.
 
         This method is called by the TradingEngine when the strategy is added to it.
@@ -95,7 +94,6 @@ class Strategy:
             # Unsubscribe from the topic
             self._trading_engine.message_bus.unsubscribe(topic, self.on_bar)
             self._subscribed_bar_types.remove(bar_type)
-
 
     def subscribe_trade_ticks(self, instrument: Instrument):
         """Subscribe to trade tick data for a specific instrument.

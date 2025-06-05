@@ -1,6 +1,3 @@
-import pytest
-from suite_trading.domain.market_data.bar import BarUnit, BarType
-from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.platform.messaging.topic_protocol import TopicProtocol
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
@@ -9,9 +6,7 @@ from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
 def test_topic_protocol_create_bar_topic():
     """Test that TopicProtocol.create_bar_topic generates the correct topic name."""
     # Create a bar type
-    bar_type = create_bar_type(
-        value=5
-    )
+    bar_type = create_bar_type(value=5)
 
     # Generate the topic name
     topic = TopicProtocol.create_bar_topic(bar_type)
@@ -26,9 +21,7 @@ def test_trading_engine_publish_bar():
     engine = TradingEngine()
 
     # Create a bar type
-    bar_type = create_bar_type(
-        value=5
-    )
+    bar_type = create_bar_type(value=5)
 
     # Create a bar
     from datetime import datetime, timezone
@@ -47,7 +40,7 @@ def test_trading_engine_publish_bar():
         open_price=open_price,
         high_price=high_price,
         low_price=low_price,
-        close_price=close_price
+        close_price=close_price,
     )
 
     # Create a flag to track if the callback was called

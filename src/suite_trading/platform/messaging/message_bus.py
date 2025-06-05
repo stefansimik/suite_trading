@@ -68,7 +68,7 @@ class MessageBus:
                 raise ValueError(f"Topic parts cannot be empty (e.g., 'part1{self.TOPIC_SEPARATOR}{self.TOPIC_SEPARATOR}part2')")
 
             # Check if part contains only allowed characters
-            if not re.match(r'^[a-zA-Z0-9*@\-_#]+$', part):
+            if not re.match(r"^[a-zA-Z0-9*@\-_#]+$", part):
                 raise ValueError(f"Topic part '{part}' contains invalid characters. Only letters, numbers, '*', '@', '-', '_', '#' are allowed")
 
         # Check if topic is lowercase and raise an error if it's not
@@ -126,9 +126,9 @@ class MessageBus:
         self._callbacks[topic].append(callback)
 
         # If topic contains a wildcard, compile a regex pattern for it
-        if '*' in topic:
-            pattern_str = topic.replace(self.TOPIC_SEPARATOR, '\\:\\:').replace('*', '.*')
-            self._wildcard_patterns[topic] = re.compile(f'^{pattern_str}$')
+        if "*" in topic:
+            pattern_str = topic.replace(self.TOPIC_SEPARATOR, "\\:\\:").replace("*", ".*")
+            self._wildcard_patterns[topic] = re.compile(f"^{pattern_str}$")
 
     def unsubscribe(self, topic: str, callback: Callable):
         """

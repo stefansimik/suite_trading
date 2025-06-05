@@ -1,6 +1,6 @@
 repos: # List of pre-commit hook repositories to use
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.8
+    rev: v0.11.12
     hooks:
       - id: ruff  # Ruff linter - checks code for errors, style issues and can automatically fix them
       - id: ruff-format  # Ruff formatter - formats code to ensure consistent style
@@ -34,6 +34,11 @@ repos: # List of pre-commit hook repositories to use
       - id: detect-private-key  # detects the presence of private keys
 
   - repo: https://github.com/asottile/add-trailing-comma
-    rev: v3.1.0
+    rev: v3.2.0
     hooks:
       - id: add-trailing-comma  # automatically adds trailing commas to calls and literals
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.8.1
+    hooks:
+      - id: nbstripout  # strips output cells from Jupyter notebooks

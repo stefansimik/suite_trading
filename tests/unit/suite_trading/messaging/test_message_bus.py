@@ -22,7 +22,7 @@ def test_subscribe_and_publish():
         topic1_called = True
         assert data == "data1"
 
-    def on_topic1_wildcard(data):# This callback will be called for both "topic1" and "topic1.*"
+    def on_topic1_wildcard(data):  # This callback will be called for both "topic1" and "topic1.*"
         nonlocal topic1_wildcard_called
         topic1_wildcard_called = True
 
@@ -51,6 +51,7 @@ def test_subscribe_and_publish():
     assert topic1_wildcard_called, "Callback for 'topic1::*' was not called"
     assert topic1_subtopic_called, "Callback for 'topic1::subtopic' was not called"
     assert star_subtopic_called, "Callback for '*::subtopic' wildcard was not called"
+
 
 def test_unsubscribe():
     """
@@ -87,6 +88,7 @@ def test_unsubscribe():
 
     # Verify that callback was not invoked
     assert not callback_called, "Callback was called after unsubscribing"
+
 
 def test_invoke_callbacks_in_order():
     """
@@ -140,7 +142,7 @@ def test_validate_topic_format():
         "topic-with-hyphens",
         "topic_with_underscores",
         "topic@with@at",
-        "topic#with#hash"
+        "topic#with#hash",
     ]
 
     for topic in valid_topics:

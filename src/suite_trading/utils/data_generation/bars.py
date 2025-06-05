@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from typing import List, Optional, Callable, Dict, Union
+from typing import List, Callable
 
 from suite_trading.domain.market_data.bar import Bar, BarType, BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
@@ -26,12 +26,7 @@ DEFAULT_VOLUME = Decimal("1000")
 # Default first bar will be created after the create_bar function is defined
 
 
-def create_bar_type(
-    instrument=DEFAULT_INSTRUMENT,
-    value=DEFAULT_BAR_VALUE,
-    unit=DEFAULT_BAR_UNIT,
-    price_type=DEFAULT_PRICE_TYPE
-) -> BarType:
+def create_bar_type(instrument=DEFAULT_INSTRUMENT, value=DEFAULT_BAR_VALUE, unit=DEFAULT_BAR_UNIT, price_type=DEFAULT_PRICE_TYPE) -> BarType:
     """
     Create a bar type for demo purposes.
 
@@ -44,12 +39,7 @@ def create_bar_type(
     Returns:
         A BarType instance
     """
-    return BarType(
-        instrument=instrument,
-        value=value,
-        unit=unit,
-        price_type=price_type
-    )
+    return BarType(instrument=instrument, value=value, unit=unit, price_type=price_type)
 
 
 # Create default bar type using function with default parameters
@@ -63,7 +53,7 @@ def create_bar(
     high_price: Decimal = DEFAULT_HIGH_PRICE,
     low_price: Decimal = DEFAULT_LOW_PRICE,
     close_price: Decimal = DEFAULT_CLOSE_PRICE,
-    volume: Decimal = DEFAULT_VOLUME
+    volume: Decimal = DEFAULT_VOLUME,
 ) -> Bar:
     """
     Create a single demo bar with the given parameters.
@@ -105,16 +95,7 @@ def create_bar(
         # Default fallback for any future units
         start_dt = end_dt - timedelta(minutes=bar_type.value)
 
-    return Bar(
-        bar_type=bar_type,
-        start_dt=start_dt,
-        end_dt=end_dt,
-        open=open_price,
-        high=high_price,
-        low=low_price,
-        close=close_price,
-        volume=volume
-    )
+    return Bar(bar_type=bar_type, start_dt=start_dt, end_dt=end_dt, open=open_price, high=high_price, low=low_price, close=close_price, volume=volume)
 
 
 # Create default first bar using constants
@@ -125,15 +106,11 @@ DEFAULT_FIRST_BAR = create_bar(
     high_price=DEFAULT_HIGH_PRICE,
     low_price=DEFAULT_LOW_PRICE,
     close_price=DEFAULT_CLOSE_PRICE,
-    volume=DEFAULT_VOLUME
+    volume=DEFAULT_VOLUME,
 )
 
 
-def create_bar_series(
-    first_bar: Bar = DEFAULT_FIRST_BAR,
-    count: int = 20,
-    pattern_func: Callable = monotonic_trend
-) -> List[Bar]:
+def create_bar_series(first_bar: Bar = DEFAULT_FIRST_BAR, count: int = 20, pattern_func: Callable = monotonic_trend) -> List[Bar]:
     """
     Generate a series of bars with a specified price pattern.
 
@@ -190,11 +167,7 @@ def create_bar_series(
 
     for i in range(1, count):
         # Get prices from pattern function
-        prices = pattern_func(
-            base_price=base_price,
-            index=i,
-            price_increment=bar_type.instrument.price_increment
-        )
+        prices = pattern_func(base_price=base_price, index=i, price_increment=bar_type.instrument.price_increment)
 
         # Create bar
         bar = create_bar(
@@ -204,7 +177,7 @@ def create_bar_series(
             high_price=prices["high"],
             low_price=prices["low"],
             close_price=prices["close"],
-            volume=volume
+            volume=volume,
         )
 
         bars.append(bar)  # Append to maintain chronological order

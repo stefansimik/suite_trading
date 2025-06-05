@@ -10,7 +10,6 @@ class DemoStrategy(Strategy):
         self.subscribe_bars(eurusd_1min_bars_type)
 
 
-
 def test_basic_flow():
     # Create a trading engine
     engine: TradingEngine = TradingEngine()
@@ -42,7 +41,7 @@ def test_basic_flow():
         open_price=open_price,
         high_price=high_price,
         low_price=low_price,
-        close_price=close_price
+        close_price=close_price,
     )
     engine.publish_bar(bar)
 

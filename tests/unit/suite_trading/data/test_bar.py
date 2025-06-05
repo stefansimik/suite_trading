@@ -25,12 +25,7 @@ VOLUME_DECIMAL = Decimal(str(VOLUME))
 def test_bar_construction_and_values():
     """Test that Bar can be constructed properly and its values are correctly set."""
     # Create a bar type
-    bar_type = BarType(
-        instrument=INSTRUMENT,
-        value=BAR_VALUE,
-        unit=BarUnit.MINUTE,
-        price_type=PriceType.LAST
-    )
+    bar_type = BarType(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST)
 
     # Create a bar
     now = datetime.now(timezone.utc)
@@ -42,7 +37,7 @@ def test_bar_construction_and_values():
         high=HIGH_PRICE,
         low=LOW_PRICE,
         close=CLOSE_PRICE,
-        volume=VOLUME
+        volume=VOLUME,
     )
 
     # Test that the properties correctly delegate to bar_type

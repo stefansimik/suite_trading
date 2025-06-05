@@ -39,7 +39,7 @@ We are building a modern algorithmic trading framework in Python that allows:
 # Git Commit Guidelines
 
 - Write commits in **imperative mood** (like giving a command)
-  - **✅ Good:** "Add user authentication" 
+  - **✅ Good:** "Add user authentication"
   - **❌ Avoid:** "Added user authentication"
 - Keep subject line concise (50 chars or less)
 - Start with capital letter, no period at end

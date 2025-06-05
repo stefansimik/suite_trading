@@ -6,7 +6,6 @@ from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
 __all__ = [
     # Price pattern functions
     "monotonic_trend",
-    
     # Bar generation functions
     "create_bar_type",
     "create_bar",

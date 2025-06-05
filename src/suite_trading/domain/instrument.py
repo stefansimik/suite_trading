@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -41,7 +40,6 @@ class Instrument:
             raise ValueError("quantity_increment must be positive")
         if self.contract_value_multiplier <= 0:
             raise ValueError("contract_value_multiplier must be positive")
-
 
     def __str__(self) -> str:
         """Return a string representation of the instrument.

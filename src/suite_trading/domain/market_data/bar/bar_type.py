@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import ClassVar
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
@@ -31,8 +30,6 @@ class BarType:
 
     SEPARATOR: ClassVar[str] = "::"
 
-
     def __str__(self) -> str:
-        """Return a string representation of the bar type.
-        """
+        """Return a string representation of the bar type."""
         return f"{str(self.instrument)}{self.SEPARATOR}{self.value}-{self.unit.name}{self.SEPARATOR}{self.price_type.name}"

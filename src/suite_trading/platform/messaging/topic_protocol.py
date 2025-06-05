@@ -1,4 +1,4 @@
-from suite_trading.domain.market_data.bar import Bar, BarType
+from suite_trading.domain.market_data.bar import BarType
 from suite_trading.platform.messaging.message_bus import MessageBus
 
 
@@ -15,9 +15,6 @@ class TopicProtocol:
         Returns:
             str: The topic name in format 'bar::{instrument}::{value}-{unit}::{price_type}'
         """
-        return MessageBus.topic_from_parts([
-            "bar",
-            str(bar_type.instrument).lower(),
-            f"{bar_type.value}-{bar_type.unit.name.lower()}",
-            bar_type.price_type.name.lower()
-        ])
+        return MessageBus.topic_from_parts(
+            ["bar", str(bar_type.instrument).lower(), f"{bar_type.value}-{bar_type.unit.name.lower()}", bar_type.price_type.name.lower()],
+        )
