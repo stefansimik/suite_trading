@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "suite_trading"
 version = "0.0.1"
@@ -6,12 +10,16 @@ readme = "README.md"
 requires-python = "==3.13.*"
 dependencies = [
     "pytest>=8.3.5",
+    "pandas>=2.3.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pre-commit==4.2.0",
     "pytest==8.3.5",
+    "jupyterlab>=4.4.3",
+    "plotly>=6.1.2",
+
 ]
 
 # Configuration for Pytest
@@ -24,3 +32,6 @@ testpaths = ["tests", ]
 fix = true
 show-fixes = true
 line-length = 150
+
+[tool.setuptools.packages.find]
+where = ["src"]
