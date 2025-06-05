@@ -21,13 +21,9 @@ DEFAULT_LOW_PRICE = Decimal("1.0990")
 DEFAULT_CLOSE_PRICE = Decimal("1.1005")
 DEFAULT_VOLUME = Decimal("1000")
 
-# Create default bar type using constants
-DEFAULT_BAR_TYPE = BarType(
-    instrument=DEFAULT_INSTRUMENT,
-    value=DEFAULT_BAR_VALUE,
-    unit=DEFAULT_BAR_UNIT,
-    price_type=DEFAULT_PRICE_TYPE
-)
+# Default bar type will be created after the create_bar_type function is defined
+
+# Default first bar will be created after the create_bar function is defined
 
 
 def create_bar_type(
@@ -54,6 +50,10 @@ def create_bar_type(
         unit=unit,
         price_type=price_type
     )
+
+
+# Create default bar type using function with default parameters
+DEFAULT_BAR_TYPE = create_bar_type()
 
 
 def create_bar(
@@ -117,32 +117,30 @@ def create_bar(
     )
 
 
+# Create default first bar using constants
+DEFAULT_FIRST_BAR = create_bar(
+    bar_type=DEFAULT_BAR_TYPE,
+    end_dt=DEFAULT_END_DT,
+    open_price=DEFAULT_OPEN_PRICE,
+    high_price=DEFAULT_HIGH_PRICE,
+    low_price=DEFAULT_LOW_PRICE,
+    close_price=DEFAULT_CLOSE_PRICE,
+    volume=DEFAULT_VOLUME
+)
+
+
 def create_bar_series(
+    first_bar: Bar = DEFAULT_FIRST_BAR,
     count: int = 20,
-    instrument: Instrument = DEFAULT_INSTRUMENT,
-    bar_value: int = DEFAULT_BAR_VALUE,
-    bar_unit: BarUnit = DEFAULT_BAR_UNIT,
-    price_type: PriceType = DEFAULT_PRICE_TYPE,
-    end_dt: Optional[datetime] = None,
-    base_price: Decimal = DEFAULT_OPEN_PRICE,
-    volume: Decimal = DEFAULT_VOLUME,
-    pattern_func: Callable = monotonic_trend,
-    pattern_args: Optional[Dict] = None
+    pattern_func: Callable = monotonic_trend
 ) -> List[Bar]:
     """
     Generate a series of bars with a specified price pattern.
 
     Args:
-        count: Number of bars to generate
-        instrument: The financial instrument
-        bar_value: Value component of bar type
-        bar_unit: Time unit of the bar
-        price_type: Type of price used
-        end_dt: End datetime of the last bar (None means current time)
-        base_price: Starting price for the series
-        volume: Volume for each bar
+        first_bar: The first bar of the series
+        count: Number of bars to generate (including first bar)
         pattern_func: Function that determines price pattern
-        pattern_args: Additional arguments for the pattern function
 
     Returns:
         List of Bar objects in chronological order (oldest first)
@@ -150,55 +148,52 @@ def create_bar_series(
     if count <= 0:
         raise ValueError("count must be positive")
 
-    # Set defaults
-    if end_dt is None:
-        end_dt = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    if pattern_args is None:
-        pattern_args = {}
+    # Extract properties from first bar
+    bar_type = first_bar.bar_type
+    end_dt = first_bar.end_dt
+    base_price = first_bar.open
+    volume = first_bar.volume
 
-    # Create bar type
-    bar_type = create_bar_type(
-        instrument=instrument,
-        value=bar_value,
-        unit=bar_unit,
-        price_type=price_type
-    )
-
-    # Calculate time delta between bars
-    if bar_unit == BarUnit.SECOND:
-        time_delta = timedelta(seconds=bar_value)
-    elif bar_unit == BarUnit.MINUTE:
-        time_delta = timedelta(minutes=bar_value)
-    elif bar_unit == BarUnit.HOUR:
-        time_delta = timedelta(hours=bar_value)
-    elif bar_unit == BarUnit.DAY:
-        time_delta = timedelta(days=bar_value)
-    elif bar_unit == BarUnit.WEEK:
-        time_delta = timedelta(weeks=bar_value)
-    elif bar_unit == BarUnit.MONTH:
+    # Calculate time delta between bars based on bar_type
+    if bar_type.unit == BarUnit.SECOND:
+        time_delta = timedelta(seconds=bar_type.value)
+    elif bar_type.unit == BarUnit.MINUTE:
+        time_delta = timedelta(minutes=bar_type.value)
+    elif bar_type.unit == BarUnit.HOUR:
+        time_delta = timedelta(hours=bar_type.value)
+    elif bar_type.unit == BarUnit.DAY:
+        time_delta = timedelta(days=bar_type.value)
+    elif bar_type.unit == BarUnit.WEEK:
+        time_delta = timedelta(weeks=bar_type.value)
+    elif bar_type.unit == BarUnit.MONTH:
         # Approximate a month as 30 days
-        time_delta = timedelta(days=30 * bar_value)
-    elif bar_unit == BarUnit.TICK:
+        time_delta = timedelta(days=30 * bar_type.value)
+    elif bar_type.unit == BarUnit.TICK:
         # For tick-based bars, we use a small time difference
-        time_delta = timedelta(milliseconds=bar_value)
-    elif bar_unit == BarUnit.VOLUME:
+        time_delta = timedelta(milliseconds=bar_type.value)
+    elif bar_type.unit == BarUnit.VOLUME:
         # For volume-based bars, we use a small time difference
-        time_delta = timedelta(milliseconds=bar_value)
+        time_delta = timedelta(milliseconds=bar_type.value)
     else:
         # Default fallback for any future units
-        time_delta = timedelta(minutes=bar_value)
+        time_delta = timedelta(minutes=bar_type.value)
 
-    # Generate bars in reverse order (newest to oldest)
-    bars = []
-    current_end_dt = end_dt
+    # Start with the first bar
+    bars = [first_bar]
 
-    for i in range(count):
+    # If count is 1, just return the first bar
+    if count == 1:
+        return bars
+
+    # Generate remaining bars
+    current_end_dt = end_dt + time_delta
+
+    for i in range(1, count):
         # Get prices from pattern function
         prices = pattern_func(
             base_price=base_price,
-            index=count - i - 1,  # Reverse index
-            price_increment=instrument.price_increment,
-            **pattern_args
+            index=i,
+            price_increment=bar_type.instrument.price_increment
         )
 
         # Create bar
@@ -212,7 +207,7 @@ def create_bar_series(
             volume=volume
         )
 
-        bars.insert(0, bar)  # Insert at beginning to maintain chronological order
-        current_end_dt -= time_delta
+        bars.append(bar)  # Append to maintain chronological order
+        current_end_dt += time_delta
 
     return bars
