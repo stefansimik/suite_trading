@@ -2,15 +2,17 @@
 
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from typing import List, Callable
+import random
+from typing import List, Callable, Optional
 
 from suite_trading.domain.market_data.bar import Bar, BarType, BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.instrument import Instrument
-from suite_trading.utils.data_generation.price_patterns import monotonic_trend
+from suite_trading.utils.data_generation.price_patterns import monotonic
+from suite_trading.utils.math import round_to_increment
 
 # Default values for bar generation
-DEFAULT_INSTRUMENT = Instrument("EURUSD", "FOREX", "0.00001", "1")
+DEFAULT_INSTRUMENT = Instrument("EURUSD", "FOREX", "0.0001", "100_000")
 DEFAULT_BAR_VALUE = 1
 DEFAULT_BAR_UNIT = BarUnit.MINUTE
 DEFAULT_PRICE_TYPE = PriceType.LAST
@@ -19,7 +21,7 @@ DEFAULT_OPEN_PRICE = Decimal("1.1000")
 DEFAULT_HIGH_PRICE = Decimal("1.1010")
 DEFAULT_LOW_PRICE = Decimal("1.0990")
 DEFAULT_CLOSE_PRICE = Decimal("1.1005")
-DEFAULT_VOLUME = Decimal("1000")
+DEFAULT_VOLUME = Decimal("9999")
 
 # Default bar type will be created after the create_bar_type function is defined
 
@@ -110,14 +112,26 @@ DEFAULT_FIRST_BAR = create_bar(
 )
 
 
-def create_bar_series(first_bar: Bar = DEFAULT_FIRST_BAR, count: int = 20, pattern_func: Callable = monotonic_trend) -> List[Bar]:
+def create_bar_series(
+    first_bar: Bar = DEFAULT_FIRST_BAR,
+    count: int = 20,
+    price_pattern_func: Callable = monotonic,
+    default_body_size_ticks: int = 20,
+    body_variation: float = 0.5,
+    wick_variation: float = 0.5,
+    random_seed: Optional[int] = None,
+) -> List[Bar]:
     """
     Generate a series of bars with a specified price pattern.
 
     Args:
         first_bar: The first bar of the series
         count: Number of bars to generate (including first bar)
-        pattern_func: Function that determines price pattern
+        price_pattern_func: Function that returns Y-values representing the price curve
+        default_body_size_ticks: Default size of the candlestick body in ticks
+        body_variation: Variation of body size (0.5 = ±50%)
+        wick_variation: Variation of wick size as a proportion of body size (0.5 = random height in range 0-50% of body height)
+        random_seed: Optional seed for random number generator to ensure reproducible results
 
     Returns:
         List of Bar objects in chronological order (oldest first)
@@ -125,11 +139,16 @@ def create_bar_series(first_bar: Bar = DEFAULT_FIRST_BAR, count: int = 20, patte
     if count <= 0:
         raise ValueError("count must be positive")
 
+    # Set random seed if provided for reproducible results
+    if random_seed is not None:
+        random.seed(random_seed)
+
     # Extract properties from first bar
     bar_type = first_bar.bar_type
     end_dt = first_bar.end_dt
-    base_price = first_bar.open
+    base_price = float(first_bar.open)
     volume = first_bar.volume
+    price_increment = bar_type.instrument.price_increment
 
     # Calculate time delta between bars based on bar_type
     if bar_type.unit == BarUnit.SECOND:
@@ -164,29 +183,81 @@ def create_bar_series(first_bar: Bar = DEFAULT_FIRST_BAR, count: int = 20, patte
 
     # Generate remaining bars
     current_end_dt = end_dt + time_delta
-    previous_close = first_bar.close  # Store the close price of the previous bar
+    previous_close = float(first_bar.close)  # Store the close price of the previous bar
 
     for i in range(1, count):
-        # Get prices from pattern function
-        prices = pattern_func(base_price=base_price, index=i, price_increment=bar_type.instrument.price_increment)
+        # Get price from pattern function (Y-value for this index)
+        pattern_price = price_pattern_func(index=i)
 
-        # Override the open price with the close price of the previous bar
-        # to ensure continuity between bars
+        # Scale the pattern price to the actual price range
+        # The pattern function returns values around 1.0, so we scale by the base price
+        target_price = base_price * pattern_price
+
+        # Generate a random body size with variation
+        tick_size = float(price_increment)
+        body_size_ticks = default_body_size_ticks * (1 + random.uniform(-body_variation, body_variation))
+        body_size = body_size_ticks * tick_size
+
+        # Determine if this candle is bullish (up) or bearish (down) with some randomness
+        # but biased by the direction from previous close to target price
+        price_direction = target_price - previous_close
+        is_bullish = random.random() < (0.5 + 0.4 * (1 if price_direction > 0 else -1))
+
+        # Set open price to previous close for continuity
         open_price = previous_close
+
+        # Calculate close price based on body size and direction
+        # but ensure it's moving towards the target price
+        if is_bullish:
+            # Bullish candle (close > open)
+            close_price = open_price + body_size
+            # Adjust close to move towards target price
+            if target_price < close_price:
+                # If target is below close, reduce the body size
+                close_price = open_price + min(body_size, max(0, target_price - open_price))
+        else:
+            # Bearish candle (close < open)
+            close_price = open_price - body_size
+            # Adjust close to move towards target price
+            if target_price > close_price:
+                # If target is above close, reduce the body size
+                close_price = open_price - min(body_size, max(0, open_price - target_price))
+
+        # Generate random wick sizes
+        upper_wick = random.uniform(0, wick_variation) * body_size
+        lower_wick = random.uniform(0, wick_variation) * body_size
+
+        # Calculate high and low prices based on body and wicks
+        if is_bullish:
+            high_price = close_price + upper_wick
+            low_price = open_price - lower_wick
+        else:
+            high_price = open_price + upper_wick
+            low_price = close_price - lower_wick
+
+        # Round prices to price increment
+        open_decimal = round_to_increment(open_price, price_increment)
+        close_decimal = round_to_increment(close_price, price_increment)
+        high_decimal = round_to_increment(high_price, price_increment)
+        low_decimal = round_to_increment(low_price, price_increment)
+
+        # Ensure high is highest and low is lowest
+        high_decimal = max(open_decimal, high_decimal, close_decimal)
+        low_decimal = min(open_decimal, low_decimal, close_decimal)
 
         # Create bar
         bar = create_bar(
             bar_type=bar_type,
             end_dt=current_end_dt,
-            open_price=open_price,
-            high_price=max(open_price, prices["high"]),  # Ensure high is at least as high as open
-            low_price=min(open_price, prices["low"]),  # Ensure low is at most as low as open
-            close_price=prices["close"],
+            open_price=open_decimal,
+            high_price=high_decimal,
+            low_price=low_decimal,
+            close_price=close_decimal,
             volume=volume,
         )
 
         bars.append(bar)  # Append to maintain chronological order
-        previous_close = bar.close  # Update previous_close for the next iteration
+        previous_close = float(bar.close)  # Update previous_close for the next iteration
         current_end_dt += time_delta
 
     return bars
