@@ -27,6 +27,44 @@ We are building a modern algorithmic trading framework in Python that allows:
 - Include purpose, parameters, return values, and exceptions in function docstrings
 - Include type information for all parameters, return values, and attributes in docstrings
 
+## Exception Message Formatting
+
+- Prefix variables with $ to distinguish them from normal text
+- Include actual values of variables in the message
+- Use f-strings for string interpolation
+- Be specific about requirements and valid ranges
+
+### Examples
+
+```python
+# Basic format with variable and its value
+if count <= 1:
+    raise ValueError(f"$count must be >= 1, but provided value is: {count}")
+
+# Include context and expectations
+if start_date >= end_date:
+    raise ValueError(f"$start_date ({start_date}) must be earlier than $end_date ({end_date})")
+
+# Provide guidance on how to fix when relevant
+if api_key is None or len(api_key) < 10:
+    raise ValueError(f"$api_key is invalid: '{api_key}'. Must be at least 10 characters. Get a valid key from the dashboard.")
+
+# For multiple issues, use bullet points
+def validate_user(user):
+    errors = []
+    if not user.name:
+        errors.append(f"$name cannot be empty, got: '{user.name}'")
+    if user.age < 18:
+        errors.append(f"$age must be at least 18, got: {user.age}")
+
+    if errors:
+        raise ValueError("User validation failed:\n• " + "\n• ".join(errors))
+
+# Include units when relevant
+if timeout < 0.5:
+    raise ValueError(f"$timeout must be at least 0.5 seconds, got: {timeout}s")
+```
+
 # Testing Guidelines
 
 - Don't generate tests unless explicitly asked

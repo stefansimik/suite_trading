@@ -21,7 +21,7 @@ class Strategy:
         """
         # Validate that the strategy name doesn't have empty characters at the start and end
         if name != name.strip():
-            raise ValueError("Strategy name cannot have empty characters at the start or end")
+            raise ValueError(f"$name cannot have empty characters at the start or end, but provided value is: '{name}'")
 
         self.name = name
         self._trading_engine = None
@@ -69,7 +69,7 @@ class Strategy:
             bar_type (BarType): The type of bar to subscribe to.
         """
         if self._trading_engine is None:
-            raise RuntimeError("Strategy must be added to a TradingEngine before subscribing to bars")
+            raise RuntimeError(f"$strategy '{self.name}' must be added to a TradingEngine before subscribing to bars")
 
         # Create a standardized topic name for the bar type
         topic = TopicProtocol.create_bar_topic(bar_type)

@@ -43,18 +43,18 @@ class QuoteTick:
 
         # Ensure timestamp is timezone-aware
         if self.timestamp.tzinfo is None:
-            raise ValueError("timestamp must be timezone-aware")
+            raise ValueError(f"$timestamp must be timezone-aware, but provided value is: {self.timestamp}")
 
         # Validate volumes
         if self.bid_volume <= 0:
-            raise ValueError("bid_volume must be positive")
+            raise ValueError(f"$bid_volume must be positive, but provided value is: {self.bid_volume}")
         if self.ask_volume <= 0:
-            raise ValueError("ask_volume must be positive")
+            raise ValueError(f"$ask_volume must be positive, but provided value is: {self.ask_volume}")
 
         # Validate prices
         if self.bid_price <= 0:
-            raise ValueError("bid_price must be positive")
+            raise ValueError(f"$bid_price must be positive, but provided value is: {self.bid_price}")
         if self.ask_price <= 0:
-            raise ValueError("ask_price must be positive")
+            raise ValueError(f"$ask_price must be positive, but provided value is: {self.ask_price}")
         if self.bid_price >= self.ask_price:
-            raise ValueError("bid_price must be less than ask_price")
+            raise ValueError(f"$bid_price ({self.bid_price}) must be less than $ask_price ({self.ask_price})")

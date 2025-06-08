@@ -39,8 +39,8 @@ class TradeTick:
 
         # Ensure timestamp is timezone-aware
         if self.timestamp.tzinfo is None:
-            raise ValueError("timestamp must be timezone-aware")
+            raise ValueError(f"$timestamp must be timezone-aware, but provided value is: {self.timestamp}")
 
         # Validate volume
         if self.volume <= 0:
-            raise ValueError("volume must be positive")
+            raise ValueError(f"$volume must be positive, but provided value is: {self.volume}")

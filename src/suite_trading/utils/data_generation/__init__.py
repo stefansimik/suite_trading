@@ -1,13 +1,14 @@
 """Data generation utilities for creating realistic demo and test data."""
 
-from suite_trading.utils.data_generation.bars import create_bar_type, create_bar, create_bar_series
-from suite_trading.utils.data_generation.price_patterns import monotonic
+from suite_trading.utils.data_generation.bars import create_bar, create_bar_series
+from suite_trading.utils.data_generation.price_patterns import linear_function, sine_wave_function, zig_zag_function
 
 __all__ = [
     # Bar generation functions
-    "create_bar_type",
     "create_bar",
     "create_bar_series",
-    # Price pattern function
-    "monotonic",
+    # Price pattern function/s
+    "linear_function",
+    "sine_wave_function",
+    "zig_zag_function",
 ]

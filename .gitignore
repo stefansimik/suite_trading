@@ -5,6 +5,7 @@
 __pycache__/
 
 # Jupyter
+*.ipynb
 .virtual_documents/
 
 # Logs

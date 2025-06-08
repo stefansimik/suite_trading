@@ -23,24 +23,13 @@ def test_trading_engine_publish_bar():
     # Create a bar type
     bar_type = create_bar_type(value=5)
 
-    # Create a bar
+    # Create a bar using default implementation
     from datetime import datetime, timezone
-    from decimal import Decimal
 
-    # Create default prices
-    open_price = Decimal("1.1000")
-    high_price = Decimal("1.1100")
-    low_price = Decimal("1.0900")
-    close_price = Decimal("1.1050")
-
-    # Create a bar with the bar_type
+    # Create a bar with the bar_type using a fixed datetime
     bar = create_bar(
         bar_type=bar_type,
-        end_dt=datetime.now(timezone.utc),
-        open_price=open_price,
-        high_price=high_price,
-        low_price=low_price,
-        close_price=close_price,
+        end_dt=datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
     )
 
     # Create a flag to track if the callback was called

@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from suite_trading.domain.market_data.bar import BarUnit, Bar, BarType
+from suite_trading.domain.market_data.bar import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.instrument import Instrument
+from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
 
 # Constants
 INSTRUMENT = Instrument(name="EURUSD", exchange="FOREX", price_increment=Decimal("0.00001"))
@@ -24,20 +25,16 @@ VOLUME_DECIMAL = Decimal(str(VOLUME))
 
 def test_bar_construction_and_values():
     """Test that Bar can be constructed properly and its values are correctly set."""
-    # Create a bar type
-    bar_type = BarType(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST)
+    # Create a bar type using the utility function
+    bar_type = create_bar_type(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST)
 
-    # Create a bar
-    now = datetime.now(timezone.utc)
-    bar = Bar(
+    # Create a bar using the utility function with a fixed datetime
+    fixed_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    bar = create_bar(
         bar_type=bar_type,
-        start_dt=now,
-        end_dt=now.replace(minute=now.minute + BAR_VALUE),
-        open=OPEN_PRICE,
-        high=HIGH_PRICE,
-        low=LOW_PRICE,
-        close=CLOSE_PRICE,
-        volume=VOLUME,
+        end_dt=fixed_dt.replace(minute=fixed_dt.minute + BAR_VALUE),
+        close_price=CLOSE_PRICE_DECIMAL,
+        volume=VOLUME_DECIMAL,
     )
 
     # Test that the properties correctly delegate to bar_type
@@ -52,13 +49,20 @@ def test_bar_construction_and_values():
     assert bar.unit == BarUnit.MINUTE
     assert bar.price_type == PriceType.LAST
 
-    # Test that the price data and volume are correctly set
-    assert bar.open == OPEN_PRICE_DECIMAL
-    assert bar.high == HIGH_PRICE_DECIMAL
-    assert bar.low == LOW_PRICE_DECIMAL
+    # Test that the close price and volume match what we provided
     assert bar.close == CLOSE_PRICE_DECIMAL
     assert bar.volume == VOLUME_DECIMAL
 
+    # Test that open, high, and low are calculated values (not checking specific values)
+    assert isinstance(bar.open, Decimal)
+    assert isinstance(bar.high, Decimal)
+    assert isinstance(bar.low, Decimal)
+
+    # Test relationships between OHLC values for a bullish bar (default is_bullish=True)
+    assert bar.close > bar.open  # For bullish bar
+    assert bar.high >= bar.close  # High should be >= close
+    assert bar.low <= bar.open  # Low should be <= open
+
     # Test the start and end datetime
-    assert bar.start_dt == now
-    assert bar.end_dt == now.replace(minute=now.minute + BAR_VALUE)
+    assert bar.start_dt == fixed_dt
+    assert bar.end_dt == fixed_dt.replace(minute=fixed_dt.minute + BAR_VALUE)

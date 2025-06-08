@@ -35,11 +35,11 @@ class Instrument:
 
         # Validate increments
         if self.price_increment <= 0:
-            raise ValueError("price_increment must be positive")
+            raise ValueError(f"$price_increment must be positive, but provided value is: {self.price_increment}")
         if self.quantity_increment <= 0:
-            raise ValueError("quantity_increment must be positive")
+            raise ValueError(f"$quantity_increment must be positive, but provided value is: {self.quantity_increment}")
         if self.contract_value_multiplier <= 0:
-            raise ValueError("contract_value_multiplier must be positive")
+            raise ValueError(f"$contract_value_multiplier must be positive, but provided value is: {self.contract_value_multiplier}")
 
     def __str__(self) -> str:
         """Return a string representation of the instrument.

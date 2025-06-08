@@ -85,13 +85,13 @@ class Bar:
 
         # Ensure datetimes are timezone-aware
         if self.start_dt.tzinfo is None:
-            raise ValueError("start_dt must be timezone-aware")
+            raise ValueError(f"$start_dt must be timezone-aware, but provided value is: {self.start_dt}")
         if self.end_dt.tzinfo is None:
-            raise ValueError("end_dt must be timezone-aware")
+            raise ValueError(f"$end_dt must be timezone-aware, but provided value is: {self.end_dt}")
 
         # Ensure end_dt is after start_dt
         if self.end_dt <= self.start_dt:
-            raise ValueError("end_dt must be after start_dt")
+            raise ValueError(f"$end_dt ({self.end_dt}) must be after $start_dt ({self.start_dt})")
 
         # Validate negative price
         # No validation here, because prices can be occasionally negative - mostly commodities
@@ -99,8 +99,12 @@ class Bar:
 
         # Validate high price
         if self.high < self.open or self.high < self.low or self.high < self.close:
-            raise ValueError("High price must be greater than or equal to all other prices")
+            raise ValueError(
+                f"$high price ({self.high}) must be greater than or equal to all other prices: open={self.open}, low={self.low}, close={self.close}",
+            )
 
         # Validate low price
         if self.low > self.open or self.low > self.high or self.low > self.close:
-            raise ValueError("Low price must be less than or equal to all other prices")
+            raise ValueError(
+                f"$low price ({self.low}) must be less than or equal to all other prices: open={self.open}, high={self.high}, close={self.close}",
+            )

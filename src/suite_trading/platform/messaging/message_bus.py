@@ -56,7 +56,7 @@ class MessageBus:
         """
         # Check if topic is empty
         if not topic:
-            raise ValueError(f"Topic cannot be empty. | Got '{topic}'")
+            raise ValueError(f"$topic cannot be empty, but provided value is: '{topic}'")
 
         # Split topic by separator
         parts = topic.split(self.TOPIC_SEPARATOR)
@@ -65,15 +65,17 @@ class MessageBus:
         for part in parts:
             # Check if part is empty
             if not part:
-                raise ValueError(f"Topic parts cannot be empty (e.g., 'part1{self.TOPIC_SEPARATOR}{self.TOPIC_SEPARATOR}part2')")
+                raise ValueError(
+                    f"$topic parts cannot be empty, but found empty part in: '{topic}' (e.g., 'part1{self.TOPIC_SEPARATOR}{self.TOPIC_SEPARATOR}part2')",
+                )
 
             # Check if part contains only allowed characters
             if not re.match(r"^[a-zA-Z0-9*@\-_#]+$", part):
-                raise ValueError(f"Topic part '{part}' contains invalid characters. Only letters, numbers, '*', '@', '-', '_', '#' are allowed")
+                raise ValueError(f"$topic part '{part}' contains invalid characters. Only letters, numbers, '*', '@', '-', '_', '#' are allowed")
 
         # Check if topic is lowercase and raise an error if it's not
         if topic.lower() != topic:
-            raise ValueError(f"Topic must be lowercase. Got '{topic}'")
+            raise ValueError(f"$topic must be lowercase, but provided value is: '{topic}'")
 
         return True
 

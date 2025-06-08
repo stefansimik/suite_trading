@@ -13,14 +13,17 @@ dependencies = [
     "pandas>=2.3.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pre-commit==4.2.0",
-    "pytest==8.3.5",
+    "pytest==8.4.0",
     "jupyterlab>=4.4.3",
+    "jupytext==1.17.2",
     "plotly>=6.1.2",
-
 ]
+
+[tool.uv]
+default-groups = "all"
 
 # Configuration for Pytest
 [tool.pytest.ini_options]
@@ -35,3 +38,6 @@ line-length = 150
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.jupytext]
+formats = "ipynb,py:percent"

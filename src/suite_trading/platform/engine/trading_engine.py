@@ -61,7 +61,7 @@ class TradingEngine:
         for existing_strategy in self.strategies:
             if existing_strategy.name == strategy.name:
                 raise ValueError(
-                    f"Strategy cannot be added, because it does not have unique name. Strategy with name '{strategy.name}' already exists and another one with same name cannot be added again.",
+                    f"$strategy cannot be added, because it does not have unique name. Strategy with $name '{strategy.name}' already exists and another one with same name cannot be added again.",
                 )
 
         # Set the trading engine reference in the strategy
