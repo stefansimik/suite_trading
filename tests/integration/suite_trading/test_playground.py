@@ -1,6 +1,6 @@
 from suite_trading import Strategy, TradingEngine
 from suite_trading.domain.market_data.bar import BarUnit
-from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
+from suite_trading.utils.data_generation import create_bar_type, create_bar_series, DEFAULT_FIRST_BAR
 
 
 class DemoStrategy(Strategy):
@@ -14,25 +14,21 @@ def test_basic_flow():
     # Create a trading engine
     engine: TradingEngine = TradingEngine()
 
-    # Create + add strategy
+    # Add strategy
     strategy: Strategy = DemoStrategy("DemoStrategy01")
     engine.add_strategy(strategy)
 
     # Start trading engine
     engine.start()
 
-    # Publish bar
-    from datetime import datetime, timezone
-
-    # Create a bar type
-    bar_type = create_bar_type(value=5, unit=BarUnit.MINUTE)
-
-    # Create a bar using default implementation with a fixed datetime
-    bar = create_bar(
-        bar_type=bar_type,
-        end_dt=datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-    )
-    engine.publish_bar(bar)
+    # Feed bars to the engine
+    bars = create_bar_series(first_bar=DEFAULT_FIRST_BAR, num_bars=20)
+    for bar in bars:
+        engine.publish_bar(bar)
 
     # Stop trading engine
     engine.stop()
+
+
+if __name__ == "__main__":
+    test_basic_flow()

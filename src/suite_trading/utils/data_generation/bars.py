@@ -7,7 +7,7 @@ from typing import List, Callable
 from suite_trading.domain.market_data.bar import Bar, BarType, BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.instrument import Instrument
-from suite_trading.utils.data_generation.price_patterns import linear_function
+from suite_trading.utils.data_generation.price_patterns import zig_zag_function
 from suite_trading.utils.math import round_to_increment
 
 # DEFAULT VALUES, THAT ARE USED FOR GENERATION OF DEMO BARS
@@ -124,7 +124,7 @@ DEFAULT_FIRST_BAR = create_bar(is_bullish=True)
 def create_bar_series(
     first_bar: Bar = DEFAULT_FIRST_BAR,
     num_bars: int = 20,
-    price_pattern_func: Callable = linear_function,
+    price_pattern_func: Callable = zig_zag_function,
 ) -> List[Bar]:
     """
     Generate a series of bars with a specified price pattern.
