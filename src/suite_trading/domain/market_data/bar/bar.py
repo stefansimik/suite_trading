@@ -13,6 +13,13 @@ from suite_trading.domain.market_data.price_type import PriceType
 class Bar:
     """Represents a time period in financial markets with OHLC price data and optional volume.
 
+    Time Interval Convention:
+        Bars use LEFT-CLOSED, RIGHT-CLOSED intervals [start_dt, end_dt], meaning both the start
+        and end timestamps are included in the bar period. For example, a 5-minute bar ending
+        at 15:35:00 covers the period [15:30:00, 15:35:00], including both boundary timestamps.
+
+        For detailed explanation of why this convention is used, see: docs/bar-time-intervals.md
+
     Attributes:
         bar_type (BarType): Contains instrument, period, and price type information.
         start_dt (datetime): The datetime representing the start of the bar period (timezone-aware).

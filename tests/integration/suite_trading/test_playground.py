@@ -6,8 +6,11 @@ from suite_trading.utils.data_generation import create_bar_type, create_bar_seri
 class DemoStrategy(Strategy):
     def on_start(self):
         # Using the demo data module to create a bar type
-        eurusd_1min_bars_type = create_bar_type(value=5, unit=BarUnit.MINUTE)
+        eurusd_1min_bars_type = create_bar_type(value=1, unit=BarUnit.MINUTE)
         self.subscribe_bars(eurusd_1min_bars_type)
+
+    def on_bar(self, bar):
+        pass
 
 
 def test_basic_flow():
