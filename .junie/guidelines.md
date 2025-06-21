@@ -27,6 +27,28 @@ We are building a modern algorithmic trading framework in Python that allows:
 - Include purpose, parameters, return values, and exceptions in function docstrings
 - Include type information for all parameters, return values, and attributes in docstrings
 
+## Comment Formatting
+
+- Use consistent indentation for inline comments
+- Always use exactly 2 spaces before the `#` symbol for inline comments
+- Align all inline comments in the same code block consistently
+
+### Examples
+
+```python
+# ✅ Good - consistent 2-space indentation
+MARKET = "MARKET"  # Execute immediately at best available price
+LIMIT = "LIMIT"  # Execute only at specified price or better
+STOP = "STOP"  # Market order triggered when stop price is reached
+STOP_LIMIT = "STOP_LIMIT"  # Limit order triggered when stop price is reached
+
+# ❌ Bad - inconsistent indentation
+MARKET = "MARKET"        # Execute immediately at best available price
+LIMIT = "LIMIT"          # Execute only at specified price or better
+STOP = "STOP"            # Market order triggered when stop price is reached
+STOP_LIMIT = "STOP_LIMIT" # Limit order triggered when stop price is reached
+```
+
 ## Exception Message Formatting
 
 - Prefix variables with $ to distinguish them from normal text
