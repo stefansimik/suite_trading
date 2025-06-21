@@ -1,6 +1,7 @@
-from suite_trading import Strategy, TradingEngine
-from suite_trading.domain.market_data.bar import BarUnit
-from suite_trading.utils.data_generation import create_bar_type, create_bar_series, DEFAULT_FIRST_BAR
+from suite_trading.strategy.base import Strategy
+from suite_trading.platform.engine.trading_engine import TradingEngine
+from suite_trading.domain.market_data.bar.bar_unit import BarUnit
+from suite_trading.utils.data_generation.bars import create_bar_type, create_bar_series, DEFAULT_FIRST_BAR
 
 
 class DemoStrategy(Strategy):

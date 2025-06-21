@@ -1,4 +1,5 @@
-from suite_trading.domain.market_data.bar import Bar, BarType
+from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.tick.trade_tick import TradeTick
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.domain.instrument import Instrument

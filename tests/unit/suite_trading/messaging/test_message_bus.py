@@ -1,5 +1,5 @@
 import pytest
-from suite_trading import MessageBus
+from suite_trading.platform.messaging.message_bus import MessageBus
 
 
 def test_subscribe_and_publish():

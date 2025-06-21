@@ -87,6 +87,42 @@ if timeout < 0.5:
     raise ValueError(f"$timeout must be at least 0.5 seconds, got: {timeout}s")
 ```
 
+## Import and Package Structure
+
+### No Re-exports Rule
+
+- **Never use re-exports in `__init__.py` files**
+- Each class/function should be imported directly from its source module
+- `__init__.py` files should contain only docstrings explaining the package purpose
+- This eliminates import ambiguity and ensures consistent import patterns across the codebase
+
+#### Benefits
+- **Zero Ambiguity**: Exactly one way to import each class
+- **No Decision Paralysis**: Users don't choose between multiple import paths
+- **Consistent Codebases**: All developers use the same import patterns
+- **Zero Maintenance**: No need to maintain `__all__` lists or coordinate exports
+- **Clear Dependencies**: Import statements clearly show where each class comes from
+- **IDE Friendly**: Auto-completion and "Go to Definition" work perfectly
+
+#### Examples
+
+```python
+# ✅ Good - direct imports from source modules
+from suite_trading.platform.engine.trading_engine import TradingEngine
+from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.order.order_enums import OrderSide
+
+# ❌ Bad - re-exports (not allowed)
+from suite_trading import TradingEngine  # Would require re-export
+from suite_trading.domain import Bar     # Would require re-export
+```
+
+#### Package Structure
+- `__init__.py` files contain only:
+  - Package docstring explaining the package purpose
+  - Version information (only in root `__init__.py`)
+  - No imports, no `__all__` lists, no re-exports
+
 # Testing Guidelines
 
 - Don't generate tests unless explicitly asked

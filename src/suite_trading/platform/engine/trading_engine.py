@@ -2,7 +2,7 @@ import logging
 from suite_trading.strategy.base import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_protocol import TopicProtocol
-from suite_trading.domain.market_data.bar import Bar
+from suite_trading.domain.market_data.bar.bar import Bar
 
 logger = logging.getLogger(__name__)
 

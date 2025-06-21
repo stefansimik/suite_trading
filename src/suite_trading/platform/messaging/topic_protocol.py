@@ -1,4 +1,4 @@
-from suite_trading.domain.market_data.bar import BarType
+from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.platform.messaging.message_bus import MessageBus
 
 

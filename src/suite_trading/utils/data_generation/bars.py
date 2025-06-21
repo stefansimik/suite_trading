@@ -4,7 +4,9 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import List, Callable
 
-from suite_trading.domain.market_data.bar import Bar, BarType, BarUnit
+from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.market_data.bar.bar_type import BarType
+from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.data_generation.price_patterns import zig_zag_function

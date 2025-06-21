@@ -14,7 +14,7 @@
 
 import sys
 import os
-from suite_trading.utils.data_generation import linear_function, sine_wave_function, zig_zag_function
+from suite_trading.utils.data_generation.price_patterns import linear_function, sine_wave_function, zig_zag_function
 import plotly.graph_objects as go
 
 # %%
