@@ -32,14 +32,13 @@ We are building a modern algorithmic trading framework in Python that allows:
 - Use consistent indentation for inline comments
 - Always use exactly 2 spaces before the `#` symbol for inline comments
 - Align all inline comments in the same code block consistently
+- Use sentence case for section comments (not title case)
 
 ### Example
-
 ```python
-MARKET = "MARKET"  # Execute immediately at best available price
-LIMIT = "LIMIT"  # Execute only at specified price or better
-STOP = "STOP"  # Market order triggered when stop price is reached
-STOP_LIMIT = "STOP_LIMIT"  # Limit order triggered when stop price is reached
+# Order identification  # ← sentence case for sections
+order_id: str  # Unique identifier for the order
+side: OrderDirection  # Whether this is a BUY or SELL order
 ```
 
 ## Exception Message Formatting
