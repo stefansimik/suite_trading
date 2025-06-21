@@ -24,7 +24,8 @@ class StateMachine:
     """A simple, elegant state machine implementation.
 
     This state machine accepts state transition definitions as a dictionary
-    and manages the current state based on actions received.
+    and manages the current state based on actions received. It also provides
+    functionality to check if the current state is terminal (has no outgoing transitions).
 
     Example:
         ```python
@@ -50,6 +51,9 @@ class StateMachine:
         # Create and use the state machine
         sm = StateMachine(OrderState.PENDING, transitions)
         sm.execute_action(OrderAction.SUBMIT)  # State becomes SUBMITTED
+
+        # Check if in terminal state
+        print(sm.is_in_terminal_state())  # False - SUBMITTED has outgoing transitions
         ```
     """
 
@@ -120,6 +124,17 @@ class StateMachine:
 
         self._current_state = self._transitions[key]
         return self._current_state
+
+    def is_in_terminal_state(self) -> bool:
+        """Check if the state machine is currently in a terminal state.
+
+        A terminal state is one from which no actions can be executed,
+        meaning there are no transitions defined starting from that state.
+
+        Returns:
+            bool: True if the current state is terminal, False otherwise.
+        """
+        return len(self.get_valid_actions()) == 0
 
     def reset(self, new_state: State):
         """Reset the state machine to a specific state.
