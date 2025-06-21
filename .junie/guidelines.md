@@ -33,20 +33,13 @@ We are building a modern algorithmic trading framework in Python that allows:
 - Always use exactly 2 spaces before the `#` symbol for inline comments
 - Align all inline comments in the same code block consistently
 
-### Examples
+### Example
 
 ```python
-# ✅ Good - consistent 2-space indentation
 MARKET = "MARKET"  # Execute immediately at best available price
 LIMIT = "LIMIT"  # Execute only at specified price or better
 STOP = "STOP"  # Market order triggered when stop price is reached
 STOP_LIMIT = "STOP_LIMIT"  # Limit order triggered when stop price is reached
-
-# ❌ Bad - inconsistent indentation
-MARKET = "MARKET"        # Execute immediately at best available price
-LIMIT = "LIMIT"          # Execute only at specified price or better
-STOP = "STOP"            # Market order triggered when stop price is reached
-STOP_LIMIT = "STOP_LIMIT" # Limit order triggered when stop price is reached
 ```
 
 ## Exception Message Formatting
@@ -67,10 +60,6 @@ if count <= 1:
 if start_date >= end_date:
     raise ValueError(f"$start_date ({start_date}) must be earlier than $end_date ({end_date})")
 
-# Provide guidance on how to fix when relevant
-if api_key is None or len(api_key) < 10:
-    raise ValueError(f"$api_key is invalid: '{api_key}'. Must be at least 10 characters. Get a valid key from the dashboard.")
-
 # For multiple issues, use bullet points
 def validate_user(user):
     errors = []
@@ -78,13 +67,8 @@ def validate_user(user):
         errors.append(f"$name cannot be empty, got: '{user.name}'")
     if user.age < 18:
         errors.append(f"$age must be at least 18, got: {user.age}")
-
     if errors:
         raise ValueError("User validation failed:\n• " + "\n• ".join(errors))
-
-# Include units when relevant
-if timeout < 0.5:
-    raise ValueError(f"$timeout must be at least 0.5 seconds, got: {timeout}s")
 ```
 
 ## Import and Package Structure
@@ -98,11 +82,10 @@ if timeout < 0.5:
 
 #### Benefits
 - **Zero Ambiguity**: Exactly one way to import each class
-- **No Decision Paralysis**: Users don't choose between multiple import paths
-- **Consistent Codebases**: All developers use the same import patterns
-- **Zero Maintenance**: No need to maintain `__all__` lists or coordinate exports
 - **Clear Dependencies**: Import statements clearly show where each class comes from
+- **Zero Maintenance**: No need to maintain `__all__` lists or coordinate exports
 - **IDE Friendly**: Auto-completion and "Go to Definition" work perfectly
+
 
 #### Examples
 
