@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.domain.order.order_enums import OrderDirection, TimeInForce
+from suite_trading.domain.order.order_enums import OrderSide, TimeInForce
 from suite_trading.domain.order.order_state import OrderState, OrderAction, create_order_state_machine
 from suite_trading.utils.id_generator import get_next_id
 from suite_trading.utils.state_machine import StateMachine
@@ -20,7 +20,7 @@ class Order:
     def __init__(
         self,
         instrument: Instrument,
-        side: OrderDirection,
+        side: OrderSide,
         quantity: Decimal,
         order_id: int = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
@@ -29,7 +29,7 @@ class Order:
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            side (OrderDirection): Whether this is a BUY or SELL order.
+            side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
@@ -64,11 +64,11 @@ class Order:
 
     @property
     def is_buy(self) -> bool:
-        return self.side == OrderDirection.BUY
+        return self.side == OrderSide.BUY
 
     @property
     def is_sell(self) -> bool:
-        return self.side == OrderDirection.SELL
+        return self.side == OrderSide.SELL
 
     @property
     def state(self) -> OrderState:
@@ -144,7 +144,7 @@ class MarketOrder(Order):
     def __init__(
         self,
         instrument: Instrument,
-        side: OrderDirection,
+        side: OrderSide,
         quantity: Decimal,
         order_id: int = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
@@ -153,7 +153,7 @@ class MarketOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            side (OrderDirection): Whether this is a BUY or SELL order.
+            side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
@@ -171,7 +171,7 @@ class LimitOrder(Order):
     def __init__(
         self,
         instrument: Instrument,
-        side: OrderDirection,
+        side: OrderSide,
         quantity: Decimal,
         limit_price: Decimal,
         order_id: int = None,
@@ -181,7 +181,7 @@ class LimitOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            side (OrderDirection): Whether this is a BUY or SELL order.
+            side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             limit_price (Decimal): The limit price for the order.
             order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
@@ -217,7 +217,7 @@ class StopOrder(Order):
     def __init__(
         self,
         instrument: Instrument,
-        side: OrderDirection,
+        side: OrderSide,
         quantity: Decimal,
         stop_price: Decimal,
         order_id: int = None,
@@ -227,7 +227,7 @@ class StopOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            side (OrderDirection): Whether this is a BUY or SELL order.
+            side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             stop_price (Decimal): The stop price for the order.
             order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
@@ -263,7 +263,7 @@ class StopLimitOrder(Order):
     def __init__(
         self,
         instrument: Instrument,
-        side: OrderDirection,
+        side: OrderSide,
         quantity: Decimal,
         stop_price: Decimal,
         limit_price: Decimal,
@@ -274,7 +274,7 @@ class StopLimitOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            side (OrderDirection): Whether this is a BUY or SELL order.
+            side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             stop_price (Decimal): The stop price that triggers the order.
             limit_price (Decimal): The limit price for the order once triggered.

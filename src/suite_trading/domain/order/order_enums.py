@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class OrderDirection(Enum):
+class OrderSide(Enum):
     """Represents the side/direction of an order."""
 
     BUY = "BUY"
