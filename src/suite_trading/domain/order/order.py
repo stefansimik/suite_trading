@@ -1,16 +1,12 @@
-from dataclasses import dataclass, field
 from decimal import Decimal
-from datetime import datetime
-from typing import Optional
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderDirection, TimeInForce
 from suite_trading.domain.order.order_state import OrderState, OrderAction, create_order_state_machine
-from suite_trading.utils.state_machine import StateMachine
 from suite_trading.utils.id_generator import get_next_id
+from suite_trading.utils.state_machine import StateMachine
 
 
-@dataclass
 class Order:
     """Base class for all trading orders.
 
@@ -21,20 +17,41 @@ class Order:
         state (OrderState): Current state of the order from the internal state machine.
     """
 
-    # Trading details
-    instrument: Instrument  # The financial instrument to trade
-    side: OrderDirection  # Whether this is a BUY or SELL order
-    quantity: Decimal  # The quantity to trade
+    def __init__(
+        self,
+        instrument: Instrument,
+        side: OrderDirection,
+        quantity: Decimal,
+        order_id: int = None,
+        time_in_force: TimeInForce = TimeInForce.GTC,
+    ):
+        """Initialize a new Order.
 
-    # Fields with defaults (must come after fields without defaults)
-    order_id: int = field(default_factory=get_next_id)  # Unique identifier for the order
-    time_in_force: TimeInForce = TimeInForce.GTC  # How long the order remains active
-    filled_quantity: Decimal = Decimal("0")  # How much has been filled so far
-    average_fill_price: Optional[Decimal] = None  # Average price of fills
-    created_time: Optional[datetime] = None  # When the order was created
+        Args:
+            instrument (Instrument): The financial instrument to trade.
+            side (OrderDirection): Whether this is a BUY or SELL order.
+            quantity (Decimal): The quantity to trade.
+            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+        """
+        # Order identification
+        self.order_id = order_id if order_id is not None else get_next_id()
 
-    # Internal state
-    _state_machine: StateMachine = field(init=False)  # Internal state machine for order lifecycle
+        # Trading details
+        self.instrument = instrument
+        self.side = side
+        self.quantity = quantity
+
+        # Execution details
+        self.time_in_force = time_in_force
+        self.filled_quantity = Decimal("0")  # Always initialize to 0 for new orders
+        self.average_fill_price = None  # Always initialize to None for new orders
+
+        # Internal state
+        self._state_machine: StateMachine = create_order_state_machine()
+
+        # Validation
+        self._validate()
 
     @property
     def unfilled_quantity(self) -> Decimal:
@@ -62,27 +79,24 @@ class Order:
         """
         return self._state_machine.current_state
 
-    def transition(self, action: OrderAction) -> None:
-        """Transition order to new state based on action.
+    def change_state(self, action: OrderAction) -> None:
+        """Change order state based on action.
 
         Args:
             action (OrderAction): The action to perform on the order.
 
         Raises:
-            ValueError: If the transition is not valid for the current state.
+            ValueError: If the state change is not valid for the current state.
         """
         # Execute action on the state machine - state is now managed by the property
         self._state_machine.execute_action(action)
 
-    def __post_init__(self) -> None:
-        """Validate the order data after initialization.
+    def _validate(self) -> None:
+        """Validate the order data.
 
         Raises:
             ValueError: If order data is invalid.
         """
-        # Initialize state machine for this order instance
-        self._state_machine = create_order_state_machine()
-
         # Validate quantity
         if self.quantity <= 0:
             raise ValueError(f"$quantity must be positive, but provided value is: {self.quantity}")
@@ -94,8 +108,32 @@ class Order:
         if self.filled_quantity > self.quantity:
             raise ValueError(f"$filled_quantity ({self.filled_quantity}) cannot exceed $quantity ({self.quantity})")
 
+    def __repr__(self) -> str:
+        """Return a string representation of the order.
 
-@dataclass
+        Returns:
+            str: String representation of the order.
+        """
+        return (
+            f"{self.__class__.__name__}(order_id={self.order_id}, "
+            f"instrument={self.instrument}, side={self.side}, "
+            f"quantity={self.quantity}, state={self.state})"
+        )
+
+    def __eq__(self, other) -> bool:
+        """Check equality with another order.
+
+        Args:
+            other: The other object to compare with.
+
+        Returns:
+            bool: True if orders are equal, False otherwise.
+        """
+        if not isinstance(other, Order):
+            return False
+        return self.order_id == other.order_id
+
+
 class MarketOrder(Order):
     """Market order that executes immediately at the current market price.
 
@@ -103,12 +141,26 @@ class MarketOrder(Order):
     as quickly as possible at the best available price.
     """
 
-    def __post_init__(self) -> None:
-        """Initialize and validate the market order."""
-        super().__post_init__()
+    def __init__(
+        self,
+        instrument: Instrument,
+        side: OrderDirection,
+        quantity: Decimal,
+        order_id: int = None,
+        time_in_force: TimeInForce = TimeInForce.GTC,
+    ):
+        """Initialize a new MarketOrder.
+
+        Args:
+            instrument (Instrument): The financial instrument to trade.
+            side (OrderDirection): Whether this is a BUY or SELL order.
+            quantity (Decimal): The quantity to trade.
+            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+        """
+        super().__init__(instrument, side, quantity, order_id, time_in_force)
 
 
-@dataclass
 class LimitOrder(Order):
     """Limit order that executes only at a specified price or better.
 
@@ -116,18 +168,45 @@ class LimitOrder(Order):
     price reaches the specified limit price or better.
     """
 
-    limit_price: Decimal = field(kw_only=True)  # The limit price for the order
+    def __init__(
+        self,
+        instrument: Instrument,
+        side: OrderDirection,
+        quantity: Decimal,
+        limit_price: Decimal,
+        order_id: int = None,
+        time_in_force: TimeInForce = TimeInForce.GTC,
+    ):
+        """Initialize a new LimitOrder.
 
-    def __post_init__(self) -> None:
-        """Initialize and validate the limit order."""
-        super().__post_init__()
+        Args:
+            instrument (Instrument): The financial instrument to trade.
+            side (OrderDirection): Whether this is a BUY or SELL order.
+            quantity (Decimal): The quantity to trade.
+            limit_price (Decimal): The limit price for the order.
+            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+        """
+        # Set limit price before calling parent constructor
+        self.limit_price = limit_price
+
+        # Call parent constructor
+        super().__init__(instrument, side, quantity, order_id, time_in_force)
+
+    def _validate(self) -> None:
+        """Validate the limit order data.
+
+        Raises:
+            ValueError: If order data is invalid.
+        """
+        # Call parent validation first
+        super()._validate()
 
         # Validate limit_price is positive
         if self.limit_price <= 0:
             raise ValueError(f"$limit_price must be positive, but provided value is: {self.limit_price}")
 
 
-@dataclass
 class StopOrder(Order):
     """Stop order that becomes a market order when the stop price is reached.
 
@@ -135,18 +214,45 @@ class StopOrder(Order):
     when the market price reaches the specified stop price.
     """
 
-    stop_price: Decimal = field(kw_only=True)  # The stop price for the order
+    def __init__(
+        self,
+        instrument: Instrument,
+        side: OrderDirection,
+        quantity: Decimal,
+        stop_price: Decimal,
+        order_id: int = None,
+        time_in_force: TimeInForce = TimeInForce.GTC,
+    ):
+        """Initialize a new StopOrder.
 
-    def __post_init__(self) -> None:
-        """Initialize and validate the stop order."""
-        super().__post_init__()
+        Args:
+            instrument (Instrument): The financial instrument to trade.
+            side (OrderDirection): Whether this is a BUY or SELL order.
+            quantity (Decimal): The quantity to trade.
+            stop_price (Decimal): The stop price for the order.
+            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+        """
+        # Set stop price before calling parent constructor
+        self.stop_price = stop_price
+
+        # Call parent constructor
+        super().__init__(instrument, side, quantity, order_id, time_in_force)
+
+    def _validate(self) -> None:
+        """Validate the stop order data.
+
+        Raises:
+            ValueError: If order data is invalid.
+        """
+        # Call parent validation first
+        super()._validate()
 
         # Validate stop_price is positive
         if self.stop_price <= 0:
             raise ValueError(f"$stop_price must be positive, but provided value is: {self.stop_price}")
 
 
-@dataclass
 class StopLimitOrder(Order):
     """Stop-limit order that becomes a limit order when the stop price is reached.
 
@@ -154,12 +260,42 @@ class StopLimitOrder(Order):
     price reaches the stop price, the order becomes a limit order at the limit price.
     """
 
-    stop_price: Decimal = field(kw_only=True)  # The stop price that triggers the order
-    limit_price: Decimal = field(kw_only=True)  # The limit price for the order once triggered
+    def __init__(
+        self,
+        instrument: Instrument,
+        side: OrderDirection,
+        quantity: Decimal,
+        stop_price: Decimal,
+        limit_price: Decimal,
+        order_id: int = None,
+        time_in_force: TimeInForce = TimeInForce.GTC,
+    ):
+        """Initialize a new StopLimitOrder.
 
-    def __post_init__(self) -> None:
-        """Initialize and validate the stop-limit order."""
-        super().__post_init__()
+        Args:
+            instrument (Instrument): The financial instrument to trade.
+            side (OrderDirection): Whether this is a BUY or SELL order.
+            quantity (Decimal): The quantity to trade.
+            stop_price (Decimal): The stop price that triggers the order.
+            limit_price (Decimal): The limit price for the order once triggered.
+            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+        """
+        # Set prices before calling parent constructor
+        self.stop_price = stop_price
+        self.limit_price = limit_price
+
+        # Call parent constructor
+        super().__init__(instrument, side, quantity, order_id, time_in_force)
+
+    def _validate(self) -> None:
+        """Validate the stop-limit order data.
+
+        Raises:
+            ValueError: If order data is invalid.
+        """
+        # Call parent validation first
+        super()._validate()
 
         # Validate both prices are positive
         if self.stop_price <= 0:

@@ -20,6 +20,27 @@ We are building a modern algorithmic trading framework in Python that allows:
 
 - Always use `ClassVar` from `typing` module to explicitly mark class variables in dataclasses
 
+### When to Prefer Normal Classes Over Dataclasses
+
+**Use normal classes instead of dataclasses when:**
+
+- **Logical attribute ordering matters more than technical constraints**
+  - When primary identifiers (like `order_id`) should logically come first but have default values
+  - When you need to group related attributes together regardless of their default status
+  - When dataclass field ordering rules force unnatural domain ordering
+
+- **Complex domain models require flexibility**
+  - Core business objects that need sophisticated initialization logic
+  - Classes with inheritance hierarchies where constructor flexibility matters
+  - When validation logic is complex and benefits from explicit constructor control
+
+**Keep dataclasses for:**
+- Simple data containers with natural field ordering
+- Immutable value objects (with `frozen=True`)
+- Market data structures where technical ordering aligns with logical ordering
+
+**Decision rule:** If natural domain ordering conflicts with dataclass field rules → Use normal classes
+
 ## Documentation
 
 - Use Google documentation style for all docstrings
@@ -39,6 +60,30 @@ We are building a modern algorithmic trading framework in Python that allows:
 # Order identification  # ← sentence case for sections
 order_id: str  # Unique identifier for the order
 side: OrderDirection  # Whether this is a BUY or SELL order
+```
+
+## Parameter Formatting
+
+- When functions have many parameters, put each parameter on a separate line for better readability
+- This applies to function definitions, method definitions, and class constructors
+- Maintain consistent indentation for all parameters
+
+### Examples
+
+```python
+# ❌ Wrong - multiple parameters on same line
+def __init__(self, instrument: Instrument, side: OrderDirection, quantity: Decimal,
+             order_id: int = None, time_in_force: TimeInForce = TimeInForce.GTC,
+             filled_quantity: Decimal = Decimal("0")):
+
+# ✅ Good - each parameter on separate line
+def __init__(self,
+             instrument: Instrument,
+             side: OrderDirection,
+             quantity: Decimal,
+             order_id: int = None,
+             time_in_force: TimeInForce = TimeInForce.GTC,
+             filled_quantity: Decimal = Decimal("0")):
 ```
 
 ## Exception Message Formatting
