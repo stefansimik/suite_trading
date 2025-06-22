@@ -2,13 +2,12 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from datetime import datetime
 from typing import Optional
-import random
-import time
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderDirection, TimeInForce
 from suite_trading.domain.order.order_state import OrderState, OrderAction, create_order_state_machine
 from suite_trading.utils.state_machine import StateMachine
+from suite_trading.utils.id_generator import get_next_id
 
 
 @dataclass
@@ -28,7 +27,7 @@ class Order:
     quantity: Decimal  # The quantity to trade
 
     # Fields with defaults (must come after fields without defaults)
-    order_id: int = field(default_factory=lambda: int(time.time_ns()) + random.randint(1, 999999))  # Unique random identifier for the order
+    order_id: int = field(default_factory=get_next_id)  # Unique identifier for the order
     time_in_force: TimeInForce = TimeInForce.GTC  # How long the order remains active
     filled_quantity: Decimal = Decimal("0")  # How much has been filled so far
     average_fill_price: Optional[Decimal] = None  # Average price of fills
