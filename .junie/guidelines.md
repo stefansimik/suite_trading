@@ -14,6 +14,29 @@ We are building a modern algorithmic trading framework in Python that allows:
 - **Intuitive Domain Model**: Create a simple, understandable domain model
 - **Broker Agnostic**: Framework should be broker agnostic where possible
 
+## User-Centric Design Principle
+
+**APIs should be designed for the user, not for internal implementation convenience.**
+
+This principle guides decisions when there's tension between internal code simplicity and external API usability. While KISS and YAGNI promote simplicity, this principle ensures that simplicity doesn't come at the cost of user experience.
+
+Example:
+**Domain Model Alignment**: The API should match how users think about the domain
+  - `execution.side` feels natural vs. `execution.order.side` feels awkward
+  - Users conceptually think "executions have a side" not "executions' orders have a side"
+
+### Decision Framework
+
+When facing API design choices:
+
+1. **Identify the user mental model** - How do users think about this concept?
+2. **Assess implementation cost** - Is the user-friendly approach expensive?
+3. **Consider consistency** - Does this pattern fit with existing APIs?
+4. **Evaluate maintenance** - Will this create ongoing complexity?
+5. **Balance principles** - How does this interact with KISS/YAGNI/DRY?
+
+**Rule of thumb:** If the cost is low and the user benefit is clear, favor the user-centric approach.
+
 # Coding Standards
 
 ## Dataclasses

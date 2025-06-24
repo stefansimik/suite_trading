@@ -22,7 +22,7 @@ class Order:
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        order_id: int = None,
+        id: int = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new Order.
@@ -31,11 +31,11 @@ class Order:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
-            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Order identification
-        self.order_id = order_id if order_id is not None else get_next_id()
+        self.id = id if id is not None else get_next_id()
 
         # Trading details
         self.instrument = instrument
@@ -64,10 +64,20 @@ class Order:
 
     @property
     def is_buy(self) -> bool:
+        """Check if this is a buy order.
+
+        Returns:
+            bool: True if this is a buy order.
+        """
         return self.side == OrderSide.BUY
 
     @property
     def is_sell(self) -> bool:
+        """Check if this is a sell order.
+
+        Returns:
+            bool: True if this is a sell order.
+        """
         return self.side == OrderSide.SELL
 
     @property
@@ -115,9 +125,7 @@ class Order:
             str: String representation of the order.
         """
         return (
-            f"{self.__class__.__name__}(order_id={self.order_id}, "
-            f"instrument={self.instrument}, side={self.side}, "
-            f"quantity={self.quantity}, state={self.state})"
+            f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
         )
 
     def __eq__(self, other) -> bool:
@@ -131,7 +139,7 @@ class Order:
         """
         if not isinstance(other, Order):
             return False
-        return self.order_id == other.order_id
+        return self.id == other.id
 
 
 class MarketOrder(Order):
@@ -146,7 +154,7 @@ class MarketOrder(Order):
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        order_id: int = None,
+        id: int = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new MarketOrder.
@@ -155,10 +163,10 @@ class MarketOrder(Order):
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
-            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
-        super().__init__(instrument, side, quantity, order_id, time_in_force)
+        super().__init__(instrument, side, quantity, id, time_in_force)
 
 
 class LimitOrder(Order):
@@ -174,7 +182,7 @@ class LimitOrder(Order):
         side: OrderSide,
         quantity: Decimal,
         limit_price: Decimal,
-        order_id: int = None,
+        id: int = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new LimitOrder.
@@ -184,14 +192,14 @@ class LimitOrder(Order):
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             limit_price (Decimal): The limit price for the order.
-            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set limit price before calling parent constructor
         self.limit_price = limit_price
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, order_id, time_in_force)
+        super().__init__(instrument, side, quantity, id, time_in_force)
 
     def _validate(self) -> None:
         """Validate the limit order data.
@@ -220,7 +228,7 @@ class StopOrder(Order):
         side: OrderSide,
         quantity: Decimal,
         stop_price: Decimal,
-        order_id: int = None,
+        id: int = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new StopOrder.
@@ -230,14 +238,14 @@ class StopOrder(Order):
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             stop_price (Decimal): The stop price for the order.
-            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set stop price before calling parent constructor
         self.stop_price = stop_price
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, order_id, time_in_force)
+        super().__init__(instrument, side, quantity, id, time_in_force)
 
     def _validate(self) -> None:
         """Validate the stop order data.
@@ -267,7 +275,7 @@ class StopLimitOrder(Order):
         quantity: Decimal,
         stop_price: Decimal,
         limit_price: Decimal,
-        order_id: int = None,
+        id: int = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new StopLimitOrder.
@@ -278,7 +286,7 @@ class StopLimitOrder(Order):
             quantity (Decimal): The quantity to trade.
             stop_price (Decimal): The stop price that triggers the order.
             limit_price (Decimal): The limit price for the order once triggered.
-            order_id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set prices before calling parent constructor
@@ -286,7 +294,7 @@ class StopLimitOrder(Order):
         self.limit_price = limit_price
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, order_id, time_in_force)
+        super().__init__(instrument, side, quantity, id, time_in_force)
 
     def _validate(self) -> None:
         """Validate the stop-limit order data.
