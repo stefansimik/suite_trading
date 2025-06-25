@@ -188,6 +188,11 @@ class Order:
         executions (List[Execution]): List of executions for this order, in chronological order.
 
     Properties:
+        id (str): Unique identifier for the order (read-only).
+        instrument (Instrument): The financial instrument to trade (read-only).
+        side (OrderSide): Whether this is a BUY or SELL order (read-only).
+        quantity (Decimal): The quantity to trade (read-only).
+        time_in_force (TimeInForce): How long the order remains active (read-only).
         state (OrderState): Current state of the order from the internal state machine.
     """
 
@@ -208,16 +213,18 @@ class Order:
             id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
-        # Order identification
-        self.id = id if id is not None else get_next_id()
+        # Order identification (private attributes with public properties)
+        self._id = id if id is not None else get_next_id()
 
-        # Trading details
-        self.instrument = instrument
-        self.side = side
-        self.quantity = quantity
+        # Trading details (private attributes with public properties)
+        self._instrument = instrument
+        self._side = side
+        self._quantity = quantity
 
-        # Execution details
-        self.time_in_force = time_in_force
+        # Execution details (private attributes with public properties)
+        self._time_in_force = time_in_force
+
+        # Mutable execution tracking attributes
         self.filled_quantity = Decimal("0")  # Always initialize to 0 for new orders
         self.average_fill_price = None  # Always initialize to None for new orders
         self.executions: List[Execution] = []  # List of executions in chronological order
@@ -227,6 +234,51 @@ class Order:
 
         # Validation
         self._validate()
+
+    @property
+    def id(self) -> str:
+        """Get the unique identifier for the order.
+
+        Returns:
+            str: The order ID.
+        """
+        return self._id
+
+    @property
+    def instrument(self) -> Instrument:
+        """Get the financial instrument to trade.
+
+        Returns:
+            Instrument: The financial instrument.
+        """
+        return self._instrument
+
+    @property
+    def side(self) -> OrderSide:
+        """Get the order side (BUY or SELL).
+
+        Returns:
+            OrderSide: The order side.
+        """
+        return self._side
+
+    @property
+    def quantity(self) -> Decimal:
+        """Get the quantity to trade.
+
+        Returns:
+            Decimal: The order quantity.
+        """
+        return self._quantity
+
+    @property
+    def time_in_force(self) -> TimeInForce:
+        """Get how long the order remains active.
+
+        Returns:
+            TimeInForce: The time in force setting.
+        """
+        return self._time_in_force
 
     @property
     def unfilled_quantity(self) -> Decimal:
@@ -365,6 +417,9 @@ class LimitOrder(Order):
 
     Limit orders require a limit_price and will only execute if the market
     price reaches the specified limit price or better.
+
+    Properties:
+        limit_price (Decimal): The limit price for the order (read-only).
     """
 
     def __init__(
@@ -386,11 +441,20 @@ class LimitOrder(Order):
             id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
-        # Set limit price before calling parent constructor
-        self.limit_price = limit_price
+        # Set limit price (private attribute with public property)
+        self._limit_price = limit_price
 
         # Call parent constructor
         super().__init__(instrument, side, quantity, id, time_in_force)
+
+    @property
+    def limit_price(self) -> Decimal:
+        """Get the limit price for the order.
+
+        Returns:
+            Decimal: The limit price.
+        """
+        return self._limit_price
 
     def _validate(self) -> None:
         """Validate the limit order data.
@@ -411,6 +475,9 @@ class StopOrder(Order):
 
     Stop orders require a stop_price and will trigger a market order
     when the market price reaches the specified stop price.
+
+    Properties:
+        stop_price (Decimal): The stop price for the order (read-only).
     """
 
     def __init__(
@@ -432,11 +499,20 @@ class StopOrder(Order):
             id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
-        # Set stop price before calling parent constructor
-        self.stop_price = stop_price
+        # Set stop price (private attribute with public property)
+        self._stop_price = stop_price
 
         # Call parent constructor
         super().__init__(instrument, side, quantity, id, time_in_force)
+
+    @property
+    def stop_price(self) -> Decimal:
+        """Get the stop price for the order.
+
+        Returns:
+            Decimal: The stop price.
+        """
+        return self._stop_price
 
     def _validate(self) -> None:
         """Validate the stop order data.
@@ -457,6 +533,10 @@ class StopLimitOrder(Order):
 
     Stop-limit orders require both a stop_price and limit_price. When the market
     price reaches the stop price, the order becomes a limit order at the limit price.
+
+    Properties:
+        stop_price (Decimal): The stop price that triggers the order (read-only).
+        limit_price (Decimal): The limit price for the order once triggered (read-only).
     """
 
     def __init__(
@@ -480,12 +560,30 @@ class StopLimitOrder(Order):
             id (int, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
-        # Set prices before calling parent constructor
-        self.stop_price = stop_price
-        self.limit_price = limit_price
+        # Set prices (private attributes with public properties)
+        self._stop_price = stop_price
+        self._limit_price = limit_price
 
         # Call parent constructor
         super().__init__(instrument, side, quantity, id, time_in_force)
+
+    @property
+    def stop_price(self) -> Decimal:
+        """Get the stop price that triggers the order.
+
+        Returns:
+            Decimal: The stop price.
+        """
+        return self._stop_price
+
+    @property
+    def limit_price(self) -> Decimal:
+        """Get the limit price for the order once triggered.
+
+        Returns:
+            Decimal: The limit price.
+        """
+        return self._limit_price
 
     def _validate(self) -> None:
         """Validate the stop-limit order data.
