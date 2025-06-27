@@ -79,9 +79,9 @@ class MessageBus:
 
         return True
 
-    def publish(self, topic: str, obj: Any):
+    def publish(self, topic: str, obj: Any, min_subscribers: int = 0, max_subscribers: int = None):
         """
-        Publish an object to a specific topic.
+        Publish an object to a specific topic with subscriber validation.
 
         This will invoke all callbacks registered for:
         - The exact topic
@@ -90,23 +90,39 @@ class MessageBus:
         Args:
             topic (str): The topic to publish to
             obj (Any): The object to publish
+            min_subscribers (int): Minimum required subscribers (default: 0)
+            max_subscribers (int): Maximum allowed subscribers (default: unlimited)
 
         Raises:
-            ValueError: If the topic has an invalid structure
+            ValueError: If the topic has an invalid structure or subscriber count is outside the specified range
         """
         # Validate topic
         self._validate_topic(topic)
 
-        # Direct topic match
-        if topic in self._callbacks:
-            for callback in self._callbacks[topic]:
-                callback(obj)
+        # Collect all matching callbacks in a single pass
+        callbacks_to_invoke = []
 
-        # Wildcard topic matches
+        # Check for exact topic matches and add their callbacks
+        if topic in self._callbacks:
+            callbacks_to_invoke.extend(self._callbacks[topic])
+
+        # Check for wildcard pattern matches and add their callbacks
         for pattern_topic, pattern in self._wildcard_patterns.items():
             if pattern.match(topic) and pattern_topic in self._callbacks:
-                for callback in self._callbacks[pattern_topic]:
-                    callback(obj)
+                callbacks_to_invoke.extend(self._callbacks[pattern_topic])
+
+        # Validate subscriber count using collected callbacks
+        subscriber_count = len(callbacks_to_invoke)
+
+        if subscriber_count < min_subscribers:
+            raise ValueError(f"Topic '{topic}' has {subscriber_count} subscribers, but minimum {min_subscribers} required")
+
+        if max_subscribers is not None and subscriber_count > max_subscribers:
+            raise ValueError(f"Topic '{topic}' has {subscriber_count} subscribers, but maximum {max_subscribers} allowed")
+
+        # Invoke all collected callbacks
+        for callback in callbacks_to_invoke:
+            callback(obj)
 
     def subscribe(self, topic: str, callback: Callable):
         """

@@ -73,6 +73,9 @@ class TradingEngine:
 
         Args:
             bar (Bar): The bar to publish.
+
+        Raises:
+            ValueError: If no strategies are subscribed to receive the bar data.
         """
         # Create a standardized topic name for the bar
         topic = TopicProtocol.create_bar_topic(bar.bar_type)
