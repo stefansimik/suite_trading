@@ -1,5 +1,6 @@
-from typing import Any, Callable, Dict, List, Pattern
+from typing import Any, Callable, Dict, List, Pattern, Tuple
 import re
+from suite_trading.platform.messaging.message_priority import SubscriberPriority
 
 
 class MessageBus:
@@ -8,6 +9,7 @@ class MessageBus:
     This implementation provides:
     - Direct topic subscriptions
     - Wildcard topic subscriptions (using * as wildcard)
+    - Priority-based callback ordering
     - Synchronized and ordered event invocation
     """
 
@@ -29,10 +31,10 @@ class MessageBus:
     def __init__(self):
         """Initialize a new MessageBus instance.
 
-        Initializes empty dictionaries for storing callbacks and wildcard patterns.
+        Initializes empty dictionaries for storing callbacks with priorities and wildcard patterns.
         """
-        # Dictionary to store callbacks for each topic
-        self._callbacks: Dict[str, List[Callable]] = {}
+        # Dictionary to store callbacks with their priorities for each topic
+        self._callbacks: Dict[str, List[Tuple[Callable, SubscriberPriority]]] = {}
         # Dictionary to store compiled regex patterns for wildcard topics
         self._wildcard_patterns: Dict[str, Pattern] = {}
 
@@ -99,14 +101,14 @@ class MessageBus:
         # Validate topic
         self._validate_topic(topic)
 
-        # Collect all matching callbacks in a single pass
+        # Collect all matching callbacks with priorities in a single pass
         callbacks_to_invoke = []
 
-        # Check for exact topic matches and add their callbacks
+        # Check for exact topic matches and add their callbacks with priorities
         if topic in self._callbacks:
             callbacks_to_invoke.extend(self._callbacks[topic])
 
-        # Check for wildcard pattern matches and add their callbacks
+        # Check for wildcard pattern matches and add their callbacks with priorities
         for pattern_topic, pattern in self._wildcard_patterns.items():
             if pattern.match(topic) and pattern_topic in self._callbacks:
                 callbacks_to_invoke.extend(self._callbacks[pattern_topic])
@@ -120,17 +122,19 @@ class MessageBus:
         if max_subscribers is not None and subscriber_count > max_subscribers:
             raise ValueError(f"Topic '{topic}' has {subscriber_count} subscribers, but maximum {max_subscribers} allowed")
 
-        # Invoke all collected callbacks
-        for callback in callbacks_to_invoke:
+        # Sort callbacks by priority (highest first) and invoke them
+        callbacks_to_invoke.sort(key=lambda x: x[1], reverse=True)
+        for callback, _ in callbacks_to_invoke:
             callback(obj)
 
-    def subscribe(self, topic: str, callback: Callable):
+    def subscribe(self, topic: str, callback: Callable, priority: SubscriberPriority = SubscriberPriority.MEDIUM):
         """
-        Subscribe a callback to a specific topic.
+        Subscribe a callback to a specific topic with priority.
 
         Args:
             topic (str): The topic to subscribe to
             callback (Callable): The callback function to invoke when the topic is published
+            priority (SubscriberPriority): The priority level for this subscription (default: MEDIUM)
 
         Raises:
             ValueError: If the topic has an invalid structure
@@ -141,7 +145,11 @@ class MessageBus:
         if topic not in self._callbacks:
             self._callbacks[topic] = []
 
-        self._callbacks[topic].append(callback)
+        # Store callback with its priority
+        self._callbacks[topic].append((callback, priority))
+
+        # Sort by priority (highest first) to maintain order
+        self._callbacks[topic].sort(key=lambda x: x[1], reverse=True)
 
         # If topic contains a wildcard, compile a regex pattern for it
         if "*" in topic:
@@ -162,8 +170,9 @@ class MessageBus:
         # Validate topic
         self._validate_topic(topic)
 
-        if topic in self._callbacks and callback in self._callbacks[topic]:
-            self._callbacks[topic].remove(callback)
+        if topic in self._callbacks:
+            # Find and remove the callback (search by callback function, ignore priority)
+            self._callbacks[topic] = [(cb, prio) for cb, prio in self._callbacks[topic] if cb != callback]
 
             # If no callbacks left for this topic, remove the topic
             if not self._callbacks[topic]:
@@ -187,4 +196,6 @@ class MessageBus:
         # Validate topic
         self._validate_topic(topic)
 
-        return self._callbacks.get(topic, [])
+        # Extract just the callback functions from the (callback, priority) tuples
+        callback_tuples = self._callbacks.get(topic, [])
+        return [callback for callback, _ in callback_tuples]

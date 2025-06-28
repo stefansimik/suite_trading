@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
+    from suite_trading.platform.cache import Cache
 
 
 class Strategy:
@@ -38,6 +39,20 @@ class Strategy:
             trading_engine (TradingEngine): The trading engine instance.
         """
         self._trading_engine = trading_engine
+
+    @property
+    def cache(self) -> "Cache":
+        """Access to the data cache.
+
+        Returns:
+            Cache: The cache instance from the trading engine.
+
+        Raises:
+            RuntimeError: If the strategy is not added to a TradingEngine.
+        """
+        if self._trading_engine is None:
+            raise RuntimeError(f"Strategy '{self.name}' must be added to TradingEngine before accessing cache")
+        return self._trading_engine.cache
 
     def on_start(self):
         """Called when the strategy is started.
@@ -72,11 +87,11 @@ class Strategy:
         if self._trading_engine is None:
             raise RuntimeError(f"$strategy '{self.name}' must be added to a TradingEngine before subscribing to bars")
 
-        # Create a standardized topic name for the bar type
-        topic = TopicProtocol.create_bar_topic(bar_type)
-
         # Subscribe to the topic
+        topic = TopicProtocol.create_bar_topic(bar_type)
         self._trading_engine.message_bus.subscribe(topic, self.on_bar)
+
+        # Remember the subscribed bar type
         self._subscribed_bar_types.add(bar_type)
 
     def unsubscribe_bars(self, bar_type: BarType):
