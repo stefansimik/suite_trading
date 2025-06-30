@@ -13,6 +13,8 @@ We are building a modern algorithmic trading framework in Python that allows:
 - **Fail Fast**: Detect errors early and report them immediately
 - **Intuitive Domain Model**: Create a simple, understandable domain model
 - **Broker Agnostic**: Framework should be broker agnostic where possible
+- **Single Responsibility Principle (SRP)**: Each class should have only one reason to change and be responsible for one specific functionality
+- **Separation of Concerns**: Different aspects of functionality should be handled by different classes, making it crystal clear who is responsible for what
 
 ## User-Centric Design Principle
 
