@@ -23,15 +23,8 @@ class TradingEngine:
         """
         self.strategies: list[Strategy] = []
 
-        # Subscribe cache to all bar data with highest priority
-        self._setup_cache_subscriptions()
-
-    def _setup_cache_subscriptions(self):
-        """Set up cache subscriptions with system highest priority.
-
-        This ensures the cache receives and stores data before strategies process it.
-        """
-        # Subscribe to the wildcard topic to catch all bars with system highest priority
+        # Subscribe cache to all bar data with system highest priority
+        # This ensures the cache receives and stores data before strategies process it
         MessageBus.get().subscribe("bar::*", Cache.get().on_bar, SubscriberPriority.SYSTEM_HIGHEST)
 
     def start(self):
