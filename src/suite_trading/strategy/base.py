@@ -4,6 +4,7 @@ from suite_trading.domain.market_data.tick.trade_tick import TradeTick
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.domain.instrument import Instrument
 from suite_trading.platform.messaging.topic_protocol import TopicProtocol
+from suite_trading.platform.messaging.message_bus import MessageBus
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -89,7 +90,7 @@ class Strategy:
 
         # Subscribe to the topic
         topic = TopicProtocol.create_bar_topic(bar_type)
-        self._trading_engine.message_bus.subscribe(topic, self.on_bar)
+        MessageBus.get().subscribe(topic, self.on_bar)
 
         # Remember the subscribed bar type
         self._subscribed_bar_types.add(bar_type)
@@ -108,7 +109,7 @@ class Strategy:
             topic = TopicProtocol.create_bar_topic(bar_type)
 
             # Unsubscribe from the topic
-            self._trading_engine.message_bus.unsubscribe(topic, self.on_bar)
+            MessageBus.get().unsubscribe(topic, self.on_bar)
             self._subscribed_bar_types.remove(bar_type)
 
     def subscribe_trade_ticks(self, instrument: Instrument):

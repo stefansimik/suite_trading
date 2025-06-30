@@ -11,10 +11,15 @@ class MessageBus:
     - Wildcard topic subscriptions (using * as wildcard)
     - Priority-based callback ordering
     - Synchronized and ordered event invocation
+
+    MessageBus is implemented as a singleton to provide global access.
     """
 
     # The separator used in topics
     TOPIC_SEPARATOR = "::"
+
+    # Singleton instance
+    _instance = None
 
     @classmethod
     def topic_from_parts(cls, topic_parts: List[str]) -> str:
@@ -28,11 +33,37 @@ class MessageBus:
         """
         return cls.TOPIC_SEPARATOR.join(topic_parts)
 
+    @classmethod
+    def get(cls) -> "MessageBus":
+        """Get the singleton MessageBus instance.
+
+        Returns:
+            MessageBus: The singleton MessageBus instance.
+        """
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def clear(cls):
+        """Clear the singleton instance.
+
+        This method is primarily intended for testing purposes to ensure
+        clean state between test runs.
+        """
+        cls._instance = None
+
     def __init__(self):
         """Initialize a new MessageBus instance.
 
         Initializes empty dictionaries for storing callbacks with priorities and wildcard patterns.
+
+        Note: This constructor should not be called directly. Use MessageBus.get() instead.
         """
+        # Prevent multiple instances (except for the first one created by get() or tests)
+        if MessageBus._instance is not None:
+            raise RuntimeError("MessageBus is a singleton. Use MessageBus.get() to access the instance.")
+
         # Dictionary to store callbacks with their priorities for each topic
         self._callbacks: Dict[str, List[Tuple[Callable, SubscriberPriority]]] = {}
         # Dictionary to store compiled regex patterns for wildcard topics

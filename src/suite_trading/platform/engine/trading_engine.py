@@ -19,23 +19,13 @@ class TradingEngine:
     def __init__(self):
         """Initialize a new TradingEngine instance.
 
-        Creates a new MessageBus instance and Cache component internally.
+        Creates a Cache component internally. Uses the singleton MessageBus instance.
         """
         self.strategies: list[Strategy] = []
-        self._message_bus = MessageBus()
         self._cache = Cache()
 
         # Subscribe cache to all bar data with highest priority
         self._setup_cache_subscriptions()
-
-    @property
-    def message_bus(self) -> MessageBus:
-        """Get the message bus instance.
-
-        Returns:
-            MessageBus: The message bus instance.
-        """
-        return self._message_bus
 
     @property
     def cache(self) -> Cache:
@@ -52,7 +42,7 @@ class TradingEngine:
         This ensures the cache receives and stores data before strategies process it.
         """
         # Subscribe to the wildcard topic to catch all bars with system highest priority
-        self._message_bus.subscribe("bar::*", self._cache.on_bar, SubscriberPriority.SYSTEM_HIGHEST)
+        MessageBus.get().subscribe("bar::*", self._cache.on_bar, SubscriberPriority.SYSTEM_HIGHEST)
 
     def start(self):
         """Start all registered strategies.
@@ -104,4 +94,4 @@ class TradingEngine:
         topic = TopicProtocol.create_bar_topic(bar.bar_type)
 
         # Publish the bar to the message bus
-        self._message_bus.publish(topic, bar)
+        MessageBus.get().publish(topic, bar)
