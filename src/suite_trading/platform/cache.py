@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
+from suite_trading.utils.collections.readonly_list import ReadOnlyList
 
 
 class Cache:
@@ -70,15 +71,30 @@ class Cache:
         # Insert at the beginning to maintain newest-first order
         self._bars[bar.bar_type].insert(0, bar)
 
-    def bars(self, bar_type: BarType, count: Optional[int] = None) -> List[Bar]:
-        """Get bars for a specific bar type.
+    def bars(self, bar_type: BarType, count: Optional[int] = None) -> ReadOnlyList[Bar]:
+        """Get bars for a specific bar type as a read-only view.
 
         Args:
             bar_type (BarType): The type of bar to retrieve.
             count (Optional[int]): Maximum number of bars to return. If None, returns all bars.
 
         Returns:
-            List[Bar]: List of bars, newest first (index 0 = latest).
+            ReadOnlyList[Bar]: Read-only view of bars, newest first (index 0 = latest).
+        """
+        if bar_type not in self._bars:
+            return ReadOnlyList([])
+
+        return ReadOnlyList(self._bars[bar_type], count)
+
+    def bars_copy(self, bar_type: BarType, count: Optional[int] = None) -> List[Bar]:
+        """Get bars as a copy (for backward compatibility or when modification is needed).
+
+        Args:
+            bar_type (BarType): The type of bar to retrieve.
+            count (Optional[int]): Maximum number of bars to return. If None, returns all bars.
+
+        Returns:
+            List[Bar]: Copy of bars list, newest first (index 0 = latest).
         """
         if bar_type not in self._bars:
             return []
