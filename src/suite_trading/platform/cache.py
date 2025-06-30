@@ -8,14 +8,45 @@ class Cache:
 
     The Cache stores market data in memory and provides simple access methods for strategies.
     Data is stored with newest items first (index 0 = latest).
+
+    Cache is implemented as a singleton to provide global access.
     """
+
+    # Singleton instance
+    _instance = None
+
+    @classmethod
+    def get(cls) -> "Cache":
+        """Get the singleton Cache instance.
+
+        Returns:
+            Cache: The singleton Cache instance.
+        """
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def clear(cls):
+        """Clear the singleton instance.
+
+        This method is primarily intended for testing purposes to ensure
+        clean state between test runs.
+        """
+        cls._instance = None
 
     def __init__(self):
         """Initialize a new Cache instance.
 
         Creates empty storage for bars. Future extensions will include
         trade ticks, quote ticks, and orders.
+
+        Note: This constructor should not be called directly. Use Cache.get() instead.
         """
+        # Prevent multiple instances (except for the first one created by get() or tests)
+        if Cache._instance is not None:
+            raise RuntimeError("Cache is a singleton. Use Cache.get() to access the instance.")
+
         # Bar storage: BarType -> List[Bar] (newest first, index 0 = latest)
         self._bars: Dict[BarType, List[Bar]] = {}
 
