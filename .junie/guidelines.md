@@ -73,6 +73,19 @@ When facing API design choices:
 - Include purpose, parameters, return values, and exceptions in function docstrings
 - Include type information for all parameters, return values, and attributes in docstrings
 
+### Docstring Writing Style
+
+Write docstrings that are easy to understand for everyone:
+
+- **Use natural language**: Write like you're explaining to a colleague, not like a technical manual
+- **Use simple words**: Replace complex terms with everyday words that anyone can understand
+- **Make benefits concrete**: Explain what something does and why it matters in clear, specific terms
+
+**Examples:**
+- ✅ "Engine makes sure the provider is available" instead of "Engine validates provider availability"
+- ✅ "Strategies don't need to know how the provider works" instead of "Clean separation of concerns"
+- ✅ "This lets strategies focus on trading decisions" instead of "This facilitates strategic focus optimization"
+
 ## Comment Formatting
 
 - Use consistent indentation for inline comments
@@ -113,23 +126,42 @@ def __init__(self,
 
 ## Exception Message Formatting
 
-- Prefix variables with $ to distinguish them from normal text
-- Include actual values of variables in the message
-- Use f-strings for string interpolation
-- Be specific about requirements and valid ranges
+**Rule**: All error and exception messages must follow a specific format to be clear, actionable, and consistent.
+
+### Format Requirements
+
+1. **Function Context**: Always specify which function was called
+   - Use backticks around function names: `` `function_name` ``
+   - Example: `` `subscribe_to_bars` ``, `` `submit_order` ``
+
+2. **Variable Identification**: Prefix variables with `$` to distinguish them from normal text
+   - Example: `$market_data_provider`, `$trading_engine`, `$bar_type`
+
+3. **Variable Values**: Include actual values of variables when relevant
+   - Use f-strings for interpolation: `f"$bar_type ({bar_type})"`
+   - For objects, include meaningful identifiers: `f"$instrument ({instrument.symbol})"`
+
+4. **Root Cause**: Clearly state what's None or what condition failed
+   - Example: "because $market_data_provider is None"
+   - Example: "because $trading_engine is None"
+
+5. **Solution Guidance**: Provide actionable advice on how to fix the issue
+   - Example: "Set a market data provider when creating TradingEngine"
+   - Example: "Add the strategy to a TradingEngine first"
 
 ### Examples
 
 ```python
-# Basic format with variable and its value
-if count <= 1:
-    raise ValueError(f"$count must be >= 1, but provided value is: {count}")
+# Function call with None check
+raise RuntimeError(f"Cannot call `subscribe_to_bars` for $bar_type ({bar_type}) because $market_data_provider is None. Set a market data provider when creating TradingEngine.")
 
-# Include context and expectations
-if start_date >= end_date:
-    raise ValueError(f"$start_date ({start_date}) must be earlier than $end_date ({end_date})")
+# Strategy context
+raise RuntimeError(f"Cannot call `subscribe_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.")
 
-# For multiple issues, use bullet points
+# Value validation
+raise ValueError(f"$count must be >= 1, but provided value is: {count}")
+
+# Multiple issues with bullet points
 def validate_user(user):
     errors = []
     if not user.name:
