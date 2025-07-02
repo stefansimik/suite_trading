@@ -10,7 +10,7 @@ from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order import Order
 from suite_trading.platform.cache import Cache
 from suite_trading.platform.providers.market_data_provider import MarketDataProvider
-from suite_trading.platform.providers.trading_provider import TradingProvider
+from suite_trading.platform.providers.brokerage_provider import BrokerageProvider
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +31,11 @@ class TradingEngine:
     of getting the data they need and managing connections.
     """
 
-    def __init__(self, trading_provider: TradingProvider, market_data_provider: Optional[MarketDataProvider] = None):
+    def __init__(self, trading_provider: BrokerageProvider, market_data_provider: Optional[MarketDataProvider] = None):
         """Initialize a new TradingEngine instance.
 
         Args:
-            trading_provider (TradingProvider): Required provider for trading operations.
+            trading_provider (BrokerageProvider): Required provider for trading operations.
             market_data_provider (Optional[MarketDataProvider]): Optional provider for market data.
 
         Uses the singleton Cache and MessageBus instances.
@@ -96,7 +96,6 @@ class TradingEngine:
                 )
 
         # Set the trading engine reference in the strategy
-        # TODO: this has to be re-evaluated
         strategy._set_trading_engine(self)
         self.strategies.append(strategy)
 

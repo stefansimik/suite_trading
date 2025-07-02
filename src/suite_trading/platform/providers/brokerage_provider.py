@@ -5,14 +5,20 @@ from suite_trading.domain.instrument import Instrument
 
 
 @runtime_checkable
-class TradingProvider(Protocol):
-    """Protocol for trading/execution providers.
+class BrokerageProvider(Protocol):
+    """Protocol for brokerage service providers.
 
     The @runtime_checkable decorator from Python's typing module allows you to use
     isinstance() and issubclass() checks with Protocol classes at runtime.
 
-    This protocol defines the interface that trading providers must implement
-    to handle order management, executions, and position tracking.
+    This protocol defines the interface that brokerage providers must implement
+    to handle core brokerage operations including:
+    - Connection management (connect, disconnect, status checking)
+    - Order management (submitting, canceling, and retrieving orders)
+    - Position tracking (retrieving current positions)
+
+    Brokerage providers serve as the bridge between trading strategies and
+    actual broker/exchange systems, handling essential trading operations.
     """
 
     def connect(self) -> None:
@@ -34,7 +40,7 @@ class TradingProvider(Protocol):
         """Check connection status.
 
         Returns:
-            bool: True if connected to trading provider, False otherwise.
+            bool: True if connected to brokerage provider, False otherwise.
         """
         ...
 
@@ -45,7 +51,7 @@ class TradingProvider(Protocol):
             order (Order): The order to submit for execution.
 
         Raises:
-            ConnectionError: If not connected to trading provider.
+            ConnectionError: If not connected to brokerage provider.
             ValueError: If order is invalid or cannot be submitted.
         """
         ...
@@ -57,7 +63,7 @@ class TradingProvider(Protocol):
             order (Order): The order to cancel.
 
         Raises:
-            ConnectionError: If not connected to trading provider.
+            ConnectionError: If not connected to brokerage provider.
             ValueError: If order cannot be cancelled (e.g., already filled).
         """
         ...
@@ -72,7 +78,7 @@ class TradingProvider(Protocol):
             List[Order]: List of open orders.
 
         Raises:
-            ConnectionError: If not connected to trading provider.
+            ConnectionError: If not connected to brokerage provider.
         """
         ...
 
@@ -87,6 +93,6 @@ class TradingProvider(Protocol):
             List[Position]: List of positions matching the filter criteria.
 
         Raises:
-            ConnectionError: If not connected to trading provider.
+            ConnectionError: If not connected to brokerage provider.
         """
         ...
