@@ -4,12 +4,12 @@
 # Python
 __pycache__/
 
+# Distribution
+dist/
+
 # Jupyter
 *.ipynb
 .virtual_documents/
 
 # Logs
 *.log
-
-# Special files
-TODO.md

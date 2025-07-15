@@ -55,6 +55,7 @@ class TradingEngine:
         Uses the singleton Cache and MessageBus instances.
         """
         self.strategies: list[Strategy] = []
+
         self.historical_data_provider = historical_data_provider
         self.live_data_provider = live_data_provider
         self.brokerage_provider = brokerage_provider
