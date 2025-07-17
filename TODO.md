@@ -25,23 +25,22 @@ The architecture **guarantees** that strategies receive **exactly the same event
 
 ### Phase 1: Core Event Foundation
 
-#### 1.1 Event Interface (Protocol)
+#### 1.1 Event Interface (Abstract Base Class)
 
 **Why First**: This is the fundamental contract that all event objects must follow.
 
-**Event Interface Specification:**
-All event objects coming from outside world to TradingEngine must implement the `Event` interface:
+**Event Abstract Base Class Specification:**
+All event objects coming from outside world to TradingEngine must inherit from the `Event` abstract base class:
 
 ```python
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Protocol, runtime_checkable
 
-@runtime_checkable
-class Event(Protocol):
-    """Protocol for all event objects entering the TradingEngine from external sources.
 
-    This interface ensures consistent structure for event object handling, sorting, and processing
+class Event(ABC):
+    """Abstract base class for all event objects entering the TradingEngine from external sources.
+
+    This class ensures consistent structure for event object handling, sorting, and processing
     across different object types (bars, ticks, quotes, time events, etc.).
 
     All event objects must be sortable to enable correct chronological processing order.
@@ -108,31 +107,35 @@ class Event(Protocol):
         return self.dt_received < other.dt_received
 ```
 
-**Dependencies**: None - this is pure interface definition
+**Dependencies**: None - this is pure abstract base class definition
 
 #### 1.2 Core Event Objects Implementation
 
 **Why Second**: Implement all concrete event types that will flow through the system.
 
 **Implementation Order**:
-1. **Bar** - implements Event interface
-2. **TradeTick** - implements Event interface
-3. **QuoteTick** - implements Event interface
-4. **TimeEvent** (OneTimeEvent, RepeatingEvent) - implements Event interface
+1. **Bar** - inherits from Event abstract base class
+2. **TradeTick** - inherits from Event abstract base class
+3. **QuoteTick** - inherits from Event abstract base class
+4. **TimeEvent** (OneTimeEvent, RepeatingEvent) - inherits from Event abstract base class
 
 **Implementation Requirements:**
-- All market data classes must implement the Event interface
-- New event types (custom objects) must implement this interface
-- TradingEngine will sort all incoming event objects using the comparison method
+- All market data classes must inherit from the Event abstract base class
+- New event types (custom objects) must inherit from Event ABC
+- All concrete implementations must provide the three abstract properties: `dt_received`, `dt_event`, `event_type`
+- TradingEngine will sort all incoming event objects using the inherited comparison method
 - Processing order: sorted by dt_event first, then by dt_received
+- Python will prevent instantiation of incomplete implementations (missing abstract properties)
 
 **Event Object Requirements:**
-All objects from EventFeed must have:
-- `dt_received`: When object entered our system (includes network latency simulation)
-- Event datetime: Official time for the object (e.g., bar end-time)
-- Object type identifier for easy type distinction
+All objects from EventFeed must:
+- Inherit from Event abstract base class
+- Implement `dt_received`: When object entered our system (includes network latency simulation)
+- Implement `dt_event`: Official time for the object (e.g., bar end-time)
+- Implement `event_type`: Object type identifier for easy type distinction
+- Automatically get sorting functionality through inheritance
 
-**Dependencies**: Requires Event interface from step 1.1
+**Dependencies**: Requires Event abstract base class from step 1.1
 
 #### 1.3 EventFeed Interface (Protocol)
 
@@ -145,13 +148,16 @@ All objects from EventFeed must have:
 - Access to last processed time for object generation
 
 ```python
+from typing import Protocol
+from suite_trading.domain.event import Event
+
 class EventFeed(Protocol):
     def next(self) -> Event | None: ...
     def has_next(self) -> bool: ...
     def get_event_types(self) -> list[str]: ...
 ```
 
-**Dependencies**: Requires Event interface and concrete event objects
+**Dependencies**: Requires Event abstract base class and concrete event objects
 
 ### Phase 2: Event Infrastructure
 
@@ -178,7 +184,7 @@ MarketDataStorage should be an abstract storage interface (Protocol), allowing m
   - Quote-ticks of instruments
 - Standard feature: ability to add any market events into the storage
 - Database-based implementations require `connect` and `disconnect` functions
-- Return event objects that implement Event interface
+- Return event objects that inherit from Event abstract base class
 - Support for querying by time ranges and instruments
 
 **Storage Schema (SQLite example):**
@@ -257,7 +263,7 @@ MarketEventStorage will be the primary source of historical events for strategie
 - Consistent sorting in both backtesting and live trading modes
 - Must handle realistic event object arrival scenarios
 
-**Dependencies**: Requires Event interface and concrete implementations
+**Dependencies**: Requires Event abstract base class and concrete implementations
 
 #### 3.2 Delay Simulation Component
 
@@ -270,7 +276,7 @@ MarketEventStorage will be the primary source of historical events for strategie
 - Can modify `dt_received` timestamps to simulate network delays
 - Configurable delay patterns for different event types
 - Enables realistic backtesting scenarios with latency simulation
-- Maintains Event interface contract
+- Maintains Event abstract base class contract
 
 **Integration:**
 - All events flow through this component first
@@ -436,7 +442,7 @@ The workflow ensures perfect event type consistency through this process:
 4. **Same event objects** flow through strategy (Bar, TradeTick, QuoteTick, etc.)
 
 **Architectural Guarantees:**
-- **Universal Event Interface**: All event objects implement the same `Event` protocol
+- **Universal Event Interface**: All event objects inherit from the same `Event` abstract base class
 - **Identical EventFeed Interface**: Historical and live EventFeeds use same `next()` method
 - **Same Callback Methods**: `on_bar()`, `on_trade_tick()`, `on_quote_tick()` work identically
 - **MarketEventStorage Contract**: Must return same event object types as live feeds provide
