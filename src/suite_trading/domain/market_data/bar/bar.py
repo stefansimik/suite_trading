@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
+from src.suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.instrument import Instrument
@@ -10,7 +11,7 @@ from suite_trading.domain.market_data.price_type import PriceType
 
 
 @dataclass(frozen=True)
-class Bar:
+class Bar(Event):
     """Represents a time period in financial markets with OHLC price data and optional volume.
 
     Time Interval Convention:
@@ -51,6 +52,7 @@ class Bar:
     close: Decimal
 
     volume: Optional[Decimal] = None
+    dt_received: Optional[datetime] = None
 
     @property
     def instrument(self) -> Instrument:
@@ -71,6 +73,27 @@ class Bar:
     def price_type(self) -> PriceType:
         """Get the price_type from bar_type."""
         return self.bar_type.price_type
+
+    @property
+    def dt_event(self) -> datetime:
+        """Event datetime when the bar period ended.
+
+        For bars, the event time is the end of the bar period (end_dt).
+        This represents the official time when the bar was completed.
+
+        Returns:
+            datetime: The bar end timestamp.
+        """
+        return self.end_dt
+
+    @property
+    def event_type(self) -> str:
+        """Type identifier for the bar event.
+
+        Returns:
+            str: Always returns "bar" for Bar objects.
+        """
+        return "bar"
 
     def __post_init__(self) -> None:
         """

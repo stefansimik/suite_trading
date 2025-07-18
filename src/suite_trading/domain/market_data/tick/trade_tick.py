@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 
+from src.suite_trading.domain.event import Event
 from suite_trading.domain.instrument import Instrument
 
 
 @dataclass(frozen=True)
-class TradeTick:
+class TradeTick(Event):
     """Represents a single trade in financial markets.
 
     A TradeTick contains information about a single executed trade, including
@@ -23,6 +25,7 @@ class TradeTick:
     price: Decimal
     volume: Decimal
     timestamp: datetime
+    dt_received: Optional[datetime] = None
 
     def __post_init__(self) -> None:
         """Validate the trade tick data after initialization.
@@ -44,3 +47,23 @@ class TradeTick:
         # Validate volume
         if self.volume <= 0:
             raise ValueError(f"$volume must be positive, but provided value is: {self.volume}")
+
+    @property
+    def dt_event(self) -> datetime:
+        """Event datetime when the trade occurred.
+
+        For trade ticks, the event time is the timestamp when the trade was executed.
+
+        Returns:
+            datetime: The trade timestamp.
+        """
+        return self.timestamp
+
+    @property
+    def event_type(self) -> str:
+        """Type identifier for the trade tick event.
+
+        Returns:
+            str: Always returns "trade_tick" for TradeTick objects.
+        """
+        return "trade_tick"

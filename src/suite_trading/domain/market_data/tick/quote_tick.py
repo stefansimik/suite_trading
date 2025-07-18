@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 
+from src.suite_trading.domain.event import Event
 from suite_trading.domain.instrument import Instrument
 
 
 @dataclass(frozen=True)
-class QuoteTick:
+class QuoteTick(Event):
     """Represents a market quote in financial markets.
 
     A QuoteTick contains information about the best bid and ask prices and volumes
@@ -27,6 +29,7 @@ class QuoteTick:
     bid_volume: Decimal
     ask_volume: Decimal
     timestamp: datetime
+    dt_received: Optional[datetime] = None
 
     def __post_init__(self) -> None:
         """Validate the quote tick data after initialization.
@@ -58,3 +61,23 @@ class QuoteTick:
             raise ValueError(f"$ask_price must be positive, but provided value is: {self.ask_price}")
         if self.bid_price >= self.ask_price:
             raise ValueError(f"$bid_price ({self.bid_price}) must be less than $ask_price ({self.ask_price})")
+
+    @property
+    def dt_event(self) -> datetime:
+        """Event datetime when the quote was recorded.
+
+        For quote ticks, the event time is the timestamp when the quote was captured.
+
+        Returns:
+            datetime: The quote timestamp.
+        """
+        return self.timestamp
+
+    @property
+    def event_type(self) -> str:
+        """Type identifier for the quote tick event.
+
+        Returns:
+            str: Always returns "quote_tick" for QuoteTick objects.
+        """
+        return "quote_tick"
