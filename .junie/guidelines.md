@@ -79,12 +79,14 @@ Write docstrings that are easy to understand for everyone:
 
 - **Use natural language**: Write like you're explaining to a colleague, not like a technical manual
 - **Use simple words**: Replace complex terms with everyday words that anyone can understand
+- **Write for beginners**: Assume the reader is learning - explain concepts clearly and simply
 - **Make benefits concrete**: Explain what something does and why it matters in clear, specific terms
 
 **Examples:**
 - ✅ "Engine makes sure the provider is available" instead of "Engine validates provider availability"
 - ✅ "Strategies don't need to know how the provider works" instead of "Clean separation of concerns"
 - ✅ "This lets strategies focus on trading decisions" instead of "This facilitates strategic focus optimization"
+- ✅ "Simple way to get events from different sources" instead of "Unified interface for event retrieval with permanent closure detection"
 
 ## Comment Formatting
 
