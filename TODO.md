@@ -30,112 +30,110 @@ The architecture **guarantees** that strategies receive **exactly the same event
 **Why Now**: Now that we have event objects, we can define how to produce them.
 
 **Core Interface Design:**
-- Explicit availability checking with `has_next()` method
-- `next()` returns Event objects only (never None)
-- Exception-based handling for edge cases (finished/error states)
-- Future-proof design where None can be legitimate return value
+- Simple event retrieval with `next() -> Optional[Event]`
+- Performance optimization with `is_finished()` method
+- No exceptions for normal flow control
+- KISS principle: minimal complexity for common cases
 
 **Interface Definition:**
 ```python
-from typing import Protocol
+from typing import Protocol, Optional
 from suite_trading.domain.event import Event
 
-class EventFeedFinished(Exception):
-    """Raised when EventFeed has no more data ever (end of dataset)."""
-    pass
-
-class EventFeedError(Exception):
-    """Raised when EventFeed encounters an error (connection lost, etc.)."""
-    pass
-
 class EventFeed(Protocol):
-    def has_next(self) -> bool:
-        """Check if there is an event available in the buffer.
+    """Simple event feed interface with permanent closure detection."""
+
+    def next(self) -> Optional[Event]:
+        """Get the next event if available.
+
+        Returns None if:
+        - No event is currently available (live feeds)
+        - Feed has no more data but is not permanently finished
 
         Returns:
-            bool: True if next() will return an event, False if buffer is empty
+            Event: Next event object, or None if no event available
         """
         ...
 
-    def next(self) -> Event:
-        """Get the next event from the buffer.
+    def is_finished(self) -> bool:
+        """Check if this feed is permanently closed.
 
-        Should only be called after has_next() returns True.
+        A finished feed will never produce events again and should be
+        removed from active polling to improve performance.
 
         Returns:
-            Event: Next event object (never None)
-
-        Raises:
-            EventFeedFinished: No more data ever, stop polling
-            EventFeedError: Something went wrong, handle error
+            bool: True if feed is permanently closed, False otherwise
         """
         ...
 
     def get_event_types(self) -> list[str]:
-        """Get list of event types this feed produces."""
+        """Get list of event types this feed produces.
+
+        Returns:
+            list[str]: List of event type identifiers (e.g., ["bar", "tick"])
+        """
         ...
 ```
 
 **Usage Pattern:**
 ```python
-# TradingEngine polling logic - simple and clean
-if feed.has_next():
-    event = feed.next()  # Guaranteed to return Event, never None
-    self.buffer_event(event)
-```
+# TradingEngine polling with performance optimization
+def poll_feeds(self):
+    """Poll all active feeds for new events."""
+    # Check for finished feeds first (less frequent operation)
+    for feed in list(self.active_feeds):
+        if feed.is_finished():
+            self.active_feeds.remove(feed)
+            self.logger.info(f"Removed finished feed: {feed}")
 
-**Edge Case Handling:**
-```python
-# Exception handling only when exceptional situations occur
-try:
-    if feed.has_next():
+    # Poll remaining active feeds for events
+    for feed in self.active_feeds:
         event = feed.next()
-        self.buffer_event(event)
-except EventFeedFinished:
-    self.active_feeds.remove(feed)  # Stop polling this feed
-except EventFeedError as e:
-    self.handle_feed_error(feed, e)  # Handle error appropriately
+        if event is not None:
+            self.buffer_event(event)
 ```
 
 **Implementation Examples:**
 
-*LiveBarFeed:*
-```python
-class LiveBarFeed:
-    def has_next(self) -> bool:
-        if self.connection_lost():
-            return False  # Will raise error in next()
-        return self.current_bar_complete()
-
-    def next(self) -> Event:
-        if self.connection_lost():
-            raise EventFeedError("Connection to data provider lost")
-
-        if not self.current_bar_complete():
-            raise RuntimeError("next() called when has_next() is False")
-
-        return self.get_completed_bar()  # Always returns Event
-```
-
-*HistoricalBarFeed:*
+*Historical Feed (becomes finished):*
 ```python
 class HistoricalBarFeed:
-    def has_next(self) -> bool:
-        return self.has_more_data()
+    def __init__(self, data_source):
+        self.data_source = data_source
+        self._finished = False
 
-    def next(self) -> Event:
-        if not self.has_more_data():
-            raise EventFeedFinished("End of historical dataset reached")
+    def next(self) -> Optional[Event]:
+        if self._finished:
+            return None
 
-        return self.get_next_bar()  # Always returns Event
+        if self.data_source.has_more_data():
+            return self.data_source.get_next_bar()
+        else:
+            self._finished = True
+            return None
+
+    def is_finished(self) -> bool:
+        return self._finished
+```
+
+*Live Feed (never finished):*
+```python
+class LiveBarFeed:
+    def next(self) -> Optional[Event]:
+        if self.current_bar_complete():
+            return self.get_completed_bar()
+        return None
+
+    def is_finished(self) -> bool:
+        return False  # Live feeds are never finished
 ```
 
 **Key Benefits:**
-- **Simple Common Case**: Check availability, then get event - no None handling
-- **Future-Proof**: None available for legitimate return values
-- **Clear Semantics**: Explicit availability checking vs exceptional situations
-- **Exception-Based Edge Cases**: Finished/error states handled through exceptions
-- **KISS Principle**: Minimal complexity for 90% of use cases
+- **Ultra-Simple Common Case**: Just `event = feed.next(); if event: process(event)`
+- **Performance Optimization**: Finished feeds can be removed from polling
+- **Clear Semantics**: `next()` handles data availability, `is_finished()` handles permanent closure
+- **No Exception Handling**: Normal flow uses simple None checks
+- **KISS Principle**: Minimal additional complexity while solving performance problem
 
 **Dependencies**: Requires Event abstract base class and concrete event objects
 
