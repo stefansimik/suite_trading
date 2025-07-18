@@ -1,1 +1,0 @@
-"""Trading platform infrastructure components."""

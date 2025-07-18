@@ -180,7 +180,6 @@ def validate_user(user):
 
 - **Never use re-exports in `__init__.py` files**
 - Each class/function should be imported directly from its source module
-- `__init__.py` files should contain only docstrings explaining the package purpose
 - This eliminates import ambiguity and ensures consistent import patterns across the codebase
 
 #### Benefits
@@ -188,7 +187,6 @@ def validate_user(user):
 - **Clear Dependencies**: Import statements clearly show where each class comes from
 - **Zero Maintenance**: No need to maintain `__all__` lists or coordinate exports
 - **IDE Friendly**: Auto-completion and "Go to Definition" work perfectly
-
 
 #### Examples
 
@@ -203,11 +201,34 @@ from suite_trading import TradingEngine  # Would require re-export
 from suite_trading.domain import Bar     # Would require re-export
 ```
 
-#### Package Structure
-- `__init__.py` files contain only:
-  - Package docstring explaining the package purpose
-  - Version information (only in root `__init__.py`)
-  - No imports, no `__all__` lists, no re-exports
+### Package Structure and `__init__.py` Files
+
+**Rule: Only create `__init__.py` files when they contain executable code.**
+
+Create `__init__.py` files **only** for:
+- **Executable code** (imports, variable assignments, function calls)
+- **Version information** (root package only: `__version__ = "1.0.0"`)
+- **Package initialization logic**
+
+**Don't create** `__init__.py` files that contain only docstrings, comments, or are empty.
+
+Use **namespace packages** (PEP 420) for directory organization - no `__init__.py` needed.
+
+#### Examples
+
+```python
+# ✅ Good - executable code
+# src/suite_trading/__init__.py
+__version__ = "0.0.1"
+
+# ✅ Good - namespace packages (no __init__.py)
+# src/suite_trading/domain/
+# src/suite_trading/platform/
+
+# ❌ Bad - only docstring
+# src/suite_trading/domain/__init__.py
+"""Domain objects."""  # Delete this file
+```
 
 # Testing Guidelines
 

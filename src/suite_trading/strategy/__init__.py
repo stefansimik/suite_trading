@@ -1,1 +1,0 @@
-"""Strategy-related components for trading algorithms."""
