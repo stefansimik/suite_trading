@@ -30,20 +30,112 @@ The architecture **guarantees** that strategies receive **exactly the same event
 **Why Now**: Now that we have event objects, we can define how to produce them.
 
 **Core Interface Design:**
-- Python Iterator-like interface with `next()` method
-- Must know when finished (similar to Python Iterator)
-- Must declare types of event objects it returns
-- Access to last processed time for object generation
+- Explicit availability checking with `has_next()` method
+- `next()` returns Event objects only (never None)
+- Exception-based handling for edge cases (finished/error states)
+- Future-proof design where None can be legitimate return value
 
+**Interface Definition:**
 ```python
 from typing import Protocol
 from suite_trading.domain.event import Event
 
+class EventFeedFinished(Exception):
+    """Raised when EventFeed has no more data ever (end of dataset)."""
+    pass
+
+class EventFeedError(Exception):
+    """Raised when EventFeed encounters an error (connection lost, etc.)."""
+    pass
+
 class EventFeed(Protocol):
-    def next(self) -> Event | None: ...
-    def has_next(self) -> bool: ...
-    def get_event_types(self) -> list[str]: ...
+    def has_next(self) -> bool:
+        """Check if there is an event available in the buffer.
+
+        Returns:
+            bool: True if next() will return an event, False if buffer is empty
+        """
+        ...
+
+    def next(self) -> Event:
+        """Get the next event from the buffer.
+
+        Should only be called after has_next() returns True.
+
+        Returns:
+            Event: Next event object (never None)
+
+        Raises:
+            EventFeedFinished: No more data ever, stop polling
+            EventFeedError: Something went wrong, handle error
+        """
+        ...
+
+    def get_event_types(self) -> list[str]:
+        """Get list of event types this feed produces."""
+        ...
 ```
+
+**Usage Pattern:**
+```python
+# TradingEngine polling logic - simple and clean
+if feed.has_next():
+    event = feed.next()  # Guaranteed to return Event, never None
+    self.buffer_event(event)
+```
+
+**Edge Case Handling:**
+```python
+# Exception handling only when exceptional situations occur
+try:
+    if feed.has_next():
+        event = feed.next()
+        self.buffer_event(event)
+except EventFeedFinished:
+    self.active_feeds.remove(feed)  # Stop polling this feed
+except EventFeedError as e:
+    self.handle_feed_error(feed, e)  # Handle error appropriately
+```
+
+**Implementation Examples:**
+
+*LiveBarFeed:*
+```python
+class LiveBarFeed:
+    def has_next(self) -> bool:
+        if self.connection_lost():
+            return False  # Will raise error in next()
+        return self.current_bar_complete()
+
+    def next(self) -> Event:
+        if self.connection_lost():
+            raise EventFeedError("Connection to data provider lost")
+
+        if not self.current_bar_complete():
+            raise RuntimeError("next() called when has_next() is False")
+
+        return self.get_completed_bar()  # Always returns Event
+```
+
+*HistoricalBarFeed:*
+```python
+class HistoricalBarFeed:
+    def has_next(self) -> bool:
+        return self.has_more_data()
+
+    def next(self) -> Event:
+        if not self.has_more_data():
+            raise EventFeedFinished("End of historical dataset reached")
+
+        return self.get_next_bar()  # Always returns Event
+```
+
+**Key Benefits:**
+- **Simple Common Case**: Check availability, then get event - no None handling
+- **Future-Proof**: None available for legitimate return values
+- **Clear Semantics**: Explicit availability checking vs exceptional situations
+- **Exception-Based Edge Cases**: Finished/error states handled through exceptions
+- **KISS Principle**: Minimal complexity for 90% of use cases
 
 **Dependencies**: Requires Event abstract base class and concrete event objects
 
