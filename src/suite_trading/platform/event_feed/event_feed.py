@@ -83,32 +83,6 @@ class EventFeed(Protocol):
         """
         ...
 
-    def get_event_types(self) -> list[str]:
-        """Tell what kinds of events this feed gives you.
-
-        This lets you know what to expect from this feed. The names here should
-        match what you'll see in the actual events when you call next().
-
-        Common types you might see:
-        - "bar": Price bars (open, high, low, close data)
-        - "trade_tick": Individual trades that happened
-        - "quote_tick": Bid/ask price updates
-        - "one_time_event": Something that happens once at a specific time
-        - "periodic_event": Something that happens regularly (like every minute)
-
-        Returns:
-            list[str]: List of event type names this feed can give you.
-                      These match what you'll see in the events themselves.
-
-        Example:
-            # Feed that only gives bars
-            return ["bar"]
-
-            # Feed that gives multiple types
-            return ["trade_tick", "quote_tick"]
-        """
-        ...
-
     def connect(self) -> None:
         """Connect to the data source if needed.
 
