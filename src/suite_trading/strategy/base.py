@@ -1,3 +1,4 @@
+from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.tick.trade_tick import TradeTick
@@ -91,7 +92,7 @@ class Strategy:
 
         # Subscribe to the message bus topic
         topic = TopicProtocol.create_bar_topic(bar_type)
-        MessageBus.get().subscribe(topic, self.on_bar)
+        MessageBus.get().subscribe(topic, self.on_event)
 
         # Remember the subscribed bar type
         self._subscribed_bar_types.add(bar_type)
@@ -110,7 +111,7 @@ class Strategy:
         if bar_type in self._subscribed_bar_types:
             # Unsubscribe from the message bus topic
             topic = TopicProtocol.create_bar_topic(bar_type)
-            MessageBus.get().unsubscribe(topic, self.on_bar)
+            MessageBus.get().unsubscribe(topic, self.on_event)
             self._subscribed_bar_types.remove(bar_type)
 
             # Stop market data (will stop publishing if last subscriber)
@@ -132,7 +133,7 @@ class Strategy:
 
         # Subscribe to the message bus topic
         topic = TopicProtocol.create_trade_tick_topic(instrument)
-        MessageBus.get().subscribe(topic, self.on_trade_tick)
+        MessageBus.get().subscribe(topic, self.on_event)
 
         # Remember the subscribed instrument
         self._subscribed_trade_tick_instruments.add(instrument)
@@ -153,7 +154,7 @@ class Strategy:
 
         # Subscribe to the message bus topic
         topic = TopicProtocol.create_quote_tick_topic(instrument)
-        MessageBus.get().subscribe(topic, self.on_quote_tick)
+        MessageBus.get().subscribe(topic, self.on_event)
 
         # Remember the subscribed instrument
         self._subscribed_quote_tick_instruments.add(instrument)
@@ -172,7 +173,7 @@ class Strategy:
         if instrument in self._subscribed_trade_tick_instruments:
             # Unsubscribe from the message bus topic
             topic = TopicProtocol.create_trade_tick_topic(instrument)
-            MessageBus.get().unsubscribe(topic, self.on_trade_tick)
+            MessageBus.get().unsubscribe(topic, self.on_event)
             self._subscribed_trade_tick_instruments.remove(instrument)
 
             # Stop market data (will stop publishing if last subscriber)
@@ -192,7 +193,7 @@ class Strategy:
         if instrument in self._subscribed_quote_tick_instruments:
             # Unsubscribe from the message bus topic
             topic = TopicProtocol.create_quote_tick_topic(instrument)
-            MessageBus.get().unsubscribe(topic, self.on_quote_tick)
+            MessageBus.get().unsubscribe(topic, self.on_event)
             self._subscribed_quote_tick_instruments.remove(instrument)
 
             # Stop market data (will stop publishing if last subscriber)
@@ -201,6 +202,44 @@ class Strategy:
     # -----------------------------------------------
     # DATA HANDLERS
     # -----------------------------------------------
+
+    def on_event(self, event: Event):
+        """Universal callback receiving complete event wrapper.
+
+        This method receives the full event context including:
+        - dt_received (when event entered our system)
+        - dt_event (official event timestamp)
+        - event_type (for routing/filtering)
+        - Complete event metadata
+
+        Override this method when you need access to event metadata.
+        The default implementation routes events to specific callbacks.
+
+        Args:
+            event (Event): The complete event wrapper (NewBarEvent, NewTradeTickEvent, etc.)
+        """
+        # Default implementation routes to specific handlers
+        self._distribute_event_to_specific_callbacks(event)
+
+    def _distribute_event_to_specific_callbacks(self, event: Event):
+        """Internal routing method to distribute events to specific callbacks.
+
+        This method extracts the pure data objects from event wrappers and
+        calls the appropriate specific callback methods (on_bar, on_trade_tick, etc.).
+
+        Args:
+            event (Event): The event wrapper to route to specific callbacks.
+        """
+        # TODO: Let's think, what is better, if we should check event_type
+        #   as string or it would be better to check `instanceof` and compare real type
+
+        if event.event_type == "bar":
+            self.on_bar(event.bar)  # Extract bar from NewBarEvent
+        elif event.event_type == "trade_tick":
+            self.on_trade_tick(event.trade_tick)  # Extract from NewTradeTickEvent
+        elif event.event_type == "quote_tick":
+            self.on_quote_tick(event.quote_tick)  # Extract from NewQuoteTickEvent
+        # Add other event types as needed
 
     def on_bar(self, bar: Bar):
         """Called when a new bar is received.

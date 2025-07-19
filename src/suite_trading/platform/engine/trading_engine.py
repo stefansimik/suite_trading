@@ -1,10 +1,12 @@
 import logging
-from typing import Optional
+import heapq
+from typing import Optional, List
+from datetime import datetime
 from suite_trading.strategy.base import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.message_priority import SubscriberPriority
 from suite_trading.platform.messaging.topic_protocol import TopicProtocol
-from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order import Order
@@ -12,6 +14,7 @@ from suite_trading.platform.cache import Cache
 from suite_trading.platform.providers.historical_market_data_provider import HistoricalMarketDataProvider
 from suite_trading.platform.providers.live_market_data_provider import LiveMarketDataProvider
 from suite_trading.platform.providers.brokerage_provider import BrokerageProvider
+from suite_trading.platform.event_feed.event_feed import EventFeed
 
 logger = logging.getLogger(__name__)
 
@@ -60,16 +63,23 @@ class TradingEngine:
         self.live_data_provider = live_data_provider
         self.brokerage_provider = brokerage_provider
 
+        # EventFeed management
+        self._event_feeds: List[EventFeed] = []
+        self._event_buffer: List[Event] = []  # Min-heap for chronological ordering
+        self._current_time: Optional[datetime] = None
+        self._is_running: bool = False
+
         # Subscribe cache to all bar data with system highest priority
         # This ensures the cache receives and stores data before strategies process it
         MessageBus.get().subscribe("bar::*", Cache.get().on_bar, SubscriberPriority.SYSTEM_HIGHEST)
 
     def start(self):
-        """Start all registered strategies and connect providers.
+        """Start the TradingEngine and all EventFeeds.
 
-        This method connects the providers and calls the on_start
-        method of each registered strategy.
+        This method connects providers, starts EventFeeds, and begins event processing.
         """
+        self._is_running = True
+
         # Connect providers
         if self.historical_data_provider:
             self.historical_data_provider.connect()
@@ -77,18 +87,31 @@ class TradingEngine:
             self.live_data_provider.connect()
         self.brokerage_provider.connect()
 
+        # Connect all EventFeeds
+        for feed in self._event_feeds:
+            feed.connect()
+
         # Start strategies
         for strategy in self.strategies:
             strategy.on_start()
 
-    def stop(self):
-        """Stop all strategies and disconnect providers.
+        # Start event processing loop
+        self._process_events()
 
-        This method calls the on_stop method of each registered strategy,
-        which will automatically unsubscribe from all bar subscriptions,
-        then disconnects the providers.
+    # TODO: Is order here correct? Shouldn't it be in reverse order than in `start` function?
+    def stop(self):
+        """Stop the TradingEngine and disconnect all EventFeeds.
+
+        This method stops event processing, disconnects EventFeeds, stops strategies,
+        and disconnects providers.
         """
-        # Stop strategies first
+        self._is_running = False
+
+        # Disconnect all EventFeeds
+        for feed in self._event_feeds:
+            feed.disconnect()
+
+        # Stop strategies
         for strategy in self.strategies:
             strategy.on_stop()
 
@@ -118,6 +141,106 @@ class TradingEngine:
         # Set the trading engine reference in the strategy
         strategy._set_trading_engine(self)
         self.strategies.append(strategy)
+
+    def add_event_feed(self, event_feed: EventFeed):
+        """Add an EventFeed to the TradingEngine.
+
+        EventFeeds are the primary way to feed events/data into the TradingEngine.
+        All events from EventFeeds are processed chronologically and distributed
+        via MessageBus to strategies.
+
+        Args:
+            event_feed (EventFeed): The EventFeed to add for event processing.
+        """
+        self._event_feeds.append(event_feed)
+
+        # TODO: Re-evaluate, why we have to check if this engine is running.
+        #   And what happens if it is not running? When the EventFeed will be connected later?
+        if self._is_running:
+            event_feed.connect()
+
+    def remove_event_feed(self, event_feed: EventFeed):
+        """Remove an EventFeed from the TradingEngine.
+
+        Args:
+            event_feed (EventFeed): The EventFeed to remove.
+        """
+        if event_feed in self._event_feeds:
+            event_feed.disconnect()
+            self._event_feeds.remove(event_feed)
+
+    def get_current_time(self) -> Optional[datetime]:
+        """Get the current time from event processing.
+
+        In backtesting mode, this reflects the latest event timestamp.
+        In live trading mode, this reflects real-time progression.
+
+        Returns:
+            datetime: Current time from event processing, or None if no events processed yet.
+        """
+        # TODO: TradingEngine will need to have own StateMachine, that will reflect
+        #   the state, in which it is right now and based on the state, it will return
+        #   correct time (historical time from last event | or live time from system clock)
+
+        return self._current_time
+
+    def _process_events(self):
+        """Main event processing loop - polls EventFeeds and distributes events."""
+        while self._is_running:
+            # Poll all EventFeeds for new events
+            self._poll_event_feeds()
+
+            # Process buffered events chronologically
+            self._process_buffered_events()
+
+            # Remove finished EventFeeds
+            self._cleanup_finished_feeds()
+
+            # Break if no more EventFeeds (for backtesting)
+            if not self._event_feeds:
+                break
+
+    def _poll_event_feeds(self):
+        """Poll all EventFeeds for new events and buffer them."""
+        for feed in self._event_feeds:
+            if feed.is_connected():
+                event = feed.next()
+                if event is not None:
+                    # Add to buffer for chronological processing
+                    heapq.heappush(self._event_buffer, event)
+                    # TODO: Need to explain / understand, how this works really
+
+    def _process_buffered_events(self):
+        """Process buffered events in chronological order."""
+        while self._event_buffer:
+            # Get earliest event
+            event = heapq.heappop(self._event_buffer)
+
+            # Update current time
+            self._current_time = event.dt_event
+
+            # Distribute event via MessageBus
+            self._distribute_event(event)
+
+    def _distribute_event(self, event: Event):
+        """Distribute event to strategies via MessageBus."""
+        if event.event_type == "bar":
+            topic = TopicProtocol.create_bar_topic(event.bar.bar_type)
+            MessageBus.get().publish(topic, event)
+        elif event.event_type == "trade_tick":
+            topic = TopicProtocol.create_trade_tick_topic(event.trade_tick.instrument)
+            MessageBus.get().publish(topic, event)
+        elif event.event_type == "quote_tick":
+            topic = TopicProtocol.create_quote_tick_topic(event.quote_tick.instrument)
+            MessageBus.get().publish(topic, event)
+        # Add other event types as needed
+
+    def _cleanup_finished_feeds(self):
+        """Remove finished EventFeeds to optimize performance."""
+        finished_feeds = [feed for feed in self._event_feeds if feed.is_finished()]
+        for feed in finished_feeds:
+            feed.disconnect()
+            self._event_feeds.remove(feed)
 
     def subscribe_to_bars(self, bar_type: BarType, subscriber: object):
         """Subscribe to bar data for the specified bar type.
@@ -222,19 +345,3 @@ class TradingEngine:
             order (Order): The order to submit for execution.
         """
         self.brokerage_provider.submit_order(order)
-
-    # TODO: This will be removed and replaced by MarketDataProvider functionality
-    def publish_bar(self, bar: Bar):
-        """Publish a bar to the message bus.
-
-        Args:
-            bar (Bar): The bar to publish.
-
-        Raises:
-            ValueError: If no strategies are subscribed to receive the bar data.
-        """
-        # Create a standardized topic name for the bar
-        topic = TopicProtocol.create_bar_topic(bar.bar_type)
-
-        # Publish the bar to the message bus
-        MessageBus.get().publish(topic, bar)
