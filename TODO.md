@@ -35,6 +35,13 @@ The architecture **guarantees** that strategies receive **exactly the same event
 
 **Note:** Renamed from MarketDataCatalog for clarity - this component is essentially market data storage.
 
+**Why "MarketDataStorage"**: We chose this name because it perfectly balances clarity and simplicity:
+- **Crystal clear purpose**: Immediately understandable - it stores market data
+- **Implementation neutral**: Doesn't imply specific backend (database, files, cloud, etc.)
+- **Natural language alignment**: Matches how users actually talk ("market data storage")
+- **KISS principle**: Simple, straightforward, no over-engineering
+- **User-centric design**: Aligns with user mental model perfectly
+
 MarketDataStorage should be an abstract storage interface (Protocol), allowing multiple implementations.
 
 **Design Focus:**
@@ -61,6 +68,32 @@ MarketDataStorage is a repository that stores large volumes of various historica
 - Database-based implementations require `connect` and `disconnect` functions
 - Return event objects that inherit from Event abstract base class
 - Support for querying by time ranges and instruments
+
+**Method Interface:**
+
+*Connection Management:*
+Essential for database implementations:
+- `connect()` - Establish connection to storage backend
+- `disconnect()` - Close connection to storage backend
+- `is_connected()` - Check if connection is active
+
+*Generic Reading Data of Any Data-Type:*
+- `query_events(event_types, start, end)` - Generic query that returns one or more event/data types within specified range. If start/end datetime is not specified - there is no limit
+
+*User-Friendly Reading of Most Common Market Data:*
+Built on top of generic `query_events`:
+- `get_bars(bar_type: BarType, start, end)` - Get bar data for specific bar type and time range
+- `get_trade_ticks(...)` - Get trade tick data for specified criteria and time range
+- `get_quote_ticks(...)` - Get quote tick data for specified criteria and time range
+
+*Discovery of Available Data-Types:*
+- `list_event_types(...)` - Returns all available event types with their existing time ranges AND event counts. Provides comprehensive information about what data is available including date ranges, total count of events, instrument information, and other relevant metadata
+
+*Methods for Add/Update Data:*
+- `add_or_update(Event or Iterator<Event>)` - Add new events or update existing events. Iterator support handles bulk operations efficiently
+
+*Methods for Removal:*
+- `remove(Event or Iterator<Event>)` - Remove specified events from storage
 
 **Storage Schema (SQLite example):**
 - Separate table for Bars with reference to BarTypes table, which references Instrument
