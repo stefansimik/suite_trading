@@ -46,11 +46,18 @@ MarketDataStorage should be an abstract storage interface (Protocol), allowing m
   - Other storage backends
 
 **Core Functionality:**
+MarketDataStorage is a repository that stores large volumes of various historical market data with the following capabilities:
+
 - Collection/database of multiple series of market events:
   - Bars of instruments
   - Trade-ticks of instruments
   - Quote-ticks of instruments
-- Standard feature: ability to add any market events into the storage
+- Ability to add/remove/update/read any single market data (or range from-until)
+- Ability to filter data - select just a part/portion (from-until) and create an EventFeed
+- Can be read-only (does not support modification operations like add/remove/update, but only read)
+- On request, should be able to return EventFeed based on criteria (BarType/TradeTick/QuoteTick + from + until)
+- By nature serves only historical data (only past data can be stored, as future/live data is never known in advance and cannot be stored)
+- Main motivation: single storage for various data with ability to easily get EventFeed from it
 - Database-based implementations require `connect` and `disconnect` functions
 - Return event objects that inherit from Event abstract base class
 - Support for querying by time ranges and instruments
@@ -65,20 +72,23 @@ MarketDataStorage should be an abstract storage interface (Protocol), allowing m
 - Large dataset management and partitioning strategies
 - Optimal database schema performance optimization
 
-MarketEventStorage will be the primary source of historical events for strategies running in backtesting mode.
+MarketDataStorage will be the primary source of historical events for strategies running in backtesting mode.
 
 **Dependencies**: Requires concrete event objects from Phase 1
 
 #### 2.2 Historical EventFeed Implementations
 
-**Why Now**: Concrete implementations that read from MarketEventStorage.
+**Why Now**: Concrete implementations that read from MarketDataStorage.
+
+EventFeed is a streaming interface that delivers events (one-by-one, chronologically ordered) to strategies. It can be used for feeding both historical and live data.
 
 **Implementation Types:**
 - HistoricalBarFeed
 - HistoricalTradeFeed
 - HistoricalQuoteFeed
+- CsvFileEventFeed - simple implementation that reads bar(s) from CSV file and feeds them one-by-one into the strategy
 
-**Dependencies**: Requires EventFeed interface and MarketEventStorage
+**Dependencies**: Requires EventFeed interface and MarketDataStorage
 
 #### 2.3 Live EventFeed Implementations
 
@@ -221,7 +231,7 @@ Backtesting executes **only Phase B** of the complete Live Trading workflow and 
 **Event-Driven Process:**
 1. Strategy subscribes to specific market events (determines required EventFeeds)
 2. Specify start + end datetime (backtesting period)
-3. TradingEngine creates historical EventFeeds from MarketEventStorage for **same event types**
+3. TradingEngine creates historical EventFeeds from MarketDataStorage for **same event types**
 4. TradingEngine polls events from all EventFeeds using `next()` method
 5. Events sorted by datetime and distributed via MessageBus
 6. Time progresses automatically based on event timestamps
@@ -254,7 +264,7 @@ The workflow ensures perfect event type consistency through this process:
 
 1. **Strategy subscribes** to specific market event types (e.g., bars, trade ticks, quote ticks)
 2. **TradingEngine creates corresponding EventFeeds** from appropriate sources:
-   - **Historical Mode**: EventFeeds from MarketEventStorage for same event types
+   - **Historical Mode**: EventFeeds from MarketDataStorage for same event types
    - **Live Mode**: EventFeeds from live sources for same event types
 3. **Same callback system** handles both historical and live events through identical methods
 4. **Same event objects** flow through strategy (Bar, TradeTick, QuoteTick, etc.)
@@ -263,7 +273,7 @@ The workflow ensures perfect event type consistency through this process:
 - **Universal Event Interface**: All event objects inherit from the same `Event` abstract base class
 - **Identical EventFeed Interface**: Historical and live EventFeeds use same `next()` method
 - **Same Callback Methods**: `on_bar()`, `on_trade_tick()`, `on_quote_tick()` work identically
-- **MarketEventStorage Contract**: Must return same event object types as live feeds provide
+- **MarketDataStorage Contract**: Must return same event object types as live feeds provide
 
 **Four-Phase Unified Process:**
 

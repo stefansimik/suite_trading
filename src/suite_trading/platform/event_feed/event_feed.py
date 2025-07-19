@@ -3,14 +3,14 @@ from suite_trading.domain.event import Event
 
 
 class EventFeed(Protocol):
-    """Simple way to get events from different sources.
+    """Streaming interface that delivers events (one-by-one, chronologically ordered) to strategies.
 
-    EventFeed is technical abstraction, that lets you get events (or data) from anywhere - historical data files, live market
-    feeds, scheduled timers, etc. It's designed to be super simple to use while still
-    being fast when you have lots of event sources.
+    Can be used for feeding both historical and live data from any source - historical data files,
+    live market feeds, scheduled timers, etc. The interface is designed to be super simple to use
+    while still being fast when you have lots of event sources.
 
-    Every EventFeed provides both event access and resource management.
-    Simple feeds that don't need connections can implement no-op methods.
+    Every EventFeed provides both event access and resource management. Simple feeds that don't
+    need connections can implement no-op methods.
 
     How it works:
     - Call next() to get an event, or None if nothing is ready
