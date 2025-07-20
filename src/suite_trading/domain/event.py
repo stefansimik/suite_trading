@@ -40,20 +40,6 @@ class Event(ABC):
         """
         ...
 
-    @property
-    @abstractmethod
-    def event_type(self) -> str:
-        """Type identifier for the event object.
-
-        Used for easy type distinction and routing to appropriate handlers.
-        Should be a simple string identifier like "bar", "trade_tick",
-        "quote_tick", "time_event", etc.
-
-        Returns:
-            str: The type identifier for this event object.
-        """
-        ...
-
     def __lt__(self, other: "Event") -> bool:
         """Enable sorting by event datetime for chronological processing.
 

@@ -30,17 +30,3 @@ class NewBarEvent(Event):
             datetime: The bar end timestamp.
         """
         return self.bar.end_dt
-
-    @property
-    def event_type(self) -> str:
-        """Type identifier for routing and filtering.
-
-        Returns:
-            str: Always returns "bar" for bar events.
-        """
-        # TODO: Let's think if returning string as type of event is really needed.
-        #   Couldn't we check the class name of the Event and convert it to string
-        #   or alternatively remove this `event_type` attribute and where needed
-        #   we could simply check the class of the Event itself and handle apropriately?
-
-        return "bar"

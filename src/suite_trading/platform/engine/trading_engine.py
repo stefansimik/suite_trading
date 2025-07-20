@@ -1,126 +1,61 @@
 import logging
-import heapq
-from typing import Optional, List
-from datetime import datetime
 from suite_trading.strategy.base import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
-from suite_trading.platform.messaging.message_priority import SubscriberPriority
 from suite_trading.platform.messaging.topic_protocol import TopicProtocol
-from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.instrument import Instrument
-from suite_trading.domain.order.order import Order
-from suite_trading.platform.cache import Cache
-from suite_trading.platform.providers.historical_market_data_provider import HistoricalMarketDataProvider
-from suite_trading.platform.providers.live_market_data_provider import LiveMarketDataProvider
-from suite_trading.platform.providers.brokerage_provider import BrokerageProvider
-from suite_trading.platform.event_feed.event_feed import EventFeed
 
 logger = logging.getLogger(__name__)
 
 
 class TradingEngine:
-    """Main engine for managing and running trading strategies.
+    """Simple engine for managing and running trading strategies.
 
-    The TradingEngine works as the main coordinator between strategies and three providers:
-    historical market data, live market data, and brokerage operations.
-
-    Strategies don't talk directly to providers - instead, they ask the TradingEngine
-    to get market data for them and execute orders through the brokerage provider.
+    The TradingEngine coordinates strategies and provides a framework for strategy
+    execution and management.
 
     **Architecture:**
-    - **HistoricalMarketDataProvider**: Handles bulk historical data retrieval for strategy initialization
-    - **LiveMarketDataProvider**: Manages real-time streaming subscriptions for live trading
-    - **BrokerageProvider**: Handles order execution and position management
+    - **Strategies**: Implement trading logic and subscribe to events via MessageBus
+    - **MessageBus**: Handles event distribution to strategies
 
-    **Why this indirect approach is important:**
-    - **Safety check**: Engine makes sure the providers are available before subscribing
-    - **Stable abstraction layer**: TradingEngine acts as a stable abstraction layer that shields strategies from changes in the underlying providers. The engine provides a consistent interface that doesn't change even when provider implementations or APIs evolve.
-    - **Automated connections**: Engine automatically connects and disconnects providers when TradingEngine starts and stops
-
-    This design lets strategies focus on trading decisions while the engine takes care
-    of getting the data they need, managing connections, and executing orders.
+    This simple design focuses on strategy coordination and management.
     """
 
-    def __init__(
-        self,
-        brokerage_provider: BrokerageProvider,
-        historical_data_provider: Optional[HistoricalMarketDataProvider] = None,
-        live_data_provider: Optional[LiveMarketDataProvider] = None,
-    ):
+    def __init__(self):
         """Initialize a new TradingEngine instance.
 
-        Args:
-            brokerage_provider (BrokerageProvider): Required provider for trading operations.
-            historical_data_provider (Optional[HistoricalMarketDataProvider]): Optional provider for historical market data.
-            live_data_provider (Optional[LiveMarketDataProvider]): Optional provider for live market data streaming.
-
-        Uses the singleton Cache and MessageBus instances.
+        Creates its own MessageBus instance for isolated operation.
         """
         self.strategies: list[Strategy] = []
-
-        self.historical_data_provider = historical_data_provider
-        self.live_data_provider = live_data_provider
-        self.brokerage_provider = brokerage_provider
-
-        # EventFeed management
-        self._event_feeds: List[EventFeed] = []
-        self._event_buffer: List[Event] = []  # Min-heap for chronological ordering
-        self._current_time: Optional[datetime] = None
         self._is_running: bool = False
+        self.message_bus = MessageBus()
 
-        # Subscribe cache to all bar data with system highest priority
-        # This ensures the cache receives and stores data before strategies process it
-        MessageBus.get().subscribe("bar::*", Cache.get().on_bar, SubscriberPriority.SYSTEM_HIGHEST)
+        # Track strategy subscriptions for demand-based publishing
+        self._bar_subscriptions: dict[BarType, set[Strategy]] = {}  # Track which strategies subscribe to which bar types
+        self._trade_tick_subscriptions: dict[Instrument, set[Strategy]] = {}  # Track trade tick subscriptions
+        self._quote_tick_subscriptions: dict[Instrument, set[Strategy]] = {}  # Track quote tick subscriptions
 
     def start(self):
-        """Start the TradingEngine and all EventFeeds.
+        """Start the TradingEngine and all strategies.
 
-        This method connects providers, starts EventFeeds, and begins event processing.
+        This method starts all registered strategies.
         """
         self._is_running = True
-
-        # Connect providers
-        if self.historical_data_provider:
-            self.historical_data_provider.connect()
-        if self.live_data_provider:
-            self.live_data_provider.connect()
-        self.brokerage_provider.connect()
-
-        # Connect all EventFeeds
-        for feed in self._event_feeds:
-            feed.connect()
 
         # Start strategies
         for strategy in self.strategies:
             strategy.on_start()
 
-        # Start event processing loop
-        self._process_events()
-
-    # TODO: Is order here correct? Shouldn't it be in reverse order than in `start` function?
     def stop(self):
-        """Stop the TradingEngine and disconnect all EventFeeds.
+        """Stop the TradingEngine and all strategies.
 
-        This method stops event processing, disconnects EventFeeds, stops strategies,
-        and disconnects providers.
+        This method stops all registered strategies.
         """
         self._is_running = False
-
-        # Disconnect all EventFeeds
-        for feed in self._event_feeds:
-            feed.disconnect()
 
         # Stop strategies
         for strategy in self.strategies:
             strategy.on_stop()
-
-        # Disconnect providers
-        if self.historical_data_provider:
-            self.historical_data_provider.disconnect()
-        if self.live_data_provider:
-            self.live_data_provider.disconnect()
-        self.brokerage_provider.disconnect()
 
     def add_strategy(self, strategy: Strategy):
         """Add a strategy to the engine.
@@ -142,206 +77,210 @@ class TradingEngine:
         strategy._set_trading_engine(self)
         self.strategies.append(strategy)
 
-    def add_event_feed(self, event_feed: EventFeed):
-        """Add an EventFeed to the TradingEngine.
+    # -----------------------------------------------
+    # MARKET DATA SUBSCRIPTION MANAGEMENT
+    # -----------------------------------------------
 
-        EventFeeds are the primary way to feed events/data into the TradingEngine.
-        All events from EventFeeds are processed chronologically and distributed
-        via MessageBus to strategies.
+    def subscribe_to_bars(self, bar_type: BarType, strategy: Strategy):
+        """Subscribe a strategy to bar data for a specific bar type.
 
-        Args:
-            event_feed (EventFeed): The EventFeed to add for event processing.
-        """
-        self._event_feeds.append(event_feed)
-
-        # TODO: Re-evaluate, why we have to check if this engine is running.
-        #   And what happens if it is not running? When the EventFeed will be connected later?
-        if self._is_running:
-            event_feed.connect()
-
-    def remove_event_feed(self, event_feed: EventFeed):
-        """Remove an EventFeed from the TradingEngine.
-
-        Args:
-            event_feed (EventFeed): The EventFeed to remove.
-        """
-        if event_feed in self._event_feeds:
-            event_feed.disconnect()
-            self._event_feeds.remove(event_feed)
-
-    def get_current_time(self) -> Optional[datetime]:
-        """Get the current time from event processing.
-
-        In backtesting mode, this reflects the latest event timestamp.
-        In live trading mode, this reflects real-time progression.
-
-        Returns:
-            datetime: Current time from event processing, or None if no events processed yet.
-        """
-        # TODO: TradingEngine will need to have own StateMachine, that will reflect
-        #   the state, in which it is right now and based on the state, it will return
-        #   correct time (historical time from last event | or live time from system clock)
-
-        return self._current_time
-
-    def _process_events(self):
-        """Main event processing loop - polls EventFeeds and distributes events."""
-        while self._is_running:
-            # Poll all EventFeeds for new events
-            self._poll_event_feeds()
-
-            # Process buffered events chronologically
-            self._process_buffered_events()
-
-            # Remove finished EventFeeds
-            self._cleanup_finished_feeds()
-
-            # Break if no more EventFeeds (for backtesting)
-            if not self._event_feeds:
-                break
-
-    def _poll_event_feeds(self):
-        """Poll all EventFeeds for new events and buffer them."""
-        for feed in self._event_feeds:
-            if feed.is_connected():
-                event = feed.next()
-                if event is not None:
-                    # Add to buffer for chronological processing
-                    heapq.heappush(self._event_buffer, event)
-                    # TODO: Need to explain / understand, how this works really
-
-    def _process_buffered_events(self):
-        """Process buffered events in chronological order."""
-        while self._event_buffer:
-            # Get earliest event
-            event = heapq.heappop(self._event_buffer)
-
-            # Update current time
-            self._current_time = event.dt_event
-
-            # Distribute event via MessageBus
-            self._distribute_event(event)
-
-    def _distribute_event(self, event: Event):
-        """Distribute event to strategies via MessageBus."""
-        if event.event_type == "bar":
-            topic = TopicProtocol.create_bar_topic(event.bar.bar_type)
-            MessageBus.get().publish(topic, event)
-        elif event.event_type == "trade_tick":
-            topic = TopicProtocol.create_trade_tick_topic(event.trade_tick.instrument)
-            MessageBus.get().publish(topic, event)
-        elif event.event_type == "quote_tick":
-            topic = TopicProtocol.create_quote_tick_topic(event.quote_tick.instrument)
-            MessageBus.get().publish(topic, event)
-        # Add other event types as needed
-
-    def _cleanup_finished_feeds(self):
-        """Remove finished EventFeeds to optimize performance."""
-        finished_feeds = [feed for feed in self._event_feeds if feed.is_finished()]
-        for feed in finished_feeds:
-            feed.disconnect()
-            self._event_feeds.remove(feed)
-
-    def subscribe_to_bars(self, bar_type: BarType, subscriber: object):
-        """Subscribe to bar data for the specified bar type.
+        This method handles all the technical details of subscription:
+        - Subscribes the strategy to the MessageBus topic
+        - Tracks which strategies are subscribed to which bar types
+        - Initiates data publishing when first strategy subscribes
 
         Args:
             bar_type (BarType): The type of bar to subscribe to.
-            subscriber (object): The subscriber object (typically a strategy).
-
-        Raises:
-            RuntimeError: If no live data provider is configured.
+            strategy (Strategy): The strategy that wants to subscribe.
         """
-        if not self.live_data_provider:
-            raise RuntimeError(
-                f"Cannot call `subscribe_to_bars` for $bar_type ({bar_type}) because $live_data_provider is None. Set a live data provider when creating TradingEngine.",
-            )
-        self.live_data_provider.subscribe_to_bars(bar_type, subscriber)
+        # Initialize subscription set for this bar type if needed
+        if bar_type not in self._bar_subscriptions:
+            self._bar_subscriptions[bar_type] = set()
 
-    def unsubscribe_from_bars(self, bar_type: BarType, subscriber: object):
-        """Unsubscribe from bar data for the specified bar type.
+        # Check if this is the first subscriber for this bar type
+        is_first_subscriber = len(self._bar_subscriptions[bar_type]) == 0
+
+        # Add strategy to subscription tracking
+        self._bar_subscriptions[bar_type].add(strategy)
+
+        # Subscribe strategy to MessageBus topic
+        topic = TopicProtocol.create_bar_topic(bar_type)
+        self.message_bus.subscribe(topic, strategy.on_event)
+
+        # TODO: Initiate sending bars from market data provider
+        # When first strategy subscribes, start requesting this bar type from data provider
+        if is_first_subscriber:
+            # TODO: self.market_data_provider.start_bars(bar_type)
+            pass
+
+    def unsubscribe_from_bars(self, bar_type: BarType, strategy: Strategy):
+        """Unsubscribe a strategy from bar data for a specific bar type.
+
+        This method handles cleanup when a strategy unsubscribes:
+        - Unsubscribes the strategy from the MessageBus topic
+        - Removes strategy from subscription tracking
+        - Stops data publishing when last strategy unsubscribes
 
         Args:
             bar_type (BarType): The type of bar to unsubscribe from.
-            subscriber (object): The subscriber object to remove.
-
-        Raises:
-            RuntimeError: If no live data provider is configured.
+            strategy (Strategy): The strategy that wants to unsubscribe.
         """
-        if not self.live_data_provider:
-            raise RuntimeError(
-                f"Cannot call `unsubscribe_from_bars` for $bar_type ({bar_type}) because $live_data_provider is None. Set a live data provider when creating TradingEngine.",
+        # Check if we have subscriptions for this bar type
+        if bar_type not in self._bar_subscriptions:
+            logger.warning(
+                f"Cannot call `unsubscribe_from_bars` for $bar_type ({bar_type}) and $strategy ('{strategy.name}') because no subscriptions exist for this bar type. This likely indicates a logical mistake - trying to unsubscribe from something that was never subscribed to.",
             )
-        self.live_data_provider.unsubscribe_from_bars(bar_type, subscriber)
+            return
 
-    def subscribe_to_trade_ticks(self, instrument: Instrument, subscriber: object):
-        """Subscribe to trade tick data for the specified instrument.
+        # Remove strategy from subscription tracking
+        self._bar_subscriptions[bar_type].discard(strategy)
+
+        # Unsubscribe strategy from MessageBus topic
+        topic = TopicProtocol.create_bar_topic(bar_type)
+        self.message_bus.unsubscribe(topic, strategy.on_event)
+
+        # Check if this was the last subscriber
+        if len(self._bar_subscriptions[bar_type]) == 0:
+            # Clean up empty subscription set
+            del self._bar_subscriptions[bar_type]
+
+            # TODO: Stop requesting bars from market data provider
+            # When last strategy unsubscribes, stop requesting this bar type from data provider
+            # TODO: self.market_data_provider.stop_bars(bar_type)
+            pass
+
+    def subscribe_to_trade_ticks(self, instrument: Instrument, strategy: Strategy):
+        """Subscribe a strategy to trade tick data for a specific instrument.
+
+        This method handles all the technical details of subscription:
+        - Subscribes the strategy to the MessageBus topic
+        - Tracks which strategies are subscribed to which instruments
+        - Initiates data publishing when first strategy subscribes
 
         Args:
             instrument (Instrument): The instrument to subscribe to.
-            subscriber (object): The subscriber object (typically a strategy).
-
-        Raises:
-            RuntimeError: If no live data provider is configured.
+            strategy (Strategy): The strategy that wants to subscribe.
         """
-        if not self.live_data_provider:
-            raise RuntimeError(
-                f"Cannot call `subscribe_to_trade_ticks` for $instrument ({instrument.name}) because $live_data_provider is None. Set a live data provider when creating TradingEngine.",
-            )
-        self.live_data_provider.subscribe_to_trade_ticks(instrument, subscriber)
+        # Initialize subscription set for this instrument if needed
+        if instrument not in self._trade_tick_subscriptions:
+            self._trade_tick_subscriptions[instrument] = set()
 
-    def unsubscribe_from_trade_ticks(self, instrument: Instrument, subscriber: object):
-        """Unsubscribe from trade tick data for the specified instrument.
+        # Check if this is the first subscriber for this instrument
+        is_first_subscriber = len(self._trade_tick_subscriptions[instrument]) == 0
+
+        # Add strategy to subscription tracking
+        self._trade_tick_subscriptions[instrument].add(strategy)
+
+        # Subscribe strategy to MessageBus topic
+        topic = TopicProtocol.create_trade_tick_topic(instrument)
+        self.message_bus.subscribe(topic, strategy.on_event)
+
+        # TODO: Initiate sending trade ticks from market data provider
+        # When first strategy subscribes, start requesting this instrument from data provider
+        if is_first_subscriber:
+            # TODO: self.market_data_provider.start_trade_ticks(instrument)
+            pass
+
+    def unsubscribe_from_trade_ticks(self, instrument: Instrument, strategy: Strategy):
+        """Unsubscribe a strategy from trade tick data for a specific instrument.
+
+        This method handles cleanup when a strategy unsubscribes:
+        - Unsubscribes the strategy from the MessageBus topic
+        - Removes strategy from subscription tracking
+        - Stops data publishing when last strategy unsubscribes
 
         Args:
             instrument (Instrument): The instrument to unsubscribe from.
-            subscriber (object): The subscriber object to remove.
-
-        Raises:
-            RuntimeError: If no live data provider is configured.
+            strategy (Strategy): The strategy that wants to unsubscribe.
         """
-        if not self.live_data_provider:
-            raise RuntimeError(
-                f"Cannot call `unsubscribe_from_trade_ticks` for $instrument ({instrument.name}) because $live_data_provider is None. Set a live data provider when creating TradingEngine.",
+        # Check if we have subscriptions for this instrument
+        if instrument not in self._trade_tick_subscriptions:
+            logger.warning(
+                f"Cannot call `unsubscribe_from_trade_ticks` for $instrument ({instrument}) and $strategy ('{strategy.name}') because no subscriptions exist for this instrument. This likely indicates a logical mistake - trying to unsubscribe from something that was never subscribed to.",
             )
-        self.live_data_provider.unsubscribe_from_trade_ticks(instrument, subscriber)
+            return
 
-    def subscribe_to_quote_ticks(self, instrument: Instrument, subscriber: object):
-        """Subscribe to quote tick data for the specified instrument.
+        # Remove strategy from subscription tracking
+        self._trade_tick_subscriptions[instrument].discard(strategy)
+
+        # Unsubscribe strategy from MessageBus topic
+        topic = TopicProtocol.create_trade_tick_topic(instrument)
+        self.message_bus.unsubscribe(topic, strategy.on_event)
+
+        # Check if this was the last subscriber
+        if len(self._trade_tick_subscriptions[instrument]) == 0:
+            # Clean up empty subscription set
+            del self._trade_tick_subscriptions[instrument]
+
+            # TODO: Stop requesting trade ticks from market data provider
+            # When last strategy unsubscribes, stop requesting this instrument from data provider
+            # TODO: self.market_data_provider.stop_trade_ticks(instrument)
+            pass
+
+    def subscribe_to_quote_ticks(self, instrument: Instrument, strategy: Strategy):
+        """Subscribe a strategy to quote tick data for a specific instrument.
+
+        This method handles all the technical details of subscription:
+        - Subscribes the strategy to the MessageBus topic
+        - Tracks which strategies are subscribed to which instruments
+        - Initiates data publishing when first strategy subscribes
 
         Args:
             instrument (Instrument): The instrument to subscribe to.
-            subscriber (object): The subscriber object (typically a strategy).
-
-        Raises:
-            RuntimeError: If no live data provider is configured.
+            strategy (Strategy): The strategy that wants to subscribe.
         """
-        if not self.live_data_provider:
-            raise RuntimeError(
-                f"Cannot call `subscribe_to_quote_ticks` for $instrument ({instrument.name}) because $live_data_provider is None. Set a live data provider when creating TradingEngine.",
-            )
-        self.live_data_provider.subscribe_to_quote_ticks(instrument, subscriber)
+        # Initialize subscription set for this instrument if needed
+        if instrument not in self._quote_tick_subscriptions:
+            self._quote_tick_subscriptions[instrument] = set()
 
-    def unsubscribe_from_quote_ticks(self, instrument: Instrument, subscriber: object):
-        """Unsubscribe from quote tick data for the specified instrument.
+        # Check if this is the first subscriber for this instrument
+        is_first_subscriber = len(self._quote_tick_subscriptions[instrument]) == 0
+
+        # Add strategy to subscription tracking
+        self._quote_tick_subscriptions[instrument].add(strategy)
+
+        # Subscribe strategy to MessageBus topic
+        topic = TopicProtocol.create_quote_tick_topic(instrument)
+        self.message_bus.subscribe(topic, strategy.on_event)
+
+        # TODO: Initiate sending quote ticks from market data provider
+        # When first strategy subscribes, start requesting this instrument from data provider
+        if is_first_subscriber:
+            # TODO: self.market_data_provider.start_quote_ticks(instrument)
+            pass
+
+    def unsubscribe_from_quote_ticks(self, instrument: Instrument, strategy: Strategy):
+        """Unsubscribe a strategy from quote tick data for a specific instrument.
+
+        This method handles cleanup when a strategy unsubscribes:
+        - Unsubscribes the strategy from the MessageBus topic
+        - Removes strategy from subscription tracking
+        - Stops data publishing when last strategy unsubscribes
 
         Args:
             instrument (Instrument): The instrument to unsubscribe from.
-            subscriber (object): The subscriber object to remove.
-
-        Raises:
-            RuntimeError: If no live data provider is configured.
+            strategy (Strategy): The strategy that wants to unsubscribe.
         """
-        if not self.live_data_provider:
-            raise RuntimeError(
-                f"Cannot call `unsubscribe_from_quote_ticks` for $instrument ({instrument.name}) because $live_data_provider is None. Set a live data provider when creating TradingEngine.",
+        # Check if we have subscriptions for this instrument
+        if instrument not in self._quote_tick_subscriptions:
+            logger.warning(
+                f"Cannot call `unsubscribe_from_quote_ticks` for $instrument ({instrument}) and $strategy ('{strategy.name}') because no subscriptions exist for this instrument. This likely indicates a logical mistake - trying to unsubscribe from something that was never subscribed to.",
             )
-        self.live_data_provider.unsubscribe_from_quote_ticks(instrument, subscriber)
+            return
 
-    def submit_order(self, order: Order):
-        """Submit an order through the brokerage provider.
+        # Remove strategy from subscription tracking
+        self._quote_tick_subscriptions[instrument].discard(strategy)
 
-        Args:
-            order (Order): The order to submit for execution.
-        """
-        self.brokerage_provider.submit_order(order)
+        # Unsubscribe strategy from MessageBus topic
+        topic = TopicProtocol.create_quote_tick_topic(instrument)
+        self.message_bus.unsubscribe(topic, strategy.on_event)
+
+        # Check if this was the last subscriber
+        if len(self._quote_tick_subscriptions[instrument]) == 0:
+            # Clean up empty subscription set
+            del self._quote_tick_subscriptions[instrument]
+
+            # TODO: Stop requesting quote ticks from market data provider
+            # When last strategy unsubscribes, stop requesting this instrument from data provider
+            # TODO: self.market_data_provider.stop_quote_ticks(instrument)
+            pass

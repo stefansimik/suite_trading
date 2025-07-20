@@ -30,12 +30,3 @@ class NewQuoteTickEvent(Event):
             datetime: The quote timestamp.
         """
         return self.quote_tick.timestamp
-
-    @property
-    def event_type(self) -> str:
-        """Type identifier for routing and filtering.
-
-        Returns:
-            str: Always returns "quote_tick" for quote tick events.
-        """
-        return "quote_tick"

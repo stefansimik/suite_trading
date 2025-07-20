@@ -1,5 +1,4 @@
 from suite_trading.platform.messaging.topic_protocol import TopicProtocol
-from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
 
@@ -45,7 +44,7 @@ def test_trading_engine_publish_bar():
 
     # Subscribe to the topic
     topic = TopicProtocol.create_bar_topic(bar_type)
-    MessageBus.get().subscribe(topic, on_bar)
+    engine.message_bus.subscribe(topic, on_bar)
 
     # Publish the bar
     engine.publish_bar(bar)

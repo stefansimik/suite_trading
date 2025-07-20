@@ -2,15 +2,6 @@ import pytest
 from suite_trading.platform.messaging.message_bus import MessageBus
 
 
-@pytest.fixture(autouse=True)
-def clean_message_bus_singleton():
-    """Ensure MessageBus singleton is clean for each test."""
-    # Code before yield executes before each test
-    MessageBus.clear()
-    yield
-    # Code after yield executes after each test (none in this case)
-
-
 def test_subscribe_and_publish():
     """
     Test subscribing to topics and publishing messages,

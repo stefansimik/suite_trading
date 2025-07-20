@@ -11,4 +11,4 @@ class SubscriberPriority(IntEnum):
     LOW = -1  # Low priority - background tasks, logging
     MEDIUM = 0  # Medium priority (default) - normal strategy operations
     HIGH = 1  # High priority - important strategy operations
-    SYSTEM_HIGHEST = 2  # System highest - reserved for system components (Cache, etc.)
+    SYSTEM_HIGHEST = 2  # System highest - reserved for system components

@@ -30,12 +30,3 @@ class NewTradeTickEvent(Event):
             datetime: The trade timestamp.
         """
         return self.trade_tick.timestamp
-
-    @property
-    def event_type(self) -> str:
-        """Type identifier for routing and filtering.
-
-        Returns:
-            str: Always returns "trade_tick" for trade tick events.
-        """
-        return "trade_tick"

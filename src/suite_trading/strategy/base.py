@@ -1,11 +1,12 @@
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.market_data.tick.trade_tick import TradeTick
+from suite_trading.domain.market_data.tick.trade_tick_event import NewTradeTickEvent
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
+from suite_trading.domain.market_data.tick.quote_tick_event import NewQuoteTickEvent
 from suite_trading.domain.instrument import Instrument
-from suite_trading.platform.messaging.topic_protocol import TopicProtocol
-from suite_trading.platform.messaging.message_bus import MessageBus
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -87,14 +88,10 @@ class Strategy:
                 f"Cannot call `subscribe_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        # Request market data (will start publishing if first subscriber)
+        # Ask TradingEngine to handle all subscription details
         self._trading_engine.subscribe_to_bars(bar_type, self)
 
-        # Subscribe to the message bus topic
-        topic = TopicProtocol.create_bar_topic(bar_type)
-        MessageBus.get().subscribe(topic, self.on_event)
-
-        # Remember the subscribed bar type
+        # Remember the subscribed bar type for cleanup during stop
         self._subscribed_bar_types.add(bar_type)
 
     def unsubscribe_bars(self, bar_type: BarType):
@@ -109,13 +106,11 @@ class Strategy:
             )
 
         if bar_type in self._subscribed_bar_types:
-            # Unsubscribe from the message bus topic
-            topic = TopicProtocol.create_bar_topic(bar_type)
-            MessageBus.get().unsubscribe(topic, self.on_event)
-            self._subscribed_bar_types.remove(bar_type)
-
-            # Stop market data (will stop publishing if last subscriber)
+            # Ask TradingEngine to handle all unsubscription details
             self._trading_engine.unsubscribe_from_bars(bar_type, self)
+
+            # Remove from our local tracking
+            self._subscribed_bar_types.remove(bar_type)
 
     def subscribe_trade_ticks(self, instrument: Instrument):
         """Subscribe to trade tick data for a specific instrument with automatic demand-based publishing.
@@ -128,14 +123,10 @@ class Strategy:
                 f"Cannot call `subscribe_trade_ticks` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        # Request market data (will start publishing if first subscriber)
+        # Ask TradingEngine to handle all subscription details
         self._trading_engine.subscribe_to_trade_ticks(instrument, self)
 
-        # Subscribe to the message bus topic
-        topic = TopicProtocol.create_trade_tick_topic(instrument)
-        MessageBus.get().subscribe(topic, self.on_event)
-
-        # Remember the subscribed instrument
+        # Remember the subscribed instrument for cleanup during stop
         self._subscribed_trade_tick_instruments.add(instrument)
 
     def subscribe_quote_ticks(self, instrument: Instrument):
@@ -149,14 +140,10 @@ class Strategy:
                 f"Cannot call `subscribe_quote_ticks` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        # Request market data (will start publishing if first subscriber)
+        # Ask TradingEngine to handle all subscription details
         self._trading_engine.subscribe_to_quote_ticks(instrument, self)
 
-        # Subscribe to the message bus topic
-        topic = TopicProtocol.create_quote_tick_topic(instrument)
-        MessageBus.get().subscribe(topic, self.on_event)
-
-        # Remember the subscribed instrument
+        # Remember the subscribed instrument for cleanup during stop
         self._subscribed_quote_tick_instruments.add(instrument)
 
     def unsubscribe_trade_ticks(self, instrument: Instrument):
@@ -171,13 +158,11 @@ class Strategy:
             )
 
         if instrument in self._subscribed_trade_tick_instruments:
-            # Unsubscribe from the message bus topic
-            topic = TopicProtocol.create_trade_tick_topic(instrument)
-            MessageBus.get().unsubscribe(topic, self.on_event)
-            self._subscribed_trade_tick_instruments.remove(instrument)
-
-            # Stop market data (will stop publishing if last subscriber)
+            # Ask TradingEngine to handle all unsubscription details
             self._trading_engine.unsubscribe_from_trade_ticks(instrument, self)
+
+            # Remove from our local tracking
+            self._subscribed_trade_tick_instruments.remove(instrument)
 
     def unsubscribe_quote_ticks(self, instrument: Instrument):
         """Unsubscribe from quote tick data for a specific instrument with automatic cleanup.
@@ -191,13 +176,11 @@ class Strategy:
             )
 
         if instrument in self._subscribed_quote_tick_instruments:
-            # Unsubscribe from the message bus topic
-            topic = TopicProtocol.create_quote_tick_topic(instrument)
-            MessageBus.get().unsubscribe(topic, self.on_event)
-            self._subscribed_quote_tick_instruments.remove(instrument)
-
-            # Stop market data (will stop publishing if last subscriber)
+            # Ask TradingEngine to handle all unsubscription details
             self._trading_engine.unsubscribe_from_quote_ticks(instrument, self)
+
+            # Remove from our local tracking
+            self._subscribed_quote_tick_instruments.remove(instrument)
 
     # -----------------------------------------------
     # DATA HANDLERS
@@ -209,7 +192,6 @@ class Strategy:
         This method receives the full event context including:
         - dt_received (when event entered our system)
         - dt_event (official event timestamp)
-        - event_type (for routing/filtering)
         - Complete event metadata
 
         Override this method when you need access to event metadata.
@@ -230,14 +212,11 @@ class Strategy:
         Args:
             event (Event): The event wrapper to route to specific callbacks.
         """
-        # TODO: Let's think, what is better, if we should check event_type
-        #   as string or it would be better to check `instanceof` and compare real type
-
-        if event.event_type == "bar":
+        if isinstance(event, NewBarEvent):
             self.on_bar(event.bar)  # Extract bar from NewBarEvent
-        elif event.event_type == "trade_tick":
+        elif isinstance(event, NewTradeTickEvent):
             self.on_trade_tick(event.trade_tick)  # Extract from NewTradeTickEvent
-        elif event.event_type == "quote_tick":
+        elif isinstance(event, NewQuoteTickEvent):
             self.on_quote_tick(event.quote_tick)  # Extract from NewQuoteTickEvent
         # Add other event types as needed
 

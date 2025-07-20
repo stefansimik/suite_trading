@@ -1,11 +1,10 @@
 # Python virtual environment
 .venv
 
-# Python
+# Ignored folders
 __pycache__/
-
-# Distribution
 dist/
+temp*/
 
 # Jupyter
 *.ipynb

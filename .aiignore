@@ -1,10 +1,13 @@
 # Python virtual environment
 .venv
 
-# Python
+# Ignored folders
 __pycache__/
+dist/
+temp*/
 
 # Jupyter
+*.ipynb
 .virtual_documents/
 
 # Logs
