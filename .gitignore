@@ -4,7 +4,7 @@
 # Ignored folders
 __pycache__/
 dist/
-temp*/
+**/temp_*/
 
 # Jupyter
 *.ipynb
