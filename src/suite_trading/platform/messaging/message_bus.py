@@ -95,8 +95,8 @@ class MessageBus:
         self._callbacks[topic].sort(key=lambda x: x[1], reverse=True)
 
         # If topic contains a wildcard, compile a regex pattern for it
-        if "*" in topic:
-            pattern_str = topic.replace(TopicFactory.TOPIC_SEPARATOR, "\\:\\:").replace("*", ".*")
+        if TopicFactory.WILDCARD_CHAR in topic:
+            pattern_str = topic.replace(TopicFactory.TOPIC_SEPARATOR, "\\:\\:").replace(TopicFactory.WILDCARD_CHAR, ".*")
             self._wildcard_patterns[topic] = re.compile(f"^{pattern_str}$")
 
     def unsubscribe(self, topic: str, callback: Callable):

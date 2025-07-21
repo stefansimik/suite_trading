@@ -9,6 +9,8 @@ class TopicFactory:
 
     # Topic separator - now owned by TopicFactory
     TOPIC_SEPARATOR = "::"
+    # Wildcard character for topic patterns
+    WILDCARD_CHAR = "*"
 
     @classmethod
     def create_topic_from_parts(cls, topic_parts: Sequence[str]) -> str:
@@ -53,8 +55,10 @@ class TopicFactory:
                 )
 
             # Check if part contains only allowed characters
-            if not re.match(r"^[a-zA-Z0-9*@\-_#]+$", part):
-                raise ValueError(f"$topic part '{part}' contains invalid characters. Only letters, numbers, '*', '@', '-', '_', '#' are allowed")
+            if not re.match(rf"^[a-zA-Z0-9{re.escape(cls.WILDCARD_CHAR)}@\-_#]+$", part):
+                raise ValueError(
+                    f"$topic part '{part}' contains invalid characters. Only letters, numbers, '{cls.WILDCARD_CHAR}', '@', '-', '_', '#' are allowed",
+                )
 
         # Check if topic is lowercase and raise an error if it's not
         if topic.lower() != topic:
