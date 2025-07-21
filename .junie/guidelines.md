@@ -6,13 +6,13 @@ Modern algorithmic trading framework in Python for backtesting and live trading.
 
 - **KISS**: Always prefer the simplest working solution
 - **YAGNI**: Only implement when actually needed
-- **DRY**: Single representation for each piece of knowledge
+- **DRY**: Eliminate duplication of information, logic or business rules across the codebase
 - **Composition Over Inheritance**: Prefer composition over inheritance hierarchies
 - **Fail Fast**: Detect and report errors immediately
 - **Intuitive Domain Model**: Create simple, understandable domain models
-- **Broker Agnostic**: Framework should be broker agnostic where possible
-- **Single Responsibility**: Each class has one reason to change
-- **Separation of Concerns**: Clear responsibility boundaries between classes
+- **Single Responsibility**: Ensure each class has only one job or responsibility
+- **Separation of Concerns**: Organize code so different concerns are handled by different parts of the system
+- **Principle of Least Surprise**: Code should behave in ways that users naturally expect
 
 ## User-Centric Design Principle
 
@@ -31,6 +31,43 @@ Guides decisions when there's tension between internal simplicity and external u
 **Rule:** If cost is low and user benefit is clear, favor the user-centric approach.
 
 # Coding Standards
+
+## Naming Conventions
+
+**Rule: All names (functions, variables, classes) should be as simple as possible, predictable, and self-documenting.**
+
+The purpose of any name should be immediately clear and indicate what it does or contains.
+
+### Guidelines
+
+- **Use clear, descriptive names**: Choose names that explain the purpose without needing comments
+- **Avoid abbreviations**: Write `user_count` instead of `usr_cnt` or `uc`
+- **Use verbs for functions**: Functions should describe what they do (`calculate_total`, `send_message`)
+- **Use nouns for variables**: Variables should describe what they contain (`total_amount`, `user_list`)
+- **Be specific**: Use `trading_engine` instead of `engine`, `bar_data` instead of `data`
+- **Follow conventions**: Use standard Python naming patterns (snake_case for functions/variables)
+
+### Examples
+
+```python
+# ✅ Good - clear and self-documenting
+def calculate_portfolio_value(positions: list) -> Decimal:
+    total_value = Decimal('0')
+    for position in positions:
+        market_price = get_current_price(position.instrument)
+        position_value = position.quantity * market_price
+        total_value += position_value
+    return total_value
+
+# ❌ Bad - unclear and abbreviated
+def calc_pv(pos: list) -> Decimal:
+    tv = Decimal('0')
+    for p in pos:
+        mp = get_price(p.inst)
+        pv = p.qty * mp
+        tv += pv
+    return tv
+```
 
 ## Standard Classes Only
 
