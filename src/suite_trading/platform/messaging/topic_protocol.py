@@ -7,7 +7,7 @@ class TopicProtocol:
     """Protocol class for creating standardized topic names for different data types."""
 
     @staticmethod
-    def create_bar_topic(bar_type: BarType) -> str:
+    def create_topic_for_bar(bar_type: BarType) -> str:
         """Create a standardized topic name for a specific bar type.
 
         Args:
@@ -21,7 +21,7 @@ class TopicProtocol:
         )
 
     @staticmethod
-    def create_trade_tick_topic(instrument: Instrument) -> str:
+    def create_topic_for_trade_tick(instrument: Instrument) -> str:
         """Create a standardized topic name for trade ticks of a specific instrument.
 
         Args:
@@ -35,7 +35,7 @@ class TopicProtocol:
         )
 
     @staticmethod
-    def create_quote_tick_topic(instrument: Instrument) -> str:
+    def create_topic_for_quote_tick(instrument: Instrument) -> str:
         """Create a standardized topic name for quote ticks of a specific instrument.
 
         Args:
