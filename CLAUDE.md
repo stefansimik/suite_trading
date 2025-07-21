@@ -83,5 +83,72 @@ Strategies use a two-phase subscription system:
 ### Event Wrapper Pattern
 Raw market data (Bar, TradeTick) is wrapped in event objects (NewBarEvent, NewTradeTickEvent) that include timing metadata and are routed through the MessageBus.
 
+## Core Development Principles
+
+### KISS, YAGNI, DRY
+- **KISS**: Always prefer the simplest working solution
+- **YAGNI**: Only implement when actually needed
+- **DRY**: Single representation for each piece of knowledge
+- **Composition Over Inheritance**: Prefer composition over inheritance hierarchies
+- **Fail Fast**: Detect and report errors immediately
+- **Intuitive Domain Model**: Create simple, understandable domain models
+- **Broker Agnostic**: Framework should be broker agnostic where possible
+- **Single Responsibility**: Each class has one reason to change
+- **Separation of Concerns**: Clear responsibility boundaries between classes
+
+### User-Centric Design Principle
+**APIs should be designed for the user, not for internal implementation convenience.**
+
+When there's tension between internal simplicity and external usability, favor the user-centric approach if cost is low and user benefit is clear.
+
+## Coding Standards
+
+### Standard Classes Only
+**Rule: Use standard classes exclusively. No dataclasses allowed.**
+
+This ensures complete consistency and aligns with core principles of explicit code and predictable behavior.
+
+### Documentation Style
+- Use Google documentation style for all docstrings
+- Format docstrings with content on separate lines
+- Write in natural language that's easy to understand
+- Use simple words and explain concepts clearly
+- Make benefits concrete and specific
+
+### String Representation Methods
+Use `self.__class__.__name__` instead of hardcoded class names in `__str__` and `__repr__` methods for better maintainability.
+
+### Exception Message Formatting
+All error messages must follow this format:
+1. **Function Context**: Use backticks around function names: `` `function_name` ``
+2. **Variable Identification**: Prefix variables with `$`: `$market_data_provider`
+3. **Variable Values**: Include actual values: `f"$bar_type ({bar_type})"`
+4. **Root Cause**: State what's None or what condition failed
+5. **Solution Guidance**: Provide actionable advice
+
+Example: `f"Cannot call \`subscribe_to_bars\` for $bar_type ({bar_type}) because $market_data_provider is None. Set a market data provider when creating TradingEngine."`
+
+### Import and Package Structure
+- **No Re-exports**: Import classes directly from their source modules
+- **Namespace Packages**: Only create `__init__.py` files with executable code
+- Each import should clearly show where classes come from
+
+### Comment and Parameter Formatting
+- Use exactly 2 spaces before `#` for inline comments
+- Put each parameter on separate line for functions with many parameters
+- Use sentence case for section comments
+
+### Testing Guidelines
+- Use `pytest` library (not `unittest`)
+- Test function names start with "test_" and describe what they're testing
+- Organize in `tests/unit/` and `tests/integration/`
+- Mirror the package structure being tested
+
+### Git Commit Guidelines
+- Write in imperative mood (like giving a command)
+- Keep subject line concise (50 chars or less)
+- Start with capital letter, no period at end
+- Use present tense verbs: Add, Fix, Remove, Update
+
 ## Development Status
-This is an early-stage project (~5% complete). Core architecture is established but major components like market data providers, execution engine, and clock system are not yet implemented.
+This is an early-stage project, where core architecture and main components are being designed and implemented.

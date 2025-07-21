@@ -1,43 +1,34 @@
 # Project Overview
 
-We are building a modern algorithmic trading framework in Python that allows:
-- Backtesting strategies with historical data
-- Running live strategies
+Modern algorithmic trading framework in Python for backtesting and live trading.
 
 # Core Development Principles
 
-- **KISS (Keep It Simple, Stupid)**: Always prefer the simplest possible working solution
-- **YAGNI (You Aren't Gonna Need It)**: Only implement things when actually needed
-- **DRY (Don't Repeat Yourself)**: Every piece of knowledge should have a single representation
+- **KISS**: Always prefer the simplest working solution
+- **YAGNI**: Only implement when actually needed
+- **DRY**: Single representation for each piece of knowledge
 - **Composition Over Inheritance**: Prefer composition over inheritance hierarchies
-- **Fail Fast**: Detect errors early and report them immediately
-- **Intuitive Domain Model**: Create a simple, understandable domain model
+- **Fail Fast**: Detect and report errors immediately
+- **Intuitive Domain Model**: Create simple, understandable domain models
 - **Broker Agnostic**: Framework should be broker agnostic where possible
-- **Single Responsibility Principle (SRP)**: Each class should have only one reason to change and be responsible for one specific functionality
-- **Separation of Concerns**: Different aspects of functionality should be handled by different classes, making it crystal clear who is responsible for what
+- **Single Responsibility**: Each class has one reason to change
+- **Separation of Concerns**: Clear responsibility boundaries between classes
 
 ## User-Centric Design Principle
 
 **APIs should be designed for the user, not for internal implementation convenience.**
 
-This principle guides decisions when there's tension between internal code simplicity and external API usability. While KISS and YAGNI promote simplicity, this principle ensures that simplicity doesn't come at the cost of user experience.
-
-Example:
-**Domain Model Alignment**: The API should match how users think about the domain
-  - `execution.side` feels natural vs. `execution.order.side` feels awkward
-  - Users conceptually think "executions have a side" not "executions' orders have a side"
+Guides decisions when there's tension between internal simplicity and external usability. Example: `execution.side` feels natural vs. `execution.order.side` feels awkward.
 
 ### Decision Framework
 
-When facing API design choices:
-
-1. **Identify the user mental model** - How do users think about this concept?
+1. **Identify user mental model** - How do users think about this?
 2. **Assess implementation cost** - Is the user-friendly approach expensive?
-3. **Consider consistency** - Does this pattern fit with existing APIs?
+3. **Consider consistency** - Does this fit existing APIs?
 4. **Evaluate maintenance** - Will this create ongoing complexity?
 5. **Balance principles** - How does this interact with KISS/YAGNI/DRY?
 
-**Rule of thumb:** If the cost is low and the user benefit is clear, favor the user-centric approach.
+**Rule:** If cost is low and user benefit is clear, favor the user-centric approach.
 
 # Coding Standards
 
@@ -68,8 +59,6 @@ Write docstrings that are easy to understand for everyone:
 
 **Examples:**
 - ✅ "Engine makes sure the provider is available" instead of "Engine validates provider availability"
-- ✅ "Strategies don't need to know how the provider works" instead of "Clean separation of concerns"
-- ✅ "This lets strategies focus on trading decisions" instead of "This facilitates strategic focus optimization"
 - ✅ "Simple way to get events from different sources" instead of "Unified interface for event retrieval with permanent closure detection"
 
 ## Comment Formatting
@@ -97,17 +86,14 @@ side: OrderDirection  # Whether this is a BUY or SELL order
 ```python
 # ❌ Wrong - multiple parameters on same line
 def __init__(self, instrument: Instrument, side: OrderDirection, quantity: Decimal,
-             order_id: int = None, time_in_force: TimeInForce = TimeInForce.GTC,
-             filled_quantity: Decimal = Decimal("0")):
+             order_id: int = None):
 
 # ✅ Good - each parameter on separate line
 def __init__(self,
              instrument: Instrument,
              side: OrderDirection,
              quantity: Decimal,
-             order_id: int = None,
-             time_in_force: TimeInForce = TimeInForce.GTC,
-             filled_quantity: Decimal = Decimal("0")):
+             order_id: int = None):
 ```
 
 ## String Representation Methods
@@ -115,7 +101,6 @@ def __init__(self,
 **Rule**: Use `self.__class__.__name__` instead of hardcoded class names in `__str__` and `__repr__` methods.
 
 **Why**: Makes class names automatically update if the class is renamed, improving maintainability.
-ds
 ### Examples
 
 ```python
@@ -136,7 +121,6 @@ def __str__(self) -> str:
 
 1. **Function Context**: Always specify which function was called
    - Use backticks around function names: `` `function_name` ``
-   - Example: `` `subscribe_to_bars` ``, `` `submit_order` ``
 
 2. **Variable Identification**: Prefix variables with `$` to distinguish them from normal text
    - Example: `$market_data_provider`, `$trading_engine`, `$bar_type`
@@ -147,11 +131,9 @@ def __str__(self) -> str:
 
 4. **Root Cause**: Clearly state what's None or what condition failed
    - Example: "because $market_data_provider is None"
-   - Example: "because $trading_engine is None"
 
 5. **Solution Guidance**: Provide actionable advice on how to fix the issue
    - Example: "Set a market data provider when creating TradingEngine"
-   - Example: "Add the strategy to a TradingEngine first"
 
 ### Examples
 
@@ -159,21 +141,11 @@ def __str__(self) -> str:
 # Function call with None check
 raise RuntimeError(f"Cannot call `subscribe_to_bars` for $bar_type ({bar_type}) because $market_data_provider is None. Set a market data provider when creating TradingEngine.")
 
-# Strategy context
-raise RuntimeError(f"Cannot call `subscribe_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.")
-
 # Value validation
 raise ValueError(f"$count must be >= 1, but provided value is: {count}")
 
-# Multiple issues with bullet points
-def validate_user(user):
-    errors = []
-    if not user.name:
-        errors.append(f"$name cannot be empty, got: '{user.name}'")
-    if user.age < 18:
-        errors.append(f"$age must be at least 18, got: {user.age}")
-    if errors:
-        raise ValueError("User validation failed:\n• " + "\n• ".join(errors))
+# Multiple issues
+raise ValueError("User validation failed:\n• $name cannot be empty\n• $age must be at least 18")
 ```
 
 ## Import and Package Structure
