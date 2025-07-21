@@ -24,9 +24,9 @@ class MessageBus:
         # Dictionary to store compiled regex patterns for wildcard topics
         self._wildcard_patterns: Dict[str, Pattern] = {}
 
-    def publish(self, topic: str, obj: Any, min_subscribers: int = 0, max_subscribers: int = None):
+    def publish(self, topic: str, data: Any, min_subscribers: int = 0, max_subscribers: int = None):
         """
-        Publish an object to a specific topic with subscriber validation.
+        Publish data to a specific topic with subscriber validation.
 
         This will invoke all callbacks registered for:
         - The exact topic
@@ -34,7 +34,7 @@ class MessageBus:
 
         Args:
             topic (str): The topic to publish to
-            obj (Any): The object to publish
+            data (Any): The data to publish
             min_subscribers (int): Minimum required subscribers (default: 0)
             max_subscribers (int): Maximum allowed subscribers (default: unlimited)
 
@@ -68,7 +68,7 @@ class MessageBus:
         # Sort callbacks by priority (highest first) and invoke them
         callbacks_to_invoke.sort(key=lambda x: x[1], reverse=True)
         for callback, _ in callbacks_to_invoke:
-            callback(obj)
+            callback(data)
 
     def subscribe(self, topic: str, callback: Callable, priority: SubscriberPriority = SubscriberPriority.MEDIUM):
         """
