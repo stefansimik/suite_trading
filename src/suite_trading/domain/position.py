@@ -1,12 +1,10 @@
-from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Union
 
 from suite_trading.domain.instrument import Instrument
 
 
-@dataclass(frozen=True)
 class Position:
     """Represents a trading position for a specific instrument.
 
@@ -30,36 +28,76 @@ class Position:
         market_value (Decimal): The current market value of the position (quantity * current_price).
     """
 
-    # Fields without defaults (must come first)
-    instrument: Instrument
-    quantity: Decimal
-    average_price: Decimal
+    def __init__(
+        self,
+        instrument: Instrument,
+        quantity: Union[Decimal, str, float],
+        average_price: Union[Decimal, str, float],
+        unrealized_pnl: Union[Decimal, str, float] = Decimal("0"),
+        realized_pnl: Union[Decimal, str, float] = Decimal("0"),
+        last_update: Optional[datetime] = None,
+    ):
+        """Initialize a new position.
 
-    # Fields with defaults (must come last)
-    unrealized_pnl: Decimal = Decimal("0")
-    realized_pnl: Decimal = Decimal("0")
-    last_update: Optional[datetime] = None
-
-    def __post_init__(self) -> None:
-        """Validate the position data after initialization.
+        Args:
+            instrument: The financial instrument for this position.
+            quantity: The current position size (positive for long, negative for short).
+            average_price: The average price at which the position was established.
+            unrealized_pnl: The current unrealized profit/loss based on market price.
+            realized_pnl: The total realized profit/loss from closed portions.
+            last_update: When this position was last updated (timezone-aware).
 
         Raises:
-            ValueError: If some data are invalid.
+            ValueError: If position data is invalid.
         """
-        # Convert values to Decimal if they're not already
-        for field in ["quantity", "average_price", "unrealized_pnl", "realized_pnl"]:
-            value = getattr(self, field)
-            if not isinstance(value, Decimal):
-                # Set a new converted value (bypass frozen dataclass mechanism)
-                object.__setattr__(self, field, Decimal(str(value)))
+        # Store instrument and last_update
+        self._instrument = instrument
+        self._last_update = last_update
 
+        # Explicit type conversion
+        self._quantity = Decimal(str(quantity))
+        self._average_price = Decimal(str(average_price))
+        self._unrealized_pnl = Decimal(str(unrealized_pnl))
+        self._realized_pnl = Decimal(str(realized_pnl))
+
+        # Explicit validation
         # Validate that average_price is positive when there's a position
-        if self.quantity != 0 and self.average_price <= 0:
-            raise ValueError(f"$average_price must be positive when position exists, but provided value is: {self.average_price}")
+        if self._quantity != 0 and self._average_price <= 0:
+            raise ValueError(f"$average_price must be positive when position exists, but provided value is: {self._average_price}")
 
         # Validate timezone-aware datetime if provided
-        if self.last_update is not None and self.last_update.tzinfo is None:
-            raise ValueError(f"$last_update must be timezone-aware, but provided value is: {self.last_update}")
+        if self._last_update is not None and self._last_update.tzinfo is None:
+            raise ValueError(f"$last_update must be timezone-aware, but provided value is: {self._last_update}")
+
+    @property
+    def instrument(self) -> Instrument:
+        """Get the instrument."""
+        return self._instrument
+
+    @property
+    def quantity(self) -> Decimal:
+        """Get the position quantity."""
+        return self._quantity
+
+    @property
+    def average_price(self) -> Decimal:
+        """Get the average price."""
+        return self._average_price
+
+    @property
+    def unrealized_pnl(self) -> Decimal:
+        """Get the unrealized P&L."""
+        return self._unrealized_pnl
+
+    @property
+    def realized_pnl(self) -> Decimal:
+        """Get the realized P&L."""
+        return self._realized_pnl
+
+    @property
+    def last_update(self) -> Optional[datetime]:
+        """Get the last update timestamp."""
+        return self._last_update
 
     @property
     def is_long(self) -> bool:
@@ -146,3 +184,35 @@ class Position:
         """
         side = "LONG" if self.is_long else "SHORT" if self.is_short else "FLAT"
         return f"{side} {abs(self.quantity)} {self.instrument} @ {self.average_price}"
+
+    def __repr__(self) -> str:
+        """Return a developer-friendly representation of the position.
+
+        Returns:
+            str: A detailed string representation.
+        """
+        return (
+            f"{self.__class__.__name__}(instrument={self.instrument!r}, quantity={self.quantity}, "
+            f"average_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, "
+            f"realized_pnl={self.realized_pnl}, last_update={self.last_update!r})"
+        )
+
+    def __eq__(self, other) -> bool:
+        """Check equality with another position.
+
+        Args:
+            other: The other object to compare with.
+
+        Returns:
+            bool: True if positions are equal, False otherwise.
+        """
+        if not isinstance(other, Position):
+            return False
+        return (
+            self.instrument == other.instrument
+            and self.quantity == other.quantity
+            and self.average_price == other.average_price
+            and self.unrealized_pnl == other.unrealized_pnl
+            and self.realized_pnl == other.realized_pnl
+            and self.last_update == other.last_update
+        )

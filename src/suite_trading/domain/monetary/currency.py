@@ -159,4 +159,4 @@ class Currency:
 
     def __repr__(self) -> str:
         """Return detailed string representation."""
-        return f"Currency('{self.code}', {self.precision}, '{self.name}', {self.currency_type})"
+        return f"{self.__class__.__name__}('{self.code}', {self.precision}, '{self.name}', {self.currency_type})"

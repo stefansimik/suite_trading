@@ -199,7 +199,7 @@ class Money:
 
     def __repr__(self) -> str:
         """Return string like 'Money(1000.50, USD)'."""
-        return f"Money({self.value}, {self.currency.code})"
+        return f"{self.__class__.__name__}({self.value}, {self.currency.code})"
 
     def __hash__(self) -> int:
         """Hash based on value and currency code."""

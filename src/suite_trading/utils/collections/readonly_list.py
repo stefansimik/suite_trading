@@ -85,7 +85,7 @@ class ReadOnlyList(Generic[T], Sequence[T]):
         Returns:
             str: Human-readable representation.
         """
-        return f"ReadOnlyList({self._count} items)"
+        return f"{self.__class__.__name__}({self._count} items)"
 
     def __bool__(self) -> bool:
         """Check if the read-only list is non-empty.
@@ -117,7 +117,7 @@ class ReadOnlyList(Generic[T], Sequence[T]):
         for i in range(start, stop):
             if self._data[i] == value:
                 return i
-        raise ValueError(f"{value} is not in ReadOnlyList")
+        raise ValueError(f"{value} is not in {self.__class__.__name__}")
 
     def count(self, value: T) -> int:
         """Count occurrences of value in the read-only list.

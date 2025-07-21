@@ -41,30 +41,14 @@ When facing API design choices:
 
 # Coding Standards
 
-## Dataclasses
+## Standard Classes Only
 
-- Always use `ClassVar` from `typing` module to explicitly mark class variables in dataclasses
+**Rule: Use standard classes exclusively. No dataclasses allowed.**
 
-### When to Prefer Normal Classes Over Dataclasses
-
-**Use normal classes instead of dataclasses when:**
-
-- **Logical attribute ordering matters more than technical constraints**
-  - When primary identifiers (like `order_id`) should logically come first but have default values
-  - When you need to group related attributes together regardless of their default status
-  - When dataclass field ordering rules force unnatural domain ordering
-
-- **Complex domain models require flexibility**
-  - Core business objects that need sophisticated initialization logic
-  - Classes with inheritance hierarchies where constructor flexibility matters
-  - When validation logic is complex and benefits from explicit constructor control
-
-**Keep dataclasses for:**
-- Simple data containers with natural field ordering
-- Immutable value objects (with `frozen=True`)
-- Market data structures where technical ordering aligns with logical ordering
-
-**Decision rule:** If natural domain ordering conflicts with dataclass field rules → Use normal classes
+**Why:** Complete consistency eliminates cognitive overhead and aligns with our core principles:
+- **KISS**: One pattern everywhere, zero exceptions to remember
+- **Explicit over Implicit**: All initialization and validation logic is clear and visible
+- **User-Centric Design**: Predictable, consistent behavior across all domain objects
 
 ## Documentation
 
@@ -124,6 +108,24 @@ def __init__(self,
              order_id: int = None,
              time_in_force: TimeInForce = TimeInForce.GTC,
              filled_quantity: Decimal = Decimal("0")):
+```
+
+## String Representation Methods
+
+**Rule**: Use `self.__class__.__name__` instead of hardcoded class names in `__str__` and `__repr__` methods.
+
+**Why**: Makes class names automatically update if the class is renamed, improving maintainability.
+ds
+### Examples
+
+```python
+# ❌ Wrong - hardcoded class name
+def __str__(self) -> str:
+    return f"NewBarEvent(bar={self.bar}, dt_received={self.dt_received})"
+
+# ✅ Good - dynamic class name
+def __str__(self) -> str:
+    return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received})"
 ```
 
 ## Exception Message Formatting

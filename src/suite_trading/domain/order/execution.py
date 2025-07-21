@@ -1,8 +1,7 @@
 from __future__ import annotations  # Enables forward references in type hints
-from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union, Optional
 
 # TYPE_CHECKING lets us use Order for type hints without importing it at runtime.
 # This avoids circular imports since Order also needs to reference Execution.
@@ -14,7 +13,6 @@ from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.utils.id_generator import get_next_id
 
 
-@dataclass(frozen=True)
 class Execution:
     """Represents an order execution/fill.
 
@@ -39,28 +37,41 @@ class Execution:
         is_sell (bool): True if this is a sell execution.
     """
 
-    # Fields without defaults (must come first)
-    order: Order
-    quantity: Decimal
-    price: Decimal
-    timestamp: datetime
+    def __init__(
+        self,
+        order: Order,
+        quantity: Union[Decimal, str, float],
+        price: Union[Decimal, str, float],
+        timestamp: datetime,
+        id: Optional[str] = None,
+        commission: Union[Decimal, str, float] = Decimal("0"),
+    ):
+        """Initialize a new execution.
 
-    # Fields with defaults (must come last)
-    id: str | None = None
-    commission: Decimal = Decimal("0")
+        Args:
+            order: Reference to the parent order that was executed.
+            quantity: The quantity that was executed in this fill.
+            price: The price at which this execution occurred.
+            timestamp: When this execution occurred.
+            id: Unique identifier for this execution (auto-generated if None).
+            commission: Commission/fees charged for this execution.
 
-    def __post_init__(self):
-        """Initialize computed fields and validate the execution data."""
+        Raises:
+            ValueError: If execution data is invalid.
+        """
+        # Store order and timestamp
+        self._order = order
+        self._timestamp = timestamp
+
         # Generate ID if not provided
-        if self.id is None:
-            object.__setattr__(self, "id", get_next_id())
+        self._id = id if id is not None else get_next_id()
 
-        # Convert numeric values to Decimal for precise financial calculations
-        object.__setattr__(self, "quantity", self._convert_to_decimal(self.quantity))
-        object.__setattr__(self, "price", self._convert_to_decimal(self.price))
-        object.__setattr__(self, "commission", self._convert_to_decimal(self.commission))
+        # Explicit type conversion for precise financial calculations
+        self._quantity = self._convert_to_decimal(quantity)
+        self._price = self._convert_to_decimal(price)
+        self._commission = self._convert_to_decimal(commission)
 
-        # Validation
+        # Explicit validation
         self._validate()
 
     @staticmethod
@@ -76,6 +87,36 @@ class Execution:
         if isinstance(value, Decimal):
             return value
         return Decimal(str(value))
+
+    @property
+    def order(self) -> Order:
+        """Get the parent order."""
+        return self._order
+
+    @property
+    def quantity(self) -> Decimal:
+        """Get the executed quantity."""
+        return self._quantity
+
+    @property
+    def price(self) -> Decimal:
+        """Get the execution price."""
+        return self._price
+
+    @property
+    def timestamp(self) -> datetime:
+        """Get the execution timestamp."""
+        return self._timestamp
+
+    @property
+    def id(self) -> str:
+        """Get the execution ID."""
+        return self._id
+
+    @property
+    def commission(self) -> Decimal:
+        """Get the commission."""
+        return self._commission
 
     @property
     def instrument(self) -> Instrument:
@@ -138,22 +179,22 @@ class Execution:
             ValueError: If execution data is invalid.
         """
         # Validate quantity
-        if self.quantity <= 0:
-            raise ValueError(f"$quantity must be positive, but provided value is: {self.quantity}")
+        if self._quantity <= 0:
+            raise ValueError(f"$quantity must be positive, but provided value is: {self._quantity}")
 
         # Validate price
-        if self.price <= 0:
-            raise ValueError(f"$price must be positive, but provided value is: {self.price}")
+        if self._price <= 0:
+            raise ValueError(f"$price must be positive, but provided value is: {self._price}")
 
         # Validate commission (can be 0 but not negative)
-        if self.commission < 0:
-            raise ValueError(f"$commission cannot be negative, but provided value is: {self.commission}")
+        if self._commission < 0:
+            raise ValueError(f"$commission cannot be negative, but provided value is: {self._commission}")
 
         # Note: instrument and side consistency is guaranteed by properties that delegate to order
 
         # Validate that execution quantity doesn't exceed unfilled quantity
-        if self.quantity > self.order.unfilled_quantity:
-            raise ValueError(f"Execution $quantity ({self.quantity}) cannot exceed order unfilled quantity ({self.order.unfilled_quantity})")
+        if self._quantity > self._order.unfilled_quantity:
+            raise ValueError(f"Execution $quantity ({self._quantity}) cannot exceed order unfilled quantity ({self._order.unfilled_quantity})")
 
     def __repr__(self) -> str:
         """Return a string representation of the execution.
@@ -162,7 +203,7 @@ class Execution:
             str: String representation of the execution.
         """
         return (
-            f"Execution(id={self.id}, "
+            f"{self.__class__.__name__}(id={self.id}, "
             f"order_id={self.order.id}, instrument={self.instrument}, "
             f"side={self.side}, quantity={self.quantity}, price={self.price}, "
             f"timestamp={self.timestamp})"
