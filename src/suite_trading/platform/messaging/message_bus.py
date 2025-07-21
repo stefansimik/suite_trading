@@ -1,6 +1,7 @@
 from typing import Any, Callable, Dict, List, Pattern, Tuple
 import re
 from suite_trading.platform.messaging.message_priority import SubscriberPriority
+from suite_trading.platform.messaging.topic_factory import TopicFactory
 
 
 class MessageBus:
@@ -13,21 +14,6 @@ class MessageBus:
     - Synchronized and ordered event invocation
     """
 
-    # The separator used in topics
-    TOPIC_SEPARATOR = "::"
-
-    @classmethod
-    def topic_from_parts(cls, topic_parts: List[str]) -> str:
-        """Create a topic string from a list of parts.
-
-        Args:
-            topic_parts (List[str]): The parts of the topic
-
-        Returns:
-            str: The topic string with parts joined by the topic separator
-        """
-        return cls.TOPIC_SEPARATOR.join(topic_parts)
-
     def __init__(self):
         """Initialize a new MessageBus instance.
 
@@ -37,49 +23,6 @@ class MessageBus:
         self._callbacks: Dict[str, List[Tuple[Callable, SubscriberPriority]]] = {}
         # Dictionary to store compiled regex patterns for wildcard topics
         self._wildcard_patterns: Dict[str, Pattern] = {}
-
-    def _validate_topic(self, topic: str) -> bool:
-        """
-        Validates if a topic has the correct structure.
-
-        Topic requirements:
-        - Topic consists of one or multiple parts split by the topic separator
-        - Names between separators can contain basic characters, numbers, wildcard '*', and special characters '@', '-', '_', '#'
-        - Topic is case sensitive and must be lowercase
-
-        Args:
-            topic (str): The topic to validate
-
-        Returns:
-            bool: True if the topic is valid
-
-        Raises:
-            ValueError: If the topic is invalid
-        """
-        # Check if topic is empty
-        if not topic:
-            raise ValueError(f"$topic cannot be empty, but provided value is: '{topic}'")
-
-        # Split topic by separator
-        parts = topic.split(self.TOPIC_SEPARATOR)
-
-        # Check each part
-        for part in parts:
-            # Check if part is empty
-            if not part:
-                raise ValueError(
-                    f"$topic parts cannot be empty, but found empty part in: '{topic}' (e.g., 'part1{self.TOPIC_SEPARATOR}{self.TOPIC_SEPARATOR}part2')",
-                )
-
-            # Check if part contains only allowed characters
-            if not re.match(r"^[a-zA-Z0-9*@\-_#]+$", part):
-                raise ValueError(f"$topic part '{part}' contains invalid characters. Only letters, numbers, '*', '@', '-', '_', '#' are allowed")
-
-        # Check if topic is lowercase and raise an error if it's not
-        if topic.lower() != topic:
-            raise ValueError(f"$topic must be lowercase, but provided value is: '{topic}'")
-
-        return True
 
     def publish(self, topic: str, obj: Any, min_subscribers: int = 0, max_subscribers: int = None):
         """
@@ -99,7 +42,7 @@ class MessageBus:
             ValueError: If the topic has an invalid structure or subscriber count is outside the specified range
         """
         # Validate topic
-        self._validate_topic(topic)
+        TopicFactory.validate_topic(topic)
 
         # Collect all matching callbacks with priorities in a single pass
         callbacks_to_invoke = []
@@ -140,7 +83,7 @@ class MessageBus:
             ValueError: If the topic has an invalid structure
         """
         # Validate topic
-        self._validate_topic(topic)
+        TopicFactory.validate_topic(topic)
 
         if topic not in self._callbacks:
             self._callbacks[topic] = []
@@ -153,7 +96,7 @@ class MessageBus:
 
         # If topic contains a wildcard, compile a regex pattern for it
         if "*" in topic:
-            pattern_str = topic.replace(self.TOPIC_SEPARATOR, "\\:\\:").replace("*", ".*")
+            pattern_str = topic.replace(TopicFactory.TOPIC_SEPARATOR, "\\:\\:").replace("*", ".*")
             self._wildcard_patterns[topic] = re.compile(f"^{pattern_str}$")
 
     def unsubscribe(self, topic: str, callback: Callable):
@@ -168,7 +111,7 @@ class MessageBus:
             ValueError: If the topic has an invalid structure
         """
         # Validate topic
-        self._validate_topic(topic)
+        TopicFactory.validate_topic(topic)
 
         if topic in self._callbacks:
             # Find and remove the callback (search by callback function, ignore priority)
@@ -194,7 +137,7 @@ class MessageBus:
             ValueError: If the topic has an invalid structure
         """
         # Validate topic
-        self._validate_topic(topic)
+        TopicFactory.validate_topic(topic)
 
         # Extract just the callback functions from the (callback, priority) tuples
         callback_tuples = self._callbacks.get(topic, [])

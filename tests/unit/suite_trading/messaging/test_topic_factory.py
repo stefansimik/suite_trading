@@ -1,15 +1,15 @@
-from suite_trading.platform.messaging.topic_protocol import TopicProtocol
+from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
 
 
 def test_topic_protocol_create_topic_for_bar():
-    """Test that TopicProtocol.create_topic_for_bar generates the correct topic name."""
+    """Test that TopicFactory.create_topic_for_bar generates the correct topic name."""
     # Create a bar type
     bar_type = create_bar_type(value=5)
 
     # Generate the topic name
-    topic = TopicProtocol.create_topic_for_bar(bar_type)
+    topic = TopicFactory.create_topic_for_bar(bar_type)
 
     # Verify the topic name
     assert topic == "bar::eurusd@forex::5-minute::last"
@@ -43,7 +43,7 @@ def test_trading_engine_publish_bar():
         received_bar = received_bar_param
 
     # Subscribe to the topic
-    topic = TopicProtocol.create_topic_for_bar(bar_type)
+    topic = TopicFactory.create_topic_for_bar(bar_type)
     engine.message_bus.subscribe(topic, on_bar)
 
     # Publish the bar

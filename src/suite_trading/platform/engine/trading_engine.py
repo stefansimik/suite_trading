@@ -1,7 +1,7 @@
 import logging
 from suite_trading.strategy.base import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
-from suite_trading.platform.messaging.topic_protocol import TopicProtocol
+from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.instrument import Instrument
 
@@ -104,7 +104,7 @@ class TradingEngine:
         self._bar_subscriptions[bar_type].add(strategy)
 
         # Subscribe strategy to MessageBus topic
-        topic = TopicProtocol.create_topic_for_bar(bar_type)
+        topic = TopicFactory.create_topic_for_bar(bar_type)
         self.message_bus.subscribe(topic, strategy.on_event)
 
         # TODO: Initiate sending bars from market data provider
@@ -136,7 +136,7 @@ class TradingEngine:
         self._bar_subscriptions[bar_type].discard(strategy)
 
         # Unsubscribe strategy from MessageBus topic
-        topic = TopicProtocol.create_topic_for_bar(bar_type)
+        topic = TopicFactory.create_topic_for_bar(bar_type)
         self.message_bus.unsubscribe(topic, strategy.on_event)
 
         # Check if this was the last subscriber
@@ -172,7 +172,7 @@ class TradingEngine:
         self._trade_tick_subscriptions[instrument].add(strategy)
 
         # Subscribe strategy to MessageBus topic
-        topic = TopicProtocol.create_topic_for_trade_tick(instrument)
+        topic = TopicFactory.create_topic_for_trade_tick(instrument)
         self.message_bus.subscribe(topic, strategy.on_event)
 
         # TODO: Initiate sending trade ticks from market data provider
@@ -204,7 +204,7 @@ class TradingEngine:
         self._trade_tick_subscriptions[instrument].discard(strategy)
 
         # Unsubscribe strategy from MessageBus topic
-        topic = TopicProtocol.create_topic_for_trade_tick(instrument)
+        topic = TopicFactory.create_topic_for_trade_tick(instrument)
         self.message_bus.unsubscribe(topic, strategy.on_event)
 
         # Check if this was the last subscriber
@@ -240,7 +240,7 @@ class TradingEngine:
         self._quote_tick_subscriptions[instrument].add(strategy)
 
         # Subscribe strategy to MessageBus topic
-        topic = TopicProtocol.create_topic_for_quote_tick(instrument)
+        topic = TopicFactory.create_topic_for_quote_tick(instrument)
         self.message_bus.subscribe(topic, strategy.on_event)
 
         # TODO: Initiate sending quote ticks from market data provider
@@ -272,7 +272,7 @@ class TradingEngine:
         self._quote_tick_subscriptions[instrument].discard(strategy)
 
         # Unsubscribe strategy from MessageBus topic
-        topic = TopicProtocol.create_topic_for_quote_tick(instrument)
+        topic = TopicFactory.create_topic_for_quote_tick(instrument)
         self.message_bus.unsubscribe(topic, strategy.on_event)
 
         # Check if this was the last subscriber
