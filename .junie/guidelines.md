@@ -185,6 +185,32 @@ raise ValueError(f"$count must be >= 1, but provided value is: {count}")
 raise ValueError("User validation failed:\n• $name cannot be empty\n• $age must be at least 18")
 ```
 
+## Markdown Formatting
+
+**Rule**: All generated Markdown content must have a maximum line length of 100 characters.
+
+**Why**: Consistent line length improves readability and ensures proper formatting across different
+editors and viewing environments.
+
+### Requirements
+
+- **Line Length Limit**: No line should exceed 100 characters
+- **Automatic Line Breaks**: Add newlines after reaching 100 characters
+- **Preserve Readability**: Break lines at natural points (spaces, punctuation) when possible
+- **Code Blocks**: Code examples within Markdown should also follow this rule
+- **Lists and Headers**: Apply the same 100-character limit to all content types
+
+### Examples
+
+```markdown
+# ✅ Good - lines under 100 characters
+This is a properly formatted Markdown paragraph that stays within the 100-character limit by
+breaking lines at appropriate points to maintain readability and consistency.
+
+# ❌ Bad - line exceeds 100 characters
+This is an improperly formatted Markdown paragraph that exceeds the 100-character limit and should be broken into multiple lines for better readability.
+```
+
 ## Import and Package Structure
 
 ### No Re-exports Rule
