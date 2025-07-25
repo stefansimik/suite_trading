@@ -13,17 +13,20 @@ class NewBarEvent(Event):
     Attributes:
         bar (Bar): The pure bar data object containing OHLC information.
         dt_received (datetime): When the event entered our system (timezone-aware UTC).
+        is_historical (bool): Whether this bar data is historical or live.
     """
 
-    def __init__(self, bar: Bar, dt_received: datetime):
+    def __init__(self, bar: Bar, dt_received: datetime, is_historical: bool = True):
         """Initialize a new bar event.
 
         Args:
             bar: The pure bar data object containing OHLC information.
             dt_received: When the event entered our system (timezone-aware UTC).
+            is_historical: Whether this bar data is historical or live. Defaults to True.
         """
         self._bar = bar
         self._dt_received = dt_received
+        self._is_historical = is_historical
 
     @property
     def bar(self) -> Bar:
@@ -34,6 +37,11 @@ class NewBarEvent(Event):
     def dt_received(self) -> datetime:
         """Get the received timestamp."""
         return self._dt_received
+
+    @property
+    def is_historical(self) -> bool:
+        """Get whether this bar data is historical or live."""
+        return self._is_historical
 
     @property
     def dt_event(self) -> datetime:
@@ -52,7 +60,7 @@ class NewBarEvent(Event):
         Returns:
             str: A human-readable string representation.
         """
-        return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received})"
+        return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received}, is_historical={self.is_historical})"
 
     def __repr__(self) -> str:
         """Return a developer-friendly representation of the bar event.
@@ -60,7 +68,7 @@ class NewBarEvent(Event):
         Returns:
             str: A detailed string representation.
         """
-        return f"{self.__class__.__name__}(bar={self.bar!r}, dt_received={self.dt_received!r})"
+        return f"{self.__class__.__name__}(bar={self.bar!r}, dt_received={self.dt_received!r}, is_historical={self.is_historical!r})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another bar event.
@@ -73,4 +81,4 @@ class NewBarEvent(Event):
         """
         if not isinstance(other, NewBarEvent):
             return False
-        return self.bar == other.bar and self.dt_received == other.dt_received
+        return self.bar == other.bar and self.dt_received == other.dt_received and self.is_historical == other.is_historical
