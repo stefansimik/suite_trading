@@ -117,20 +117,33 @@ side: OrderDirection  # Whether this is a BUY or SELL order
 - When functions have many parameters, put each parameter on a separate line for better readability
 - This applies to function definitions, method definitions, and class constructors
 - Maintain consistent indentation for all parameters
+- Add a trailing comma after the last parameter in multi-line parameter lists
+- For long function names, use proper spacing and alignment
 
 ### Examples
 
 ```python
 # ❌ Wrong - multiple parameters on same line
 def __init__(self, instrument: Instrument, side: OrderDirection, quantity: Decimal,
-             order_id: int = None):
+             order_id: int = None) -> None:
 
-# ✅ Good - each parameter on separate line
-def __init__(self,
-             instrument: Instrument,
-             side: OrderDirection,
-             quantity: Decimal,
-             order_id: int = None):
+# ✅ Good - each parameter on separate line with trailing comma
+def __init__(
+    self,
+    instrument: Instrument,
+    side: OrderDirection,
+    quantity: Decimal,
+    order_id: int = None
+) -> None:
+
+# ✅ Good - long function names with proper formatting
+def get_historical_bars_series(
+    self,
+    instrument: Instrument,
+    from_dt: datetime,
+    until_dt: Optional[datetime] = None,
+) -> Sequence[Bar]:
+    ...
 ```
 
 ## String Representation Methods
