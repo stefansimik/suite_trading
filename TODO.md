@@ -23,10 +23,12 @@ and receive data through consistent interfaces.**
 - All market data must be delivered through standardized interfaces regardless of source
 - Data format and structure must be consistent across all providers
 
-We should design protocol named: `MarketDataProvider`, which contain functions to provide:
-- check if requested data are available
-- request historical data (for specified instrument + date range)
-- subscribe to live data (for specified instrument + data-type (like bars / ticks / ...))
+We should design protocol named: `MarketDataProvider`, which contains the following interface methods:
+- `get_historical_bars_series(instrument: Instrument, from_dt: datetime, until_dt: Optional[datetime] = None) -> Sequence[Bar]`
+- `stream_historical_bars(instrument: Instrument, from_dt: datetime, until_dt: Optional[datetime] = None) -> None`
+- `subscribe_to_live_bars(instrument: Instrument, bar_type: BarType) -> None`
+- `subscribe_to_live_bars_with_history(instrument: Instrument, bar_type: BarType, history_period: datetime) -> None`
+- `unsubscribe_from_live_bars(instrument: Instrument, bar_type: BarType) -> None`
 
 ### Requirement 2: Explicit Broker Selection
 **The system must provide strategies with full control over broker selection through explicit broker specification
@@ -287,12 +289,18 @@ The TradingEngine must:
 - **Manage Subscriptions**: Track active subscriptions for each strategy
 - **Ensure Data Continuity**: In live-trading mode, there should be no gap between historical vs. live data
 - **Handle Multiple Strategies**: Support concurrent strategies with different data needs
-- **Market Data Distribution**: Use MessageBus to deliver data to subscribed strategies with proper data type context (`is_historical` flag)
+- **Market Data Distribution**: Use MessageBus to deliver data to subscribed strategies with proper data type context (`is_historical` flag). The `NewBarEvent` class has been enhanced with an `is_historical` attribute to support this functionality. When creating NewBarEvent instances, the system must properly set the `is_historical` flag based on the data source (True for historical data, False for live data).
 - **Broker Registration and Management**: TradingEngine should be able to add/register one or more brokers under specific custom names:
-  - Each broker must be an instance of Broker protocol (functions to be designed so far)
+  - Each broker must be an instance of Broker protocol with the following interface:
+    - `connect()` - Establish broker connection
+    - `disconnect()` - Close broker connection
+    - `is_connected()` - Check connection status
+    - `submit_order(order: Order)` - Submit order for execution
+    - `cancel_order(order: Order)` - Cancel an existing order
+    - `modify_order(order: Order)` - Modify an existing order
+    - `get_active_orders()` - Get all currently active orders
   - Support dynamic broker registration during runtime
-  - Maintain a broker registry with named access (broker.SIM, broker.I
-  - B, broker.OANDA, etc.)
+  - Maintain a broker registry with named access (broker.SIM, broker.IB, broker.OANDA, etc.)
   - Route orders to specified brokers based on explicit broker selection from strategies
 
 ### Broker Architecture
@@ -356,3 +364,31 @@ class SmartTradingStrategy(Strategy):
 ```
 
 This design pattern ensures that strategies can seamlessly transition between different trading modes while maintaining full control over execution destinations based on data context.
+
+## NewBarEvent Implementation Details
+
+To support the `is_historical` parameter functionality described above, the `NewBarEvent` class has been enhanced with the following implementation:
+
+### Updated Constructor
+```python
+def __init__(self,
+             bar: Bar,
+             dt_received: datetime,
+             is_historical: bool = True):
+```
+
+### New Property
+```python
+@property
+def is_historical(self) -> bool:
+    """Get whether this bar data is historical or live."""
+    return self._is_historical
+```
+
+### Integration Points
+- **Historical data requests**: Create NewBarEvent with `is_historical=True`
+- **Live data feeds**: Create NewBarEvent with `is_historical=False`
+- **Strategy event handling**: Extract `is_historical` from NewBarEvent for callback context
+- **MessageBus distribution**: TradingEngine uses MessageBus to route events to appropriate strategy subscribers with proper historical context
+
+This enhancement ensures that all bar data events carry the necessary context information to enable intelligent broker selection and trading mode decisions within strategies.
