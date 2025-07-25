@@ -24,11 +24,18 @@ and receive data through consistent interfaces.**
 - Data format and structure must be consistent across all providers
 
 We should design protocol named: `MarketDataProvider`, which contains the following interface methods:
-- `get_historical_bars_series(instrument: Instrument, from_dt: datetime, until_dt: Optional[datetime] = None) -> Sequence[Bar]`
-- `stream_historical_bars(instrument: Instrument, from_dt: datetime, until_dt: Optional[datetime] = None) -> None`
-- `subscribe_to_live_bars(instrument: Instrument, bar_type: BarType) -> None`
-- `subscribe_to_live_bars_with_history(instrument: Instrument, bar_type: BarType, history_period: datetime) -> None`
-- `unsubscribe_from_live_bars(instrument: Instrument, bar_type: BarType) -> None`
+
+**Connection Management:**
+- `connect() -> None` - Establish market data provider connection
+- `disconnect() -> None` - Close market data provider connection
+- `is_connected() -> bool` - Check market data provider connection status
+
+**Data Retrieval Methods:**
+- `get_historical_bars_series(bar_type: BarType, from_dt: datetime, until_dt: Optional[datetime] = None) -> Sequence[Bar]`
+- `stream_historical_bars(bar_type: BarType, from_dt: datetime, until_dt: Optional[datetime] = None) -> None`
+- `subscribe_to_live_bars(bar_type: BarType) -> None`
+- `subscribe_to_live_bars_with_history(bar_type: BarType, history_days: int) -> None`
+- `unsubscribe_from_live_bars(bar_type: BarType) -> None`
 
 ### Requirement 2: Explicit Broker Selection
 **The system must provide strategies with full control over broker selection through explicit broker specification
@@ -65,42 +72,41 @@ predictable access to market data.
 The `MarketDataProvider` must provide these essential functions for bar data:
 
 **1. Request Historical Bars (Two Forms)**
-- **`get_historical_bars_series(instrument, from_dt, until_dt=None)`**:
-  - Returns all historical bars at once as a list/series (any Sequence of bars)
+- **`get_historical_bars_series(bar_type, from_dt, until_dt=None)`**:
+  - Returns complete historical dataset as a sequence, perfect for setting up indicators, calculating initial values, or analyzing patterns that need the full dataset available immediately
   - Useful for strategy initialization, indicator setup, and analysis requiring complete datasets
   - Specific callback function will be designed to handle the complete series delivery (like `Strategy.on_historical_bars_series`, but maybe we can figure out better names)
   - Memory-efficient for smaller datasets and initialization scenarios
 
-- **`stream_historical_bars(instrument, from_dt, until_dt=None)`**:
-  - Streams individual bars one-by-one into `Strategy.on_bar(bar, is_historical=True)` callback
+- **`stream_historical_bars(bar_type, from_dt, until_dt=None)`**:
+  - Delivers bars individually through callbacks, perfect for processing large historical datasets without loading everything into memory at once
+  - Maintains chronological order just like live trading scenarios
   - Useful for backtesting and scenarios requiring large datasets without memory overhead
   - Enables processing of extensive historical data without loading everything into memory
-  - Maintains chronological order consistent with live trading scenarios
 
 **2. Subscribe to Live Bars**
-- **`subscribe_to_live_bars(instrument, bar_type)`**:
-  - Subscribes to real-time bar data feed
+- **`subscribe_to_live_bars(bar_type)`**:
+  - Starts receiving live market data as it happens, allowing strategies to react to current market conditions
+  - Can be called dynamically during strategy execution to adapt data needs based on runtime conditions
   - Delivers live bars through `Strategy.on_bar(bar, is_historical=False)` callback
   - Supports dynamic subscription during strategy execution
-  - Allows strategies to adapt their data needs based on runtime conditions
   - Of course, the opposite function for unsubscription must exist as well.
 
 **3. Subscribe to Live Bars with History**
-- **`subscribe_to_live_bars_with_history(instrument, bar_type, history_period)`**:
+- **`subscribe_to_live_bars_with_history(bar_type, history_days)`**:
+  - First feeds historical bars for the specified number of days before now, then automatically starts feeding live bars without any gaps between historical and live data
+  - This ensures continuous data flow with no missing bars, critical for live trading scenarios that need recent historical context
   - Special method that provides seamless transition from historical to live data
-  - First delivers historical bars for the specified period
-  - Then automatically transitions to live bar feed without gaps
-  - Ensures continuous data flow with no missing bars between historical and live data
   - Critical for live trading scenarios requiring initialization with recent historical context
   - Of course, the opposite function for unsubscription must exist as well.
 
 #### Key Design Principles
 
-**Parameters for All Functions related to Historical bars:**
-- **Instrument**: The financial instrument for which data is needed
+**Parameters for All Functions:**
+- **Bar Type**: The bar type specifying instrument and bar characteristics (contains both the financial instrument and bar specifications like timeframe, price type, etc.)
 - **From DateTime**: Start datetime for historical data period
 - **Until DateTime** (optional): End datetime (if not specified, means "until data available")
-- **Bar Type**: Specification of bar characteristics (timeframe, price type, etc.)
+- **History Days**: Number of days before now to include historical data (for `subscribe_to_live_bars_with_history`)
 
 **Dynamic Request Capability:**
 - All data requests can be made dynamically at any moment during strategy execution
