@@ -17,20 +17,10 @@
 
 #### Step 2.1: Add Market Data Provider Integration to TradingEngine ✅ COMPLETED
 
-#### Step 2.2: Add Broker Management to TradingEngine
+#### Step 2.2: Add Broker Management to TradingEngine ✅ COMPLETED
 **File**: `src/suite_trading/platform/engine/trading_engine.py` (modify existing)
 **Dependencies**: Broker protocol
 **Purpose**: Enable TradingEngine to manage multiple brokers and handle order operations
-
-Key additions:
-- `add_broker(name: str, broker: Broker)` - register broker under name
-- `remove_broker(name: str)` - remove broker by name
-- `get_brokers() -> Dict[str, Broker]` - returns dictionary: name -> Broker
-- `broker` property - indexed property for broker access (e.g., `engine.broker.IB`)
-- `submit_order(order: Order, broker: Broker)` - delegate to specified broker
-- `cancel_order(order: Order, broker: Broker)` - delegate to specified broker
-- `modify_order(order: Order, broker: Broker)` - delegate to specified broker
-- `get_active_orders(broker: Broker) -> List[Order]` - delegate to specified broker
 
 #### Step 2.3: Add MessageBus Integration for Data Distribution
 **File**: `src/suite_trading/platform/engine/trading_engine.py` (modify existing)

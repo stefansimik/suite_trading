@@ -1,13 +1,15 @@
 import logging
 from datetime import datetime
-from typing import Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 from suite_trading.strategy.base import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.platform.market_data.market_data_provider import MarketDataProvider
+from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.instrument import Instrument
+from suite_trading.domain.order.orders import Order
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,9 @@ class TradingEngine:
         self._is_running: bool = False
         self.message_bus = MessageBus()
         self._market_data_provider: Optional[MarketDataProvider] = None
+
+        # Broker management
+        self._brokers: Dict[str, Broker] = {}
 
         # Track strategy subscriptions for demand-based publishing
         self._bar_subscriptions: dict[BarType, set[Strategy]] = {}  # Track which strategies subscribe to which bar types
@@ -194,6 +199,105 @@ class TradingEngine:
         # Start receiving bars with history from market data provider
         if is_first_subscriber:
             self._market_data_provider.subscribe_to_live_bars_with_history(bar_type, history_days)
+
+    # -----------------------------------------------
+    # BROKER MANAGEMENT
+    # -----------------------------------------------
+
+    def add_broker(self, name: str, broker: Broker) -> None:
+        """Register a broker under the given name.
+
+        Args:
+            name: Name to register the broker under.
+            broker: The broker instance to register.
+
+        Raises:
+            ValueError: If a broker with the same name already exists.
+        """
+        if name in self._brokers:
+            raise ValueError(f"Broker with $name '{name}' already exists. Cannot add another broker with the same name.")
+
+        self._brokers[name] = broker
+
+    def remove_broker(self, name: str) -> None:
+        """Remove a broker by name.
+
+        Args:
+            name: Name of the broker to remove.
+
+        Raises:
+            KeyError: If no broker with the given name exists.
+        """
+        if name not in self._brokers:
+            raise KeyError(f"No broker with $name '{name}' is registered. Cannot remove non-existent broker.")
+
+        del self._brokers[name]
+
+    @property
+    def brokers(self) -> Dict[str, Broker]:
+        """Get all registered brokers.
+
+        Returns:
+            Dictionary mapping broker names to broker instances.
+        """
+        return self._brokers
+
+    # -----------------------------------------------
+    # ORDER MANAGEMENT
+    # -----------------------------------------------
+
+    def submit_order(self, order: Order, broker: Broker) -> None:
+        """Submit an order through the specified broker.
+
+        Args:
+            order: The order to submit.
+            broker: The broker to submit the order through.
+
+        Raises:
+            ConnectionError: If the broker is not connected.
+            ValueError: If the order is invalid or cannot be submitted.
+        """
+        broker.submit_order(order)
+
+    def cancel_order(self, order: Order, broker: Broker) -> None:
+        """Cancel an order through the specified broker.
+
+        Args:
+            order: The order to cancel.
+            broker: The broker to cancel the order through.
+
+        Raises:
+            ConnectionError: If the broker is not connected.
+            ValueError: If the order cannot be cancelled.
+        """
+        broker.cancel_order(order)
+
+    def modify_order(self, order: Order, broker: Broker) -> None:
+        """Modify an order through the specified broker.
+
+        Args:
+            order: The order to modify with updated parameters.
+            broker: The broker to modify the order through.
+
+        Raises:
+            ConnectionError: If the broker is not connected.
+            ValueError: If the order cannot be modified.
+        """
+        broker.modify_order(order)
+
+    def get_active_orders(self, broker: Broker) -> List[Order]:
+        """Get all active orders from the specified broker.
+
+        Args:
+            broker: The broker to get active orders from.
+
+        Returns:
+            List of all active orders for the specified broker.
+
+        Raises:
+            ConnectionError: If the broker is not connected.
+        """
+        return broker.get_active_orders()
 
     # -----------------------------------------------
     # MARKET DATA SUBSCRIPTION MANAGEMENT
