@@ -1,11 +1,12 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Sequence
+from typing import TYPE_CHECKING, List, Sequence
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
+from suite_trading.platform.market_data.market_data_provider import MarketDataProvider
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -74,15 +75,16 @@ class Strategy:
         self,
         bar_type: BarType,
         from_dt: datetime,
-        until_dt: Optional[datetime] = None,
+        until_dt: datetime,
+        provider: MarketDataProvider,
     ) -> Sequence[Bar]:
         """Get historical bars as a complete series.
 
         Args:
             bar_type (BarType): The type of bar to request.
             from_dt (datetime): Start date and time for historical data.
-            until_dt (Optional[datetime]): End date and time for historical data.
-                If None, requests data until the most recent available.
+            until_dt (datetime): End date and time for historical data.
+            provider (MarketDataProvider): The market data provider to use for this request.
 
         Returns:
             Sequence[Bar]: Complete series of historical bars.
@@ -95,14 +97,15 @@ class Strategy:
                 f"Cannot call `get_historical_bars_series` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        return self._trading_engine.get_historical_bars_series(bar_type, from_dt, until_dt)
+        return self._trading_engine.get_historical_bars_series(bar_type, from_dt, until_dt, provider)
 
     # TODO: Check
     def stream_historical_bars(
         self,
         bar_type: BarType,
         from_dt: datetime,
-        until_dt: Optional[datetime] = None,
+        until_dt: datetime,
+        provider: MarketDataProvider,
     ) -> None:
         """Stream historical bars through the callback system.
 
@@ -112,8 +115,8 @@ class Strategy:
         Args:
             bar_type (BarType): The type of bar to stream.
             from_dt (datetime): Start date and time for historical data.
-            until_dt (Optional[datetime]): End date and time for historical data.
-                If None, streams data until the most recent available.
+            until_dt (datetime): End date and time for historical data.
+            provider (MarketDataProvider): The market data provider to use for this request.
 
         Raises:
             RuntimeError: If trading engine is not set.
@@ -123,7 +126,7 @@ class Strategy:
                 f"Cannot call `stream_historical_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        self._trading_engine.stream_historical_bars(bar_type, from_dt, until_dt)
+        self._trading_engine.stream_historical_bars(bar_type, from_dt, until_dt, provider)
 
     # TODO: Check
     def subscribe_to_live_bars(self, bar_type: BarType) -> None:
@@ -153,6 +156,7 @@ class Strategy:
         self,
         bar_type: BarType,
         history_days: int,
+        provider: MarketDataProvider,
     ) -> None:
         """Subscribe to live bars with historical backfill.
 
@@ -163,6 +167,7 @@ class Strategy:
         Args:
             bar_type (BarType): The type of bar to subscribe to.
             history_days (int): Number of days of historical data to backfill.
+            provider (MarketDataProvider): The market data provider to use for this request.
 
         Raises:
             RuntimeError: If trading engine is not set.
@@ -172,7 +177,7 @@ class Strategy:
                 f"Cannot call `subscribe_to_live_bars_with_history` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        self._trading_engine.subscribe_to_live_bars_with_history(bar_type, history_days, self)
+        self._trading_engine.subscribe_to_live_bars_with_history(bar_type, history_days, self, provider)
 
     def unsubscribe_from_live_bars(self, bar_type: BarType) -> None:
         """Unsubscribe from live bar data for a specific bar type.

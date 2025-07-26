@@ -1,7 +1,7 @@
 """Market data provider protocol definition."""
 
 from datetime import datetime
-from typing import Optional, Protocol, Sequence
+from typing import Protocol, Sequence
 
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
@@ -47,7 +47,7 @@ class MarketDataProvider(Protocol):
         self,
         bar_type: BarType,
         from_dt: datetime,
-        until_dt: Optional[datetime] = None,
+        until_dt: datetime,
     ) -> Sequence[Bar]:
         """Get all historical bars at once for strategy initialization and analysis.
 
@@ -70,7 +70,7 @@ class MarketDataProvider(Protocol):
         self,
         bar_type: BarType,
         from_dt: datetime,
-        until_dt: Optional[datetime] = None,
+        until_dt: datetime,
     ) -> None:
         """Stream historical bars one-by-one for memory-efficient backtesting.
 

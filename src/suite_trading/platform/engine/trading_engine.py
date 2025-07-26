@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Sequence
 from suite_trading.strategy.base import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -35,7 +35,9 @@ class TradingEngine:
         self.strategies: list[Strategy] = []
         self._is_running: bool = False
         self.message_bus = MessageBus()
-        self._market_data_provider: Optional[MarketDataProvider] = None
+
+        # Market data provider management
+        self._market_data_providers: Dict[str, MarketDataProvider] = {}
 
         # Broker management
         self._brokers: Dict[str, Broker] = {}
@@ -103,70 +105,88 @@ class TradingEngine:
     # MARKET DATA PROVIDER MANAGEMENT
     # -----------------------------------------------
 
-    def set_market_data_provider(self, provider: MarketDataProvider) -> None:
-        """Set the market data provider for this trading engine.
+    def add_market_data_provider(self, name: str, provider: MarketDataProvider) -> None:
+        """Register a market data provider under the given name.
 
         Args:
-            provider: The market data provider to use for data requests.
+            name: Name to register the provider under.
+            provider: The market data provider instance to register.
+
+        Raises:
+            ValueError: If a provider with the same name already exists.
         """
-        self._market_data_provider = provider
+        if name in self._market_data_providers:
+            raise ValueError(f"Market data provider with $name '{name}' already exists. Cannot add another provider with the same name.")
+
+        self._market_data_providers[name] = provider
+
+    def remove_market_data_provider(self, name: str) -> None:
+        """Remove a market data provider by name.
+
+        Args:
+            name: Name of the provider to remove.
+
+        Raises:
+            KeyError: If no provider with the given name exists.
+        """
+        if name not in self._market_data_providers:
+            raise KeyError(f"No market data provider with $name '{name}' is registered. Cannot remove non-existent provider.")
+
+        del self._market_data_providers[name]
+
+    @property
+    def market_data_providers(self) -> Dict[str, MarketDataProvider]:
+        """Get all registered market data providers.
+
+        Returns:
+            Dictionary mapping provider names to provider instances.
+        """
+        return self._market_data_providers
 
     def get_historical_bars_series(
         self,
         bar_type: BarType,
         from_dt: datetime,
-        until_dt: Optional[datetime] = None,
+        until_dt: datetime,
+        provider: MarketDataProvider,
     ) -> Sequence[Bar]:
         """Get all historical bars at once for strategy initialization and analysis.
 
         Args:
             bar_type: The bar type specifying instrument and bar characteristics.
             from_dt: Start datetime for the data range.
-            until_dt: End datetime for the data range. If None, gets data
-                     until the latest available.
+            until_dt: End datetime for the data range.
+            provider: The market data provider to use for this request.
 
         Returns:
             Sequence of Bar objects containing historical market data.
-
-        Raises:
-            RuntimeError: If no market data provider is set.
         """
-        if self._market_data_provider is None:
-            raise RuntimeError(
-                f"Cannot call `get_historical_bars_series` for $bar_type ({bar_type}) because $market_data_provider is None. Set a market data provider when creating TradingEngine.",
-            )
-        return self._market_data_provider.get_historical_bars_series(bar_type, from_dt, until_dt)
+        return provider.get_historical_bars_series(bar_type, from_dt, until_dt)
 
     def stream_historical_bars(
         self,
         bar_type: BarType,
         from_dt: datetime,
-        until_dt: Optional[datetime] = None,
+        until_dt: datetime,
+        provider: MarketDataProvider,
     ) -> None:
         """Stream historical bars one-by-one for memory-efficient backtesting.
 
         Args:
             bar_type: The bar type specifying instrument and bar characteristics.
             from_dt: Start datetime for the data range.
-            until_dt: End datetime for the data range. If None, streams data
-                     until the latest available.
-
-        Raises:
-            RuntimeError: If no market data provider is set.
+            until_dt: End datetime for the data range.
+            provider: The market data provider to use for this request.
         """
-        if self._market_data_provider is None:
-            raise RuntimeError(
-                f"Cannot call `stream_historical_bars` for $bar_type ({bar_type}) because $market_data_provider is None. Set a market data provider when creating TradingEngine.",
-            )
-
         # TODO: Reevaluate, how this should work
-        self._market_data_provider.stream_historical_bars(bar_type, from_dt, until_dt)
+        provider.stream_historical_bars(bar_type, from_dt, until_dt)
 
     def subscribe_to_live_bars_with_history(
         self,
         bar_type: BarType,
         history_days: int,
         strategy: Strategy,
+        provider: MarketDataProvider,
     ) -> None:
         """Subscribe to live bars with seamless historical-to-live transition.
 
@@ -174,15 +194,8 @@ class TradingEngine:
             bar_type: The bar type specifying instrument and bar characteristics.
             history_days: Number of days before now to include historical data.
             strategy: The strategy that wants to subscribe.
-
-        Raises:
-            RuntimeError: If no market data provider is set.
+            provider: The market data provider to use for this request.
         """
-        if self._market_data_provider is None:
-            raise RuntimeError(
-                f"Cannot call `subscribe_to_live_bars_with_history` for $bar_type ({bar_type}) because $market_data_provider is None. Set a market data provider when creating TradingEngine.",
-            )
-
         # Initialize subscription set for this bar type if needed
         if bar_type not in self._bar_subscriptions:
             self._bar_subscriptions[bar_type] = set()
@@ -200,7 +213,7 @@ class TradingEngine:
         # TODO: Reevaluate, how this should work
         # Start receiving bars with history from market data provider
         if is_first_subscriber:
-            self._market_data_provider.subscribe_to_live_bars_with_history(bar_type, history_days)
+            provider.subscribe_to_live_bars_with_history(bar_type, history_days)
 
     # -----------------------------------------------
     # BROKER MANAGEMENT
