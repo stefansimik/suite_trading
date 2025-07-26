@@ -8,6 +8,7 @@ from suite_trading.platform.market_data.market_data_provider import MarketDataPr
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.orders import Order
 
@@ -88,14 +89,18 @@ class TradingEngine:
         self.strategies.append(strategy)
 
     # TODO: Reevaluate, if we need this convenience method at all / + if location is OK
-    def publish_bar(self, bar: Bar) -> None:
+    def publish_bar(self, bar: Bar, is_historical: bool = True) -> None:
         """Publish a bar to the MessageBus for distribution to subscribed strategies.
+
+        Creates a NewBarEvent with the specified historical context and publishes it to the appropriate topic.
 
         Args:
             bar: The bar to publish.
+            is_historical: Whether this bar data is historical or live. Defaults to True.
         """
+        event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical)
         topic = TopicFactory.create_topic_for_bar(bar.bar_type)
-        self.message_bus.publish(topic, bar)
+        self.message_bus.publish(topic, event)
 
     # -----------------------------------------------
     # MARKET DATA PROVIDER MANAGEMENT
