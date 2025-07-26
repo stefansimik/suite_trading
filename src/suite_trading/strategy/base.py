@@ -336,14 +336,14 @@ class Strategy:
             event (Event): The event wrapper to route to specific callbacks.
         """
         if isinstance(event, NewBarEvent):
-            self.on_bar(event.bar)  # Extract bar from NewBarEvent
+            self.on_bar(event.bar, event.is_historical)  # Extract bar and historical context from NewBarEvent
         elif isinstance(event, NewTradeTickEvent):
-            self.on_trade_tick(event.trade_tick)  # Extract from NewTradeTickEvent
+            self.on_trade_tick(event.trade_tick, event.is_historical)  # Extract from NewTradeTickEvent
         elif isinstance(event, NewQuoteTickEvent):
-            self.on_quote_tick(event.quote_tick)  # Extract from NewQuoteTickEvent
+            self.on_quote_tick(event.quote_tick, event.is_historical)  # Extract from NewQuoteTickEvent
         # Add other event types as needed
 
-    def on_bar(self, bar: Bar):
+    def on_bar(self, bar: Bar, is_historical: bool):
         """Called when a new bar is received.
 
         This method should be overridden by subclasses to implement
@@ -351,10 +351,11 @@ class Strategy:
 
         Args:
             bar (Bar): The bar data received.
+            is_historical (bool): Whether this bar data is historical or live.
         """
         pass
 
-    def on_trade_tick(self, trade_tick: TradeTick):
+    def on_trade_tick(self, trade_tick: TradeTick, is_historical: bool):
         """Called when a new trade tick is received.
 
         This method should be overridden by subclasses to implement
@@ -362,10 +363,11 @@ class Strategy:
 
         Args:
             trade_tick (TradeTick): The trade tick data received.
+            is_historical (bool): Whether this tick data is historical or live.
         """
         pass
 
-    def on_quote_tick(self, quote_tick: QuoteTick):
+    def on_quote_tick(self, quote_tick: QuoteTick, is_historical: bool):
         """Called when a new quote tick is received.
 
         This method should be overridden by subclasses to implement
@@ -373,5 +375,21 @@ class Strategy:
 
         Args:
             quote_tick (QuoteTick): The quote tick data received.
+            is_historical (bool): Whether this tick data is historical or live.
+        """
+        pass
+
+    def on_historical_bars_series(self, bars: Sequence[Bar]):
+        """Called when a series of historical bars is received.
+
+        This method is called when requesting historical bar data series,
+        typically from methods like get_historical_bars_series(). All bars
+        in the series are historical data.
+
+        This method should be overridden by subclasses to implement
+        strategy logic for processing historical bar series data.
+
+        Args:
+            bars (Sequence[Bar]): The sequence of historical bar data received.
         """
         pass

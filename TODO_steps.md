@@ -34,16 +34,7 @@
 **Dependencies**: TradingEngine with market data provider integration (Step 2.1)
 **Purpose**: Add market data request methods that delegate to TradingEngine
 
-#### Step 3.2: Update Market Data Callback Methods in Strategy
-**File**: `src/suite_trading/strategy/base.py` (modify existing)
-**Dependencies**: Updated domain objects, NewBarEvent with `is_historical` attribute
-**Purpose**: Update callback methods to handle historical vs live data context
-
-Key updates:
-- `on_bar(self, bar: Bar, is_historical: bool)` - replace existing `on_bar`
-- `on_trade_tick(self, tick: TradeTick, is_historical: bool)` - update existing
-- `on_quote_tick(self, tick: QuoteTick, is_historical: bool)` - update existing
-- `on_historical_bars_series(self, bars: Sequence[Bar])` - new callback for series data
+#### Step 3.2: Update Market Data Callback Methods in Strategy ✅ COMPLETED
 
 #### Step 3.3: Add Order Management Methods to Strategy
 **File**: `src/suite_trading/strategy/base.py` (modify existing)

@@ -56,7 +56,7 @@ class DemoStrategy(Strategy):
         eurusd_1min_bars_type = create_bar_type(value=1, unit=BarUnit.MINUTE)
         self.subscribe_bars(eurusd_1min_bars_type)
 
-    def on_bar(self, bar):
+    def on_bar(self, bar, is_historical: bool):
         pass
 
 
