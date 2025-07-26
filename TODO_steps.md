@@ -29,17 +29,10 @@
 
 ### Phase 3: Strategy Interface Enhancement
 
-#### Step 3.1: Add Market Data Request Methods to Strategy
+#### Step 3.1: Add Market Data Request Methods to Strategy ✅ COMPLETED
 **File**: `src/suite_trading/strategy/base.py` (modify existing)
 **Dependencies**: TradingEngine with market data provider integration (Step 2.1)
 **Purpose**: Add market data request methods that delegate to TradingEngine
-
-Key additions:
-- `get_historical_bars_series(bar_type: BarType, from_dt: datetime, until_dt: Optional[datetime] = None) -> Sequence[Bar]` - delegate to engine
-- `stream_historical_bars(bar_type: BarType, from_dt: datetime, until_dt: Optional[datetime] = None) -> None` - delegate to engine
-- `subscribe_to_live_bars(bar_type: BarType) -> None` - delegate to engine
-- `subscribe_to_live_bars_with_history(bar_type: BarType, history_days: int) -> None` - delegate to engine
-- `unsubscribe_from_live_bars(bar_type: BarType) -> None` - delegate to engine
 
 #### Step 3.2: Update Market Data Callback Methods in Strategy
 **File**: `src/suite_trading/strategy/base.py` (modify existing)
