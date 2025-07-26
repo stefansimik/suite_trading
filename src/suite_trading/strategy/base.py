@@ -89,7 +89,7 @@ class Strategy:
             )
 
         # Ask TradingEngine to handle all subscription details
-        self._trading_engine.subscribe_to_bars(bar_type, self)
+        self._trading_engine.subscribe_to_live_bars(bar_type, self)
 
         # Remember the subscribed bar type for cleanup during stop
         self._subscribed_bar_types.add(bar_type)
@@ -107,7 +107,7 @@ class Strategy:
 
         if bar_type in self._subscribed_bar_types:
             # Ask TradingEngine to handle all unsubscription details
-            self._trading_engine.unsubscribe_from_bars(bar_type, self)
+            self._trading_engine.unsubscribe_from_live_bars(bar_type, self)
 
             # Remove from our local tracking
             self._subscribed_bar_types.remove(bar_type)
