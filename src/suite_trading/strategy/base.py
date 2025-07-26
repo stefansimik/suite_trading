@@ -1,14 +1,11 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, List, Optional, Sequence
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
-from suite_trading.domain.market_data.tick.trade_tick import TradeTick
-from suite_trading.domain.market_data.tick.trade_tick_event import NewTradeTickEvent
-from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
-from suite_trading.domain.market_data.tick.quote_tick_event import NewQuoteTickEvent
-from suite_trading.domain.instrument import Instrument
+from suite_trading.domain.order.orders import Order
+from suite_trading.platform.broker.broker import Broker
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -32,8 +29,6 @@ class Strategy:
         self._trading_engine = None
 
         self._subscribed_bar_types = set()  # Track subscribed bar types
-        self._subscribed_trade_tick_instruments = set()  # Track subscribed trade tick instruments
-        self._subscribed_quote_tick_instruments = set()  # Track subscribed quote tick instruments
 
     def _set_trading_engine(self, trading_engine: "TradingEngine"):
         """Set the trading engine reference.
@@ -60,128 +55,15 @@ class Strategy:
         This method should be overridden by subclasses to implement
         cleanup logic when the strategy stops.
 
-        Automatically unsubscribes from all bar, trade tick, and quote tick subscriptions.
+        Automatically unsubscribes from all bar subscriptions.
         """
         # Unsubscribe from all bar topics
         for bar_type in list(self._subscribed_bar_types):
-            self.unsubscribe_bars(bar_type)
-
-        # Unsubscribe from all trade tick topics
-        for instrument in list(self._subscribed_trade_tick_instruments):
-            self.unsubscribe_trade_ticks(instrument)
-
-        # Unsubscribe from all quote tick topics
-        for instrument in list(self._subscribed_quote_tick_instruments):
-            self.unsubscribe_quote_ticks(instrument)
+            self.unsubscribe_from_live_bars(bar_type)
 
     # -----------------------------------------------
     # SUBSCRIBE TO DATA
     # -----------------------------------------------
-
-    def subscribe_bars(self, bar_type: BarType):
-        """Subscribe to bar data for a specific bar type with automatic demand-based publishing.
-
-        Args:
-            bar_type (BarType): The type of bar to subscribe to.
-        """
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `subscribe_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        # Ask TradingEngine to handle all subscription details
-        self._trading_engine.subscribe_to_live_bars(bar_type, self)
-
-        # Remember the subscribed bar type for cleanup during stop
-        self._subscribed_bar_types.add(bar_type)
-
-    def unsubscribe_bars(self, bar_type: BarType):
-        """Unsubscribe from bar data for a specific bar type with automatic cleanup.
-
-        Args:
-            bar_type (BarType): The type of bar to unsubscribe from.
-        """
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `unsubscribe_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        if bar_type in self._subscribed_bar_types:
-            # Ask TradingEngine to handle all unsubscription details
-            self._trading_engine.unsubscribe_from_live_bars(bar_type, self)
-
-            # Remove from our local tracking
-            self._subscribed_bar_types.remove(bar_type)
-
-    def subscribe_trade_ticks(self, instrument: Instrument):
-        """Subscribe to trade tick data for a specific instrument with automatic demand-based publishing.
-
-        Args:
-            instrument (Instrument): The instrument to subscribe to.
-        """
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `subscribe_trade_ticks` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        # Ask TradingEngine to handle all subscription details
-        self._trading_engine.subscribe_to_trade_ticks(instrument, self)
-
-        # Remember the subscribed instrument for cleanup during stop
-        self._subscribed_trade_tick_instruments.add(instrument)
-
-    def subscribe_quote_ticks(self, instrument: Instrument):
-        """Subscribe to quote tick data for a specific instrument with automatic demand-based publishing.
-
-        Args:
-            instrument (Instrument): The instrument to subscribe to.
-        """
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `subscribe_quote_ticks` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        # Ask TradingEngine to handle all subscription details
-        self._trading_engine.subscribe_to_quote_ticks(instrument, self)
-
-        # Remember the subscribed instrument for cleanup during stop
-        self._subscribed_quote_tick_instruments.add(instrument)
-
-    def unsubscribe_trade_ticks(self, instrument: Instrument):
-        """Unsubscribe from trade tick data for a specific instrument with automatic cleanup.
-
-        Args:
-            instrument (Instrument): The instrument to unsubscribe from.
-        """
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `unsubscribe_trade_ticks` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        if instrument in self._subscribed_trade_tick_instruments:
-            # Ask TradingEngine to handle all unsubscription details
-            self._trading_engine.unsubscribe_from_trade_ticks(instrument, self)
-
-            # Remove from our local tracking
-            self._subscribed_trade_tick_instruments.remove(instrument)
-
-    def unsubscribe_quote_ticks(self, instrument: Instrument):
-        """Unsubscribe from quote tick data for a specific instrument with automatic cleanup.
-
-        Args:
-            instrument (Instrument): The instrument to unsubscribe from.
-        """
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `unsubscribe_quote_ticks` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        if instrument in self._subscribed_quote_tick_instruments:
-            # Ask TradingEngine to handle all unsubscription details
-            self._trading_engine.unsubscribe_from_quote_ticks(instrument, self)
-
-            # Remove from our local tracking
-            self._subscribed_quote_tick_instruments.remove(instrument)
 
     # -----------------------------------------------
     # MARKET DATA REQUESTS
@@ -263,6 +145,9 @@ class Strategy:
 
         self._trading_engine.subscribe_to_live_bars(bar_type, self)
 
+        # Remember the subscribed bar type for cleanup during stop
+        self._subscribed_bar_types.add(bar_type)
+
     # TODO: Check
     def subscribe_to_live_bars_with_history(
         self,
@@ -303,7 +188,12 @@ class Strategy:
                 f"Cannot call `unsubscribe_from_live_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        self._trading_engine.unsubscribe_from_live_bars(bar_type, self)
+        if bar_type in self._subscribed_bar_types:
+            # Ask TradingEngine to handle all unsubscription details
+            self._trading_engine.unsubscribe_from_live_bars(bar_type, self)
+
+            # Remove from our local tracking
+            self._subscribed_bar_types.remove(bar_type)
 
     # -----------------------------------------------
     # DATA HANDLERS
@@ -337,10 +227,6 @@ class Strategy:
         """
         if isinstance(event, NewBarEvent):
             self.on_bar(event.bar, event.is_historical)  # Extract bar and historical context from NewBarEvent
-        elif isinstance(event, NewTradeTickEvent):
-            self.on_trade_tick(event.trade_tick, event.is_historical)  # Extract from NewTradeTickEvent
-        elif isinstance(event, NewQuoteTickEvent):
-            self.on_quote_tick(event.quote_tick, event.is_historical)  # Extract from NewQuoteTickEvent
         # Add other event types as needed
 
     def on_bar(self, bar: Bar, is_historical: bool):
@@ -352,30 +238,6 @@ class Strategy:
         Args:
             bar (Bar): The bar data received.
             is_historical (bool): Whether this bar data is historical or live.
-        """
-        pass
-
-    def on_trade_tick(self, trade_tick: TradeTick, is_historical: bool):
-        """Called when a new trade tick is received.
-
-        This method should be overridden by subclasses to implement
-        strategy logic for processing trade tick data.
-
-        Args:
-            trade_tick (TradeTick): The trade tick data received.
-            is_historical (bool): Whether this tick data is historical or live.
-        """
-        pass
-
-    def on_quote_tick(self, quote_tick: QuoteTick, is_historical: bool):
-        """Called when a new quote tick is received.
-
-        This method should be overridden by subclasses to implement
-        strategy logic for processing quote tick data.
-
-        Args:
-            quote_tick (QuoteTick): The quote tick data received.
-            is_historical (bool): Whether this tick data is historical or live.
         """
         pass
 
@@ -393,3 +255,77 @@ class Strategy:
             bars (Sequence[Bar]): The sequence of historical bar data received.
         """
         pass
+
+    # -----------------------------------------------
+    # ORDER MANAGEMENT
+    # -----------------------------------------------
+
+    def submit_order(self, order: Order, broker: Broker) -> None:
+        """Submit an order for execution.
+
+        Args:
+            order (Order): The order to submit for execution.
+            broker (Broker): The broker to submit the order to.
+
+        Raises:
+            RuntimeError: If trading engine is not set.
+        """
+        if self._trading_engine is None:
+            raise RuntimeError(
+                f"Cannot call `submit_order` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+
+        self._trading_engine.submit_order(order, broker)
+
+    def cancel_order(self, order: Order, broker: Broker) -> None:
+        """Cancel an existing order.
+
+        Args:
+            order (Order): The order to cancel.
+            broker (Broker): The broker to cancel the order with.
+
+        Raises:
+            RuntimeError: If trading engine is not set.
+        """
+        if self._trading_engine is None:
+            raise RuntimeError(
+                f"Cannot call `cancel_order` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+
+        self._trading_engine.cancel_order(order, broker)
+
+    def modify_order(self, order: Order, broker: Broker) -> None:
+        """Modify an existing order.
+
+        Args:
+            order (Order): The order to modify with updated parameters.
+            broker (Broker): The broker to modify the order with.
+
+        Raises:
+            RuntimeError: If trading engine is not set.
+        """
+        if self._trading_engine is None:
+            raise RuntimeError(
+                f"Cannot call `modify_order` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+
+        self._trading_engine.modify_order(order, broker)
+
+    def get_active_orders(self, broker: Broker) -> List[Order]:
+        """Get all currently active orders.
+
+        Args:
+            broker (Broker): The broker to get active orders from.
+
+        Returns:
+            List[Order]: List of all active orders for the specified broker.
+
+        Raises:
+            RuntimeError: If trading engine is not set.
+        """
+        if self._trading_engine is None:
+            raise RuntimeError(
+                f"Cannot call `get_active_orders` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+
+        return self._trading_engine.get_active_orders(broker)

@@ -36,16 +36,7 @@
 
 #### Step 3.2: Update Market Data Callback Methods in Strategy ✅ COMPLETED
 
-#### Step 3.3: Add Order Management Methods to Strategy
-**File**: `src/suite_trading/strategy/base.py` (modify existing)
-**Dependencies**: TradingEngine with broker management (Step 2.2)
-**Purpose**: Add order management capabilities that delegate to TradingEngine
-
-Key additions:
-- `submit_order(self, order: Order, broker: Broker = broker.SIM) -> None` - delegate to engine
-- `cancel_order(self, order: Order, broker: Broker = broker.SIM) -> None` - delegate to engine
-- `modify_order(self, order: Order, broker: Broker = broker.SIM) -> None` - delegate to engine
-- `get_active_orders(self, broker: Broker = broker.SIM) -> List[Order]` - delegate to engine
+#### Step 3.3: Add Order Management Methods to Strategy ✅ COMPLETED
 
 ### Phase 4: Enhanced Domain Objects
 

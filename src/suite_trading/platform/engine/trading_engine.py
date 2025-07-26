@@ -9,7 +9,6 @@ from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
-from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.orders import Order
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,6 @@ class TradingEngine:
 
         # Track strategy subscriptions for demand-based publishing
         self._bar_subscriptions: dict[BarType, set[Strategy]] = {}  # Track which strategies subscribe to which bar types
-        self._trade_tick_subscriptions: dict[Instrument, set[Strategy]] = {}  # Track trade tick subscriptions
-        self._quote_tick_subscriptions: dict[Instrument, set[Strategy]] = {}  # Track quote tick subscriptions
 
     def start(self):
         """Start the TradingEngine and all strategies.
@@ -381,139 +378,3 @@ class TradingEngine:
             # Stop requesting live bars from market data provider
             if self._market_data_provider is not None:
                 self._market_data_provider.unsubscribe_from_live_bars(bar_type)
-
-    def subscribe_to_trade_ticks(self, instrument: Instrument, strategy: Strategy):
-        """Subscribe a strategy to trade tick data for a specific instrument.
-
-        This method handles all the technical details of subscription:
-        - Subscribes the strategy to the MessageBus topic
-        - Tracks which strategies are subscribed to which instruments
-        - Initiates data publishing when first strategy subscribes
-
-        Args:
-            instrument (Instrument): The instrument to subscribe to.
-            strategy (Strategy): The strategy that wants to subscribe.
-        """
-        # Initialize subscription set for this instrument if needed
-        if instrument not in self._trade_tick_subscriptions:
-            self._trade_tick_subscriptions[instrument] = set()
-
-        # Check if this is the first subscriber for this instrument
-        is_first_subscriber = len(self._trade_tick_subscriptions[instrument]) == 0
-
-        # Add strategy to subscription tracking
-        self._trade_tick_subscriptions[instrument].add(strategy)
-
-        # Subscribe strategy to MessageBus topic
-        topic = TopicFactory.create_topic_for_trade_tick(instrument)
-        self.message_bus.subscribe(topic, strategy.on_event)
-
-        # TODO: Initiate sending trade ticks from market data provider
-        # When first strategy subscribes, start requesting this instrument from data provider
-        if is_first_subscriber:
-            # TODO: self.market_data_provider.start_trade_ticks(instrument)
-            pass
-
-    def unsubscribe_from_trade_ticks(self, instrument: Instrument, strategy: Strategy):
-        """Unsubscribe a strategy from trade tick data for a specific instrument.
-
-        This method handles cleanup when a strategy unsubscribes:
-        - Unsubscribes the strategy from the MessageBus topic
-        - Removes strategy from subscription tracking
-        - Stops data publishing when last strategy unsubscribes
-
-        Args:
-            instrument (Instrument): The instrument to unsubscribe from.
-            strategy (Strategy): The strategy that wants to unsubscribe.
-        """
-        # Check if we have subscriptions for this instrument
-        if instrument not in self._trade_tick_subscriptions:
-            logger.warning(
-                f"Cannot call `unsubscribe_from_trade_ticks` for $instrument ({instrument}) and $strategy ('{strategy.name}') because no subscriptions exist for this instrument. This likely indicates a logical mistake - trying to unsubscribe from something that was never subscribed to.",
-            )
-            return
-
-        # Remove strategy from subscription tracking
-        self._trade_tick_subscriptions[instrument].discard(strategy)
-
-        # Unsubscribe strategy from MessageBus topic
-        topic = TopicFactory.create_topic_for_trade_tick(instrument)
-        self.message_bus.unsubscribe(topic, strategy.on_event)
-
-        # Check if this was the last subscriber
-        if len(self._trade_tick_subscriptions[instrument]) == 0:
-            # Clean up empty subscription set
-            del self._trade_tick_subscriptions[instrument]
-
-            # TODO: Stop requesting trade ticks from market data provider
-            # When last strategy unsubscribes, stop requesting this instrument from data provider
-            # TODO: self.market_data_provider.stop_trade_ticks(instrument)
-            pass
-
-    def subscribe_to_quote_ticks(self, instrument: Instrument, strategy: Strategy):
-        """Subscribe a strategy to quote tick data for a specific instrument.
-
-        This method handles all the technical details of subscription:
-        - Subscribes the strategy to the MessageBus topic
-        - Tracks which strategies are subscribed to which instruments
-        - Initiates data publishing when first strategy subscribes
-
-        Args:
-            instrument (Instrument): The instrument to subscribe to.
-            strategy (Strategy): The strategy that wants to subscribe.
-        """
-        # Initialize subscription set for this instrument if needed
-        if instrument not in self._quote_tick_subscriptions:
-            self._quote_tick_subscriptions[instrument] = set()
-
-        # Check if this is the first subscriber for this instrument
-        is_first_subscriber = len(self._quote_tick_subscriptions[instrument]) == 0
-
-        # Add strategy to subscription tracking
-        self._quote_tick_subscriptions[instrument].add(strategy)
-
-        # Subscribe strategy to MessageBus topic
-        topic = TopicFactory.create_topic_for_quote_tick(instrument)
-        self.message_bus.subscribe(topic, strategy.on_event)
-
-        # TODO: Initiate sending quote ticks from market data provider
-        # When first strategy subscribes, start requesting this instrument from data provider
-        if is_first_subscriber:
-            # TODO: self.market_data_provider.start_quote_ticks(instrument)
-            pass
-
-    def unsubscribe_from_quote_ticks(self, instrument: Instrument, strategy: Strategy):
-        """Unsubscribe a strategy from quote tick data for a specific instrument.
-
-        This method handles cleanup when a strategy unsubscribes:
-        - Unsubscribes the strategy from the MessageBus topic
-        - Removes strategy from subscription tracking
-        - Stops data publishing when last strategy unsubscribes
-
-        Args:
-            instrument (Instrument): The instrument to unsubscribe from.
-            strategy (Strategy): The strategy that wants to unsubscribe.
-        """
-        # Check if we have subscriptions for this instrument
-        if instrument not in self._quote_tick_subscriptions:
-            logger.warning(
-                f"Cannot call `unsubscribe_from_quote_ticks` for $instrument ({instrument}) and $strategy ('{strategy.name}') because no subscriptions exist for this instrument. This likely indicates a logical mistake - trying to unsubscribe from something that was never subscribed to.",
-            )
-            return
-
-        # Remove strategy from subscription tracking
-        self._quote_tick_subscriptions[instrument].discard(strategy)
-
-        # Unsubscribe strategy from MessageBus topic
-        topic = TopicFactory.create_topic_for_quote_tick(instrument)
-        self.message_bus.unsubscribe(topic, strategy.on_event)
-
-        # Check if this was the last subscriber
-        if len(self._quote_tick_subscriptions[instrument]) == 0:
-            # Clean up empty subscription set
-            del self._quote_tick_subscriptions[instrument]
-
-            # TODO: Stop requesting quote ticks from market data provider
-            # When last strategy unsubscribes, stop requesting this instrument from data provider
-            # TODO: self.market_data_provider.stop_quote_ticks(instrument)
-            pass
