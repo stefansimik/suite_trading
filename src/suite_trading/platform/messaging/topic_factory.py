@@ -12,6 +12,8 @@ class TopicFactory:
     # Wildcard character for topic patterns
     WILDCARD_CHAR = "*"
 
+    # region Core Utility Methods
+
     @classmethod
     def create_topic_from_parts(cls, topic_parts: Sequence[str]) -> str:
         """Create a topic string from a sequence of parts.
@@ -64,6 +66,10 @@ class TopicFactory:
         if topic.lower() != topic:
             raise ValueError(f"$topic must be lowercase, but provided value is: '{topic}'")
 
+    # endregion
+
+    # region Specific Topic Creation Methods
+
     @staticmethod
     def create_topic_for_bar(bar_type: BarType) -> str:
         """Create a standardized topic name for a specific bar type.
@@ -105,3 +111,51 @@ class TopicFactory:
         return TopicFactory.create_topic_from_parts(
             ["quote_tick", str(instrument).lower()],
         )
+
+    # endregion
+
+    # region Generic Event-Based Topic Creation Methods
+
+    @staticmethod
+    def create_topic_for_event(event_type: type, request_details: dict) -> str:
+        """
+        Generate standardized topics for any event type and request details.
+
+        Args:
+            event_type: The event class (e.g., NewBarEvent, NewCalendarEvent)
+            request_details: Dict containing event-specific parameters
+
+        Returns:
+            Standardized topic string for MessageBus routing
+        """
+        # Try to use specific factory method if available
+        method_name = f"create_topic_for_{event_type.__name__.lower().replace('event', '')}"
+        if hasattr(TopicFactory, method_name):
+            return getattr(TopicFactory, method_name)(request_details)
+
+        # Generic topic generation for custom events
+        base_name = event_type.__name__.lower().replace("new", "").replace("event", "")
+
+        # Create topic components from request_details
+        components = [base_name]
+        for key, value in sorted(request_details.items()):
+            if isinstance(value, (str, int, float)):
+                components.append(f"{key}_{value}")
+            elif hasattr(value, "__name__"):
+                components.append(f"{key}_{value.__name__}")
+            elif hasattr(value, "name"):
+                components.append(f"{key}_{value.name}")
+
+        return TopicFactory.create_topic_from_parts(components)
+
+    @staticmethod
+    def create_topic_for_newbarevent(request_details: dict) -> str:
+        """Create topic for NewBarEvent using request_details dict."""
+        bar_type = request_details.get("bar_type")
+        if bar_type:
+            return TopicFactory.create_topic_from_parts(
+                ["bar", str(bar_type.instrument).lower(), f"{bar_type.value}-{bar_type.unit.name.lower()}", bar_type.price_type.name.lower()],
+            )
+        raise ValueError("bar_type required in request_details for NewBarEvent")
+
+    # endregion

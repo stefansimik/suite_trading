@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Set, Tuple, Any
+from collections import defaultdict
 from suite_trading.strategy.base import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -10,6 +11,7 @@ from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
+from suite_trading.domain.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,8 @@ class TradingEngine:
 
     This simple design focuses on strategy coordination and management.
     """
+
+    # region Initialization
 
     def __init__(self):
         """Initialize a new TradingEngine instance.
@@ -44,6 +48,39 @@ class TradingEngine:
 
         # Track strategy subscriptions for demand-based publishing
         self._bar_subscriptions: dict[BarType, set[Strategy]] = {}  # Track which strategies subscribe to which bar types
+
+        # NEW: Subscription tracking for generic events - keep original request_details
+        # Key: (event_type, frozenset of request_details items) -> Set of strategies
+        self._event_subscriptions: Dict[Tuple[type, frozenset], Set[Any]] = defaultdict(set)
+
+        # Key: (provider, event_type, frozenset of request_details items) -> active stream count
+        self._active_streams: Dict[Tuple[Any, type, frozenset], int] = defaultdict(int)
+
+        # Key: strategy -> Set of (event_type, request_details_key, provider)
+        self._strategy_subscriptions: Dict[Any, Set[Tuple[type, frozenset, Any]]] = defaultdict(set)
+
+    def _make_request_details_key(self, request_details: dict) -> frozenset:
+        """Create hashable key from request_details dict."""
+
+        def make_hashable(obj):
+            if isinstance(obj, dict):
+                return frozenset((k, make_hashable(v)) for k, v in obj.items())
+            elif isinstance(obj, list):
+                return tuple(make_hashable(item) for item in obj)
+            elif hasattr(obj, "__dict__"):
+                return str(obj)  # For complex objects, use string representation
+            else:
+                return obj
+
+        return make_hashable(request_details)
+
+    def _generate_topic(self, event_type: type, request_details: dict) -> str:
+        """Generate topic for event type and request details."""
+        return TopicFactory.create_topic_for_event(event_type, request_details)
+
+    # endregion
+
+    # region Engine Lifecycle
 
     def start(self):
         """Start the TradingEngine and all strategies.
@@ -67,6 +104,10 @@ class TradingEngine:
         for strategy in self.strategies:
             strategy.on_stop()
 
+    # endregion
+
+    # region Strategy Management
+
     def add_strategy(self, strategy: Strategy):
         """Add a strategy to the engine.
 
@@ -87,6 +128,66 @@ class TradingEngine:
         strategy._set_trading_engine(self)
         self.strategies.append(strategy)
 
+        # Initialize strategy subscription tracking
+        self._strategy_subscriptions[strategy] = set()
+
+    def remove_strategy(self, strategy: Strategy) -> None:
+        """Remove a strategy from the engine and clean up its subscriptions.
+
+        Args:
+            strategy: The strategy to remove.
+
+        Raises:
+            ValueError: If the strategy is not found.
+        """
+        if strategy not in self.strategies:
+            raise ValueError(f"Strategy '{strategy.name}' is not registered with this engine.")
+
+        # Clean up all subscriptions for this strategy
+        self._cleanup_strategy_subscriptions(strategy)
+
+        # Remove from strategies list
+        self.strategies.remove(strategy)
+
+    def _cleanup_strategy_subscriptions(self, strategy: Strategy) -> None:
+        """Clean up all subscriptions for a strategy when it stops."""
+        if strategy not in self._strategy_subscriptions:
+            return
+
+        # Get copy of subscriptions to avoid modification during iteration
+        subscriptions = self._strategy_subscriptions[strategy].copy()
+
+        for event_type, request_details_key, provider in subscriptions:
+            try:
+                # We need to reconstruct the original request_details from the key
+                # For cleanup, we'll directly remove from tracking without calling stop_streaming_live_events
+                # since the provider cleanup will be handled elsewhere
+                self._strategy_subscriptions[strategy].discard((event_type, request_details_key, provider))
+
+                # Clean up event subscriptions
+                subscription_key = (event_type, request_details_key)
+                self._event_subscriptions[subscription_key].discard(strategy)
+                if not self._event_subscriptions[subscription_key]:
+                    del self._event_subscriptions[subscription_key]
+
+                # Clean up active streams
+                stream_key = (provider, event_type, request_details_key)
+                if stream_key in self._active_streams:
+                    self._active_streams[stream_key] -= 1
+                    if self._active_streams[stream_key] <= 0:
+                        del self._active_streams[stream_key]
+
+            except Exception as e:
+                # Log error but continue cleanup
+                logger.warning(f"Error cleaning up subscription: {e}")
+
+        # Clean up the strategy's subscription tracking
+        del self._strategy_subscriptions[strategy]
+
+    # endregion
+
+    # region Utility Methods
+
     # TODO: Reevaluate, if we need this convenience method at all / + if location is OK
     def publish_bar(self, bar: Bar, is_historical: bool = True) -> None:
         """Publish a bar to the MessageBus for distribution to subscribed strategies.
@@ -101,9 +202,9 @@ class TradingEngine:
         topic = TopicFactory.create_topic_for_bar(bar.bar_type)
         self.message_bus.publish(topic, event)
 
-    # -----------------------------------------------
-    # MARKET DATA PROVIDER MANAGEMENT
-    # -----------------------------------------------
+    # endregion
+
+    # region Market Data Provider Management
 
     def add_market_data_provider(self, name: str, provider: MarketDataProvider) -> None:
         """Register a market data provider under the given name.
@@ -143,77 +244,155 @@ class TradingEngine:
         """
         return self._market_data_providers
 
-    def get_historical_bars_series(
+    # endregion
+
+    # region Generic Event-Based Market Data Methods
+
+    # NEW: Generic event-based market data methods
+    def get_historical_events(
         self,
-        bar_type: BarType,
-        from_dt: datetime,
-        until_dt: datetime,
+        requested_event_type: type,
+        request_details: dict,
         provider: MarketDataProvider,
-    ) -> Sequence[Bar]:
-        """Get all historical bars at once for strategy initialization and analysis.
+        strategy: Strategy,
+    ) -> Sequence[Event]:
+        """
+        Get historical events from specified provider.
 
         Args:
-            bar_type: The bar type specifying instrument and bar characteristics.
-            from_dt: Start datetime for the data range.
-            until_dt: End datetime for the data range.
-            provider: The market data provider to use for this request.
+            requested_event_type: Type of events to retrieve
+            request_details: Dict with event-specific parameters
+            provider: Market data provider to use
+            strategy: Strategy making the request
 
         Returns:
-            Sequence of Bar objects containing historical market data.
+            Sequence of historical events
         """
-        return provider.get_historical_bars_series(bar_type, from_dt, until_dt)
+        # Validate provider capability
+        if not provider.supports_event(requested_event_type, request_details):
+            raise ValueError(
+                f"Provider {provider.__class__.__name__} does not support {requested_event_type.__name__} events with details: {request_details}",
+            )
 
-    def stream_historical_bars(
+        # Delegate to provider
+        return provider.get_historical_events(requested_event_type, request_details)
+
+    def stream_historical_events(
         self,
-        bar_type: BarType,
-        from_dt: datetime,
-        until_dt: datetime,
+        requested_event_type: type,
+        request_details: dict,
         provider: MarketDataProvider,
-    ) -> None:
-        """Stream historical bars one-by-one for memory-efficient backtesting.
-
-        Args:
-            bar_type: The bar type specifying instrument and bar characteristics.
-            from_dt: Start datetime for the data range.
-            until_dt: End datetime for the data range.
-            provider: The market data provider to use for this request.
-        """
-        # TODO: Reevaluate, how this should work
-        provider.stream_historical_bars(bar_type, from_dt, until_dt)
-
-    def subscribe_to_live_bars_with_history(
-        self,
-        bar_type: BarType,
-        history_days: int,
         strategy: Strategy,
-        provider: MarketDataProvider,
     ) -> None:
-        """Subscribe to live bars with seamless historical-to-live transition.
+        """Stream historical events to strategy via MessageBus."""
+        # Validate provider capability
+        if not provider.supports_event(requested_event_type, request_details):
+            raise ValueError(
+                f"Provider {provider.__class__.__name__} does not support {requested_event_type.__name__} events with details: {request_details}",
+            )
 
-        Args:
-            bar_type: The bar type specifying instrument and bar characteristics.
-            history_days: Number of days before now to include historical data.
-            strategy: The strategy that wants to subscribe.
-            provider: The market data provider to use for this request.
-        """
-        # Initialize subscription set for this bar type if needed
-        if bar_type not in self._bar_subscriptions:
-            self._bar_subscriptions[bar_type] = set()
-
-        # Check if this is the first subscriber for this bar type
-        is_first_subscriber = len(self._bar_subscriptions[bar_type]) == 0
-
-        # Add strategy to subscription tracking
-        self._bar_subscriptions[bar_type].add(strategy)
-
-        # Subscribe strategy to MessageBus topic
-        topic = TopicFactory.create_topic_for_bar(bar_type)
+        # Generate topic and subscribe strategy
+        topic = self._generate_topic(requested_event_type, request_details)
         self.message_bus.subscribe(topic, strategy.on_event)
 
-        # TODO: Reevaluate, how this should work
-        # Start receiving bars with history from market data provider
-        if is_first_subscriber:
-            provider.subscribe_to_live_bars_with_history(bar_type, history_days)
+        # Delegate to provider
+        provider.stream_historical_events(requested_event_type, request_details)
+
+    def start_streaming_live_events(
+        self,
+        requested_event_type: type,
+        request_details: dict,
+        provider: MarketDataProvider,
+        strategy: Strategy,
+    ) -> None:
+        """Start streaming live events to strategy."""
+        # Validate provider capability
+        if not provider.supports_event(requested_event_type, request_details):
+            raise ValueError(
+                f"Provider {provider.__class__.__name__} does not support {requested_event_type.__name__} events with details: {request_details}",
+            )
+
+        # Track subscription - keep original request_details
+        details_key = self._make_request_details_key(request_details)
+        subscription_key = (requested_event_type, details_key)
+        stream_key = (provider, requested_event_type, details_key)
+
+        # Add strategy to subscribers
+        self._event_subscriptions[subscription_key].add(strategy)
+        self._strategy_subscriptions[strategy].add((requested_event_type, details_key, provider))
+
+        # Subscribe strategy to MessageBus topic
+        topic = self._generate_topic(requested_event_type, request_details)
+        self.message_bus.subscribe(topic, strategy.on_event)
+
+        # Start provider stream if this is first subscriber
+        if self._active_streams[stream_key] == 0:
+            provider.start_streaming_live_events(requested_event_type, request_details)
+
+        self._active_streams[stream_key] += 1
+
+    def start_streaming_live_events_with_history(
+        self,
+        requested_event_type: type,
+        request_details: dict,
+        provider: MarketDataProvider,
+        strategy: Strategy,
+    ) -> None:
+        """Start streaming live events with historical data first."""
+        # Validate provider capability
+        if not provider.supports_event(requested_event_type, request_details):
+            raise ValueError(
+                f"Provider {provider.__class__.__name__} does not support {requested_event_type.__name__} events with details: {request_details}",
+            )
+
+        # Track subscription - keep original request_details
+        details_key = self._make_request_details_key(request_details)
+        subscription_key = (requested_event_type, details_key)
+        stream_key = (provider, requested_event_type, details_key)
+
+        # Add strategy to subscribers
+        self._event_subscriptions[subscription_key].add(strategy)
+        self._strategy_subscriptions[strategy].add((requested_event_type, details_key, provider))
+
+        # Subscribe strategy to MessageBus topic
+        topic = self._generate_topic(requested_event_type, request_details)
+        self.message_bus.subscribe(topic, strategy.on_event)
+
+        # Start provider stream if this is first subscriber
+        if self._active_streams[stream_key] == 0:
+            provider.start_streaming_live_events_with_history(requested_event_type, request_details)
+
+        self._active_streams[stream_key] += 1
+
+    def stop_streaming_live_events(
+        self,
+        requested_event_type: type,
+        request_details: dict,
+        provider: MarketDataProvider,
+        strategy: Strategy,
+    ) -> None:
+        """Stop streaming live events for strategy."""
+        details_key = self._make_request_details_key(request_details)
+        subscription_key = (requested_event_type, details_key)
+        stream_key = (provider, requested_event_type, details_key)
+
+        # Remove strategy from subscribers
+        self._event_subscriptions[subscription_key].discard(strategy)
+        self._strategy_subscriptions[strategy].discard((requested_event_type, details_key, provider))
+
+        # Unsubscribe from MessageBus
+        topic = self._generate_topic(requested_event_type, request_details)
+        self.message_bus.unsubscribe(topic, strategy.on_event)
+
+        # Stop provider stream if no more subscribers
+        self._active_streams[stream_key] -= 1
+        if self._active_streams[stream_key] <= 0:
+            provider.stop_streaming_live_events(requested_event_type, request_details)
+            del self._active_streams[stream_key]
+
+        # Clean up empty subscription sets
+        if not self._event_subscriptions[subscription_key]:
+            del self._event_subscriptions[subscription_key]
 
     # -----------------------------------------------
     # BROKER MANAGEMENT
@@ -314,9 +493,9 @@ class TradingEngine:
         """
         return broker.get_active_orders()
 
-    # -----------------------------------------------
-    # MARKET DATA SUBSCRIPTION MANAGEMENT
-    # -----------------------------------------------
+    # endregion
+
+    # region Legacy Bar Subscription Methods
 
     # TODO: Reevaluate, how this should work
     def subscribe_to_live_bars(self, bar_type: BarType, strategy: Strategy):
@@ -391,3 +570,5 @@ class TradingEngine:
             # Stop requesting live bars from market data provider
             if self._market_data_provider is not None:
                 self._market_data_provider.unsubscribe_from_live_bars(bar_type)
+
+    # endregion

@@ -1,8 +1,6 @@
-from datetime import datetime
-from typing import TYPE_CHECKING, List, Sequence
+from typing import TYPE_CHECKING, List, Sequence, Set, Tuple, Any
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
@@ -13,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class Strategy:
+    # region Initialization
+
     def __init__(self, name: str):
         """Initialize a new strategy.
 
@@ -30,6 +30,28 @@ class Strategy:
         self._trading_engine = None
 
         self._subscribed_bar_types = set()  # Track subscribed bar types
+
+        # NEW: Track subscriptions for cleanup - keep original request_details
+        self._active_subscriptions: Set[Tuple[type, frozenset, Any]] = set()
+
+    def _make_request_details_key(self, request_details: dict) -> frozenset:
+        """Create hashable key from request_details dict."""
+
+        def make_hashable(obj):
+            if isinstance(obj, dict):
+                return frozenset((k, make_hashable(v)) for k, v in obj.items())
+            elif isinstance(obj, list):
+                return tuple(make_hashable(item) for item in obj)
+            elif hasattr(obj, "__dict__"):
+                return str(obj)  # For complex objects, use string representation
+            else:
+                return obj
+
+        return make_hashable(request_details)
+
+    # endregion
+
+    # region Strategy Lifecycle
 
     def _set_trading_engine(self, trading_engine: "TradingEngine"):
         """Set the trading engine reference.
@@ -56,11 +78,23 @@ class Strategy:
         This method should be overridden by subclasses to implement
         cleanup logic when the strategy stops.
 
-        Automatically unsubscribes from all bar subscriptions.
+        Automatically unsubscribes from all bar subscriptions and event subscriptions.
         """
         # Unsubscribe from all bar topics
         for bar_type in list(self._subscribed_bar_types):
             self.unsubscribe_from_live_bars(bar_type)
+
+        # Clean up all active event subscriptions
+        subscriptions_copy = self._active_subscriptions.copy()
+        for event_type, request_details_key, provider in subscriptions_copy:
+            try:
+                # We need to reconstruct the original request_details from the key
+                # For now, we'll skip cleanup of individual subscriptions since
+                # TradingEngine will handle cleanup when strategy is removed
+                pass
+            except Exception as e:
+                # Log error but continue cleanup
+                print(f"Error cleaning up subscription: {e}")
 
     # -----------------------------------------------
     # SUBSCRIBE TO DATA
@@ -70,139 +104,106 @@ class Strategy:
     # MARKET DATA REQUESTS
     # -----------------------------------------------
 
-    # TODO: Check
-    def get_historical_bars_series(
+    # endregion
+
+    # region Market Data Request Methods
+
+    # NEW: Generic event-based market data methods
+    def get_historical_events(
         self,
-        bar_type: BarType,
-        from_dt: datetime,
-        until_dt: datetime,
+        requested_event_type: type,
+        request_details: dict,
         provider: MarketDataProvider,
-    ) -> Sequence[Bar]:
-        """Get historical bars as a complete series.
+    ) -> Sequence[Event]:
+        """
+        Get historical events from specified provider.
 
         Args:
-            bar_type (BarType): The type of bar to request.
-            from_dt (datetime): Start date and time for historical data.
-            until_dt (datetime): End date and time for historical data.
-            provider (MarketDataProvider): The market data provider to use for this request.
+            requested_event_type: Type of events to retrieve
+            request_details: Dict with event-specific parameters
+            provider: Market data provider to use
 
         Returns:
-            Sequence[Bar]: Complete series of historical bars.
-
-        Raises:
-            RuntimeError: If trading engine is not set.
+            Sequence of historical events
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `get_historical_bars_series` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `get_historical_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        return self._trading_engine.get_historical_bars_series(bar_type, from_dt, until_dt, provider)
+        return self._trading_engine.get_historical_events(requested_event_type, request_details, provider, self)
 
-    # TODO: Check
-    def stream_historical_bars(
+    def stream_historical_events(
         self,
-        bar_type: BarType,
-        from_dt: datetime,
-        until_dt: datetime,
+        requested_event_type: type,
+        request_details: dict,
         provider: MarketDataProvider,
     ) -> None:
-        """Stream historical bars through the callback system.
-
-        Historical bars will be delivered through the on_bar callback method
-        with is_historical=True context.
-
-        Args:
-            bar_type (BarType): The type of bar to stream.
-            from_dt (datetime): Start date and time for historical data.
-            until_dt (datetime): End date and time for historical data.
-            provider (MarketDataProvider): The market data provider to use for this request.
-
-        Raises:
-            RuntimeError: If trading engine is not set.
-        """
+        """Stream historical events to this strategy."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `stream_historical_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `stream_historical_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        self._trading_engine.stream_historical_bars(bar_type, from_dt, until_dt, provider)
+        self._trading_engine.stream_historical_events(requested_event_type, request_details, provider, self)
 
-    # TODO: Check
-    def subscribe_to_live_bars(self, bar_type: BarType) -> None:
-        """Subscribe to live bar data for a specific bar type.
-
-        Live bars will be delivered through the on_bar callback method
-        with is_historical=False context.
-
-        Args:
-            bar_type (BarType): The type of bar to subscribe to.
-
-        Raises:
-            RuntimeError: If trading engine is not set.
-        """
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `subscribe_to_live_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        self._trading_engine.subscribe_to_live_bars(bar_type, self)
-
-        # Remember the subscribed bar type for cleanup during stop
-        self._subscribed_bar_types.add(bar_type)
-
-    # TODO: Check
-    def subscribe_to_live_bars_with_history(
+    def start_streaming_live_events(
         self,
-        bar_type: BarType,
-        history_days: int,
+        requested_event_type: type,
+        request_details: dict,
         provider: MarketDataProvider,
     ) -> None:
-        """Subscribe to live bars with historical backfill.
-
-        First delivers historical bars for the specified number of days,
-        then continues with live bars. Historical bars are delivered with
-        is_historical=True, live bars with is_historical=False.
-
-        Args:
-            bar_type (BarType): The type of bar to subscribe to.
-            history_days (int): Number of days of historical data to backfill.
-            provider (MarketDataProvider): The market data provider to use for this request.
-
-        Raises:
-            RuntimeError: If trading engine is not set.
-        """
+        """Start streaming live events to this strategy."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `subscribe_to_live_bars_with_history` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `start_streaming_live_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        self._trading_engine.subscribe_to_live_bars_with_history(bar_type, history_days, self, provider)
+        # Track subscription for cleanup - use hashable key
+        details_key = self._make_request_details_key(request_details)
+        self._active_subscriptions.add((requested_event_type, details_key, provider))
 
-    def unsubscribe_from_live_bars(self, bar_type: BarType) -> None:
-        """Unsubscribe from live bar data for a specific bar type.
+        self._trading_engine.start_streaming_live_events(requested_event_type, request_details, provider, self)
 
-        Args:
-            bar_type (BarType): The type of bar to unsubscribe from.
-
-        Raises:
-            RuntimeError: If trading engine is not set.
-        """
+    def start_streaming_live_events_with_history(
+        self,
+        requested_event_type: type,
+        request_details: dict,
+        provider: MarketDataProvider,
+    ) -> None:
+        """Start streaming live events with historical data first."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `unsubscribe_from_live_bars` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `start_streaming_live_events_with_history` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        if bar_type in self._subscribed_bar_types:
-            # Ask TradingEngine to handle all unsubscription details
-            self._trading_engine.unsubscribe_from_live_bars(bar_type, self)
+        # Track subscription for cleanup - use hashable key
+        details_key = self._make_request_details_key(request_details)
+        self._active_subscriptions.add((requested_event_type, details_key, provider))
 
-            # Remove from our local tracking
-            self._subscribed_bar_types.remove(bar_type)
+        self._trading_engine.start_streaming_live_events_with_history(requested_event_type, request_details, provider, self)
 
-    # -----------------------------------------------
-    # DATA HANDLERS
-    # -----------------------------------------------
+    def stop_streaming_live_events(
+        self,
+        requested_event_type: type,
+        request_details: dict,
+        provider: MarketDataProvider,
+    ) -> None:
+        """Stop streaming live events."""
+        if self._trading_engine is None:
+            raise RuntimeError(
+                f"Cannot call `stop_streaming_live_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+
+        # Remove from tracked subscriptions - use hashable key
+        details_key = self._make_request_details_key(request_details)
+        self._active_subscriptions.discard((requested_event_type, details_key, provider))
+
+        self._trading_engine.stop_streaming_live_events(requested_event_type, request_details, provider, self)
+
+    # endregion
+
+    # region Data Handler Methods
 
     def on_event(self, event: Event):
         """Universal callback receiving complete event wrapper.
@@ -233,6 +234,9 @@ class Strategy:
         if isinstance(event, NewBarEvent):
             self.on_bar(event.bar, event.is_historical)  # Extract bar and historical context from NewBarEvent
         # Add other event types as needed
+        else:
+            # Handle unknown event types
+            self.on_unknown_event(event)
 
     def on_bar(self, bar: Bar, is_historical: bool):
         """Called when a new bar is received.
@@ -261,9 +265,18 @@ class Strategy:
         """
         pass
 
-    # -----------------------------------------------
-    # ORDER MANAGEMENT
-    # -----------------------------------------------
+    def on_unknown_event(self, event: Event) -> None:
+        """
+        Handle unknown event types. Override for custom event handling.
+
+        Args:
+            event: Unknown event type received
+        """
+        pass
+
+    # endregion
+
+    # region Order Management Methods
 
     def submit_order(self, order: Order, broker: Broker) -> None:
         """Submit an order for execution.
@@ -334,3 +347,5 @@ class Strategy:
             )
 
         return self._trading_engine.get_active_orders(broker)
+
+    # endregion

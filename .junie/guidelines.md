@@ -226,6 +226,10 @@ This is an improperly formatted Markdown paragraph that exceeds the 100-characte
 
 ## Import and Package Structure
 
+### Import Management After Code Changes
+
+**Rule: After each code change, imports must be re-checked to remove obsolete imports and add missing imports.**
+
 ### No Re-exports Rule
 
 - **Never use re-exports in `__init__.py` files**

@@ -1,12 +1,8 @@
 """Market data provider protocol definition."""
 
-from datetime import datetime
-from typing import Protocol, Sequence
+from typing import Protocol, Sequence, List
 
-from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.domain.market_data.bar.bar_type import BarType
-
-# TODO: Specify callbacks invoked in Strategy, if methods below are called
+from suite_trading.domain.event import Event
 
 
 class MarketDataProvider(Protocol):
@@ -15,6 +11,8 @@ class MarketDataProvider(Protocol):
     Defines the interface for retrieving historical market data and
     subscribing to live market data streams.
     """
+
+    # region Connection Management
 
     def connect(self) -> None:
         """Establish market data provider connection.
@@ -43,93 +41,109 @@ class MarketDataProvider(Protocol):
         """
         ...
 
-    def get_historical_bars_series(
-        self,
-        bar_type: BarType,
-        from_dt: datetime,
-        until_dt: datetime,
-    ) -> Sequence[Bar]:
-        """Get all historical bars at once for strategy initialization and analysis.
+    # endregion
 
-        Returns complete historical dataset as a sequence, perfect for setting up
-        indicators, calculating initial values, or analyzing patterns that need
-        the full dataset available immediately.
+    # region Capability Discovery
 
-        Args:
-            bar_type: The bar type specifying instrument and bar characteristics.
-            from_dt: Start datetime for the data range.
-            until_dt: End datetime for the data range. If None, gets data
-                     until the latest available.
+    # NEW: Capability discovery methods
+    def get_supported_events(self) -> List[type]:
+        """
+        Return list of event types this provider supports.
 
         Returns:
-            Sequence of Bar objects containing historical market data.
+            List of event classes that this provider can generate
         """
         ...
 
-    def stream_historical_bars(
-        self,
-        bar_type: BarType,
-        from_dt: datetime,
-        until_dt: datetime,
-    ) -> None:
-        """Stream historical bars one-by-one for memory-efficient backtesting.
-
-        Delivers bars individually through callbacks, perfect for processing
-        large historical datasets without loading everything into memory at once.
-        Maintains chronological order just like live trading scenarios.
+    def supports_event(self, requested_event_type: type, request_details: dict) -> bool:
+        """
+        Check if provider supports specific event type with given request details.
 
         Args:
-            bar_type: The bar type specifying instrument and bar characteristics.
-            from_dt: Start datetime for the data range.
-            until_dt: End datetime for the data range. If None, streams data
-                     until the latest available.
+            requested_event_type: The type of event being requested (e.g., NewBarEvent)
+            request_details: Dict containing specific requirements
+
+        Returns:
+            True if provider can handle this event type with these details
         """
         ...
 
-    def subscribe_to_live_bars(
-        self,
-        bar_type: BarType,
-    ) -> None:
-        """Subscribe to real-time bar data feed for live trading.
+    # endregion
 
-        Starts receiving live market data as it happens, allowing strategies
-        to react to current market conditions. Can be called dynamically
-        during strategy execution to adapt data needs based on runtime conditions.
+    # region Event-Based Data Methods
+
+    # NEW: Generic event-based data methods
+    def get_historical_events(
+        self,
+        requested_event_type: type,
+        request_details: dict,
+    ) -> Sequence[Event]:
+        """
+        Get historical events of specified type.
 
         Args:
-            bar_type: The bar type specifying instrument and bar characteristics.
+            requested_event_type: Type of events to retrieve (e.g., NewBarEvent)
+            request_details: Dict with event-specific parameters
+
+        Returns:
+            Sequence of historical events
         """
         ...
 
-    def subscribe_to_live_bars_with_history(
+    def stream_historical_events(
         self,
-        bar_type: BarType,
-        history_days: int,
+        requested_event_type: type,
+        request_details: dict,
     ) -> None:
-        """Subscribe to live bars with seamless historical-to-live transition.
-
-        First feeds historical bars for the specified number of days before now,
-        then automatically starts feeding live bars without any gaps between
-        historical and live data. This ensures continuous data flow with no missing
-        bars, critical for live trading scenarios that need recent historical context.
+        """
+        Stream historical events to MessageBus.
 
         Args:
-            bar_type: The bar type specifying instrument and bar characteristics.
-            history_days: Number of days before now to include historical data.
+            requested_event_type: Type of events to stream
+            request_details: Dict with event-specific parameters
         """
         ...
 
-    def unsubscribe_from_live_bars(
+    def start_streaming_live_events(
         self,
-        bar_type: BarType,
+        requested_event_type: type,
+        request_details: dict,
     ) -> None:
-        """Stop receiving live bar updates for an instrument.
-
-        Cancels active subscription and stops the flow of live market data.
-        Useful for strategies that need to dynamically adjust their data
-        subscriptions based on changing market conditions or trading logic.
+        """
+        Start streaming live events to MessageBus.
 
         Args:
-            bar_type: The bar type specifying instrument and bar characteristics.
+            requested_event_type: Type of events to stream
+            request_details: Dict with event-specific parameters
         """
         ...
+
+    def start_streaming_live_events_with_history(
+        self,
+        requested_event_type: type,
+        request_details: dict,
+    ) -> None:
+        """
+        Start streaming live events with historical data first.
+
+        Args:
+            requested_event_type: Type of events to stream
+            request_details: Dict with event-specific parameters
+        """
+        ...
+
+    def stop_streaming_live_events(
+        self,
+        requested_event_type: type,
+        request_details: dict,
+    ) -> None:
+        """
+        Stop streaming live events.
+
+        Args:
+            requested_event_type: Type of events to stop streaming
+            request_details: Dict with event-specific parameters
+        """
+        ...
+
+    # endregion
