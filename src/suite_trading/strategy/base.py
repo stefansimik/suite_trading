@@ -147,7 +147,7 @@ class Strategy:
 
         self._trading_engine.stream_historical_events(requested_event_type, request_details, provider, self)
 
-    def start_streaming_live_events(
+    def start_live_stream(
         self,
         requested_event_type: type,
         request_details: dict,
@@ -156,16 +156,16 @@ class Strategy:
         """Start streaming live events to this strategy."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `start_streaming_live_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `start_live_stream` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         # Track subscription for cleanup - use hashable key
         details_key = self._make_request_details_key(request_details)
         self._active_subscriptions.add((requested_event_type, details_key, provider))
 
-        self._trading_engine.start_streaming_live_events(requested_event_type, request_details, provider, self)
+        self._trading_engine.start_live_stream(requested_event_type, request_details, provider, self)
 
-    def start_streaming_live_events_with_history(
+    def start_live_stream_with_history(
         self,
         requested_event_type: type,
         request_details: dict,
@@ -174,16 +174,16 @@ class Strategy:
         """Start streaming live events with historical data first."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `start_streaming_live_events_with_history` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `start_live_stream_with_history` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         # Track subscription for cleanup - use hashable key
         details_key = self._make_request_details_key(request_details)
         self._active_subscriptions.add((requested_event_type, details_key, provider))
 
-        self._trading_engine.start_streaming_live_events_with_history(requested_event_type, request_details, provider, self)
+        self._trading_engine.start_live_stream_with_history(requested_event_type, request_details, provider, self)
 
-    def stop_streaming_live_events(
+    def stop_live_stream(
         self,
         requested_event_type: type,
         request_details: dict,
@@ -192,14 +192,14 @@ class Strategy:
         """Stop streaming live events."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `stop_streaming_live_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `stop_live_stream` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         # Remove from tracked subscriptions - use hashable key
         details_key = self._make_request_details_key(request_details)
         self._active_subscriptions.discard((requested_event_type, details_key, provider))
 
-        self._trading_engine.stop_streaming_live_events(requested_event_type, request_details, provider, self)
+        self._trading_engine.stop_live_stream(requested_event_type, request_details, provider, self)
 
     # endregion
 

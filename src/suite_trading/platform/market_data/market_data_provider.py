@@ -104,7 +104,7 @@ class MarketDataProvider(Protocol):
         """
         ...
 
-    def start_streaming_live_events(
+    def start_live_stream(
         self,
         requested_event_type: type,
         request_details: dict,
@@ -118,7 +118,7 @@ class MarketDataProvider(Protocol):
         """
         ...
 
-    def start_streaming_live_events_with_history(
+    def start_live_stream_with_history(
         self,
         requested_event_type: type,
         request_details: dict,
@@ -132,7 +132,7 @@ class MarketDataProvider(Protocol):
         """
         ...
 
-    def stop_streaming_live_events(
+    def stop_live_stream(
         self,
         requested_event_type: type,
         request_details: dict,

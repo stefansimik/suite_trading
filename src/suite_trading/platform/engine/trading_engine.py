@@ -160,7 +160,7 @@ class TradingEngine:
         for event_type, request_details_key, provider in subscriptions:
             try:
                 # We need to reconstruct the original request_details from the key
-                # For cleanup, we'll directly remove from tracking without calling stop_streaming_live_events
+                # For cleanup, we'll directly remove from tracking without calling stop_live_stream
                 # since the provider cleanup will be handled elsewhere
                 self._strategy_subscriptions[strategy].discard((event_type, request_details_key, provider))
 
@@ -298,7 +298,7 @@ class TradingEngine:
         # Delegate to provider
         provider.stream_historical_events(requested_event_type, request_details)
 
-    def start_streaming_live_events(
+    def start_live_stream(
         self,
         requested_event_type: type,
         request_details: dict,
@@ -327,11 +327,11 @@ class TradingEngine:
 
         # Start provider stream if this is first subscriber
         if self._active_streams[stream_key] == 0:
-            provider.start_streaming_live_events(requested_event_type, request_details)
+            provider.start_live_stream(requested_event_type, request_details)
 
         self._active_streams[stream_key] += 1
 
-    def start_streaming_live_events_with_history(
+    def start_live_stream_with_history(
         self,
         requested_event_type: type,
         request_details: dict,
@@ -360,11 +360,11 @@ class TradingEngine:
 
         # Start provider stream if this is first subscriber
         if self._active_streams[stream_key] == 0:
-            provider.start_streaming_live_events_with_history(requested_event_type, request_details)
+            provider.start_live_stream_with_history(requested_event_type, request_details)
 
         self._active_streams[stream_key] += 1
 
-    def stop_streaming_live_events(
+    def stop_live_stream(
         self,
         requested_event_type: type,
         request_details: dict,
@@ -387,7 +387,7 @@ class TradingEngine:
         # Stop provider stream if no more subscribers
         self._active_streams[stream_key] -= 1
         if self._active_streams[stream_key] <= 0:
-            provider.stop_streaming_live_events(requested_event_type, request_details)
+            provider.stop_live_stream(requested_event_type, request_details)
             del self._active_streams[stream_key]
 
         # Clean up empty subscription sets
