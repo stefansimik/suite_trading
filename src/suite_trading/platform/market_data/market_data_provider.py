@@ -8,17 +8,15 @@ from suite_trading.domain.event import Event
 class MarketDataProvider(Protocol):
     """Protocol for market data providers.
 
-    Defines the interface for retrieving historical market data and
-    subscribing to live market data streams.
+    Provides methods to get historical data and subscribe to live market data.
     """
 
     # region Connection Management
 
     def connect(self) -> None:
-        """Establish market data provider connection.
+        """Connect to this MarketDataProvider.
 
-        Connects to the market data source to enable data retrieval and
-        subscription capabilities. Must be called before requesting any data.
+        Must be called before requesting any data.
 
         Raises:
             ConnectionError: If connection cannot be established.
@@ -26,18 +24,17 @@ class MarketDataProvider(Protocol):
         ...
 
     def disconnect(self) -> None:
-        """Close market data provider connection.
+        """Disconnect from this MarketDataProvider.
 
-        Cleanly disconnects from the market data source and stops all active
-        subscriptions. Handles cases where connection is already closed gracefully.
+        Stops all active subscriptions and handles already closed connections gracefully.
         """
         ...
 
     def is_connected(self) -> bool:
-        """Check market data provider connection status.
+        """Check if connected to this MarketDataProvider.
 
         Returns:
-            bool: True if connected to market data provider, False otherwise.
+            bool: True if connected, False otherwise.
         """
         ...
 
@@ -48,23 +45,23 @@ class MarketDataProvider(Protocol):
     # NEW: Capability discovery methods
     def get_supported_events(self) -> List[type]:
         """
-        Return list of event types this provider supports.
+        Get all event types supported by this provider.
 
         Returns:
-            List of event classes that this provider can generate
+            List of event classes this provider can generate
         """
         ...
 
     def supports_event(self, requested_event_type: type, request_details: dict) -> bool:
         """
-        Check if provider supports specific event type with given request details.
+        Check if this provider supports the requested event type
 
         Args:
-            requested_event_type: The type of event being requested (e.g., NewBarEvent)
-            request_details: Dict containing specific requirements
+            requested_event_type: Event type to check (e.g., NewBarEvent)
+            request_details: Requirements for the event
 
         Returns:
-            True if provider can handle this event type with these details
+            True if supported, False otherwise
         """
         ...
 
@@ -79,14 +76,14 @@ class MarketDataProvider(Protocol):
         request_details: dict,
     ) -> Sequence[Event]:
         """
-        Get historical events of specified type.
+        Get all historical events of the specified type at once.
 
         Args:
             requested_event_type: Type of events to retrieve (e.g., NewBarEvent)
-            request_details: Dict with event-specific parameters
+            request_details: Parameters for the request
 
         Returns:
-            Sequence of historical events
+            Complete sequence of historical events in a single batch
         """
         ...
 
@@ -96,11 +93,11 @@ class MarketDataProvider(Protocol):
         request_details: dict,
     ) -> None:
         """
-        Stream historical events to MessageBus.
+        Stream historical events to the MessageBus.
 
         Args:
             requested_event_type: Type of events to stream
-            request_details: Dict with event-specific parameters
+            request_details: Parameters for the request
         """
         ...
 
@@ -110,11 +107,11 @@ class MarketDataProvider(Protocol):
         request_details: dict,
     ) -> None:
         """
-        Start streaming live events to MessageBus.
+        Start streaming live events to the MessageBus.
 
         Args:
             requested_event_type: Type of events to stream
-            request_details: Dict with event-specific parameters
+            request_details: Parameters for the request
         """
         ...
 
@@ -124,11 +121,11 @@ class MarketDataProvider(Protocol):
         request_details: dict,
     ) -> None:
         """
-        Start streaming live events with historical data first.
+        Start with historical data, then stream live events.
 
         Args:
             requested_event_type: Type of events to stream
-            request_details: Dict with event-specific parameters
+            request_details: Parameters for the request
         """
         ...
 
@@ -141,8 +138,8 @@ class MarketDataProvider(Protocol):
         Stop streaming live events.
 
         Args:
-            requested_event_type: Type of events to stop streaming
-            request_details: Dict with event-specific parameters
+            requested_event_type: Type of events to stop
+            request_details: Parameters to identify the stream
         """
         ...
 
