@@ -267,14 +267,10 @@ class TradingEngine:
 
         Returns:
             Sequence of historical events
-        """
-        # Validate provider capability
-        if not provider.supports_event(requested_event_type, request_details):
-            raise ValueError(
-                f"Provider {provider.__class__.__name__} does not support {requested_event_type.__name__} events with details: {request_details}",
-            )
 
-        # Delegate to provider
+        Raises:
+            UnsupportedEventTypeError: If provider doesn't support the event type
+        """
         return provider.get_historical_events(requested_event_type, request_details)
 
     def stream_historical_events(
@@ -284,13 +280,12 @@ class TradingEngine:
         provider: MarketDataProvider,
         strategy: Strategy,
     ) -> None:
-        """Stream historical events to strategy via MessageBus."""
-        # Validate provider capability
-        if not provider.supports_event(requested_event_type, request_details):
-            raise ValueError(
-                f"Provider {provider.__class__.__name__} does not support {requested_event_type.__name__} events with details: {request_details}",
-            )
+        """
+        Stream historical events to strategy via MessageBus.
 
+        Raises:
+            UnsupportedEventTypeError: If provider doesn't support the event type
+        """
         # Generate topic and subscribe strategy
         topic = self._generate_topic(requested_event_type, request_details)
         self.message_bus.subscribe(topic, strategy.on_event)
@@ -305,13 +300,12 @@ class TradingEngine:
         provider: MarketDataProvider,
         strategy: Strategy,
     ) -> None:
-        """Start streaming live events to strategy."""
-        # Validate provider capability
-        if not provider.supports_event(requested_event_type, request_details):
-            raise ValueError(
-                f"Provider {provider.__class__.__name__} does not support {requested_event_type.__name__} events with details: {request_details}",
-            )
+        """
+        Start streaming live events to strategy.
 
+        Raises:
+            UnsupportedEventTypeError: If provider doesn't support the event type
+        """
         # Track subscription - keep original request_details
         details_key = self._make_request_details_key(request_details)
         subscription_key = (requested_event_type, details_key)
@@ -338,13 +332,12 @@ class TradingEngine:
         provider: MarketDataProvider,
         strategy: Strategy,
     ) -> None:
-        """Start streaming live events with historical data first."""
-        # Validate provider capability
-        if not provider.supports_event(requested_event_type, request_details):
-            raise ValueError(
-                f"Provider {provider.__class__.__name__} does not support {requested_event_type.__name__} events with details: {request_details}",
-            )
+        """
+        Start streaming live events with historical data first.
 
+        Raises:
+            UnsupportedEventTypeError: If provider doesn't support the event type
+        """
         # Track subscription - keep original request_details
         details_key = self._make_request_details_key(request_details)
         subscription_key = (requested_event_type, details_key)

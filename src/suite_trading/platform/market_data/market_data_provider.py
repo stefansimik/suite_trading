@@ -1,8 +1,31 @@
 """Market data provider protocol definition."""
 
-from typing import Protocol, Sequence, List
+from typing import Protocol, Sequence
 
 from suite_trading.domain.event import Event
+
+
+class UnsupportedEventTypeError(Exception):
+    """Raised when a provider doesn't support the requested event type at all."""
+
+    def __init__(self, event_type: type):
+        self.event_type = event_type
+        super().__init__(f"Provider does not support {event_type.__name__} events")
+
+
+class UnsupportedConfigurationError(Exception):
+    """Raised when a provider supports the event type but not the specific configuration."""
+
+    def __init__(self, event_type: type, request_details: dict, reason: str = None):
+        self.event_type = event_type
+        self.request_details = request_details
+        self.reason = reason
+
+        message = f"Provider supports {event_type.__name__} events but not with configuration: {request_details}"
+        if reason:
+            message += f" - {reason}"
+
+        super().__init__(message)
 
 
 class MarketDataProvider(Protocol):
@@ -40,36 +63,8 @@ class MarketDataProvider(Protocol):
 
     # endregion
 
-    # region Capability Discovery
-
-    # NEW: Capability discovery methods
-    def get_supported_events(self) -> List[type]:
-        """
-        Get all event types supported by this provider.
-
-        Returns:
-            List of event classes this provider can generate
-        """
-        ...
-
-    def supports_event(self, requested_event_type: type, request_details: dict) -> bool:
-        """
-        Check if this provider supports the requested event type
-
-        Args:
-            requested_event_type: Event type to check (e.g., NewBarEvent)
-            request_details: Requirements for the event
-
-        Returns:
-            True if supported, False otherwise
-        """
-        ...
-
-    # endregion
-
     # region Event-Based Data Methods
 
-    # NEW: Generic event-based data methods
     def get_historical_events(
         self,
         requested_event_type: type,
@@ -84,6 +79,10 @@ class MarketDataProvider(Protocol):
 
         Returns:
             Complete sequence of historical events in a single batch
+
+        Raises:
+            UnsupportedEventTypeError: If the provider doesn't support this event type
+            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
         """
         ...
 
@@ -98,6 +97,10 @@ class MarketDataProvider(Protocol):
         Args:
             requested_event_type: Type of events to stream
             request_details: Parameters for the request
+
+        Raises:
+            UnsupportedEventTypeError: If the provider doesn't support this event type
+            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
         """
         ...
 
@@ -112,6 +115,10 @@ class MarketDataProvider(Protocol):
         Args:
             requested_event_type: Type of events to stream
             request_details: Parameters for the request
+
+        Raises:
+            UnsupportedEventTypeError: If the provider doesn't support this event type
+            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
         """
         ...
 
@@ -126,6 +133,10 @@ class MarketDataProvider(Protocol):
         Args:
             requested_event_type: Type of events to stream
             request_details: Parameters for the request
+
+        Raises:
+            UnsupportedEventTypeError: If the provider doesn't support this event type
+            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
         """
         ...
 
@@ -140,6 +151,10 @@ class MarketDataProvider(Protocol):
         Args:
             requested_event_type: Type of events to stop
             request_details: Parameters to identify the stream
+
+        Raises:
+            UnsupportedEventTypeError: If the provider doesn't support this event type
+            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
         """
         ...
 
