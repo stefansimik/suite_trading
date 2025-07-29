@@ -117,13 +117,13 @@ class TopicFactory:
     # region Generic Event-Based Topic Creation Methods
 
     @staticmethod
-    def create_topic_for_event(event_type: type, request_details: dict) -> str:
+    def create_topic_for_event(event_type: type, parameters: dict) -> str:
         """
-        Generate standardized topics for any event type and request details.
+        Generate standardized topics for any event type and parameters.
 
         Args:
             event_type: The event class (e.g., NewBarEvent, NewCalendarEvent)
-            request_details: Dict containing event-specific parameters
+            parameters: Dict containing event-specific parameters
 
         Returns:
             Standardized topic string for MessageBus routing
@@ -131,14 +131,14 @@ class TopicFactory:
         # Try to use specific factory method if available
         method_name = f"create_topic_for_{event_type.__name__.lower().replace('event', '')}"
         if hasattr(TopicFactory, method_name):
-            return getattr(TopicFactory, method_name)(request_details)
+            return getattr(TopicFactory, method_name)(parameters)
 
         # Generic topic generation for custom events
         base_name = event_type.__name__.lower().replace("new", "").replace("event", "")
 
-        # Create topic components from request_details
+        # Create topic components from parameters
         components = [base_name]
-        for key, value in sorted(request_details.items()):
+        for key, value in sorted(parameters.items()):
             if isinstance(value, (str, int, float)):
                 components.append(f"{key}_{value}")
             elif hasattr(value, "__name__"):

@@ -16,12 +16,12 @@ class UnsupportedEventTypeError(Exception):
 class UnsupportedConfigurationError(Exception):
     """Raised when a provider supports the event type but not the specific configuration."""
 
-    def __init__(self, event_type: type, request_details: dict, reason: str = None):
+    def __init__(self, event_type: type, parameters: dict, reason: str = None):
         self.event_type = event_type
-        self.request_details = request_details
+        self.parameters = parameters
         self.reason = reason
 
-        message = f"Provider supports {event_type.__name__} events but not with configuration: {request_details}"
+        message = f"Provider supports {event_type.__name__} events but not with configuration: {parameters}"
         if reason:
             message += f" - {reason}"
 
@@ -67,15 +67,15 @@ class MarketDataProvider(Protocol):
 
     def get_historical_events(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
     ) -> Sequence[Event]:
         """
         Get all historical events of the specified type at once.
 
         Args:
-            requested_event_type: Type of events to retrieve (e.g., NewBarEvent)
-            request_details: Parameters for the request
+            event_type: Type of events to retrieve (e.g., NewBarEvent)
+            parameters: Parameters for the request
 
         Returns:
             Complete sequence of historical events in a single batch
@@ -88,15 +88,15 @@ class MarketDataProvider(Protocol):
 
     def stream_historical_events(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
     ) -> None:
         """
         Stream historical events to the MessageBus.
 
         Args:
-            requested_event_type: Type of events to stream
-            request_details: Parameters for the request
+            event_type: Type of events to stream
+            parameters: Parameters for the request
 
         Raises:
             UnsupportedEventTypeError: If the provider doesn't support this event type
@@ -106,15 +106,15 @@ class MarketDataProvider(Protocol):
 
     def start_live_stream(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
     ) -> None:
         """
         Start streaming live events to the MessageBus.
 
         Args:
-            requested_event_type: Type of events to stream
-            request_details: Parameters for the request
+            event_type: Type of events to stream
+            parameters: Parameters for the request
 
         Raises:
             UnsupportedEventTypeError: If the provider doesn't support this event type
@@ -124,15 +124,15 @@ class MarketDataProvider(Protocol):
 
     def start_live_stream_with_history(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
     ) -> None:
         """
         Start with historical data, then stream live events.
 
         Args:
-            requested_event_type: Type of events to stream
-            request_details: Parameters for the request
+            event_type: Type of events to stream
+            parameters: Parameters for the request
 
         Raises:
             UnsupportedEventTypeError: If the provider doesn't support this event type
@@ -142,15 +142,15 @@ class MarketDataProvider(Protocol):
 
     def stop_live_stream(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
     ) -> None:
         """
         Stop streaming live events.
 
         Args:
-            requested_event_type: Type of events to stop
-            request_details: Parameters to identify the stream
+            event_type: Type of events to stop
+            parameters: Parameters to identify the stream
 
         Raises:
             UnsupportedEventTypeError: If the provider doesn't support this event type

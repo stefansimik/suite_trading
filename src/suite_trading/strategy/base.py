@@ -31,11 +31,11 @@ class Strategy:
 
         self._subscribed_bar_types = set()  # Track subscribed bar types
 
-        # NEW: Track subscriptions for cleanup - keep original request_details
+        # NEW: Track subscriptions for cleanup - keep original parameters
         self._active_subscriptions: Set[Tuple[type, frozenset, Any]] = set()
 
-    def _make_request_details_key(self, request_details: dict) -> frozenset:
-        """Create hashable key from request_details dict."""
+    def _make_parameters_key(self, parameters: dict) -> frozenset:
+        """Create hashable key from parameters dict."""
 
         def make_hashable(obj):
             if isinstance(obj, dict):
@@ -47,7 +47,7 @@ class Strategy:
             else:
                 return obj
 
-        return make_hashable(request_details)
+        return make_hashable(parameters)
 
     # endregion
 
@@ -86,9 +86,9 @@ class Strategy:
 
         # Clean up all active event subscriptions
         subscriptions_copy = self._active_subscriptions.copy()
-        for event_type, request_details_key, provider in subscriptions_copy:
+        for event_type, parameters_key, provider in subscriptions_copy:
             try:
-                # We need to reconstruct the original request_details from the key
+                # We need to reconstruct the original parameters from the key
                 # For now, we'll skip cleanup of individual subscriptions since
                 # TradingEngine will handle cleanup when strategy is removed
                 pass
@@ -111,16 +111,16 @@ class Strategy:
     # NEW: Generic event-based market data methods
     def get_historical_events(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
     ) -> Sequence[Event]:
         """
         Get historical events from specified provider.
 
         Args:
-            requested_event_type: Type of events to retrieve
-            request_details: Dict with event-specific parameters
+            event_type: Type of events to retrieve
+            parameters: Dict with event-specific parameters
             provider: Market data provider to use
 
         Returns:
@@ -131,12 +131,12 @@ class Strategy:
                 f"Cannot call `get_historical_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        return self._trading_engine.get_historical_events(requested_event_type, request_details, provider, self)
+        return self._trading_engine.get_historical_events(event_type, parameters, provider, self)
 
     def stream_historical_events(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
     ) -> None:
         """Stream historical events to this strategy."""
@@ -145,12 +145,12 @@ class Strategy:
                 f"Cannot call `stream_historical_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        self._trading_engine.stream_historical_events(requested_event_type, request_details, provider, self)
+        self._trading_engine.stream_historical_events(event_type, parameters, provider, self)
 
     def start_live_stream(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
     ) -> None:
         """Start streaming live events to this strategy."""
@@ -160,15 +160,15 @@ class Strategy:
             )
 
         # Track subscription for cleanup - use hashable key
-        details_key = self._make_request_details_key(request_details)
-        self._active_subscriptions.add((requested_event_type, details_key, provider))
+        details_key = self._make_parameters_key(parameters)
+        self._active_subscriptions.add((event_type, details_key, provider))
 
-        self._trading_engine.start_live_stream(requested_event_type, request_details, provider, self)
+        self._trading_engine.start_live_stream(event_type, parameters, provider, self)
 
     def start_live_stream_with_history(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
     ) -> None:
         """Start streaming live events with historical data first."""
@@ -178,15 +178,15 @@ class Strategy:
             )
 
         # Track subscription for cleanup - use hashable key
-        details_key = self._make_request_details_key(request_details)
-        self._active_subscriptions.add((requested_event_type, details_key, provider))
+        details_key = self._make_parameters_key(parameters)
+        self._active_subscriptions.add((event_type, details_key, provider))
 
-        self._trading_engine.start_live_stream_with_history(requested_event_type, request_details, provider, self)
+        self._trading_engine.start_live_stream_with_history(event_type, parameters, provider, self)
 
     def stop_live_stream(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
     ) -> None:
         """Stop streaming live events."""
@@ -196,10 +196,10 @@ class Strategy:
             )
 
         # Remove from tracked subscriptions - use hashable key
-        details_key = self._make_request_details_key(request_details)
-        self._active_subscriptions.discard((requested_event_type, details_key, provider))
+        details_key = self._make_parameters_key(parameters)
+        self._active_subscriptions.discard((event_type, details_key, provider))
 
-        self._trading_engine.stop_live_stream(requested_event_type, request_details, provider, self)
+        self._trading_engine.stop_live_stream(event_type, parameters, provider, self)
 
     # endregion
 

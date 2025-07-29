@@ -49,18 +49,18 @@ class TradingEngine:
         # Track strategy subscriptions for demand-based publishing
         self._bar_subscriptions: dict[BarType, set[Strategy]] = {}  # Track which strategies subscribe to which bar types
 
-        # NEW: Subscription tracking for generic events - keep original request_details
-        # Key: (event_type, frozenset of request_details items) -> Set of strategies
+        # NEW: Subscription tracking for generic events - keep original parameters
+        # Key: (event_type, frozenset of parameters items) -> Set of strategies
         self._event_subscriptions: Dict[Tuple[type, frozenset], Set[Any]] = defaultdict(set)
 
-        # Key: (provider, event_type, frozenset of request_details items) -> active stream count
+        # Key: (provider, event_type, frozenset of parameters items) -> active stream count
         self._active_streams: Dict[Tuple[Any, type, frozenset], int] = defaultdict(int)
 
-        # Key: strategy -> Set of (event_type, request_details_key, provider)
+        # Key: strategy -> Set of (event_type, parameters_key, provider)
         self._strategy_subscriptions: Dict[Any, Set[Tuple[type, frozenset, Any]]] = defaultdict(set)
 
-    def _make_request_details_key(self, request_details: dict) -> frozenset:
-        """Create hashable key from request_details dict."""
+    def _make_parameters_key(self, parameters: dict) -> frozenset:
+        """Create hashable key from parameters dict."""
 
         def make_hashable(obj):
             if isinstance(obj, dict):
@@ -72,11 +72,11 @@ class TradingEngine:
             else:
                 return obj
 
-        return make_hashable(request_details)
+        return make_hashable(parameters)
 
-    def _generate_topic(self, event_type: type, request_details: dict) -> str:
-        """Generate topic for event type and request details."""
-        return TopicFactory.create_topic_for_event(event_type, request_details)
+    def _generate_topic(self, event_type: type, parameters: dict) -> str:
+        """Generate topic for event type and parameters."""
+        return TopicFactory.create_topic_for_event(event_type, parameters)
 
     # endregion
 
@@ -157,21 +157,21 @@ class TradingEngine:
         # Get copy of subscriptions to avoid modification during iteration
         subscriptions = self._strategy_subscriptions[strategy].copy()
 
-        for event_type, request_details_key, provider in subscriptions:
+        for event_type, parameters_key, provider in subscriptions:
             try:
-                # We need to reconstruct the original request_details from the key
+                # We need to reconstruct the original parameters from the key
                 # For cleanup, we'll directly remove from tracking without calling stop_live_stream
                 # since the provider cleanup will be handled elsewhere
-                self._strategy_subscriptions[strategy].discard((event_type, request_details_key, provider))
+                self._strategy_subscriptions[strategy].discard((event_type, parameters_key, provider))
 
                 # Clean up event subscriptions
-                subscription_key = (event_type, request_details_key)
+                subscription_key = (event_type, parameters_key)
                 self._event_subscriptions[subscription_key].discard(strategy)
                 if not self._event_subscriptions[subscription_key]:
                     del self._event_subscriptions[subscription_key]
 
                 # Clean up active streams
-                stream_key = (provider, event_type, request_details_key)
+                stream_key = (provider, event_type, parameters_key)
                 if stream_key in self._active_streams:
                     self._active_streams[stream_key] -= 1
                     if self._active_streams[stream_key] <= 0:
@@ -251,8 +251,8 @@ class TradingEngine:
     # NEW: Generic event-based market data methods
     def get_historical_events(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
         strategy: Strategy,
     ) -> Sequence[Event]:
@@ -260,8 +260,8 @@ class TradingEngine:
         Get historical events from specified provider.
 
         Args:
-            requested_event_type: Type of events to retrieve
-            request_details: Dict with event-specific parameters
+            event_type: Type of events to retrieve
+            parameters: Dict with event-specific parameters
             provider: Market data provider to use
             strategy: Strategy making the request
 
@@ -271,12 +271,12 @@ class TradingEngine:
         Raises:
             UnsupportedEventTypeError: If provider doesn't support the event type
         """
-        return provider.get_historical_events(requested_event_type, request_details)
+        return provider.get_historical_events(event_type, parameters)
 
     def stream_historical_events(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
         strategy: Strategy,
     ) -> None:
@@ -287,16 +287,16 @@ class TradingEngine:
             UnsupportedEventTypeError: If provider doesn't support the event type
         """
         # Generate topic and subscribe strategy
-        topic = self._generate_topic(requested_event_type, request_details)
+        topic = self._generate_topic(event_type, parameters)
         self.message_bus.subscribe(topic, strategy.on_event)
 
         # Delegate to provider
-        provider.stream_historical_events(requested_event_type, request_details)
+        provider.stream_historical_events(event_type, parameters)
 
     def start_live_stream(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
         strategy: Strategy,
     ) -> None:
@@ -306,29 +306,29 @@ class TradingEngine:
         Raises:
             UnsupportedEventTypeError: If provider doesn't support the event type
         """
-        # Track subscription - keep original request_details
-        details_key = self._make_request_details_key(request_details)
-        subscription_key = (requested_event_type, details_key)
-        stream_key = (provider, requested_event_type, details_key)
+        # Track subscription - keep original parameters
+        details_key = self._make_parameters_key(parameters)
+        subscription_key = (event_type, details_key)
+        stream_key = (provider, event_type, details_key)
 
         # Add strategy to subscribers
         self._event_subscriptions[subscription_key].add(strategy)
-        self._strategy_subscriptions[strategy].add((requested_event_type, details_key, provider))
+        self._strategy_subscriptions[strategy].add((event_type, details_key, provider))
 
         # Subscribe strategy to MessageBus topic
-        topic = self._generate_topic(requested_event_type, request_details)
+        topic = self._generate_topic(event_type, parameters)
         self.message_bus.subscribe(topic, strategy.on_event)
 
         # Start provider stream if this is first subscriber
         if self._active_streams[stream_key] == 0:
-            provider.start_live_stream(requested_event_type, request_details)
+            provider.start_live_stream(event_type, parameters)
 
         self._active_streams[stream_key] += 1
 
     def start_live_stream_with_history(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
         strategy: Strategy,
     ) -> None:
@@ -338,49 +338,49 @@ class TradingEngine:
         Raises:
             UnsupportedEventTypeError: If provider doesn't support the event type
         """
-        # Track subscription - keep original request_details
-        details_key = self._make_request_details_key(request_details)
-        subscription_key = (requested_event_type, details_key)
-        stream_key = (provider, requested_event_type, details_key)
+        # Track subscription - keep original parameters
+        details_key = self._make_parameters_key(parameters)
+        subscription_key = (event_type, details_key)
+        stream_key = (provider, event_type, details_key)
 
         # Add strategy to subscribers
         self._event_subscriptions[subscription_key].add(strategy)
-        self._strategy_subscriptions[strategy].add((requested_event_type, details_key, provider))
+        self._strategy_subscriptions[strategy].add((event_type, details_key, provider))
 
         # Subscribe strategy to MessageBus topic
-        topic = self._generate_topic(requested_event_type, request_details)
+        topic = self._generate_topic(event_type, parameters)
         self.message_bus.subscribe(topic, strategy.on_event)
 
         # Start provider stream if this is first subscriber
         if self._active_streams[stream_key] == 0:
-            provider.start_live_stream_with_history(requested_event_type, request_details)
+            provider.start_live_stream_with_history(event_type, parameters)
 
         self._active_streams[stream_key] += 1
 
     def stop_live_stream(
         self,
-        requested_event_type: type,
-        request_details: dict,
+        event_type: type,
+        parameters: dict,
         provider: MarketDataProvider,
         strategy: Strategy,
     ) -> None:
         """Stop streaming live events for strategy."""
-        details_key = self._make_request_details_key(request_details)
-        subscription_key = (requested_event_type, details_key)
-        stream_key = (provider, requested_event_type, details_key)
+        details_key = self._make_parameters_key(parameters)
+        subscription_key = (event_type, details_key)
+        stream_key = (provider, event_type, details_key)
 
         # Remove strategy from subscribers
         self._event_subscriptions[subscription_key].discard(strategy)
-        self._strategy_subscriptions[strategy].discard((requested_event_type, details_key, provider))
+        self._strategy_subscriptions[strategy].discard((event_type, details_key, provider))
 
         # Unsubscribe from MessageBus
-        topic = self._generate_topic(requested_event_type, request_details)
+        topic = self._generate_topic(event_type, parameters)
         self.message_bus.unsubscribe(topic, strategy.on_event)
 
         # Stop provider stream if no more subscribers
         self._active_streams[stream_key] -= 1
         if self._active_streams[stream_key] <= 0:
-            provider.stop_live_stream(requested_event_type, request_details)
+            provider.stop_live_stream(event_type, parameters)
             del self._active_streams[stream_key]
 
         # Clean up empty subscription sets
