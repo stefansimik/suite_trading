@@ -40,7 +40,7 @@ class TradingEngine:
         self.message_bus = MessageBus()
 
         # Strategy management
-        self.strategies: list[Strategy] = []
+        self._strategies: Dict[str, Strategy] = {}
 
         # Market data provider management
         self._market_data_providers: Dict[str, MarketDataProvider] = {}
@@ -71,7 +71,7 @@ class TradingEngine:
         self._is_running = True
 
         # Start strategies
-        for strategy in self.strategies:
+        for strategy in self._strategies.values():
             strategy.on_start()
 
     def stop(self):
@@ -82,53 +82,61 @@ class TradingEngine:
         self._is_running = False
 
         # Stop strategies
-        for strategy in self.strategies:
+        for strategy in self._strategies.values():
             strategy.on_stop()
 
     # endregion
 
     # region Manage strategies
 
-    def add_strategy(self, strategy: Strategy):
-        """Add a strategy to the engine.
+    def add_strategy(self, name: str, strategy: Strategy) -> None:
+        """Register a strategy under the given name.
 
         Args:
-            strategy (Strategy): The strategy to add.
+            name: Name to register the strategy under.
+            strategy: The strategy instance to register.
 
         Raises:
             ValueError: If a strategy with the same name already exists.
         """
-        # Make sure each strategy has unique name
-        for existing_strategy in self.strategies:
-            if existing_strategy.name == strategy.name:
-                raise ValueError(
-                    f"$strategy cannot be added, because it does not have unique name. Strategy with $name '{strategy.name}' already exists and another one with same name cannot be added again.",
-                )
+        if name in self._strategies:
+            raise ValueError(f"Strategy with $name '{name}' already exists. Cannot add another strategy with the same name.")
 
         # Set the trading engine reference in the strategy
         strategy._set_trading_engine(self)
-        self.strategies.append(strategy)
+        self._strategies[name] = strategy
 
         # Initialize strategy subscription tracking
         self._strategy_subscriptions[strategy] = set()
 
-    def remove_strategy(self, strategy: Strategy) -> None:
-        """Remove a strategy from the engine and clean up its subscriptions.
+    def remove_strategy(self, name: str) -> None:
+        """Remove a strategy by name.
 
         Args:
-            strategy: The strategy to remove.
+            name: Name of the strategy to remove.
 
         Raises:
-            ValueError: If the strategy is not found.
+            KeyError: If no strategy with the given name exists.
         """
-        if strategy not in self.strategies:
-            raise ValueError(f"Strategy '{strategy.name}' is not registered with this engine.")
+        if name not in self._strategies:
+            raise KeyError(f"No strategy with $name '{name}' is registered. Cannot remove non-existent strategy.")
+
+        strategy = self._strategies[name]
 
         # Clean up all subscriptions for this strategy
         self._cleanup_strategy_subscriptions(strategy)
 
-        # Remove from strategies list
-        self.strategies.remove(strategy)
+        # Remove from strategies dictionary
+        del self._strategies[name]
+
+    @property
+    def strategies(self) -> Dict[str, Strategy]:
+        """Get all registered strategies.
+
+        Returns:
+            Dictionary mapping strategy names to strategy instances.
+        """
+        return self._strategies
 
     def _cleanup_strategy_subscriptions(self, strategy: Strategy) -> None:
         """Clean up all subscriptions for a strategy when it stops."""
