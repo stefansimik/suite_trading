@@ -29,7 +29,7 @@ class TradingEngine:
     This simple design focuses on strategy coordination and management.
     """
 
-    # region Initialization
+    # region Initialize engine
 
     def __init__(self):
         """Initialize a new TradingEngine instance.
@@ -59,28 +59,9 @@ class TradingEngine:
         # Key: strategy -> Set of (event_type, parameters_key, provider)
         self._strategy_subscriptions: Dict[Any, Set[Tuple[type, frozenset, Any]]] = defaultdict(set)
 
-    def _make_parameters_key(self, parameters: dict) -> frozenset:
-        """Create hashable key from parameters dict."""
-
-        def make_hashable(obj):
-            if isinstance(obj, dict):
-                return frozenset((k, make_hashable(v)) for k, v in obj.items())
-            elif isinstance(obj, list):
-                return tuple(make_hashable(item) for item in obj)
-            elif hasattr(obj, "__dict__"):
-                return str(obj)  # For complex objects, use string representation
-            else:
-                return obj
-
-        return make_hashable(parameters)
-
-    def _generate_topic(self, event_type: type, parameters: dict) -> str:
-        """Generate topic for event type and parameters."""
-        return TopicFactory.create_topic_for_event(event_type, parameters)
-
     # endregion
 
-    # region Engine Lifecycle
+    # region Start and stop engine
 
     def start(self):
         """Start the TradingEngine and all strategies.
@@ -106,7 +87,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Strategy Management
+    # region Manage strategies
 
     def add_strategy(self, strategy: Strategy):
         """Add a strategy to the engine.
@@ -186,25 +167,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Utility Methods
-
-    # TODO: Reevaluate, if we need this convenience method at all / + if location is OK
-    def publish_bar(self, bar: Bar, is_historical: bool = True) -> None:
-        """Publish a bar to the MessageBus for distribution to subscribed strategies.
-
-        Creates a NewBarEvent with the specified historical context and publishes it to the appropriate topic.
-
-        Args:
-            bar: The bar to publish.
-            is_historical: Whether this bar data is historical or live. Defaults to True.
-        """
-        event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical)
-        topic = TopicFactory.create_topic_for_bar(bar.bar_type)
-        self.message_bus.publish(topic, event)
-
-    # endregion
-
-    # region Market Data Provider Management
+    # region Manage market data providers
 
     def add_market_data_provider(self, name: str, provider: MarketDataProvider) -> None:
         """Register a market data provider under the given name.
@@ -246,9 +209,50 @@ class TradingEngine:
 
     # endregion
 
-    # region Generic Event-Based Market Data Methods
+    # region Manage brokers
 
-    # NEW: Generic event-based market data methods
+    def add_broker(self, name: str, broker: Broker) -> None:
+        """Register a broker under the given name.
+
+        Args:
+            name: Name to register the broker under.
+            broker: The broker instance to register.
+
+        Raises:
+            ValueError: If a broker with the same name already exists.
+        """
+        if name in self._brokers:
+            raise ValueError(f"Broker with $name '{name}' already exists. Cannot add another broker with the same name.")
+
+        self._brokers[name] = broker
+
+    def remove_broker(self, name: str) -> None:
+        """Remove a broker by name.
+
+        Args:
+            name: Name of the broker to remove.
+
+        Raises:
+            KeyError: If no broker with the given name exists.
+        """
+        if name not in self._brokers:
+            raise KeyError(f"No broker with $name '{name}' is registered. Cannot remove non-existent broker.")
+
+        del self._brokers[name]
+
+    @property
+    def brokers(self) -> Dict[str, Broker]:
+        """Get all registered brokers.
+
+        Returns:
+            Dictionary mapping broker names to broker instances.
+        """
+        return self._brokers
+
+    # endregion
+
+    # region Request market data
+
     def get_historical_events(
         self,
         event_type: type,
@@ -387,51 +391,45 @@ class TradingEngine:
         if not self._event_subscriptions[subscription_key]:
             del self._event_subscriptions[subscription_key]
 
-    # -----------------------------------------------
-    # BROKER MANAGEMENT
-    # -----------------------------------------------
+    # endregion
 
-    def add_broker(self, name: str, broker: Broker) -> None:
-        """Register a broker under the given name.
+    # region Helper methods
+
+    def _make_parameters_key(self, parameters: dict) -> frozenset:
+        """Create hashable key from parameters dict."""
+
+        def make_hashable(obj):
+            if isinstance(obj, dict):
+                return frozenset((k, make_hashable(v)) for k, v in obj.items())
+            elif isinstance(obj, list):
+                return tuple(make_hashable(item) for item in obj)
+            elif hasattr(obj, "__dict__"):
+                return str(obj)  # For complex objects, use string representation
+            else:
+                return obj
+
+        return make_hashable(parameters)
+
+    def _generate_topic(self, event_type: type, parameters: dict) -> str:
+        """Generate topic for event type and parameters."""
+        return TopicFactory.create_topic_for_event(event_type, parameters)
+
+    def publish_bar(self, bar: Bar, is_historical: bool = True) -> None:
+        """Publish a bar to the MessageBus for distribution to subscribed strategies.
+
+        Creates a NewBarEvent with the specified historical context and publishes it to the appropriate topic.
 
         Args:
-            name: Name to register the broker under.
-            broker: The broker instance to register.
-
-        Raises:
-            ValueError: If a broker with the same name already exists.
+            bar: The bar to publish.
+            is_historical: Whether this bar data is historical or live. Defaults to True.
         """
-        if name in self._brokers:
-            raise ValueError(f"Broker with $name '{name}' already exists. Cannot add another broker with the same name.")
+        event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical)
+        topic = TopicFactory.create_topic_for_bar(bar.bar_type)
+        self.message_bus.publish(topic, event)
 
-        self._brokers[name] = broker
+    # endregion
 
-    def remove_broker(self, name: str) -> None:
-        """Remove a broker by name.
-
-        Args:
-            name: Name of the broker to remove.
-
-        Raises:
-            KeyError: If no broker with the given name exists.
-        """
-        if name not in self._brokers:
-            raise KeyError(f"No broker with $name '{name}' is registered. Cannot remove non-existent broker.")
-
-        del self._brokers[name]
-
-    @property
-    def brokers(self) -> Dict[str, Broker]:
-        """Get all registered brokers.
-
-        Returns:
-            Dictionary mapping broker names to broker instances.
-        """
-        return self._brokers
-
-    # -----------------------------------------------
-    # ORDER MANAGEMENT
-    # -----------------------------------------------
+    # region Submit orders
 
     def submit_order(self, order: Order, broker: Broker) -> None:
         """Submit an order through the specified broker.
@@ -485,83 +483,5 @@ class TradingEngine:
             ConnectionError: If the broker is not connected.
         """
         return broker.get_active_orders()
-
-    # endregion
-
-    # region Legacy Bar Subscription Methods
-
-    # TODO: Reevaluate, how this should work
-    def subscribe_to_live_bars(self, bar_type: BarType, strategy: Strategy):
-        """Subscribe a strategy to live bar data for a specific bar type.
-
-        This method handles all the technical details of subscription:
-        - Subscribes the strategy to the MessageBus topic
-        - Tracks which strategies are subscribed to which bar types
-        - Initiates data publishing when first strategy subscribes
-
-        Args:
-            bar_type (BarType): The type of bar to subscribe to.
-            strategy (Strategy): The strategy that wants to subscribe.
-
-        Raises:
-            RuntimeError: If no market data provider is set.
-        """
-        if self._market_data_provider is None:
-            raise RuntimeError(
-                f"Cannot call `subscribe_to_live_bars` for $bar_type ({bar_type}) because $market_data_provider is None. Set a market data provider when creating TradingEngine.",
-            )
-
-        # Initialize subscription set for this bar type if needed
-        if bar_type not in self._bar_subscriptions:
-            self._bar_subscriptions[bar_type] = set()
-
-        # Check if this is the first subscriber for this bar type
-        is_first_subscriber = len(self._bar_subscriptions[bar_type]) == 0
-
-        # Add strategy to subscription tracking
-        self._bar_subscriptions[bar_type].add(strategy)
-
-        # Subscribe strategy to MessageBus topic
-        topic = TopicFactory.create_topic_for_bar(bar_type)
-        self.message_bus.subscribe(topic, strategy.on_event)
-
-        # Start receiving live bars from market data provider
-        if is_first_subscriber:
-            self._market_data_provider.subscribe_to_live_bars(bar_type)
-
-    def unsubscribe_from_live_bars(self, bar_type: BarType, strategy: Strategy):
-        """Unsubscribe a strategy from live bar data for a specific bar type.
-
-        This method handles cleanup when a strategy unsubscribes:
-        - Unsubscribes the strategy from the MessageBus topic
-        - Removes strategy from subscription tracking
-        - Stops data publishing when last strategy unsubscribes
-
-        Args:
-            bar_type (BarType): The type of bar to unsubscribe from.
-            strategy (Strategy): The strategy that wants to unsubscribe.
-        """
-        # Check if we have subscriptions for this bar type
-        if bar_type not in self._bar_subscriptions:
-            logger.warning(
-                f"Cannot call `unsubscribe_from_live_bars` for $bar_type ({bar_type}) and $strategy ('{strategy.name}') because no subscriptions exist for this bar type. This likely indicates a logical mistake - trying to unsubscribe from something that was never subscribed to.",
-            )
-            return
-
-        # Remove strategy from subscription tracking
-        self._bar_subscriptions[bar_type].discard(strategy)
-
-        # Unsubscribe strategy from MessageBus topic
-        topic = TopicFactory.create_topic_for_bar(bar_type)
-        self.message_bus.unsubscribe(topic, strategy.on_event)
-
-        # Check if this was the last subscriber
-        if len(self._bar_subscriptions[bar_type]) == 0:
-            # Clean up empty subscription set
-            del self._bar_subscriptions[bar_type]
-
-            # Stop requesting live bars from market data provider
-            if self._market_data_provider is not None:
-                self._market_data_provider.unsubscribe_from_live_bars(bar_type)
 
     # endregion
