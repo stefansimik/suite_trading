@@ -89,16 +89,17 @@ class TradingEngine:
 
     # region Manage strategies
 
-    def add_strategy(self, name: str, strategy: Strategy) -> None:
-        """Register a strategy under the given name.
+    def add_strategy(self, strategy: Strategy) -> None:
+        """Register a strategy using its unique name.
 
         Args:
-            name: Name to register the strategy under.
             strategy: The strategy instance to register.
 
         Raises:
             ValueError: If a strategy with the same name already exists.
         """
+        name = strategy.get_unique_name()
+
         if name in self._strategies:
             raise ValueError(f"Strategy with $name '{name}' already exists. Cannot add another strategy with the same name.")
 
@@ -109,19 +110,19 @@ class TradingEngine:
         # Initialize strategy subscription tracking
         self._strategy_subscriptions[strategy] = set()
 
-    def remove_strategy(self, name: str) -> None:
-        """Remove a strategy by name.
+    def remove_strategy(self, strategy: Strategy) -> None:
+        """Remove a strategy using its unique name.
 
         Args:
-            name: Name of the strategy to remove.
+            strategy: The strategy instance to remove.
 
         Raises:
             KeyError: If no strategy with the given name exists.
         """
+        name = strategy.get_unique_name()
+
         if name not in self._strategies:
             raise KeyError(f"No strategy with $name '{name}' is registered. Cannot remove non-existent strategy.")
-
-        strategy = self._strategies[name]
 
         # Clean up all subscriptions for this strategy
         self._cleanup_strategy_subscriptions(strategy)
@@ -177,30 +178,33 @@ class TradingEngine:
 
     # region Manage market data providers
 
-    def add_market_data_provider(self, name: str, provider: MarketDataProvider) -> None:
-        """Register a market data provider under the given name.
+    def add_market_data_provider(self, provider: MarketDataProvider) -> None:
+        """Register a market data provider using its unique name.
 
         Args:
-            name: Name to register the provider under.
             provider: The market data provider instance to register.
 
         Raises:
             ValueError: If a provider with the same name already exists.
         """
+        name = provider.get_unique_name()
+
         if name in self._market_data_providers:
-            raise ValueError(f"Market data provider with $name '{name}' already exists. Cannot add another provider with the same name.")
+            raise ValueError(f"Provider with $name '{name}' already exists. Cannot add another provider with the same name.")
 
         self._market_data_providers[name] = provider
 
-    def remove_market_data_provider(self, name: str) -> None:
-        """Remove a market data provider by name.
+    def remove_market_data_provider(self, provider: MarketDataProvider) -> None:
+        """Remove a market data provider using its unique name.
 
         Args:
-            name: Name of the provider to remove.
+            provider: The market data provider instance to remove.
 
         Raises:
             KeyError: If no provider with the given name exists.
         """
+        name = provider.get_unique_name()
+
         if name not in self._market_data_providers:
             raise KeyError(f"No market data provider with $name '{name}' is registered. Cannot remove non-existent provider.")
 
@@ -219,30 +223,33 @@ class TradingEngine:
 
     # region Manage brokers
 
-    def add_broker(self, name: str, broker: Broker) -> None:
-        """Register a broker under the given name.
+    def add_broker(self, broker: Broker) -> None:
+        """Register a broker using its unique name.
 
         Args:
-            name: Name to register the broker under.
             broker: The broker instance to register.
 
         Raises:
             ValueError: If a broker with the same name already exists.
         """
+        name = broker.get_unique_name()
+
         if name in self._brokers:
             raise ValueError(f"Broker with $name '{name}' already exists. Cannot add another broker with the same name.")
 
         self._brokers[name] = broker
 
-    def remove_broker(self, name: str) -> None:
-        """Remove a broker by name.
+    def remove_broker(self, broker: Broker) -> None:
+        """Remove a broker using its unique name.
 
         Args:
-            name: Name of the broker to remove.
+            broker: The broker instance to remove.
 
         Raises:
             KeyError: If no broker with the given name exists.
         """
+        name = broker.get_unique_name()
+
         if name not in self._brokers:
             raise KeyError(f"No broker with $name '{name}' is registered. Cannot remove non-existent broker.")
 

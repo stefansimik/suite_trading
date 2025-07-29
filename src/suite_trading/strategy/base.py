@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, List, Sequence, Set, Tuple, Any
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
@@ -10,29 +11,33 @@ if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
 
 
-class Strategy:
+class Strategy(ABC):
     # region Initialize strategy
 
-    def __init__(self, name: str):
+    def __init__(self):
         """Initialize a new strategy.
 
-        Args:
-            name (str): The unique name of the strategy.
-
-        Raises:
-            ValueError: If the strategy name has empty characters at the start or end.
+        The strategy's unique name is automatically determined from the class name.
         """
-        # Validate that the strategy name doesn't have empty characters at the start and end
-        if name != name.strip():
-            raise ValueError(f"$name cannot have empty characters at the start or end, but provided value is: '{name}'")
-
-        self.name = name
         self._trading_engine = None
 
         self._subscribed_bar_types = set()  # Track subscribed bar types
 
         # NEW: Track subscriptions for cleanup - keep original parameters
         self._active_subscriptions: Set[Tuple[type, frozenset, Any]] = set()
+
+    @abstractmethod
+    def get_unique_name(self) -> str:
+        """Get unique identifier for this strategy.
+
+        Returns:
+            str: Unique name that identifies this strategy instance.
+
+        Note:
+            Each strategy implementation must provide its own unique identifier.
+            This ensures proper identification and prevents naming conflicts.
+        """
+        ...
 
     def _set_trading_engine(self, trading_engine: "TradingEngine"):
         """Set the trading engine reference.
@@ -103,7 +108,7 @@ class Strategy:
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `get_historical_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `get_historical_events` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         return self._trading_engine.get_historical_events(event_type, parameters, provider, self)
@@ -117,7 +122,7 @@ class Strategy:
         """Stream historical events to this strategy."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `stream_historical_events` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `stream_historical_events` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         self._trading_engine.stream_historical_events(event_type, parameters, provider, self)
@@ -131,7 +136,7 @@ class Strategy:
         """Start streaming live events to this strategy."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `start_live_stream` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `start_live_stream` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         # Track subscription for cleanup - use hashable key
@@ -149,7 +154,7 @@ class Strategy:
         """Start streaming live events with historical data first."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `start_live_stream_with_history` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `start_live_stream_with_history` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         # Track subscription for cleanup - use hashable key
@@ -167,7 +172,7 @@ class Strategy:
         """Stop streaming live events."""
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `stop_live_stream` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `stop_live_stream` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         # Remove from tracked subscriptions - use hashable key
@@ -265,7 +270,7 @@ class Strategy:
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `submit_order` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `submit_order` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         self._trading_engine.submit_order(order, broker)
@@ -282,7 +287,7 @@ class Strategy:
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `cancel_order` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `cancel_order` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         self._trading_engine.cancel_order(order, broker)
@@ -299,7 +304,7 @@ class Strategy:
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `modify_order` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `modify_order` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         self._trading_engine.modify_order(order, broker)
@@ -318,7 +323,7 @@ class Strategy:
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `get_active_orders` on strategy '{self.name}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `get_active_orders` on strategy '{self.get_unique_name()}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         return self._trading_engine.get_active_orders(broker)

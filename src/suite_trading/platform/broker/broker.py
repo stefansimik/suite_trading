@@ -22,6 +22,18 @@ class Broker(Protocol):
     actual broker/exchange systems, handling essential trading operations.
     """
 
+    def get_unique_name(self) -> str:
+        """Get unique identifier for this broker.
+
+        Returns:
+            str: Unique name that identifies this broker instance.
+
+        Note:
+            The name should be stable across the broker's lifetime
+            and unique within the brokers category.
+        """
+        ...
+
     def connect(self) -> None:
         """Establish broker connection.
 
