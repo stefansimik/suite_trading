@@ -12,7 +12,7 @@ class TopicFactory:
     # Wildcard character for topic patterns
     WILDCARD_CHAR = "*"
 
-    # region Core Utility Methods
+    # region Create and validate topics
 
     @classmethod
     def create_topic_from_parts(cls, topic_parts: Sequence[str]) -> str:
@@ -68,7 +68,7 @@ class TopicFactory:
 
     # endregion
 
-    # region Specific Topic Creation Methods
+    # region Create topics for market data
 
     @staticmethod
     def create_topic_for_bar(bar_type: BarType) -> str:
@@ -114,7 +114,7 @@ class TopicFactory:
 
     # endregion
 
-    # region Generic Event-Based Topic Creation Methods
+    # region Create topics for events
 
     @staticmethod
     def create_topic_for_event(event_type: type, parameters: dict) -> str:
