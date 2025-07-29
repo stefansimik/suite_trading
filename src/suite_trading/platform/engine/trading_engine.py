@@ -7,7 +7,6 @@ from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.platform.market_data.market_data_provider import MarketDataProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
@@ -36,9 +35,12 @@ class TradingEngine:
 
         Creates its own MessageBus instance for isolated operation.
         """
-        self.strategies: list[Strategy] = []
+        # Engine state and core components
         self._is_running: bool = False
         self.message_bus = MessageBus()
+
+        # Strategy management
+        self.strategies: list[Strategy] = []
 
         # Market data provider management
         self._market_data_providers: Dict[str, MarketDataProvider] = {}
@@ -46,18 +48,16 @@ class TradingEngine:
         # Broker management
         self._brokers: Dict[str, Broker] = {}
 
-        # Track strategy subscriptions for demand-based publishing
-        self._bar_subscriptions: dict[BarType, set[Strategy]] = {}  # Track which strategies subscribe to which bar types
-
-        # NEW: Subscription tracking for generic events - keep original parameters
-        # Key: (event_type, frozenset of parameters items) -> Set of strategies
-        self._event_subscriptions: Dict[Tuple[type, frozenset], Set[Any]] = defaultdict(set)
-
-        # Key: (provider, event_type, frozenset of parameters items) -> active stream count
-        self._active_streams: Dict[Tuple[Any, type, frozenset], int] = defaultdict(int)
-
-        # Key: strategy -> Set of (event_type, parameters_key, provider)
-        self._strategy_subscriptions: Dict[Any, Set[Tuple[type, frozenset, Any]]] = defaultdict(set)
+        # Subscription tracking for events
+        self._event_subscriptions: Dict[Tuple[type, frozenset], Set[Any]] = defaultdict(
+            set,
+        )  # Key: (event_type, frozenset of parameters items) -> Set of strategies
+        self._active_streams: Dict[Tuple[Any, type, frozenset], int] = defaultdict(
+            int,
+        )  # Key: (provider, event_type, frozenset of parameters items) -> active stream count
+        self._strategy_subscriptions: Dict[Any, Set[Tuple[type, frozenset, Any]]] = defaultdict(
+            set,
+        )  # Key: strategy -> Set of (event_type, parameters_key, provider)
 
     # endregion
 

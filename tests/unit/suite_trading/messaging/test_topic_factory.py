@@ -1,6 +1,7 @@
 from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 
 
 def test_topic_protocol_create_topic_for_bar():
@@ -34,21 +35,22 @@ def test_trading_engine_publish_bar():
 
     # Create a flag to track if the callback was called
     callback_called = False
-    received_bar = None
+    received_event = None
 
     # Define a callback function
-    def on_bar(received_bar_param):
-        nonlocal callback_called, received_bar
+    def on_bar_event(received_event_param):
+        nonlocal callback_called, received_event
         callback_called = True
-        received_bar = received_bar_param
+        received_event = received_event_param
 
     # Subscribe to the topic
     topic = TopicFactory.create_topic_for_bar(bar_type)
-    engine.message_bus.subscribe(topic, on_bar)
+    engine.message_bus.subscribe(topic, on_bar_event)
 
     # Publish the bar
     engine.publish_bar(bar)
 
-    # Verify that the callback was called with the correct bar
+    # Verify that the callback was called with the correct NewBarEvent
     assert callback_called, "Callback was not called"
-    assert received_bar == bar, "Received bar does not match published bar"
+    assert isinstance(received_event, NewBarEvent), "Received event is not a NewBarEvent"
+    assert received_event.bar == bar, "Received bar does not match published bar"
