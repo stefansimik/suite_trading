@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class Strategy:
-    # region Initialization
+    # region Initialize strategy
 
     def __init__(self, name: str):
         """Initialize a new strategy.
@@ -34,25 +34,6 @@ class Strategy:
         # NEW: Track subscriptions for cleanup - keep original parameters
         self._active_subscriptions: Set[Tuple[type, frozenset, Any]] = set()
 
-    def _make_parameters_key(self, parameters: dict) -> frozenset:
-        """Create hashable key from parameters dict."""
-
-        def make_hashable(obj):
-            if isinstance(obj, dict):
-                return frozenset((k, make_hashable(v)) for k, v in obj.items())
-            elif isinstance(obj, list):
-                return tuple(make_hashable(item) for item in obj)
-            elif hasattr(obj, "__dict__"):
-                return str(obj)  # For complex objects, use string representation
-            else:
-                return obj
-
-        return make_hashable(parameters)
-
-    # endregion
-
-    # region Strategy Lifecycle
-
     def _set_trading_engine(self, trading_engine: "TradingEngine"):
         """Set the trading engine reference.
 
@@ -63,6 +44,10 @@ class Strategy:
             trading_engine (TradingEngine): The trading engine instance.
         """
         self._trading_engine = trading_engine
+
+    # endregion
+
+    # region Start and stop strategy
 
     def on_start(self):
         """Called when the strategy is started.
@@ -96,19 +81,9 @@ class Strategy:
                 # Log error but continue cleanup
                 print(f"Error cleaning up subscription: {e}")
 
-    # -----------------------------------------------
-    # SUBSCRIBE TO DATA
-    # -----------------------------------------------
-
-    # -----------------------------------------------
-    # MARKET DATA REQUESTS
-    # -----------------------------------------------
-
     # endregion
 
-    # region Market Data Request Methods
-
-    # NEW: Generic event-based market data methods
+    # region Request market data
     def get_historical_events(
         self,
         event_type: type,
@@ -203,7 +178,7 @@ class Strategy:
 
     # endregion
 
-    # region Data Handler Methods
+    # region Handle events
 
     def on_event(self, event: Event):
         """Universal callback receiving complete event wrapper.
@@ -276,7 +251,7 @@ class Strategy:
 
     # endregion
 
-    # region Order Management Methods
+    # region Submit orders
 
     def submit_order(self, order: Order, broker: Broker) -> None:
         """Submit an order for execution.
@@ -347,5 +322,24 @@ class Strategy:
             )
 
         return self._trading_engine.get_active_orders(broker)
+
+    # endregion
+
+    # region Helper methods
+
+    def _make_parameters_key(self, parameters: dict) -> frozenset:
+        """Create hashable key from parameters dict."""
+
+        def make_hashable(obj):
+            if isinstance(obj, dict):
+                return frozenset((k, make_hashable(v)) for k, v in obj.items())
+            elif isinstance(obj, list):
+                return tuple(make_hashable(item) for item in obj)
+            elif hasattr(obj, "__dict__"):
+                return str(obj)  # For complex objects, use string representation
+            else:
+                return obj
+
+        return make_hashable(parameters)
 
     # endregion
