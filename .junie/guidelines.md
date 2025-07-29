@@ -7,7 +7,6 @@ Modern algorithmic trading framework in Python for backtesting and live trading.
 - **KISS**: Always prefer the simplest working solution
 - **YAGNI**: Only implement when actually needed
 - **DRY**: Eliminate duplication of information, logic or business rules across the codebase
-- **Composition Over Inheritance**: Prefer composition over inheritance hierarchies
 - **Fail Fast**: Detect and report errors immediately
 - **Intuitive Domain Model**: Create simple, understandable domain models
 - **Single Responsibility**: Ensure each class has only one job or responsibility
@@ -222,6 +221,53 @@ breaking lines at appropriate points to maintain readability and consistency.
 
 # ❌ Bad - line exceeds 100 characters
 This is an improperly formatted Markdown paragraph that exceeds the 100-character limit and should be broken into multiple lines for better readability.
+```
+
+## Code Organization with Regions
+
+**Rule**: Use regions to organize code when files become larger and contain multiple logical sections.
+
+**Why**: Regions make code more structured and intuitive, especially for AI-generated/edited files. They provide clear visual separation of different concerns and make navigation easier.
+
+### When to Use Regions
+
+- **Files with 100+ lines** that contain multiple logical sections
+- **Classes with multiple responsibilities** (engines, strategies, factories)
+- **Files with distinct functional groups** (initialization, lifecycle, data handling, etc.)
+
+### Region Guidelines
+
+- **Use simple, intuitive names**: Prefer "Initialize engine" over "Initialization Methods"
+- **Use verbs for actions**: "Start and stop engine", "Manage strategies", "Submit orders"
+- **Group related functionality**: Place management regions together (strategies, providers, brokers)
+- **Consistent formatting**: Always use `# region [name]` and `# endregion` markers
+- **Re-evaluate when editing**: Update regions when making changes to maintain organization
+
+### Examples
+
+```python
+class TradingEngine:
+    # region Initialize engine
+    def __init__(self):
+        # Initialization code
+        pass
+    # endregion
+
+    # region Start and stop engine
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+    # endregion
+
+    # region Manage strategies
+    def add_strategy(self, strategy):
+        pass
+
+    def remove_strategy(self, strategy):
+        pass
+    # endregion
 ```
 
 ## Import and Package Structure
