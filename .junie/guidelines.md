@@ -13,6 +13,26 @@ Modern algorithmic trading framework in Python for backtesting and live trading.
 - **Separation of Concerns**: Organize code so different concerns are handled by different parts of the system
 - **Principle of Least Surprise**: Code should behave in ways that users naturally expect
 
+## Initial Development Mode
+
+**Rule: During initial development, all code changes can ignore historical compatibility and backwards compatibility.**
+
+**Why:** We are in the initial development phase of the library where rapid iteration and improvement are prioritized over stability. This means:
+
+- **Any functionality can be removed** and replaced with new improved implementations
+- **Breaking changes are allowed** without deprecation warnings or migration paths
+- **APIs can be redesigned** to better serve user needs without maintaining old interfaces
+- **No backwards compatibility guarantees** - the result does not have to be backwards compatible
+- **Focus on getting it right** rather than maintaining legacy code that doesn't serve the current vision
+
+This approach allows us to:
+- **Iterate quickly** on design decisions without technical debt
+- **Optimize for the best user experience** without being constrained by past decisions
+- **Build a solid foundation** before committing to stability guarantees
+- **Learn and improve** from real usage patterns without legacy constraints
+
+**Note:** This rule applies only during the initial development phase. Once the library reaches a stable release, backwards compatibility and migration strategies will become important considerations.
+
 ## User-Centric Design Principle
 
 **APIs should be designed for the user, not for internal implementation convenience.**
