@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class Strategy(ABC):
-    # region Initialize strategy
+    # region Initialize and name strategy
 
     def __init__(self):
         """Initialize a new strategy.
@@ -39,20 +39,9 @@ class Strategy(ABC):
         """
         ...
 
-    def _set_trading_engine(self, trading_engine: "TradingEngine"):
-        """Set the trading engine reference.
-
-        This method is called by the TradingEngine when the strategy is added to it.
-        It is not expected to be called directly by subclasses.
-
-        Args:
-            trading_engine (TradingEngine): The trading engine instance.
-        """
-        self._trading_engine = trading_engine
-
     # endregion
 
-    # region Start and stop strategy
+    # region On start / stop callbacks
 
     def on_start(self):
         """Called when the strategy is started.
@@ -202,22 +191,6 @@ class Strategy(ABC):
         # Default implementation routes to specific handlers
         self._distribute_event_to_specific_callbacks(event)
 
-    def _distribute_event_to_specific_callbacks(self, event: Event):
-        """Internal routing method to distribute events to specific callbacks.
-
-        This method extracts the pure data objects from event wrappers and
-        calls the appropriate specific callback methods (on_bar, on_trade_tick, etc.).
-
-        Args:
-            event (Event): The event wrapper to route to specific callbacks.
-        """
-        if isinstance(event, NewBarEvent):
-            self.on_bar(event.bar, event.is_historical)  # Extract bar and historical context from NewBarEvent
-        # Add other event types as needed
-        else:
-            # Handle unknown event types
-            self.on_unknown_event(event)
-
     def on_bar(self, bar: Bar, is_historical: bool):
         """Called when a new bar is received.
 
@@ -330,7 +303,34 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Helper methods
+    # region Internal and helper methods
+
+    def _set_trading_engine(self, trading_engine: "TradingEngine"):
+        """Set the trading engine reference.
+
+        This method is called by the TradingEngine when the strategy is added to it.
+        It is not expected to be called directly by subclasses.
+
+        Args:
+            trading_engine (TradingEngine): The trading engine instance.
+        """
+        self._trading_engine = trading_engine
+
+    def _distribute_event_to_specific_callbacks(self, event: Event):
+        """Internal routing method to distribute events to specific callbacks.
+
+        This method extracts the pure data objects from event wrappers and
+        calls the appropriate specific callback methods (on_bar, on_trade_tick, etc.).
+
+        Args:
+            event (Event): The event wrapper to route to specific callbacks.
+        """
+        if isinstance(event, NewBarEvent):
+            self.on_bar(event.bar, event.is_historical)  # Extract bar and historical context from NewBarEvent
+        # Add other event types as needed
+        else:
+            # Handle unknown event types
+            self.on_unknown_event(event)
 
     def _make_parameters_key(self, parameters: dict) -> frozenset:
         """Create hashable key from parameters dict."""
