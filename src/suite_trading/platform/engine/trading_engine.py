@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Sequence, Set, Tuple, Any
 from collections import defaultdict
-from suite_trading.strategy.base import Strategy
+from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.platform.market_data.market_data_provider import MarketDataProvider

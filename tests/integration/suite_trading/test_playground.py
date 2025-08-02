@@ -1,4 +1,4 @@
-from suite_trading.strategy.base import Strategy
+from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.utils.data_generation.bars import create_bar_series, DEFAULT_FIRST_BAR
 from datetime import datetime
