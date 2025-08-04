@@ -11,6 +11,23 @@ class Event(ABC):
     All event objects must be sortable to enable correct chronological processing order.
     """
 
+    def __init__(self, provider_name: str):
+        """Initialize event with provider identification.
+
+        Args:
+            provider_name: Name of the provider that generated this event.
+        """
+        self._provider_name = provider_name
+
+    @property
+    def provider_name(self) -> str:
+        """Get the name of the provider that generated this event.
+
+        Returns:
+            str: Name of the source provider.
+        """
+        return self._provider_name
+
     @property
     @abstractmethod
     def dt_received(self) -> datetime:

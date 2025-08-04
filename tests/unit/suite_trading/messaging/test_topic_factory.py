@@ -48,7 +48,7 @@ def test_trading_engine_publish_bar():
     engine.message_bus.subscribe(topic, on_bar_event)
 
     # Publish the bar
-    engine.publish_bar(bar)
+    engine.publish_bar(bar, "test_provider")
 
     # Verify that the callback was called with the correct NewBarEvent
     assert callback_called, "Callback was not called"

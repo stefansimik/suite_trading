@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Callable
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -205,16 +205,17 @@ class TradingEngine:
 
     # region Helper methods
 
-    def publish_bar(self, bar: Bar, is_historical: bool = True) -> None:
+    def publish_bar(self, bar: Bar, provider_name: str, is_historical: bool = True) -> None:
         """Publish a bar to the MessageBus for distribution to subscribed strategies.
 
         Creates a NewBarEvent with the specified historical context and publishes it to the appropriate topic.
 
         Args:
             bar: The bar to publish.
+            provider_name: Name of the provider that generated this bar.
             is_historical: Whether this bar data is historical or live. Defaults to True.
         """
-        event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical)
+        event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical, provider_name=provider_name)
         topic = TopicFactory.create_topic_for_bar(bar.bar_type)
         self.message_bus.publish(topic, event)
 
@@ -274,5 +275,67 @@ class TradingEngine:
             ConnectionError: If the broker is not connected.
         """
         return broker.get_active_orders()
+
+    # endregion
+
+    # region Handling market data
+
+    def add_event_feed_for_strategy(
+        self,
+        strategy: Strategy,
+        name: str,
+        event_type: type,
+        parameters: dict,
+        callback: Callable,
+        provider_ref: str,
+    ) -> None:
+        """Add an event feed for the specified strategy.
+
+        This method handles the creation and management of event feeds based on
+        individual parameters from strategies.
+
+        Args:
+            strategy: The strategy requesting the event feed.
+            name: Unique name for this feed within the strategy.
+            event_type: Type of events to receive (e.g., NewBarEvent).
+            parameters: Dictionary with event-specific parameters.
+            callback: Function to call when events are received.
+            provider_ref: Reference name of the provider to use for this feed.
+
+        Raises:
+            ValueError: If name is already in use for this strategy or provider_ref not found.
+            UnsupportedEventTypeError: If provider doesn't support the event type.
+            UnsupportedConfigurationError: If provider doesn't support the configuration.
+        """
+        # Future implementation will:
+        # 1. Validate name is unique for this strategy
+        # 2. Find provider by provider_ref in self._market_data_providers
+        # 3. Validate that the provider supports the event type and configuration
+        # 4. Create EventFeed from the specified provider using parameters
+        # 5. Register feed with strategy for event delivery using name and callback
+        # 6. Start the feed (historical + live if requested in parameters)
+        # 7. Ensure events are delivered in chronological order across all feeds
+
+        # For now, this is a placeholder - implementation will be added in future iterations
+        pass
+
+    def remove_event_feed_for_strategy(self, strategy: Strategy, name: str) -> None:
+        """Remove an event feed for the specified strategy.
+
+        Args:
+            strategy: The strategy that owns the event feed.
+            name: Name of the feed to stop.
+
+        Raises:
+            ValueError: If name is not found for this strategy.
+        """
+        # Future implementation will:
+        # 1. Find the EventFeed by name for this strategy
+        # 2. Stop the feed gracefully (stop live streaming, cleanup resources)
+        # 3. Unregister the feed from strategy event delivery
+        # 4. Clean up any associated resources and connections
+
+        # For now, this is a placeholder - implementation will be added in future iterations
+        pass
 
     # endregion

@@ -80,7 +80,7 @@ def test_basic_flow():
     # Feed bars to the engine
     bars = create_bar_series(first_bar=DEFAULT_FIRST_BAR, num_bars=20)
     for bar in bars:
-        engine.publish_bar(bar)
+        engine.publish_bar(bar, "mock_provider")
 
     # Stop trading engine
     engine.stop()

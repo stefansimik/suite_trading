@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List, Sequence, Set, Tuple, Any
+from typing import TYPE_CHECKING, List, Set, Callable
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.market_data.market_data_provider import MarketDataProvider
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -21,8 +20,8 @@ class Strategy(ABC):
 
         self._subscribed_bar_types = set()  # Track subscribed bar types
 
-        # NEW: Track subscriptions for cleanup - keep original parameters
-        self._active_subscriptions: Set[Tuple[type, frozenset, Any]] = set()
+        # Track active event feeds by reference name
+        self._active_event_feeds: Set[str] = set()
 
     # endregion
 
@@ -42,118 +41,89 @@ class Strategy(ABC):
         This method should be overridden by subclasses to implement
         cleanup logic when the strategy stops.
 
-        Automatically unsubscribes from all bar subscriptions and event subscriptions.
+        Automatically unsubscribes from all bar subscriptions and stops all event feeds.
         """
         # Unsubscribe from all bar topics
         for bar_type in list(self._subscribed_bar_types):
             self.unsubscribe_from_live_bars(bar_type)
 
-        # Clean up all active event subscriptions
-        subscriptions_copy = self._active_subscriptions.copy()
-        for event_type, parameters_key, provider in subscriptions_copy:
+        # Stop all active event feeds
+        event_feeds_copy = self._active_event_feeds.copy()
+        for name in event_feeds_copy:
             try:
-                # We need to reconstruct the original parameters from the key
-                # For now, we'll skip cleanup of individual subscriptions since
-                # TradingEngine will handle cleanup when strategy is removed
-                pass
+                self.remove_event_feed(name)
             except Exception as e:
                 # Log error but continue cleanup
-                print(f"Error cleaning up subscription: {e}")
+                print(f"Error stopping event feed '{name}': {e}")
 
     # endregion
 
-    # region Request market data
-    def get_historical_events(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-    ) -> Sequence[Event]:
-        """
-        Get historical events from specified provider.
+    # region Handling market data
+
+    def add_event_feed(self, name: str, event_type: type, parameters: dict, callback: Callable, provider_ref: str) -> None:
+        """Add an event feed to start receiving events for the specified parameters.
+
+        The strategy will receive events through the provided callback function.
+        Events are delivered in chronological order across all active feeds.
 
         Args:
-            event_type: Type of events to retrieve
-            parameters: Dict with event-specific parameters
-            provider: Market data provider to use
+            name: Unique name for this feed within the strategy.
+            event_type: Type of events to receive (e.g., NewBarEvent).
+            parameters: Dictionary with event-specific parameters.
+            callback: Function to call when events are received.
+            provider_ref: Reference name of the provider to use for this feed.
 
-        Returns:
-            Sequence of historical events
+        Raises:
+            ValueError: If name is already in use.
+            RuntimeError: If trading engine is not set.
+            UnsupportedEventTypeError: If provider doesn't support the event type.
+            UnsupportedConfigurationError: If provider doesn't support the configuration.
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `get_historical_events` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `add_event_feed` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        return self._trading_engine.get_historical_events(event_type, parameters, provider, self)
+        if name in self._active_event_feeds:
+            raise ValueError(f"Event feed with $name '{name}' already exists. Choose a different name.")
 
-    def stream_historical_events(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-    ) -> None:
-        """Stream historical events to this strategy."""
+        # Implementation: TradingEngine will:
+        # 1. Validate name is unique for this strategy
+        # 2. Find provider by provider_ref and validate it supports the event type and configuration
+        # 3. Create EventFeed from the specified provider
+        # 4. Register feed with strategy for event delivery using name and callback
+        # 5. Start the feed (historical + live if requested in parameters)
+        self._trading_engine.add_event_feed_for_strategy(self, name, event_type, parameters, callback, provider_ref)
+
+        # Track the active feed
+        self._active_event_feeds.add(name)
+
+    def remove_event_feed(self, name: str) -> None:
+        """Remove an event feed to stop receiving events for the specified name.
+
+        Args:
+            name: Name of the feed to stop.
+
+        Raises:
+            ValueError: If name is not found.
+            RuntimeError: If trading engine is not set.
+        """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `stream_historical_events` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `remove_event_feed` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        self._trading_engine.stream_historical_events(event_type, parameters, provider, self)
+        if name not in self._active_event_feeds:
+            raise ValueError(f"No event feed with $name '{name}' is active. Cannot stop non-existent feed.")
 
-    def start_live_stream(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-    ) -> None:
-        """Start streaming live events to this strategy."""
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `start_live_stream` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
+        # Implementation: TradingEngine will:
+        # 1. Find the EventFeed by name for this strategy
+        # 2. Stop the feed gracefully
+        # 3. Clean up resources and unregister from strategy
+        self._trading_engine.remove_event_feed_for_strategy(self, name)
 
-        # Track subscription for cleanup - use hashable key
-        details_key = self._make_parameters_key(parameters)
-        self._active_subscriptions.add((event_type, details_key, provider))
-
-        self._trading_engine.start_live_stream(event_type, parameters, provider, self)
-
-    def start_live_stream_with_history(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-    ) -> None:
-        """Start streaming live events with historical data first."""
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `start_live_stream_with_history` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        # Track subscription for cleanup - use hashable key
-        details_key = self._make_parameters_key(parameters)
-        self._active_subscriptions.add((event_type, details_key, provider))
-
-        self._trading_engine.start_live_stream_with_history(event_type, parameters, provider, self)
-
-    def stop_live_stream(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-    ) -> None:
-        """Stop streaming live events."""
-        if self._trading_engine is None:
-            raise RuntimeError(
-                f"Cannot call `stop_live_stream` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
-
-        # Remove from tracked subscriptions - use hashable key
-        details_key = self._make_parameters_key(parameters)
-        self._active_subscriptions.discard((event_type, details_key, provider))
-
-        self._trading_engine.stop_live_stream(event_type, parameters, provider, self)
+        # Remove from tracked feeds
+        self._active_event_feeds.discard(name)
 
     # endregion
 
@@ -265,20 +235,5 @@ class Strategy(ABC):
             trading_engine (TradingEngine): The trading engine instance.
         """
         self._trading_engine = trading_engine
-
-    def _make_parameters_key(self, parameters: dict) -> frozenset:
-        """Create hashable key from parameters dict."""
-
-        def make_hashable(obj):
-            if isinstance(obj, dict):
-                return frozenset((k, make_hashable(v)) for k, v in obj.items())
-            elif isinstance(obj, list):
-                return tuple(make_hashable(item) for item in obj)
-            elif hasattr(obj, "__dict__"):
-                return str(obj)  # For complex objects, use string representation
-            else:
-                return obj
-
-        return make_hashable(parameters)
 
     # endregion
