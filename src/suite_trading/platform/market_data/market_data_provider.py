@@ -32,18 +32,6 @@ class MarketDataProvider(Protocol):
     Provides methods to get historical data and subscribe to live market data.
     """
 
-    def get_unique_name(self) -> str:
-        """Get unique identifier for this market data provider.
-
-        Returns:
-            str: Unique name that identifies this provider instance.
-
-        Note:
-            The name should be stable across the provider's lifetime
-            and unique within the market data providers category.
-        """
-        ...
-
     # region Connection Management
 
     def connect(self) -> None:

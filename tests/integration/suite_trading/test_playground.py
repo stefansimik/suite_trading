@@ -10,10 +10,6 @@ from suite_trading.domain.market_data.bar.bar import Bar
 class MockMarketDataProvider:
     """Mock market data provider for testing."""
 
-    def get_unique_name(self) -> str:
-        """Get unique identifier for this mock provider."""
-        return "mock_provider"
-
     def connect(self) -> None:
         pass
 
@@ -54,12 +50,12 @@ class MockMarketDataProvider:
 
 
 class DemoStrategy(Strategy):
-    def get_unique_name(self) -> str:
-        """Get unique identifier for this demo strategy."""
-        return "DemoStrategy"
-
     def on_start(self):
         # Strategy started - ready to receive events
+        pass
+
+    def on_event(self, event):
+        # Handle all events
         pass
 
     def on_bar(self, bar, is_historical: bool):
@@ -72,11 +68,11 @@ def test_basic_flow():
 
     # Add mock market data provider
     mock_provider = MockMarketDataProvider()
-    engine.add_market_data_provider(mock_provider)
+    engine.add_market_data_provider("mock_provider", mock_provider)
 
     # Add strategy
     strategy: Strategy = DemoStrategy()
-    engine.add_strategy(strategy)
+    engine.add_strategy("demo_strategy", strategy)
 
     # Start trading engine
     engine.start()
