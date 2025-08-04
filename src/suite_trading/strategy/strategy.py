@@ -172,6 +172,7 @@ class Strategy(ABC):
 
     # region Handle events
 
+    # Made abstract to prevent silent failures - ensures all strategies implement event handling
     @abstractmethod
     def on_event(self, event: Event):
         """Universal callback receiving complete event wrapper.
