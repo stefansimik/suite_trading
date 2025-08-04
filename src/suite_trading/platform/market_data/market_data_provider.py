@@ -1,8 +1,6 @@
 """Market data provider protocol definition."""
 
-from typing import Protocol, Sequence
-
-from suite_trading.domain.event import Event
+from typing import Protocol
 
 
 class UnsupportedEventTypeError(Exception):
@@ -70,103 +68,6 @@ class MarketDataProvider(Protocol):
 
         Returns:
             bool: True if connected, False otherwise.
-        """
-        ...
-
-    # endregion
-
-    # region Event-Based Data Methods
-
-    def get_historical_events(
-        self,
-        event_type: type,
-        parameters: dict,
-    ) -> Sequence[Event]:
-        """
-        Get all historical events of the specified type at once.
-
-        Args:
-            event_type: Type of events to retrieve (e.g., NewBarEvent)
-            parameters: Parameters for the request
-
-        Returns:
-            Complete sequence of historical events in a single batch
-
-        Raises:
-            UnsupportedEventTypeError: If the provider doesn't support this event type
-            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
-        """
-        ...
-
-    def stream_historical_events(
-        self,
-        event_type: type,
-        parameters: dict,
-    ) -> None:
-        """
-        Stream historical events to the MessageBus.
-
-        Args:
-            event_type: Type of events to stream
-            parameters: Parameters for the request
-
-        Raises:
-            UnsupportedEventTypeError: If the provider doesn't support this event type
-            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
-        """
-        ...
-
-    def start_live_stream(
-        self,
-        event_type: type,
-        parameters: dict,
-    ) -> None:
-        """
-        Start streaming live events to the MessageBus.
-
-        Args:
-            event_type: Type of events to stream
-            parameters: Parameters for the request
-
-        Raises:
-            UnsupportedEventTypeError: If the provider doesn't support this event type
-            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
-        """
-        ...
-
-    def start_live_stream_with_history(
-        self,
-        event_type: type,
-        parameters: dict,
-    ) -> None:
-        """
-        Start with historical data, then stream live events.
-
-        Args:
-            event_type: Type of events to stream
-            parameters: Parameters for the request
-
-        Raises:
-            UnsupportedEventTypeError: If the provider doesn't support this event type
-            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
-        """
-        ...
-
-    def stop_live_stream(
-        self,
-        event_type: type,
-        parameters: dict,
-    ) -> None:
-        """
-        Stop streaming live events.
-
-        Args:
-            event_type: Type of events to stop
-            parameters: Parameters to identify the stream
-
-        Raises:
-            UnsupportedEventTypeError: If the provider doesn't support this event type
-            UnsupportedConfigurationError: If the provider supports the event type but not the configuration
         """
         ...
 

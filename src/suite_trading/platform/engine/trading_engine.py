@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Dict, List, Sequence, Set, Tuple, Any
-from collections import defaultdict
+from typing import Dict, List
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -10,7 +9,6 @@ from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
-from suite_trading.domain.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -47,17 +45,6 @@ class TradingEngine:
 
         # Broker management
         self._brokers: Dict[str, Broker] = {}
-
-        # Subscription tracking for events
-        self._event_subscriptions: Dict[Tuple[type, frozenset], Set[Any]] = defaultdict(
-            set,
-        )  # Key: (event_type, frozenset of parameters items) -> Set of strategies
-        self._active_streams: Dict[Tuple[Any, type, frozenset], int] = defaultdict(
-            int,
-        )  # Key: (provider, event_type, frozenset of parameters items) -> active stream count
-        self._strategy_subscriptions: Dict[Any, Set[Tuple[type, frozenset, Any]]] = defaultdict(
-            set,
-        )  # Key: strategy -> Set of (event_type, parameters_key, provider)
 
     # endregion
 
@@ -107,9 +94,6 @@ class TradingEngine:
         strategy._set_trading_engine(self)
         self._strategies[name] = strategy
 
-        # Initialize strategy subscription tracking
-        self._strategy_subscriptions[strategy] = set()
-
     def remove_strategy(self, strategy: Strategy) -> None:
         """Remove a strategy using its unique name.
 
@@ -124,9 +108,6 @@ class TradingEngine:
         if name not in self._strategies:
             raise KeyError(f"No strategy with $name '{name}' is registered. Cannot remove non-existent strategy.")
 
-        # Clean up all subscriptions for this strategy
-        self._cleanup_strategy_subscriptions(strategy)
-
         # Remove from strategies dictionary
         del self._strategies[name]
 
@@ -138,41 +119,6 @@ class TradingEngine:
             Dictionary mapping strategy names to strategy instances.
         """
         return self._strategies
-
-    def _cleanup_strategy_subscriptions(self, strategy: Strategy) -> None:
-        """Clean up all subscriptions for a strategy when it stops."""
-        if strategy not in self._strategy_subscriptions:
-            return
-
-        # Get copy of subscriptions to avoid modification during iteration
-        subscriptions = self._strategy_subscriptions[strategy].copy()
-
-        for event_type, parameters_key, provider in subscriptions:
-            try:
-                # We need to reconstruct the original parameters from the key
-                # For cleanup, we'll directly remove from tracking without calling stop_live_stream
-                # since the provider cleanup will be handled elsewhere
-                self._strategy_subscriptions[strategy].discard((event_type, parameters_key, provider))
-
-                # Clean up event subscriptions
-                subscription_key = (event_type, parameters_key)
-                self._event_subscriptions[subscription_key].discard(strategy)
-                if not self._event_subscriptions[subscription_key]:
-                    del self._event_subscriptions[subscription_key]
-
-                # Clean up active streams
-                stream_key = (provider, event_type, parameters_key)
-                if stream_key in self._active_streams:
-                    self._active_streams[stream_key] -= 1
-                    if self._active_streams[stream_key] <= 0:
-                        del self._active_streams[stream_key]
-
-            except Exception as e:
-                # Log error but continue cleanup
-                logger.warning(f"Error cleaning up subscription: {e}")
-
-        # Clean up the strategy's subscription tracking
-        del self._strategy_subscriptions[strategy]
 
     # endregion
 
@@ -266,168 +212,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Request market data
-
-    def get_historical_events(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-        strategy: Strategy,
-    ) -> Sequence[Event]:
-        """
-        Get historical events from specified provider.
-
-        Args:
-            event_type: Type of events to retrieve
-            parameters: Dict with event-specific parameters
-            provider: Market data provider to use
-            strategy: Strategy making the request
-
-        Returns:
-            Sequence of historical events
-
-        Raises:
-            UnsupportedEventTypeError: If provider doesn't support the event type
-        """
-        return provider.get_historical_events(event_type, parameters)
-
-    def stream_historical_events(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-        strategy: Strategy,
-    ) -> None:
-        """
-        Stream historical events to strategy via MessageBus.
-
-        Raises:
-            UnsupportedEventTypeError: If provider doesn't support the event type
-        """
-        # Generate topic and subscribe strategy
-        topic = self._generate_topic(event_type, parameters)
-        self.message_bus.subscribe(topic, strategy.on_event)
-
-        # Delegate to provider
-        provider.stream_historical_events(event_type, parameters)
-
-    def start_live_stream(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-        strategy: Strategy,
-    ) -> None:
-        """
-        Start streaming live events to strategy.
-
-        Raises:
-            UnsupportedEventTypeError: If provider doesn't support the event type
-        """
-        # Track subscription - keep original parameters
-        details_key = self._make_parameters_key(parameters)
-        subscription_key = (event_type, details_key)
-        stream_key = (provider, event_type, details_key)
-
-        # Add strategy to subscribers
-        self._event_subscriptions[subscription_key].add(strategy)
-        self._strategy_subscriptions[strategy].add((event_type, details_key, provider))
-
-        # Subscribe strategy to MessageBus topic
-        topic = self._generate_topic(event_type, parameters)
-        self.message_bus.subscribe(topic, strategy.on_event)
-
-        # Start provider stream if this is first subscriber
-        if self._active_streams[stream_key] == 0:
-            provider.start_live_stream(event_type, parameters)
-
-        self._active_streams[stream_key] += 1
-
-    def start_live_stream_with_history(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-        strategy: Strategy,
-    ) -> None:
-        """
-        Start streaming live events with historical data first.
-
-        Raises:
-            UnsupportedEventTypeError: If provider doesn't support the event type
-        """
-        # Track subscription - keep original parameters
-        details_key = self._make_parameters_key(parameters)
-        subscription_key = (event_type, details_key)
-        stream_key = (provider, event_type, details_key)
-
-        # Add strategy to subscribers
-        self._event_subscriptions[subscription_key].add(strategy)
-        self._strategy_subscriptions[strategy].add((event_type, details_key, provider))
-
-        # Subscribe strategy to MessageBus topic
-        topic = self._generate_topic(event_type, parameters)
-        self.message_bus.subscribe(topic, strategy.on_event)
-
-        # Start provider stream if this is first subscriber
-        if self._active_streams[stream_key] == 0:
-            provider.start_live_stream_with_history(event_type, parameters)
-
-        self._active_streams[stream_key] += 1
-
-    def stop_live_stream(
-        self,
-        event_type: type,
-        parameters: dict,
-        provider: MarketDataProvider,
-        strategy: Strategy,
-    ) -> None:
-        """Stop streaming live events for strategy."""
-        details_key = self._make_parameters_key(parameters)
-        subscription_key = (event_type, details_key)
-        stream_key = (provider, event_type, details_key)
-
-        # Remove strategy from subscribers
-        self._event_subscriptions[subscription_key].discard(strategy)
-        self._strategy_subscriptions[strategy].discard((event_type, details_key, provider))
-
-        # Unsubscribe from MessageBus
-        topic = self._generate_topic(event_type, parameters)
-        self.message_bus.unsubscribe(topic, strategy.on_event)
-
-        # Stop provider stream if no more subscribers
-        self._active_streams[stream_key] -= 1
-        if self._active_streams[stream_key] <= 0:
-            provider.stop_live_stream(event_type, parameters)
-            del self._active_streams[stream_key]
-
-        # Clean up empty subscription sets
-        if not self._event_subscriptions[subscription_key]:
-            del self._event_subscriptions[subscription_key]
-
-    # endregion
-
     # region Helper methods
-
-    def _make_parameters_key(self, parameters: dict) -> frozenset:
-        """Create hashable key from parameters dict."""
-
-        def make_hashable(obj):
-            if isinstance(obj, dict):
-                return frozenset((k, make_hashable(v)) for k, v in obj.items())
-            elif isinstance(obj, list):
-                return tuple(make_hashable(item) for item in obj)
-            elif hasattr(obj, "__dict__"):
-                return str(obj)  # For complex objects, use string representation
-            else:
-                return obj
-
-        return make_hashable(parameters)
-
-    def _generate_topic(self, event_type: type, parameters: dict) -> str:
-        """Generate topic for event type and parameters."""
-        return TopicFactory.create_topic_for_event(event_type, parameters)
 
     def publish_bar(self, bar: Bar, is_historical: bool = True) -> None:
         """Publish a bar to the MessageBus for distribution to subscribed strategies.
