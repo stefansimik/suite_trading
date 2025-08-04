@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, List, Sequence, Set, Tuple, Any
 from suite_trading.domain.event import Event
-from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.market_data.market_data_provider import MarketDataProvider
@@ -174,6 +172,7 @@ class Strategy(ABC):
 
     # region Handle events
 
+    @abstractmethod
     def on_event(self, event: Event):
         """Universal callback receiving complete event wrapper.
 
@@ -182,48 +181,11 @@ class Strategy(ABC):
         - dt_event (official event timestamp)
         - Complete event metadata
 
-        Override this method when you need access to event metadata.
-        The default implementation routes events to specific callbacks.
+        This is the single central event handling method that must be implemented
+        by all strategy subclasses to handle all types of events.
 
         Args:
             event (Event): The complete event wrapper (NewBarEvent, NewTradeTickEvent, etc.)
-        """
-        # Default implementation routes to specific handlers
-        self._distribute_event_to_specific_callbacks(event)
-
-    def on_bar(self, bar: Bar, is_historical: bool):
-        """Called when a new bar is received.
-
-        This method should be overridden by subclasses to implement
-        strategy logic for processing bar data.
-
-        Args:
-            bar (Bar): The bar data received.
-            is_historical (bool): Whether this bar data is historical or live.
-        """
-        pass
-
-    def on_historical_bars_series(self, bars: Sequence[Bar]):
-        """Called when a series of historical bars is received.
-
-        This method is called when requesting historical bar data series,
-        typically from methods like get_historical_bars_series(). All bars
-        in the series are historical data.
-
-        This method should be overridden by subclasses to implement
-        strategy logic for processing historical bar series data.
-
-        Args:
-            bars (Sequence[Bar]): The sequence of historical bar data received.
-        """
-        pass
-
-    def on_unknown_event(self, event: Event) -> None:
-        """
-        Handle unknown event types. Override for custom event handling.
-
-        Args:
-            event: Unknown event type received
         """
         pass
 
@@ -315,22 +277,6 @@ class Strategy(ABC):
             trading_engine (TradingEngine): The trading engine instance.
         """
         self._trading_engine = trading_engine
-
-    def _distribute_event_to_specific_callbacks(self, event: Event):
-        """Internal routing method to distribute events to specific callbacks.
-
-        This method extracts the pure data objects from event wrappers and
-        calls the appropriate specific callback methods (on_bar, on_trade_tick, etc.).
-
-        Args:
-            event (Event): The event wrapper to route to specific callbacks.
-        """
-        if isinstance(event, NewBarEvent):
-            self.on_bar(event.bar, event.is_historical)  # Extract bar and historical context from NewBarEvent
-        # Add other event types as needed
-        else:
-            # Handle unknown event types
-            self.on_unknown_event(event)
 
     def _make_parameters_key(self, parameters: dict) -> frozenset:
         """Create hashable key from parameters dict."""
