@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List, Set, Callable
+from typing import TYPE_CHECKING, List, Callable
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
@@ -9,23 +9,11 @@ if TYPE_CHECKING:
 
 
 class Strategy(ABC):
-    # region Initialize and name strategy
+    # region Lifecycle
 
     def __init__(self):
-        """Initialize a new strategy.
-
-        The strategy's unique name is automatically determined from the class name.
-        """
+        """Initialize a new strategy."""
         self._trading_engine = None
-
-        self._subscribed_bar_types = set()  # Track subscribed bar types
-
-        # Track active event feeds by reference name
-        self._active_event_feeds: Set[str] = set()
-
-    # endregion
-
-    # region On start / stop callbacks
 
     def on_start(self):
         """Called when the strategy is started.
@@ -41,96 +29,73 @@ class Strategy(ABC):
         This method should be overridden by subclasses to implement
         cleanup logic when the strategy stops.
 
-        Automatically unsubscribes from all bar subscriptions and stops all event feeds.
+        Note: All infrastructure cleanup (event feeds, subscriptions) is handled
+        automatically by TradingEngine. Only clean up strategy-specific resources here.
         """
-        # Unsubscribe from all bar topics
-        for bar_type in list(self._subscribed_bar_types):
-            self.unsubscribe_from_live_bars(bar_type)
-
-        # Stop all active event feeds
-        event_feeds_copy = self._active_event_feeds.copy()
-        for name in event_feeds_copy:
-            try:
-                self.remove_event_feed(name)
-            except Exception as e:
-                # Log error but continue cleanup
-                print(f"Error stopping event feed '{name}': {e}")
+        # All infrastructure cleanup now handled externally
+        # Override this method to add strategy-specific cleanup only
+        pass
 
     # endregion
 
-    # region Handling market data
+    # region Event delivery
 
-    def add_event_feed(self, name: str, event_type: type, parameters: dict, callback: Callable, provider_ref: str) -> None:
-        """Add an event feed to start receiving events for the specified parameters.
+    def request_event_delivery(
+        self,
+        name: str,
+        event_type: type,
+        parameters: dict,
+        callback: Callable,
+        provider_ref: str,
+    ) -> None:
+        """Request event delivery for the specified parameters.
 
-        The strategy will receive events through the provided callback function.
-        Events are delivered in chronological order across all active feeds.
+        Sets up an event delivery mechanism that will call your callback function when events
+        become available. Events may arrive immediately (historical), over time (live), or may be
+        finite (historical series) or effectively unbounded (live feeds).
 
         Args:
-            name: Unique name for this feed within the strategy.
+            name: Unique name for this delivery request within the strategy.
             event_type: Type of events to receive (e.g., NewBarEvent).
             parameters: Dictionary with event-specific parameters.
             callback: Function to call when events are received.
-            provider_ref: Reference name of the provider to use for this feed.
+            provider_ref: Reference name of the provider to use for this request.
 
         Raises:
-            ValueError: If name is already in use.
-            RuntimeError: If trading engine is not set.
-            UnsupportedEventTypeError: If provider doesn't support the event type.
+            ValueError: If $name is already in use for this strategy.
+            RuntimeError: If $trading_engine is None.
+            UnsupportedEventTypeError: If provider doesn't support the $event_type.
             UnsupportedConfigurationError: If provider doesn't support the configuration.
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `add_event_feed` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `request_event_delivery` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        if name in self._active_event_feeds:
-            raise ValueError(f"Event feed with $name '{name}' already exists. Choose a different name.")
+        # Delegate to TradingEngine
+        self._trading_engine.request_event_delivery_for_strategy(self, name, event_type, parameters, callback, provider_ref)
 
-        # Implementation: TradingEngine will:
-        # 1. Validate name is unique for this strategy
-        # 2. Find provider by provider_ref and validate it supports the event type and configuration
-        # 3. Create EventFeed from the specified provider
-        # 4. Register feed with strategy for event delivery using name and callback
-        # 5. Start the feed (historical + live if requested in parameters)
-        self._trading_engine.add_event_feed_for_strategy(self, name, event_type, parameters, callback, provider_ref)
+    def cancel_event_delivery(self, name: str) -> None:
+        """Cancel an event delivery request by name.
 
-        # Track the active feed
-        self._active_event_feeds.add(name)
-
-    def remove_event_feed(self, name: str) -> None:
-        """Remove an event feed to stop receiving events for the specified name.
+        Safe to call even if the delivery has already completed naturally (e.g., historical data).
 
         Args:
-            name: Name of the feed to stop.
+            name: Name of the delivery request to cancel.
 
         Raises:
-            ValueError: If name is not found.
-            RuntimeError: If trading engine is not set.
+            ValueError: If $name is not found for this strategy.
+            RuntimeError: If $trading_engine is None.
         """
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `remove_event_feed` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                f"Cannot call `cancel_event_delivery` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        if name not in self._active_event_feeds:
-            raise ValueError(f"No event feed with $name '{name}' is active. Cannot stop non-existent feed.")
+        # Delegate to TradingEngine - no local tracking
+        self._trading_engine.cancel_event_delivery_for_strategy(self, name)
 
-        # Implementation: TradingEngine will:
-        # 1. Find the EventFeed by name for this strategy
-        # 2. Stop the feed gracefully
-        # 3. Clean up resources and unregister from strategy
-        self._trading_engine.remove_event_feed_for_strategy(self, name)
-
-        # Remove from tracked feeds
-        self._active_event_feeds.discard(name)
-
-    # endregion
-
-    # region Handle events
-
-    # Made abstract to prevent silent failures - ensures all strategies implement event handling
-    @abstractmethod
+    @abstractmethod  # Made abstract to prevent silent failures - ensures all strategies implement event handling
     def on_event(self, event: Event):
         """Universal callback receiving complete event wrapper.
 
@@ -149,7 +114,7 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Submit orders
+    # region Orders
 
     def submit_order(self, order: Order, broker: Broker) -> None:
         """Submit an order for execution.
@@ -223,7 +188,7 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Internal and helper methods
+    # region Internal
 
     def _set_trading_engine(self, trading_engine: "TradingEngine"):
         """Set the trading engine reference.

@@ -1,6 +1,6 @@
 """Market data provider protocol definition."""
 
-from typing import Protocol
+from typing import Protocol, Callable
 
 
 class UnsupportedEventTypeError(Exception):
@@ -56,6 +56,37 @@ class MarketDataProvider(Protocol):
 
         Returns:
             bool: True if connected, False otherwise.
+        """
+        ...
+
+    # endregion
+
+    # region Event feed factory
+
+    def get_event_feed(
+        self,
+        event_type: type,
+        parameters: dict,
+        callback: Callable,
+    ) -> object:
+        """Create or return an event feed instance for the given request.
+
+        This is a placeholder factory method that TradingEngine will call to obtain the
+        concrete event feed instance for a strategy's request. Implementations should return
+        an opaque object that at least supports a `.stop()` method to stop the feed. They may
+        optionally support `.start()`.
+
+        Args:
+            event_type: The type of events requested (e.g., NewBarEvent).
+            parameters: Provider-specific configuration for the feed.
+            callback: Function to be called when new events are delivered.
+
+        Returns:
+            object: Event feed instance managed by the provider.
+
+        Raises:
+            UnsupportedEventTypeError: If the provider doesn't support $event_type.
+            UnsupportedConfigurationError: If the $parameters are not supported for $event_type.
         """
         ...
 

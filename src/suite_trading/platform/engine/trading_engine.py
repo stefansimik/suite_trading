@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Dict, List, Callable
+from typing import Dict, List, Callable, Any
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -26,7 +26,7 @@ class TradingEngine:
     This simple design focuses on strategy coordination and management.
     """
 
-    # region Initialize engine
+    # region Lifecycle
 
     def __init__(self):
         """Initialize a new TradingEngine instance.
@@ -46,9 +46,8 @@ class TradingEngine:
         # Broker management
         self._brokers: Dict[str, Broker] = {}
 
-    # endregion
-
-    # region Start and stop engine
+        # Event feed management - track feeds per strategy
+        self._strategy_event_feeds: Dict[Strategy, Dict[str, Any]] = {}
 
     def start(self):
         """Start the TradingEngine and all strategies.
@@ -58,23 +57,31 @@ class TradingEngine:
         self._is_running = True
 
         # Start strategies
-        for strategy in self._strategies.values():
-            strategy.on_start()
+        for name in list(self._strategies.keys()):
+            self.start_strategy(name)
+
+        # TODO:
+        #   We should start / connect all brokers / market-data-providers
+        #   The order is important, first are starting all market-data-providers, then all brokers, then strategies
 
     def stop(self):
         """Stop the TradingEngine and all strategies.
 
-        This method stops all registered strategies.
+        This method stops all registered strategies and cleans up their event feeds.
         """
         self._is_running = False
 
-        # Stop strategies
-        for strategy in self._strategies.values():
-            strategy.on_stop()
+        # Stop all strategies and clean up their event feeds
+        for strategy_name in list(self._strategies.keys()):
+            self.stop_strategy(strategy_name)
+
+        # TODO:
+        #   We should stop / disconnect all brokers / market-data-providers
+        #   The order is important, first are stopping all strategies, then all brokers, then all market-data-providers
 
     # endregion
 
-    # region Manage strategies
+    # region Strategies
 
     def add_strategy(self, name: str, strategy: Strategy) -> None:
         """Register a strategy with the specified name.
@@ -89,9 +96,64 @@ class TradingEngine:
         if name in self._strategies:
             raise ValueError(f"Strategy with $name '{name}' already exists. Choose a different name.")
 
+        # TODO: Let's check, if Strategy is in appropriate state (new, not started) to be added
+
         # Set the trading engine reference in the strategy
         strategy._set_trading_engine(self)
         self._strategies[name] = strategy
+
+        # Initialize empty event feed tracking for this strategy
+        self._strategy_event_feeds[strategy] = {}
+
+    def start_strategy(self, name: str) -> None:
+        """Start a specific strategy by name.
+
+        Args:
+            name: Name of the strategy to start.
+
+        Raises:
+            KeyError: If no strategy with the given name exists.
+        """
+        if name not in self._strategies:
+            raise KeyError(f"No strategy with $name '{name}' is registered. Cannot start non-existent strategy.")
+
+        # TODO: Let's check, if Strategy is in appropriate state (new, not started) to be started
+
+        strategy = self._strategies[name]
+        strategy.on_start()
+
+    def stop_strategy(self, name: str) -> None:
+        """Stop a specific strategy by name and clean up its event feeds.
+
+        Args:
+            name: Name of the strategy to stop.
+
+        Raises:
+            KeyError: If no strategy with the given name exists.
+        """
+        if name not in self._strategies:
+            raise KeyError(f"No strategy with $name '{name}' is registered. Cannot stop non-existent strategy.")
+
+        # TODO: Let's check, if Strategy is in appropriate state (had to be started & is not stopped) to be stopped
+
+        strategy = self._strategies[name]
+
+        # Stop all registered event feeds for this strategy first
+        if strategy in self._strategy_event_feeds:
+            feed_names = list(self._strategy_event_feeds[strategy].keys())
+            for feed_name in feed_names:
+                entry = self._strategy_event_feeds[strategy].get(feed_name, {})
+                feed = entry.get("feed")
+                try:
+                    if feed is not None and hasattr(feed, "stop") and callable(getattr(feed, "stop")):
+                        feed.stop()
+                except Exception as e:
+                    logger.error(f"Error stopping event feed '{feed_name}' for strategy: {e}")
+            # Clear strategy event feed tracking after stopping all feeds
+            self._strategy_event_feeds[strategy] = {}
+
+        # Then invoke strategy's on_stop callback
+        strategy.on_stop()
 
     def remove_strategy(self, name: str) -> None:
         """Remove a strategy by name.
@@ -104,6 +166,8 @@ class TradingEngine:
         """
         if name not in self._strategies:
             raise KeyError(f"No strategy with $name '{name}' is registered. Cannot remove non-existent strategy.")
+
+        # TODO: Let's check, if Strategy is in appropriate state (stopped) to be removed
 
         # Remove from strategies dictionary
         del self._strategies[name]
@@ -119,7 +183,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Manage market data providers
+    # region Market data providers
 
     def add_market_data_provider(self, name: str, provider: MarketDataProvider) -> None:
         """Register a market data provider with the specified name.
@@ -161,7 +225,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Manage brokers
+    # region Brokers
 
     def add_broker(self, name: str, broker: Broker) -> None:
         """Register a broker with the specified name.
@@ -203,25 +267,113 @@ class TradingEngine:
 
     # endregion
 
-    # region Helper methods
+    # region Event feeds
 
-    def publish_bar(self, bar: Bar, provider_name: str, is_historical: bool = True) -> None:
-        """Publish a bar to the MessageBus for distribution to subscribed strategies.
+    def request_event_delivery_for_strategy(
+        self,
+        strategy: Strategy,
+        name: str,
+        event_type: type,
+        parameters: dict,
+        callback: Callable,
+        provider_ref: str,
+    ) -> None:
+        """Request event delivery for the specified strategy.
 
-        Creates a NewBarEvent with the specified historical context and publishes it to the appropriate topic.
+        This method creates and registers an event feed for a strategy using a selected
+        market data provider. The provider returns an opaque feed object that TradingEngine
+        stores and manages for lifecycle events (cancel/stop).
 
         Args:
-            bar: The bar to publish.
-            provider_name: Name of the provider that generated this bar.
-            is_historical: Whether this bar data is historical or live. Defaults to True.
+            strategy: The strategy requesting the event delivery.
+            name: Unique name for this delivery within the strategy.
+            event_type: Type of events to receive (e.g., NewBarEvent).
+            parameters: Dictionary with event-specific parameters.
+            callback: Function to call when events are received.
+            provider_ref: Reference name of the provider to use for this delivery.
+
+        Raises:
+            ValueError: If $name is already in use for this strategy or $provider_ref not found.
+            UnsupportedEventTypeError: If provider doesn't support the $event_type.
+            UnsupportedConfigurationError: If provider doesn't support the configuration.
         """
-        event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical, provider_name=provider_name)
-        topic = TopicFactory.create_topic_for_bar(bar.bar_type)
-        self.message_bus.publish(topic, event)
+        # Validate strategy is registered
+        if strategy not in self._strategy_event_feeds:
+            raise ValueError(
+                "Cannot call `request_event_delivery_for_strategy` because $strategy "
+                f"({strategy.__class__.__name__}) is not registered with this TradingEngine. "
+                "Add the strategy using `add_strategy` first.",
+            )
+
+        # Validate name is unique for this strategy
+        if name in self._strategy_event_feeds[strategy]:
+            raise ValueError(
+                "Cannot call `request_event_delivery_for_strategy` because $name "
+                f"('{name}') is already used for this strategy. Choose a different name.",
+            )
+
+        # Validate provider exists
+        if provider_ref not in self._market_data_providers:
+            raise ValueError(
+                "Cannot call `request_event_delivery_for_strategy` because $provider_ref "
+                f"('{provider_ref}') was not found among registered $market_data_providers. "
+                "Add the provider using `add_market_data_provider` or use a correct reference.",
+            )
+
+        provider = self._market_data_providers[provider_ref]
+
+        # Obtain event feed instance from provider (may raise provider-specific errors)
+        feed = provider.get_event_feed(event_type, parameters, callback)
+
+        # Track the event feed
+        self._strategy_event_feeds[strategy][name] = {
+            "event_type": event_type,
+            "parameters": parameters,
+            "callback": callback,
+            "provider_ref": provider_ref,
+            "feed": feed,
+        }
+
+    def cancel_event_delivery_for_strategy(self, strategy: Strategy, name: str) -> None:
+        """Cancel event delivery for the specified strategy.
+
+        Args:
+            strategy: The strategy that owns the event delivery.
+            name: Name of the delivery to cancel.
+
+        Raises:
+            ValueError: If $name is not found for this strategy, or $strategy is not registered.
+        """
+        # Validate strategy is registered
+        if strategy not in self._strategy_event_feeds:
+            raise ValueError(
+                "Cannot call `cancel_event_delivery_for_strategy` because $strategy "
+                f"({strategy.__class__.__name__}) is not registered with this TradingEngine. "
+                "Add the strategy using `add_strategy` first.",
+            )
+
+        # Validate feed exists
+        if name not in self._strategy_event_feeds[strategy]:
+            raise ValueError(
+                "Cannot call `cancel_event_delivery_for_strategy` because $name "
+                f"('{name}') does not exist for this strategy. Ensure the request was created "
+                "with `request_event_delivery_for_strategy`.",
+            )
+
+        feed = self._strategy_event_feeds[strategy][name].get("feed")
+        try:
+            # TODO: This has to be updated (EventFeed will have some `stop` or `start` method in the future)
+            if feed is not None and hasattr(feed, "stop") and callable(getattr(feed, "stop")):
+                feed.stop()
+        except Exception as e:
+            logger.error(f"Error stopping event feed '{name}' for strategy: {e}")
+        finally:
+            # Remove from tracking regardless of stop outcome
+            del self._strategy_event_feeds[strategy][name]
 
     # endregion
 
-    # region Submit orders
+    # region Orders
 
     def submit_order(self, order: Order, broker: Broker) -> None:
         """Submit an order through the specified broker.
@@ -278,64 +430,20 @@ class TradingEngine:
 
     # endregion
 
-    # region Handling market data
+    # region Helper methods
 
-    def add_event_feed_for_strategy(
-        self,
-        strategy: Strategy,
-        name: str,
-        event_type: type,
-        parameters: dict,
-        callback: Callable,
-        provider_ref: str,
-    ) -> None:
-        """Add an event feed for the specified strategy.
+    def publish_bar(self, bar: Bar, provider_name: str, is_historical: bool = True) -> None:
+        """Publish a bar to the MessageBus for distribution to subscribed strategies.
 
-        This method handles the creation and management of event feeds based on
-        individual parameters from strategies.
+        Creates a NewBarEvent with the specified historical context and publishes it to the appropriate topic.
 
         Args:
-            strategy: The strategy requesting the event feed.
-            name: Unique name for this feed within the strategy.
-            event_type: Type of events to receive (e.g., NewBarEvent).
-            parameters: Dictionary with event-specific parameters.
-            callback: Function to call when events are received.
-            provider_ref: Reference name of the provider to use for this feed.
-
-        Raises:
-            ValueError: If name is already in use for this strategy or provider_ref not found.
-            UnsupportedEventTypeError: If provider doesn't support the event type.
-            UnsupportedConfigurationError: If provider doesn't support the configuration.
+            bar: The bar to publish.
+            provider_name: Name of the provider that generated this bar.
+            is_historical: Whether this bar data is historical or live. Defaults to True.
         """
-        # Future implementation will:
-        # 1. Validate name is unique for this strategy
-        # 2. Find provider by provider_ref in self._market_data_providers
-        # 3. Validate that the provider supports the event type and configuration
-        # 4. Create EventFeed from the specified provider using parameters
-        # 5. Register feed with strategy for event delivery using name and callback
-        # 6. Start the feed (historical + live if requested in parameters)
-        # 7. Ensure events are delivered in chronological order across all feeds
-
-        # For now, this is a placeholder - implementation will be added in future iterations
-        pass
-
-    def remove_event_feed_for_strategy(self, strategy: Strategy, name: str) -> None:
-        """Remove an event feed for the specified strategy.
-
-        Args:
-            strategy: The strategy that owns the event feed.
-            name: Name of the feed to stop.
-
-        Raises:
-            ValueError: If name is not found for this strategy.
-        """
-        # Future implementation will:
-        # 1. Find the EventFeed by name for this strategy
-        # 2. Stop the feed gracefully (stop live streaming, cleanup resources)
-        # 3. Unregister the feed from strategy event delivery
-        # 4. Clean up any associated resources and connections
-
-        # For now, this is a placeholder - implementation will be added in future iterations
-        pass
+        event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical, provider_name=provider_name)
+        topic = TopicFactory.create_topic_for_bar(bar.bar_type)
+        self.message_bus.publish(topic, event)
 
     # endregion
