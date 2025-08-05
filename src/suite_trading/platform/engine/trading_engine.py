@@ -275,8 +275,8 @@ class TradingEngine:
         name: str,
         event_type: type,
         parameters: dict,
-        callback: Callable,
         provider_ref: str,
+        callback: Callable,
     ) -> None:
         """Request event delivery for the specified strategy.
 
@@ -289,8 +289,8 @@ class TradingEngine:
             name: Unique name for this delivery within the strategy.
             event_type: Type of events to receive (e.g., NewBarEvent).
             parameters: Dictionary with event-specific parameters.
-            callback: Function to call when events are received.
             provider_ref: Reference name of the provider to use for this delivery.
+            callback: Function to call when events are received. Keyword-only.
 
         Raises:
             ValueError: If $name is already in use for this strategy or $provider_ref not found.

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List, Callable
+from typing import TYPE_CHECKING, List, Callable, Optional
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
@@ -45,8 +45,8 @@ class Strategy(ABC):
         name: str,
         event_type: type,
         parameters: dict,
-        callback: Callable,
         provider_ref: str,
+        callback: Optional[Callable] = None,
     ) -> None:
         """Request event delivery for the specified parameters.
 
@@ -58,8 +58,9 @@ class Strategy(ABC):
             name: Unique name for this delivery request within the strategy.
             event_type: Type of events to receive (e.g., NewBarEvent).
             parameters: Dictionary with event-specific parameters.
-            callback: Function to call when events are received.
             provider_ref: Reference name of the provider to use for this request.
+            callback: Function to call when events are received. If omitted, defaults to
+                self.on_event. Keyword-only.
 
         Raises:
             ValueError: If $name is already in use for this strategy.
@@ -72,8 +73,19 @@ class Strategy(ABC):
                 f"Cannot call `request_event_delivery` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
+        # Default to universal handler if not provided
+        if callback is None:
+            callback = self.on_event
+
         # Delegate to TradingEngine
-        self._trading_engine.request_event_delivery_for_strategy(self, name, event_type, parameters, callback, provider_ref)
+        self._trading_engine.request_event_delivery_for_strategy(
+            strategy=self,
+            name=name,
+            event_type=event_type,
+            parameters=parameters,
+            provider_ref=provider_ref,
+            callback=callback,
+        )
 
     def cancel_event_delivery(self, name: str) -> None:
         """Cancel an event delivery request by name.
