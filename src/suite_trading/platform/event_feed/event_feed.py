@@ -3,88 +3,104 @@ from suite_trading.domain.event import Event
 
 
 class EventFeed(Protocol):
-    """Streaming interface that delivers events (one-by-one, chronologically ordered) to strategies.
+    """Simple streaming interface that delivers events in chronological order to strategies.
 
-    Can be used for feeding both historical and live data from any source - historical data files,
-    live market feeds, scheduled timers, etc. The interface is designed to be super simple to use
-    while still being fast when you have lots of event sources.
+    This protocol is intentionally minimal and non-blocking. It supports three observable runtime
+    conditions without exposing a heavy state machine.
 
-    Every EventFeed provides both event access and resource management. Simple feeds that don't
-    need cleanup can implement a no-op close() method.
+    States:
+    - READY: An event is immediately available -> next() returns an Event
+    - IDLE: No event is ready now, but the feed may produce more later -> next() returns None while
+      is_finished() is False
+    - FINISHED: The feed will never produce more events -> is_finished() is True
 
-    How it works:
-    - Call next() to get an event, or None if nothing is ready
-    - Call is_finished() to see if this source is completely done (and you can stop using it)
-    - Call close() to release resources when done
-    - No exceptions to worry about - just simple None checks
-    - Same simple pattern works for everything
+    How to use:
+    - Call next() repeatedly to pull available events.
+    - If next() returns None, check is_finished():
+      - False => the feed is IDLE; keep polling later
+      - True  => the feed is FINISHED; stop polling
+    - Always call close() once you are done to release resources.
 
-    Usage Pattern:
-        # Typical pull loop
+    Example:
         while not feed.is_finished():
             event = feed.next()
             if event is not None:
                 process_event(event)
         feed.close()
+
+    Notes:
+    - Implementations must be non-blocking in next() and should fail fast on unexpected errors
+      (raise exceptions rather than silently ignoring problems).
+    - This contract intentionally omits advanced controls such as request_stop() or
+      finished_reason(). Add such capabilities only when you truly need them, keeping the core API
+      simple.
     """
 
     def next(self) -> Optional[Event]:
-        """Get the next event if there's one ready.
+        """Return the next event if one is ready.
 
-        This is the main way to ask "do you have an event for me?" It returns None
-        when there's nothing ready right now. This happens in two situations:
-        1. No event is ready at the moment (like waiting for live market data)
-        2. The feed ran out of data but isn't completely done yet
+        Non-blocking. This method never waits for data. It maps runtime conditions to return
+        values:
+        - READY: An event is available now -> returns an Event
+        - IDLE: No event is ready yet -> returns None and is_finished() is False
+        - FINISHED: Feed will never produce more -> returns None and is_finished() is True
 
-        For historical data, you'll get None when all the data has been used up.
-        For live feeds, you'll get None when no new events have arrived yet.
+        After the feed is finished, next() continues to return None.
 
         Returns:
-            Event: The next event if one is ready, or None if nothing is available.
+            Optional[Event]: The next event if it is ready, otherwise None.
 
-        Note:
-            This never throws errors for normal situations. If something goes wrong,
-            it handles it quietly and just returns None.
+        Raises:
+            Exception: Implementations should raise on unexpected errors instead of hiding them.
         """
         ...
 
     def is_finished(self) -> bool:
-        """Check if this feed is completely done.
+        """Tell whether this feed will never produce more events.
 
-        A finished feed will never give you any more events, so you can stop asking
-        it and remove it from your list. This helps keep things running fast when
-        you have many feeds - no point checking feeds that are done.
+        Semantics:
+        - FINISHED: Returns True when the feed will not produce any more events.
+        - Not finished: Returns False; you may poll next() again later.
 
-        What this means for different types:
-        - Historical feeds: True when all the data has been used up
-        - Live feeds: Always False (they keep running and never finish)
-        - Timer feeds: True after the scheduled event happened
+        Typical behavior:
+        - Historical feeds: True after all historical events are delivered.
+        - Live feeds: Usually False until the underlying source is permanently closed or exhausted.
+        - Timer or scheduled feeds: True after the last scheduled event.
+
+        Performance:
+        - Must be fast, non-blocking, and safe to call frequently by the engine.
 
         Returns:
-            bool: True if this feed is completely done and won't give any more events,
-                 False if it might still have events in the future.
+            bool: True if finished; False otherwise.
 
-        Note:
-            This helps speed things up. Make sure your feed can answer this quickly
-            since it gets called a lot.
+        Raises:
+            Exception: Implementations should raise on unexpected internal errors.
         """
         ...
 
     def close(self) -> None:
         """Release resources used by this feed.
 
-        This cleanup method must be idempotent and safe to call multiple times.
-        For feeds that don't allocate external resources, implement this as a no-op.
+        Requirements:
+        - Idempotent: Safe to call multiple times.
+        - Non-blocking: Should not wait for long-running operations.
+        - Responsibility: Close connections, files, threads, or other external resources.
 
-        Example:
+        Examples:
             # Simple feed - no cleanup needed
             def close(self) -> None:
                 pass
 
-            # Database feed - real cleanup needed
+            # Database or network feed - real cleanup needed
             def close(self) -> None:
-                if self._connection:
+                if self._connection is not None:
                     self._connection.close()
                     self._connection = None
+
+        Returns:
+            None
+
+        Raises:
+            Exception: Implementations should raise on unexpected cleanup failures.
         """
         ...
