@@ -1,4 +1,4 @@
-"""Market data provider protocol definition."""
+"""Event feed provider protocol definition."""
 
 from typing import Protocol, Callable
 
@@ -26,16 +26,16 @@ class UnsupportedConfigurationError(Exception):
         super().__init__(message)
 
 
-class MarketDataProvider(Protocol):
-    """Protocol for market data providers.
+class EventFeedProvider(Protocol):
+    """Protocol for event feed providers.
 
-    Provides methods to get historical data and subscribe to live market data.
+    Provides methods to connect and produce event feeds.
     """
 
     # region Connection Management
 
     def connect(self) -> None:
-        """Connect to this MarketDataProvider.
+        """Connect to this EventFeedProvider.
 
         Must be called before requesting any data.
 
@@ -45,14 +45,14 @@ class MarketDataProvider(Protocol):
         ...
 
     def disconnect(self) -> None:
-        """Disconnect from this MarketDataProvider.
+        """Disconnect from this EventFeedProvider.
 
         Stops all active subscriptions and handles already closed connections gracefully.
         """
         ...
 
     def is_connected(self) -> bool:
-        """Check if connected to this MarketDataProvider.
+        """Check if connected to this EventFeedProvider.
 
         Returns:
             bool: True if connected, False otherwise.

@@ -68,7 +68,7 @@ def test_basic_flow():
 
     # Add mock market data provider
     mock_provider = MockMarketDataProvider()
-    engine.add_market_data_provider("mock_provider", mock_provider)
+    engine.add_event_feed_provider("mock_provider", mock_provider)
 
     # Add strategy
     strategy: Strategy = DemoStrategy()

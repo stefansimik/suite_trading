@@ -4,7 +4,7 @@ from typing import Dict, List, Callable, Any
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
-from suite_trading.platform.market_data.market_data_provider import MarketDataProvider
+from suite_trading.platform.market_data.market_data_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
@@ -40,8 +40,8 @@ class TradingEngine:
         # Strategy management
         self._strategies: Dict[str, Strategy] = {}
 
-        # Market data provider management
-        self._market_data_providers: Dict[str, MarketDataProvider] = {}
+        # EventFeedProvider registry
+        self._event_feed_providers: Dict[str, EventFeedProvider] = {}
 
         # Broker management
         self._brokers: Dict[str, Broker] = {}
@@ -183,45 +183,45 @@ class TradingEngine:
 
     # endregion
 
-    # region Market data providers
+    # region EventFeed providers
 
-    def add_market_data_provider(self, name: str, provider: MarketDataProvider) -> None:
-        """Register a market data provider with the specified name.
+    def add_event_feed_provider(self, name: str, provider: EventFeedProvider) -> None:
+        """Register an EventFeedProvider with the specified name.
 
         Args:
             name: Unique name to identify this provider.
-            provider: The market data provider instance to register.
+            provider: The EventFeedProvider instance to register.
 
         Raises:
-            ValueError: If a provider with the same name already exists.
+            ValueError: If a provider with the same $name already exists.
         """
-        if name in self._market_data_providers:
-            raise ValueError(f"Market data provider with $name '{name}' already exists. Choose a different name.")
+        if name in self._event_feed_providers:
+            raise ValueError(f"EventFeedProvider with $name '{name}' already exists. Choose a different name.")
 
-        self._market_data_providers[name] = provider
+        self._event_feed_providers[name] = provider
 
-    def remove_market_data_provider(self, name: str) -> None:
-        """Remove a market data provider by name.
+    def remove_event_feed_provider(self, name: str) -> None:
+        """Remove an EventFeedProvider by $name.
 
         Args:
             name: Name of the provider to remove.
 
         Raises:
-            KeyError: If no provider with the given name exists.
+            KeyError: If no provider with the given $name exists.
         """
-        if name not in self._market_data_providers:
-            raise KeyError(f"No market data provider with $name '{name}' is registered. Cannot remove non-existent provider.")
+        if name not in self._event_feed_providers:
+            raise KeyError(f"No EventFeedProvider with $name '{name}' is registered. Cannot remove non-existent provider.")
 
-        del self._market_data_providers[name]
+        del self._event_feed_providers[name]
 
     @property
-    def market_data_providers(self) -> Dict[str, MarketDataProvider]:
-        """Get all registered market data providers.
+    def event_feed_providers(self) -> Dict[str, EventFeedProvider]:
+        """Get all registered EventFeedProviders.
 
         Returns:
-            Dictionary mapping provider names to provider instances.
+            Dictionary mapping provider $name values to provider instances.
         """
-        return self._market_data_providers
+        return self._event_feed_providers
 
     # endregion
 
@@ -281,7 +281,7 @@ class TradingEngine:
         """Request event delivery for the specified strategy.
 
         This method creates and registers an event feed for a strategy using a selected
-        market data provider. The provider returns an opaque feed object that TradingEngine
+        EventFeedProvider. The EventFeedProvider returns an opaque feed object that TradingEngine
         stores and manages for lifecycle events (cancel/stop).
 
         Args:
@@ -313,14 +313,14 @@ class TradingEngine:
             )
 
         # Validate provider exists
-        if provider_ref not in self._market_data_providers:
+        if provider_ref not in self._event_feed_providers:
             raise ValueError(
                 "Cannot call `request_event_delivery_for_strategy` because $provider_ref "
-                f"('{provider_ref}') was not found among registered $market_data_providers. "
-                "Add the provider using `add_market_data_provider` or use a correct reference.",
+                f"('{provider_ref}') was not found among registered $event_feed_providers. "
+                "Add the provider using `add_event_feed_provider` or use a correct reference.",
             )
 
-        provider = self._market_data_providers[provider_ref]
+        provider = self._event_feed_providers[provider_ref]
 
         # Obtain event feed instance from provider (may raise provider-specific errors)
         feed = provider.get_event_feed(event_type, parameters, callback)
