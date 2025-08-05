@@ -10,35 +10,22 @@ class EventFeed(Protocol):
     while still being fast when you have lots of event sources.
 
     Every EventFeed provides both event access and resource management. Simple feeds that don't
-    need connections can implement no-op methods.
+    need cleanup can implement a no-op close() method.
 
     How it works:
     - Call next() to get an event, or None if nothing is ready
     - Call is_finished() to see if this source is completely done (and you can stop using it)
-    - Call connect() to establish connection to data source if needed
-    - Call disconnect() to clean up resources when done
-    - Call is_connected() to check connection status
+    - Call close() to release resources when done
     - No exceptions to worry about - just simple None checks
     - Same simple pattern works for everything
 
     Usage Pattern:
-        # Simple way to get events
-        event = feed.next()
-        if event is not None:
-            process_event(event)
-
-        # Speed up by removing feeds that are done
-        if feed.is_finished():
-            feed.disconnect()  # Clean up resources
-            active_feeds.remove(feed)
-
-        # Explicit resource management
-        feed.connect()
-        try:
-            # Use the feed
-            pass
-        finally:
-            feed.disconnect()
+        # Typical pull loop
+        while not feed.is_finished():
+            event = feed.next()
+            if event is not None:
+                process_event(event)
+        feed.close()
     """
 
     def next(self) -> Optional[Event]:
@@ -83,67 +70,21 @@ class EventFeed(Protocol):
         """
         ...
 
-    def connect(self) -> None:
-        """Connect to the data source if needed.
+    def close(self) -> None:
+        """Release resources used by this feed.
 
-        For feeds that don't need connections (like CSV files or in-memory data),
-        this method can be empty or just pass. For feeds that do need connections
-        (like databases or live APIs), this should establish the connection.
-
-        Safe to call multiple times - should not reconnect if already connected.
-
-        Example:
-            # Simple feed - no real connection needed
-            def connect(self) -> None:
-                pass
-
-            # Database feed - real connection needed
-            def connect(self) -> None:
-                if not self._connected:
-                    self._connection = sqlite3.connect(self.db_path)
-                    self._connected = True
-        """
-        ...
-
-    def disconnect(self) -> None:
-        """Disconnect from the data source and clean up resources.
-
-        For feeds that don't need cleanup, this method can be empty or just pass.
-        For feeds with resources (files, database connections, network sockets),
-        this should clean up properly.
-
-        Safe to call multiple times - should not error if already disconnected.
+        This cleanup method must be idempotent and safe to call multiple times.
+        For feeds that don't allocate external resources, implement this as a no-op.
 
         Example:
             # Simple feed - no cleanup needed
-            def disconnect(self) -> None:
+            def close(self) -> None:
                 pass
 
             # Database feed - real cleanup needed
-            def disconnect(self) -> None:
+            def close(self) -> None:
                 if self._connection:
                     self._connection.close()
                     self._connection = None
-                    self._connected = False
-        """
-        ...
-
-    def is_connected(self) -> bool:
-        """Check if the feed is currently connected to its data source.
-
-        For feeds that don't use connections, this should return True.
-        For feeds with actual connections, this should return the real status.
-
-        Returns:
-            bool: True if connected/ready, False if disconnected/not ready.
-
-        Example:
-            # Simple feed - always ready
-            def is_connected(self) -> bool:
-                return True
-
-            # Database feed - real connection status
-            def is_connected(self) -> bool:
-                return self._connection is not None
         """
         ...
