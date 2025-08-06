@@ -184,37 +184,66 @@ def __str__(self) -> str:
 
 ## Exception Message Formatting
 
-**Rule**: All error and exception messages must follow a specific format to be clear, actionable, and consistent.
+**Rule**: All error and exception messages must be 100% clear, understandable, and fully in sync with terminology used in the codebase.
+
+**Why**: Exception messages are critical user-facing communication that must be immediately clear about what went wrong and how to fix it. Unclear or inconsistent terminology creates confusion and poor user experience.
+
+### Core Principles
+
+1. **100% Clarity**: Messages must be instantly understandable without ambiguity
+2. **Terminology Consistency**: Use exact same terms as the codebase (e.g., "added to TradingEngine" not "registered")
+3. **Specific Variable Types**: Always specify what type of variable (e.g., "strategy name" not just "name")
 
 ### Format Requirements
 
 1. **Function Context**: Always specify which function was called
    - Use backticks around function names: `` `function_name` ``
 
-2. **Variable Identification**: Prefix variables with `$` to distinguish them from normal text
-   - Example: `$market_data_provider`, `$trading_engine`, `$bar_type`
+2. **Variable Identification**: Prefix variables with `$` and use actual variable names from the code
+   - **CRITICAL RULE**: `$variable_name` must represent actual variables/functions/references in the code
+   - ❌ Bad: `$execution_order_id` when the actual code is `execution.order.id`
+   - ✅ Good: `$order_id` (matches the actual variable name)
+   - ❌ Bad: `$self_id` when the actual code is `self.id`
+   - ✅ Good: `$id` (matches the actual variable name)
+   - ❌ Bad: `$trading_engine_instance` when variable is `self._trading_engine`
+   - ✅ Good: `$_trading_engine` (matches the actual variable name)
+   - ❌ Bad: `$strategy_state` when variable is `self.state`
+   - ✅ Good: `$state` (matches the actual variable name)
 
 3. **Variable Values**: Include actual values of variables when relevant
-   - Use f-strings for interpolation: `f"$bar_type ({bar_type})"`
+   - Use f-strings for interpolation: `f"$strategy_name ('{name}')"`
    - For objects, include meaningful identifiers: `f"$instrument ({instrument.symbol})"`
 
-4. **Root Cause**: Clearly state what's None or what condition failed
-   - Example: "because $market_data_provider is None"
+4. **Root Cause**: Clearly state what condition failed using codebase terminology
+   - ✅ Good: "because strategy name $name ('test') is not added to this TradingEngine"
+   - ❌ Bad: "because $name is not registered" (unclear terminology)
 
-5. **Solution Guidance**: Provide actionable advice on how to fix the issue
-   - Example: "Set a market data provider when creating TradingEngine"
+5. **Solution Guidance**: Provide actionable advice with specific method names
+   - ✅ Good: "Add the strategy using `add_strategy` first"
+   - ❌ Bad: "Register the strategy first" (inconsistent terminology)
 
 ### Examples
 
 ```python
-# Function call with None check
-raise RuntimeError(f"Cannot call `subscribe_to_bars` for $bar_type ({bar_type}) because $market_data_provider is None. Set a market data provider when creating TradingEngine.")
+# Clear variable type specification and consistent terminology
+raise KeyError(
+    f"Cannot call `start_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first."
+)
 
-# Value validation
-raise ValueError(f"$count must be >= 1, but provided value is: {count}")
+# Provider-specific clear messaging
+raise ValueError(
+    f"EventFeedProvider with provider name $name ('{name}') is already added to this TradingEngine. Choose a different name."
+)
 
-# Multiple issues
-raise ValueError("User validation failed:\n• $name cannot be empty\n• $age must be at least 18")
+# Value validation with clear context
+raise ValueError(f"$quantity must be >= 1, but provided value is: {quantity}")
+
+# Multiple issues with clear specification
+raise ValueError(
+    "Strategy validation failed:\n"
+    "• $strategy_name cannot be empty\n"
+    "• $strategy must be in NEW state"
+)
 ```
 
 ## Markdown Formatting

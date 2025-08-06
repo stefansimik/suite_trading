@@ -94,10 +94,10 @@ class TradingEngine:
         Raises:
             ValueError: If a strategy with the same name already exists or $strategy is not NEW.
         """
-        # Check: strategy name must be unique and not already registered
+        # Check: strategy name must be unique and not already added
         if name in self._strategies:
             raise ValueError(
-                f"Cannot call `add_strategy` because $name ('{name}') is already registered. Choose a different name.",
+                f"Cannot call `add_strategy` because strategy name $name ('{name}') is already added to this TradingEngine. Choose a different name.",
             )
 
         # Check: strategy must be NEW before attaching
@@ -128,10 +128,10 @@ class TradingEngine:
             KeyError: If no strategy with the given name exists.
             ValueError: If $state is not ADDED.
         """
-        # Check: strategy name must be registered before starting
+        # Check: strategy name must be added before starting
         if name not in self._strategies:
             raise KeyError(
-                f"Cannot call `start_strategy` because $name ('{name}') is not registered. Add the strategy using `add_strategy` first.",
+                f"Cannot call `start_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
             )
 
         strategy = self._strategies[name]
@@ -160,10 +160,10 @@ class TradingEngine:
             KeyError: If no strategy with the given name exists.
             ValueError: If $state is not RUNNING.
         """
-        # Check: strategy name must be registered before stopping
+        # Check: strategy name must be added before stopping
         if name not in self._strategies:
             raise KeyError(
-                f"Cannot call `stop_strategy` because $name ('{name}') is not registered. Add the strategy using `add_strategy` first.",
+                f"Cannot call `stop_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
             )
 
         strategy = self._strategies[name]
@@ -204,10 +204,10 @@ class TradingEngine:
             KeyError: If no strategy with the given name exists.
             ValueError: If $state is not STOPPED.
         """
-        # Check: strategy name must be registered before removing
+        # Check: strategy name must be added before removing
         if name not in self._strategies:
             raise KeyError(
-                f"Cannot call `remove_strategy` because $name ('{name}') is not registered. Add the strategy using `add_strategy` first.",
+                f"Cannot call `remove_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
             )
 
         strategy = self._strategies[name]
@@ -249,9 +249,11 @@ class TradingEngine:
         Raises:
             ValueError: If a provider with the same $name already exists.
         """
-        # Check: provider name must be unique and not already registered
+        # Check: provider name must be unique and not already added
         if name in self._event_feed_providers:
-            raise ValueError(f"EventFeedProvider with $name '{name}' already exists. Choose a different name.")
+            raise ValueError(
+                f"EventFeedProvider with provider name $name ('{name}') is already added to this TradingEngine. Choose a different name.",
+            )
 
         self._event_feed_providers[name] = provider
 
@@ -264,9 +266,11 @@ class TradingEngine:
         Raises:
             KeyError: If no provider with the given $name exists.
         """
-        # Check: provider name must be registered before removing
+        # Check: provider name must be added before removing
         if name not in self._event_feed_providers:
-            raise KeyError(f"No EventFeedProvider with $name '{name}' is registered. Cannot remove non-existent provider.")
+            raise KeyError(
+                f"Cannot call `remove_event_feed_provider` because provider name $name ('{name}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.",
+            )
 
         del self._event_feed_providers[name]
 
@@ -293,9 +297,9 @@ class TradingEngine:
         Raises:
             ValueError: If a broker with the same name already exists.
         """
-        # Check: broker name must be unique and not already registered
+        # Check: broker name must be unique and not already added
         if name in self._brokers:
-            raise ValueError(f"Broker with $name '{name}' already exists. Choose a different name.")
+            raise ValueError(f"Broker with broker name $name ('{name}') is already added to this TradingEngine. Choose a different name.")
 
         self._brokers[name] = broker
 
@@ -308,9 +312,11 @@ class TradingEngine:
         Raises:
             KeyError: If no broker with the given name exists.
         """
-        # Check: broker name must be registered before removing
+        # Check: broker name must be added before removing
         if name not in self._brokers:
-            raise KeyError(f"No broker with $name '{name}' is registered. Cannot remove non-existent broker.")
+            raise KeyError(
+                f"Cannot call `remove_broker` because broker name $name ('{name}') is not added to this TradingEngine. Add the broker using `add_broker` first.",
+            )
 
         del self._brokers[name]
 
@@ -355,26 +361,26 @@ class TradingEngine:
             UnsupportedEventTypeError: If provider doesn't support the $event_type.
             UnsupportedConfigurationError: If provider doesn't support the configuration.
         """
-        # Check: strategy must be registered in this engine
+        # Check: strategy must be added to this engine
         if strategy not in self._strategy_event_feeds:
             raise ValueError(
                 "Cannot call `request_event_delivery_for_strategy` because $strategy "
-                f"({strategy.__class__.__name__}) is not registered with this TradingEngine. "
+                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
                 "Add the strategy using `add_strategy` first.",
             )
 
         # Check: delivery name must be unique per strategy
         if name in self._strategy_event_feeds[strategy]:
             raise ValueError(
-                "Cannot call `request_event_delivery_for_strategy` because $name "
+                "Cannot call `request_event_delivery_for_strategy` because delivery name $name "
                 f"('{name}') is already used for this strategy. Choose a different name.",
             )
 
-        # Check: provider must exist in registered event feed providers
+        # Check: provider must exist in added event feed providers
         if provider_ref not in self._event_feed_providers:
             raise ValueError(
-                "Cannot call `request_event_delivery_for_strategy` because $provider_ref "
-                f"('{provider_ref}') was not found among registered $event_feed_providers. "
+                "Cannot call `request_event_delivery_for_strategy` because provider reference $provider_ref "
+                f"('{provider_ref}') was not found among added event feed providers. "
                 "Add the provider using `add_event_feed_provider` or use a correct reference.",
             )
 
@@ -402,18 +408,18 @@ class TradingEngine:
         Raises:
             ValueError: If $name is not found for this strategy, or $strategy is not registered.
         """
-        # Check: strategy must be registered in this engine
+        # Check: strategy must be added to this engine
         if strategy not in self._strategy_event_feeds:
             raise ValueError(
                 "Cannot call `cancel_event_delivery_for_strategy` because $strategy "
-                f"({strategy.__class__.__name__}) is not registered with this TradingEngine. "
+                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
                 "Add the strategy using `add_strategy` first.",
             )
 
         # Check: delivery name must exist for this strategy
         if name not in self._strategy_event_feeds[strategy]:
             raise ValueError(
-                "Cannot call `cancel_event_delivery_for_strategy` because $name "
+                "Cannot call `cancel_event_delivery_for_strategy` because delivery name $name "
                 f"('{name}') does not exist for this strategy. Ensure the request was created "
                 "with `request_event_delivery_for_strategy`.",
             )

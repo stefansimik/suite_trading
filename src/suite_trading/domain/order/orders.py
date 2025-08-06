@@ -151,7 +151,7 @@ class Order:
             ValueError: If the execution is not for this order.
         """
         if execution.order != self:
-            raise ValueError(f"Execution order ID ({execution.order.id}) does not match this order ID ({self.id})")
+            raise ValueError(f"Execution order with $order_id = '{execution.order.id}' does not match this order with $id = '{self.id}'")
 
         self.executions.append(execution)
 

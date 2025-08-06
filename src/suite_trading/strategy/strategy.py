@@ -106,7 +106,7 @@ class Strategy(ABC):
         # Check: trading engine must be attached before requesting event delivery
         if self._trading_engine is None:
             raise RuntimeError(
-                "Cannot call `request_event_delivery` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `request_event_delivery` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         # Check: state must allow event delivery (ADDED or RUNNING)
@@ -114,7 +114,7 @@ class Strategy(ABC):
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
                 "Cannot call `request_event_delivery` because $state "
-                f"({self.state.name}) does not allow request data. "
+                f"({self.state.name}) does not allow requesting data. "
                 f"Valid actions: {valid_actions}. Call it from `on_start` or when the strategy is RUNNING.",
             )
 
@@ -147,7 +147,7 @@ class Strategy(ABC):
         # Check: trading engine must be attached before canceling event delivery
         if self._trading_engine is None:
             raise RuntimeError(
-                "Cannot call `cancel_event_delivery` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `cancel_event_delivery` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
         # Check: state must be RUNNING to cancel event delivery
@@ -196,7 +196,7 @@ class Strategy(ABC):
         # Check: trading engine must be attached before submitting orders
         if self._trading_engine is None:
             raise RuntimeError(
-                "Cannot call `submit_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `submit_order` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
         # Check: state must be RUNNING to submit orders
         if self.state != StrategyState.RUNNING:
@@ -222,7 +222,7 @@ class Strategy(ABC):
         # Check: trading engine must be attached before canceling orders
         if self._trading_engine is None:
             raise RuntimeError(
-                "Cannot call `cancel_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `cancel_order` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
         # Check: state must be RUNNING to cancel orders
         if self.state != StrategyState.RUNNING:
@@ -248,7 +248,7 @@ class Strategy(ABC):
         # Check: trading engine must be attached before modifying orders
         if self._trading_engine is None:
             raise RuntimeError(
-                "Cannot call `modify_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `modify_order` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
         # Check: state must be RUNNING to modify orders
         if self.state != StrategyState.RUNNING:
@@ -276,7 +276,7 @@ class Strategy(ABC):
         # Check: trading engine must be attached before retrieving active orders
         if self._trading_engine is None:
             raise RuntimeError(
-                "Cannot call `get_active_orders` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `get_active_orders` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
         # Check: state must be RUNNING to retrieve active orders
         if self.state != StrategyState.RUNNING:

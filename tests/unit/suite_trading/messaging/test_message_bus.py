@@ -190,7 +190,7 @@ def test_subscriber_count_validation_point_to_point():
         pass
 
     # Should fail with no subscribers
-    with pytest.raises(ValueError, match="has 0 subscribers, but minimum 1 required"):
+    with pytest.raises(ValueError, match=r"Topic with \$topic = 'cmd::execute' has 0 subscribers, but minimum 1 subscribers are required"):
         msg_bus.publish("cmd::execute", "data", min_subscribers=1, max_subscribers=1)
 
     # Add one subscriber
@@ -206,7 +206,7 @@ def test_subscriber_count_validation_point_to_point():
     msg_bus.subscribe("cmd::execute", handler2)
 
     # Should fail with too many subscribers
-    with pytest.raises(ValueError, match="has 2 subscribers, but maximum 1 allowed"):
+    with pytest.raises(ValueError, match=r"Topic with \$topic = 'cmd::execute' has 2 subscribers, but maximum 1 subscribers are allowed"):
         msg_bus.publish("cmd::execute", "data", min_subscribers=1, max_subscribers=1)
 
 
@@ -226,7 +226,7 @@ def test_subscriber_count_validation_event_broadcasting():
         pass
 
     # Test event broadcasting: at least one subscriber required
-    with pytest.raises(ValueError, match="has 0 subscribers, but minimum 1 required"):
+    with pytest.raises(ValueError, match=r"Topic with \$topic = 'event::order::filled' has 0 subscribers, but minimum 1 subscribers are required"):
         msg_bus.publish("event::order::filled", "data", min_subscribers=1)
 
     # Add subscribers
@@ -240,7 +240,7 @@ def test_subscriber_count_validation_event_broadcasting():
     msg_bus.subscribe("event::order::filled", handler3)
 
     # Should fail if too many subscribers
-    with pytest.raises(ValueError, match="has 3 subscribers, but maximum 2 allowed"):
+    with pytest.raises(ValueError, match=r"Topic with \$topic = 'event::order::filled' has 3 subscribers, but maximum 2 subscribers are allowed"):
         msg_bus.publish("event::order::filled", "data", min_subscribers=1, max_subscribers=2)
 
 
@@ -264,11 +264,11 @@ def test_subscriber_count_validation_with_wildcards():
     msg_bus.publish("data::market::btcusdt", "data", min_subscribers=2, max_subscribers=2)
 
     # Should fail if expecting more subscribers
-    with pytest.raises(ValueError, match="has 2 subscribers, but minimum 3 required"):
+    with pytest.raises(ValueError, match=r"Topic with \$topic = 'data::market::btcusdt' has 2 subscribers, but minimum 3 subscribers are required"):
         msg_bus.publish("data::market::btcusdt", "data", min_subscribers=3)
 
     # Should fail if expecting fewer subscribers
-    with pytest.raises(ValueError, match="has 2 subscribers, but maximum 1 allowed"):
+    with pytest.raises(ValueError, match=r"Topic with \$topic = 'data::market::btcusdt' has 2 subscribers, but maximum 1 subscribers are allowed"):
         msg_bus.publish("data::market::btcusdt", "data", max_subscribers=1)
 
 
@@ -314,5 +314,5 @@ def test_subscriber_count_validation_edge_cases():
 
     # Should fail if there are subscribers when max is 0
     msg_bus.subscribe("topic", handler)
-    with pytest.raises(ValueError, match="has 1 subscribers, but maximum 0 allowed"):
+    with pytest.raises(ValueError, match=r"Topic with \$topic = 'topic' has 1 subscribers, but maximum 0 subscribers are allowed"):
         msg_bus.publish("topic", "data", min_subscribers=0, max_subscribers=0)

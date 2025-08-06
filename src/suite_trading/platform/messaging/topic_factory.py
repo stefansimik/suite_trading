@@ -156,6 +156,6 @@ class TopicFactory:
             return TopicFactory.create_topic_from_parts(
                 ["bar", str(bar_type.instrument).lower(), f"{bar_type.value}-{bar_type.unit.name.lower()}", bar_type.price_type.name.lower()],
             )
-        raise ValueError("bar_type required in request_details for NewBarEvent")
+        raise ValueError("$bar_type is required in $request_details for NewBarEvent")
 
     # endregion

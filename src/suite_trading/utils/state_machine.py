@@ -119,7 +119,7 @@ class StateMachine:
         if key not in self._transitions:
             valid_actions = [a.value for a in self.get_valid_actions()]
             raise ValueError(
-                f"Invalid $action '{action.value}' from $current_state '{self._current_state.value}'. Valid actions are: {valid_actions}",
+                f"Invalid $action '{action.value}' from $_current_state '{self._current_state.value}'. Valid actions are: {valid_actions}",
             )
 
         self._current_state = self._transitions[key]

@@ -221,12 +221,12 @@ class Money:
         """
         value_str = value_str.strip()
         if not value_str:
-            raise ValueError("$value_str cannot be empty")
+            raise ValueError("Value string with $value_str = '' cannot be empty")
 
         # Split by whitespace
         parts = value_str.split()
         if len(parts) != 2:
-            raise ValueError(f"$value_str must be in format 'value currency_code', but provided value is: '{value_str}'")
+            raise ValueError(f"Value string with $value_str = '{value_str}' must be in format 'value currency_code'")
 
         value_part, currency_part = parts
 

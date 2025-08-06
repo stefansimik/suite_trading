@@ -60,10 +60,14 @@ class MessageBus:
         subscriber_count = len(callbacks_to_invoke)
 
         if subscriber_count < min_subscribers:
-            raise ValueError(f"Topic '{topic}' has {subscriber_count} subscribers, but minimum {min_subscribers} required")
+            raise ValueError(
+                f"Topic with $topic = '{topic}' has {subscriber_count} subscribers, but minimum {min_subscribers} subscribers are required",
+            )
 
         if max_subscribers is not None and subscriber_count > max_subscribers:
-            raise ValueError(f"Topic '{topic}' has {subscriber_count} subscribers, but maximum {max_subscribers} allowed")
+            raise ValueError(
+                f"Topic with $topic = '{topic}' has {subscriber_count} subscribers, but maximum {max_subscribers} subscribers are allowed",
+            )
 
         # Sort callbacks by priority (highest first) and invoke them
         callbacks_to_invoke.sort(key=lambda x: x[1], reverse=True)
