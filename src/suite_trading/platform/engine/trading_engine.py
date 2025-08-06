@@ -9,7 +9,7 @@ from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
-from suite_trading.strategy.strategy_state import StrategyState
+from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ class TradingEngine:
         self._strategy_event_feeds[strategy] = {}
 
         # Transition strategy lifecycle to ADDED after successful registration
-        strategy._set_state(StrategyState.ADDED)
+        strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
 
     def start_strategy(self, name: str) -> None:
         """Start a specific strategy by name.
@@ -136,17 +136,18 @@ class TradingEngine:
 
         strategy = self._strategies[name]
 
-        # Check: strategy must be ADDED before starting
-        if strategy.state != StrategyState.ADDED:
+        # Check: strategy must be able to start
+        if not strategy._state_machine.can_execute_action(StrategyAction.START_STRATEGY):
+            valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
             raise ValueError(
-                f"Cannot call `start_strategy` because $state ({strategy.state.name}) is not ADDED.",
+                f"Cannot start strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
             )
 
         try:
             strategy.on_start()
-            strategy._set_state(StrategyState.RUNNING)
+            strategy._state_machine.execute_action(StrategyAction.START_STRATEGY)
         except Exception:
-            strategy._set_state(StrategyState.ERROR)
+            strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
             raise
 
     def stop_strategy(self, name: str) -> None:
@@ -167,10 +168,11 @@ class TradingEngine:
 
         strategy = self._strategies[name]
 
-        # Check: strategy must be RUNNING before stopping
-        if strategy.state != StrategyState.RUNNING:
+        # Check: strategy must be able to stop
+        if not strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
+            valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
             raise ValueError(
-                "Cannot call `stop_strategy` because $state ({strategy.state.name}) is not RUNNING.",
+                f"Cannot stop strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
             )
 
         # Stop all registered event feeds for this strategy first
@@ -187,9 +189,9 @@ class TradingEngine:
         # Then invoke strategy's on_stop callback and transition state
         try:
             strategy.on_stop()
-            strategy._set_state(StrategyState.STOPPED)
+            strategy._state_machine.execute_action(StrategyAction.STOP_STRATEGY)
         except Exception:
-            strategy._set_state(StrategyState.ERROR)
+            strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
             raise
 
     def remove_strategy(self, name: str) -> None:
@@ -210,17 +212,18 @@ class TradingEngine:
 
         strategy = self._strategies[name]
 
-        # Check: strategy must be STOPPED before removing
-        if strategy.state != StrategyState.STOPPED:
+        # Check: strategy must be in terminal state before removing
+        if not strategy.is_in_terminal_state():
+            valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
             raise ValueError(
-                f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not STOPPED. Stop the strategy first.",
+                f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}",
             )
 
         # Remove any remaining event feed tracking for safety
         if strategy in self._strategy_event_feeds:
             del self._strategy_event_feeds[strategy]
 
-        # Remove from strategies dictionary
+        # Remove from strategies' dictionary
         del self._strategies[name]
 
     @property

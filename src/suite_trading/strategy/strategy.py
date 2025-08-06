@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, List, Callable, Optional
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.strategy.strategy_state import StrategyState
+from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction, create_strategy_state_machine
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -19,7 +19,7 @@ class Strategy(ABC):
         TradingEngine.
         """
         self._trading_engine = None
-        self._state: StrategyState = StrategyState.NEW
+        self._state_machine = create_strategy_state_machine()
 
     @property
     def state(self) -> StrategyState:
@@ -28,7 +28,15 @@ class Strategy(ABC):
         Returns:
             StrategyState: Current lifecycle state of this strategy.
         """
-        return self._state
+        return self._state_machine.current_state
+
+    def is_in_terminal_state(self) -> bool:
+        """Check if the strategy is in a terminal state.
+
+        Returns:
+            bool: True if the strategy is in a terminal state (STOPPED or ERROR).
+        """
+        return self._state_machine.is_in_terminal_state()
 
     def on_start(self):
         """Called when the strategy is started.
@@ -101,12 +109,13 @@ class Strategy(ABC):
                 "Cannot call `request_event_delivery` because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        # Check: state must be ADDED or RUNNING to request event delivery
-        if self._state not in (StrategyState.ADDED, StrategyState.RUNNING):
+        # Check: state must allow event delivery (ADDED or RUNNING)
+        if not (self._state_machine.can_execute_action(StrategyAction.START_STRATEGY) or self.state == StrategyState.RUNNING):
+            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
                 "Cannot call `request_event_delivery` because $state "
-                f"({self._state.name}) does not allow new subscriptions. "
-                "Call it from `on_start` or when the strategy is RUNNING.",
+                f"({self.state.name}) does not allow request data. "
+                f"Valid actions: {valid_actions}. Call it from `on_start` or when the strategy is RUNNING.",
             )
 
         # Default to universal handler if not provided
@@ -142,9 +151,10 @@ class Strategy(ABC):
             )
 
         # Check: state must be RUNNING to cancel event delivery
-        if self._state != StrategyState.RUNNING:
+        if self.state != StrategyState.RUNNING:
+            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
-                f"Cannot call `cancel_event_delivery` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
+                f"Cannot call `cancel_event_delivery` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
             )
 
         # Delegate to TradingEngine - no local tracking
@@ -189,9 +199,10 @@ class Strategy(ABC):
                 "Cannot call `submit_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
         # Check: state must be RUNNING to submit orders
-        if self._state != StrategyState.RUNNING:
+        if self.state != StrategyState.RUNNING:
+            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
-                f"Cannot call `submit_order` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
+                f"Cannot call `submit_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
             )
 
         self._trading_engine.submit_order(order, broker)
@@ -214,9 +225,10 @@ class Strategy(ABC):
                 "Cannot call `cancel_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
         # Check: state must be RUNNING to cancel orders
-        if self._state != StrategyState.RUNNING:
+        if self.state != StrategyState.RUNNING:
+            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
-                f"Cannot call `cancel_order` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
+                f"Cannot call `cancel_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
             )
 
         self._trading_engine.cancel_order(order, broker)
@@ -239,9 +251,10 @@ class Strategy(ABC):
                 "Cannot call `modify_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
         # Check: state must be RUNNING to modify orders
-        if self._state != StrategyState.RUNNING:
+        if self.state != StrategyState.RUNNING:
+            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
-                f"Cannot call `modify_order` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
+                f"Cannot call `modify_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
             )
 
         self._trading_engine.modify_order(order, broker)
@@ -266,9 +279,10 @@ class Strategy(ABC):
                 "Cannot call `get_active_orders` because $trading_engine is None. Add the strategy to a TradingEngine first.",
             )
         # Check: state must be RUNNING to retrieve active orders
-        if self._state != StrategyState.RUNNING:
+        if self.state != StrategyState.RUNNING:
+            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
-                f"Cannot call `get_active_orders` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
+                f"Cannot call `get_active_orders` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
             )
 
         return self._trading_engine.get_active_orders(broker)
@@ -288,13 +302,5 @@ class Strategy(ABC):
             trading_engine (TradingEngine): The trading engine instance.
         """
         self._trading_engine = trading_engine
-
-    def _set_state(self, next_state: StrategyState) -> None:
-        """Transition to the next lifecycle state.
-
-        Args:
-            next_state (StrategyState): Desired next state.
-        """
-        self._state = next_state
 
     # endregion
