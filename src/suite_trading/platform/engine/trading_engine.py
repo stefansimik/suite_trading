@@ -415,9 +415,8 @@ class TradingEngine:
             callback: Function to call when events are received. Keyword-only.
 
         Raises:
-            ValueError: If $name is already in use for this strategy or $provider_ref not found.
-            UnsupportedEventTypeError: If provider doesn't support the $event_type.
-            UnsupportedConfigurationError: If provider doesn't support the configuration.
+            ValueError: If $name is already in use for this strategy, $provider_ref not found,
+                       or the EventFeed cannot be created for $event_type with $parameters.
         """
         # Check: strategy must be added to this engine
         if strategy not in self._strategy_event_feeds:

@@ -98,10 +98,8 @@ class Strategy(ABC):
                 self.on_event. Keyword-only.
 
         Raises:
-            ValueError: If $name is already in use for this strategy.
+            ValueError: If $name is already in use for this strategy or the EventFeed cannot be created for $event_type with $parameters.
             RuntimeError: If $trading_engine is None or $state is not ADDED/RUNNING.
-            UnsupportedEventTypeError: If provider doesn't support the $event_type.
-            UnsupportedConfigurationError: If provider doesn't support the configuration.
         """
         # Check: trading engine must be attached before requesting event delivery
         if self._trading_engine is None:

@@ -6,29 +6,6 @@ if TYPE_CHECKING:
     from suite_trading.platform.event_feed.event_feed import EventFeed
 
 
-class UnsupportedEventTypeError(Exception):
-    """Raised when a provider doesn't support the requested event type at all."""
-
-    def __init__(self, event_type: type):
-        self.event_type = event_type
-        super().__init__(f"Provider does not support {event_type.__name__} events")
-
-
-class UnsupportedConfigurationError(Exception):
-    """Raised when a provider supports the event type but not the specific configuration."""
-
-    def __init__(self, event_type: type, parameters: dict, reason: str = None):
-        self.event_type = event_type
-        self.parameters = parameters
-        self.reason = reason
-
-        message = f"Provider supports {event_type.__name__} events but not with configuration: {parameters}"
-        if reason:
-            message += f" - {reason}"
-
-        super().__init__(message)
-
-
 class EventFeedProvider(Protocol):
     """Protocol for event feed providers.
 
@@ -88,8 +65,7 @@ class EventFeedProvider(Protocol):
                       request_info containing the original request metadata.
 
         Raises:
-            UnsupportedEventTypeError: If the provider doesn't support $event_type.
-            UnsupportedConfigurationError: If the $parameters are not supported for $event_type.
+            ValueError: If the EventFeed cannot be created for $event_type with $parameters.
         """
         ...
 
