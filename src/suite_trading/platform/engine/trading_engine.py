@@ -6,7 +6,7 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
-from suite_trading.platform.market_data.market_data_provider import EventFeedProvider
+from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
