@@ -359,6 +359,47 @@ __version__ = "0.0.1"
 - Mirror the package structure of the code they test
 - Keep only the root `tests/__init__.py` file
 
+## Defensive Checks Comments
+
+Rule: Put one concise comment immediately before every defensive check.
+It must start with "# Check:".
+
+What counts: Guards that validate input, state, existence, None, or configuration.
+Includes try/except used only for validation and asserts used as runtime guards.
+
+Style
+- Start with "# Check:"
+- Be specific (<= 100 chars)
+- Use imperative phrasing ("quantity must be positive")
+- Place it right before the check
+- One line per independent check
+
+Example
+```python
+# Check: strategy must be registered
+if name not in self._strategies:
+    raise KeyError(
+        f"Cannot call `start_strategy` because $name ('{name}') is not registered.",
+    )
+```
+
+Where to apply
+- Constructors and validators (__init__, _validate, property setters)
+- Orchestration (engine/strategy/provider/broker)
+- Parsing and conversion
+- Any fast-fail function
+
+Why: Makes intent obvious, supports Fail Fast and keeps reviews unambiguous.
+
+# Testing Guidelines
+
+- Don't generate tests unless explicitly asked
+- Use `pytest` library (not `unittest`)
+- Test function names should start with "test_" and describe what they're testing
+- Organize tests in `tests/unit/` and `tests/integration/`
+- Mirror the package structure of the code they test
+- Keep only the root `tests/__init__.py` file
+
 # Git Commit Guidelines
 
 - Write commits in **imperative mood** (like giving a command)

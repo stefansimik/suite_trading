@@ -29,10 +29,11 @@ class Money:
             ValueError: If value is invalid or out of range.
             TypeError: If currency is not Currency instance.
         """
+        # Check: currency must be an instance of Currency
         if not isinstance(currency, Currency):
             raise TypeError(f"$currency must be a Currency instance, but provided value is: {currency}")
 
-        # Convert value to Decimal
+        # Check: value must be convertible to Decimal
         try:
             if isinstance(value, Decimal):
                 decimal_value = value
@@ -41,7 +42,7 @@ class Money:
         except (ValueError, TypeError) as e:
             raise ValueError(f"$value cannot be converted to Decimal, but provided value is: {value}") from e
 
-        # Check value limits
+        # Check: value must be within allowed range
         if decimal_value > self.MAX_VALUE:
             raise ValueError(f"$value exceeds maximum allowed value {self.MAX_VALUE}, but provided value is: {decimal_value}")
         if decimal_value < self.MIN_VALUE:
@@ -218,9 +219,6 @@ class Money:
         Raises:
             ValueError: If string format is invalid.
         """
-        if not isinstance(value_str, str):
-            raise TypeError(f"$value_str must be a string, but provided value is: {value_str}")
-
         value_str = value_str.strip()
         if not value_str:
             raise ValueError("$value_str cannot be empty")
