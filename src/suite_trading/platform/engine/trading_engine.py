@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime
-from typing import Dict, List, Callable, Any
+from typing import Dict, List, Callable
+
+from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -51,7 +53,7 @@ class TradingEngine:
         self._brokers: Dict[str, Broker] = {}
 
         # Event feed management - track event-feeds per strategy
-        self._strategy_event_feeds: Dict[Strategy, Dict[str, Any]] = {}
+        self._strategy_event_feeds: Dict[Strategy, Dict[str, EventFeed]] = {}
 
     @property
     def state(self) -> EngineState:
