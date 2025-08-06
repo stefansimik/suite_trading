@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, List, Callable, Optional
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
+from suite_trading.strategy.strategy_state import StrategyState
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -12,8 +13,22 @@ class Strategy(ABC):
     # region Lifecycle
 
     def __init__(self):
-        """Initialize a new strategy."""
+        """Initialize a new strategy.
+
+        Sets initial lifecycle state to NEW. Engine reference is None until added by
+        TradingEngine.
+        """
         self._trading_engine = None
+        self._state: StrategyState = StrategyState.NEW
+
+    @property
+    def state(self) -> StrategyState:
+        """Get current lifecycle state.
+
+        Returns:
+            StrategyState: Current lifecycle state of this strategy.
+        """
+        return self._state
 
     def on_start(self):
         """Called when the strategy is started.
@@ -34,6 +49,18 @@ class Strategy(ABC):
         """
         # All infrastructure cleanup now handled externally
         # Override this method to add strategy-specific cleanup only
+        pass
+
+    def on_error(self, exc: Exception) -> None:
+        """Called when the strategy transitions to ERROR after an unhandled exception.
+
+        This hook is intended for user-level logging, alerting, or releasing custom resources.
+        Infrastructure cleanup (feeds, subscriptions, brokers/providers) should be handled by the
+        engine. Keep this method fast and robust; avoid raising exceptions here.
+
+        Args:
+            exc (Exception): The exception that caused the strategy to enter ERROR.
+        """
         pass
 
     # endregion
@@ -64,13 +91,22 @@ class Strategy(ABC):
 
         Raises:
             ValueError: If $name is already in use for this strategy.
-            RuntimeError: If $trading_engine is None.
+            RuntimeError: If $trading_engine is None or $state is not ADDED/RUNNING.
             UnsupportedEventTypeError: If provider doesn't support the $event_type.
             UnsupportedConfigurationError: If provider doesn't support the configuration.
         """
+        # Check: trading engine must be attached before requesting event delivery
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `request_event_delivery` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `request_event_delivery` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+
+        # Check: state must be ADDED or RUNNING to request event delivery
+        if self._state not in (StrategyState.ADDED, StrategyState.RUNNING):
+            raise RuntimeError(
+                "Cannot call `request_event_delivery` because $state "
+                f"({self._state.name}) does not allow new subscriptions. "
+                "Call it from `on_start` or when the strategy is RUNNING.",
             )
 
         # Default to universal handler if not provided
@@ -97,11 +133,18 @@ class Strategy(ABC):
 
         Raises:
             ValueError: If $name is not found for this strategy.
-            RuntimeError: If $trading_engine is None.
+            RuntimeError: If $trading_engine is None or $state is not RUNNING.
         """
+        # Check: trading engine must be attached before canceling event delivery
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `cancel_event_delivery` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `cancel_event_delivery` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+
+        # Check: state must be RUNNING to cancel event delivery
+        if self._state != StrategyState.RUNNING:
+            raise RuntimeError(
+                f"Cannot call `cancel_event_delivery` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
             )
 
         # Delegate to TradingEngine - no local tracking
@@ -131,16 +174,24 @@ class Strategy(ABC):
     def submit_order(self, order: Order, broker: Broker) -> None:
         """Submit an order for execution.
 
+        Allowed only when the strategy is RUNNING.
+
         Args:
             order (Order): The order to submit for execution.
             broker (Broker): The broker to submit the order to.
 
         Raises:
-            RuntimeError: If trading engine is not set.
+            RuntimeError: If $trading_engine is None or $state is not RUNNING.
         """
+        # Check: trading engine must be attached before submitting orders
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `submit_order` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `submit_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+        # Check: state must be RUNNING to submit orders
+        if self._state != StrategyState.RUNNING:
+            raise RuntimeError(
+                f"Cannot call `submit_order` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
             )
 
         self._trading_engine.submit_order(order, broker)
@@ -148,16 +199,24 @@ class Strategy(ABC):
     def cancel_order(self, order: Order, broker: Broker) -> None:
         """Cancel an existing order.
 
+        Allowed only when the strategy is RUNNING.
+
         Args:
             order (Order): The order to cancel.
             broker (Broker): The broker to cancel the order with.
 
         Raises:
-            RuntimeError: If trading engine is not set.
+            RuntimeError: If $trading_engine is None or $state is not RUNNING.
         """
+        # Check: trading engine must be attached before canceling orders
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `cancel_order` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `cancel_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+        # Check: state must be RUNNING to cancel orders
+        if self._state != StrategyState.RUNNING:
+            raise RuntimeError(
+                f"Cannot call `cancel_order` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
             )
 
         self._trading_engine.cancel_order(order, broker)
@@ -165,22 +224,32 @@ class Strategy(ABC):
     def modify_order(self, order: Order, broker: Broker) -> None:
         """Modify an existing order.
 
+        Allowed only when the strategy is RUNNING.
+
         Args:
             order (Order): The order to modify with updated parameters.
             broker (Broker): The broker to modify the order with.
 
         Raises:
-            RuntimeError: If trading engine is not set.
+            RuntimeError: If $trading_engine is None or $state is not RUNNING.
         """
+        # Check: trading engine must be attached before modifying orders
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `modify_order` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `modify_order` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+        # Check: state must be RUNNING to modify orders
+        if self._state != StrategyState.RUNNING:
+            raise RuntimeError(
+                f"Cannot call `modify_order` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
             )
 
         self._trading_engine.modify_order(order, broker)
 
     def get_active_orders(self, broker: Broker) -> List[Order]:
         """Get all currently active orders.
+
+        Allowed only when the strategy is RUNNING.
 
         Args:
             broker (Broker): The broker to get active orders from.
@@ -189,11 +258,17 @@ class Strategy(ABC):
             List[Order]: List of all active orders for the specified broker.
 
         Raises:
-            RuntimeError: If trading engine is not set.
+            RuntimeError: If $trading_engine is None or $state is not RUNNING.
         """
+        # Check: trading engine must be attached before retrieving active orders
         if self._trading_engine is None:
             raise RuntimeError(
-                f"Cannot call `get_active_orders` on strategy '{self.__class__.__name__}' because $trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `get_active_orders` because $trading_engine is None. Add the strategy to a TradingEngine first.",
+            )
+        # Check: state must be RUNNING to retrieve active orders
+        if self._state != StrategyState.RUNNING:
+            raise RuntimeError(
+                f"Cannot call `get_active_orders` because $state ({self._state.name}) is not RUNNING. Start the strategy first.",
             )
 
         return self._trading_engine.get_active_orders(broker)
@@ -203,14 +278,23 @@ class Strategy(ABC):
     # region Internal
 
     def _set_trading_engine(self, trading_engine: "TradingEngine"):
-        """Set the trading engine reference.
+        """Attach the trading engine reference.
 
-        This method is called by the TradingEngine when the strategy is added to it.
-        It is not expected to be called directly by subclasses.
+        This method is called by TradingEngine when the strategy is added. It does not change
+        lifecycle $state. TradingEngine is responsible for transitioning to ADDED after successful
+        registration.
 
         Args:
             trading_engine (TradingEngine): The trading engine instance.
         """
         self._trading_engine = trading_engine
+
+    def _set_state(self, next_state: StrategyState) -> None:
+        """Transition to the next lifecycle state.
+
+        Args:
+            next_state (StrategyState): Desired next state.
+        """
+        self._state = next_state
 
     # endregion

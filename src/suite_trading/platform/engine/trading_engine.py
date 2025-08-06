@@ -9,6 +9,7 @@ from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
+from suite_trading.strategy.strategy_state import StrategyState
 
 logger = logging.getLogger(__name__)
 
@@ -91,19 +92,30 @@ class TradingEngine:
             strategy: The strategy instance to register.
 
         Raises:
-            ValueError: If a strategy with the same name already exists.
+            ValueError: If a strategy with the same name already exists or $strategy is not NEW.
         """
         if name in self._strategies:
-            raise ValueError(f"Strategy with $name '{name}' already exists. Choose a different name.")
+            raise ValueError(
+                f"Cannot call `add_strategy` because $name ('{name}') is already registered. Choose a different name.",
+            )
 
-        # TODO: Let's check, if Strategy is in appropriate state (new, not started) to be added
+        # Validate strategy is NEW before attaching
+        if strategy.state != StrategyState.NEW:
+            raise ValueError(
+                "Cannot call `add_strategy` because $strategy is not NEW. Current $state is "
+                f"{strategy.state.name}. Provide a fresh instance of "
+                f"{strategy.__class__.__name__}.",
+            )
 
-        # Set the trading engine reference in the strategy
+        # Attach engine reference to strategy (no state change here)
         strategy._set_trading_engine(self)
         self._strategies[name] = strategy
 
         # Initialize empty event feed tracking for this strategy
         self._strategy_event_feeds[strategy] = {}
+
+        # Transition strategy lifecycle to ADDED after successful registration
+        strategy._set_state(StrategyState.ADDED)
 
     def start_strategy(self, name: str) -> None:
         """Start a specific strategy by name.
@@ -113,14 +125,26 @@ class TradingEngine:
 
         Raises:
             KeyError: If no strategy with the given name exists.
+            ValueError: If $state is not ADDED.
         """
         if name not in self._strategies:
-            raise KeyError(f"No strategy with $name '{name}' is registered. Cannot start non-existent strategy.")
-
-        # TODO: Let's check, if Strategy is in appropriate state (new, not started) to be started
+            raise KeyError(
+                f"Cannot call `start_strategy` because $name ('{name}') is not registered. Add the strategy using `add_strategy` first.",
+            )
 
         strategy = self._strategies[name]
-        strategy.on_start()
+
+        if strategy.state != StrategyState.ADDED:
+            raise ValueError(
+                f"Cannot call `start_strategy` because $state ({strategy.state.name}) is not ADDED.",
+            )
+
+        try:
+            strategy.on_start()
+            strategy._set_state(StrategyState.RUNNING)
+        except Exception:
+            strategy._set_state(StrategyState.ERROR)
+            raise
 
     def stop_strategy(self, name: str) -> None:
         """Stop a specific strategy by name and clean up its event feeds.
@@ -130,30 +154,38 @@ class TradingEngine:
 
         Raises:
             KeyError: If no strategy with the given name exists.
+            ValueError: If $state is not RUNNING.
         """
         if name not in self._strategies:
-            raise KeyError(f"No strategy with $name '{name}' is registered. Cannot stop non-existent strategy.")
-
-        # TODO: Let's check, if Strategy is in appropriate state (had to be started & is not stopped) to be stopped
+            raise KeyError(
+                f"Cannot call `stop_strategy` because $name ('{name}') is not registered. Add the strategy using `add_strategy` first.",
+            )
 
         strategy = self._strategies[name]
 
-        # Stop all registered event feeds for this strategy first
-        if strategy in self._strategy_event_feeds:
-            feed_names = list(self._strategy_event_feeds[strategy].keys())
-            for feed_name in feed_names:
-                entry = self._strategy_event_feeds[strategy].get(feed_name, {})
-                feed = entry.get("feed")
-                try:
-                    if feed is not None and hasattr(feed, "stop") and callable(getattr(feed, "stop")):
-                        feed.stop()
-                except Exception as e:
-                    logger.error(f"Error stopping event feed '{feed_name}' for strategy: {e}")
-            # Clear strategy event feed tracking after stopping all feeds
-            self._strategy_event_feeds[strategy] = {}
+        if strategy.state != StrategyState.RUNNING:
+            raise ValueError(
+                "Cannot call `stop_strategy` because $state ({strategy.state.name}) is not RUNNING.",
+            )
 
-        # Then invoke strategy's on_stop callback
-        strategy.on_stop()
+        # Stop all registered event feeds for this strategy first
+        feed_entries = self._strategy_event_feeds.get(strategy, {})
+        for feed_name, entry in list(feed_entries.items()):
+            try:
+                entry["feed"].stop()
+            except Exception as e:
+                logger.error(f"Error stopping event feed '{feed_name}' for strategy '{name}': {e}")
+
+        # Clear strategy event feed tracking after stopping all feeds
+        self._strategy_event_feeds[strategy] = {}
+
+        # Then invoke strategy's on_stop callback and transition state
+        try:
+            strategy.on_stop()
+            strategy._set_state(StrategyState.STOPPED)
+        except Exception:
+            strategy._set_state(StrategyState.ERROR)
+            raise
 
     def remove_strategy(self, name: str) -> None:
         """Remove a strategy by name.
@@ -163,11 +195,23 @@ class TradingEngine:
 
         Raises:
             KeyError: If no strategy with the given name exists.
+            ValueError: If $state is not STOPPED.
         """
         if name not in self._strategies:
-            raise KeyError(f"No strategy with $name '{name}' is registered. Cannot remove non-existent strategy.")
+            raise KeyError(
+                f"Cannot call `remove_strategy` because $name ('{name}') is not registered. Add the strategy using `add_strategy` first.",
+            )
 
-        # TODO: Let's check, if Strategy is in appropriate state (stopped) to be removed
+        strategy = self._strategies[name]
+
+        if strategy.state != StrategyState.STOPPED:
+            raise ValueError(
+                f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not STOPPED. Stop the strategy first.",
+            )
+
+        # Remove any remaining event feed tracking for safety
+        if strategy in self._strategy_event_feeds:
+            del self._strategy_event_feeds[strategy]
 
         # Remove from strategies dictionary
         del self._strategies[name]
@@ -361,15 +405,16 @@ class TradingEngine:
             )
 
         feed = self._strategy_event_feeds[strategy][name].get("feed")
-        try:
-            # TODO: This has to be updated (EventFeed will have some `stop` or `start` method in the future)
-            if feed is not None and hasattr(feed, "stop") and callable(getattr(feed, "stop")):
+        if feed is not None:
+            try:
                 feed.stop()
-        except Exception as e:
-            logger.error(f"Error stopping event feed '{name}' for strategy: {e}")
-        finally:
-            # Remove from tracking regardless of stop outcome
-            del self._strategy_event_feeds[strategy][name]
+            except AttributeError:
+                # No stop attribute; ignore to keep behavior simple
+                pass
+            except Exception as e:
+                logger.error(f"Error stopping event feed '{name}' for strategy: {e}")
+        # Remove from tracking regardless of stop outcome
+        del self._strategy_event_feeds[strategy][name]
 
     # endregion
 
