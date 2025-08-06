@@ -10,6 +10,7 @@ from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
+from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,10 @@ class TradingEngine:
 
         Creates its own MessageBus instance for isolated operation.
         """
-        # Engine state and core components
-        self._is_running: bool = False
+        # Engine state machine
+        self._state_machine = create_engine_state_machine()
+
+        # Message bus
         self.message_bus = MessageBus()
 
         # Strategy management
@@ -44,63 +47,94 @@ class TradingEngine:
         # EventFeedProvider registry
         self._event_feed_providers: Dict[str, EventFeedProvider] = {}
 
-        # Broker management
+        # Broker registry
         self._brokers: Dict[str, Broker] = {}
 
-        # Event feed management - track feeds per strategy
+        # Event feed management - track event-feeds per strategy
         self._strategy_event_feeds: Dict[Strategy, Dict[str, Any]] = {}
+
+    @property
+    def state(self) -> EngineState:
+        """Get current lifecycle state.
+
+        Returns:
+            EngineState: Current lifecycle state of this engine.
+        """
+        return self._state_machine.current_state
 
     def start(self):
         """Start the TradingEngine and all strategies.
 
         This method connects all event feed providers and brokers, then starts all registered strategies.
         The startup order is: event feed providers → brokers → strategies.
+
+        Raises:
+            ValueError: If engine is not in NEW state.
         """
-        self._is_running = True
+        # Check: engine must be in NEW state before starting
+        if not self._state_machine.can_execute_action(EngineAction.START_ENGINE):
+            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
+            raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
 
-        # Connect all event feed providers first
-        for provider_name, provider in self._event_feed_providers.items():
-            provider.connect()
-            logger.info(f"Connected event feed provider '{provider_name}'")
+        try:
+            # Connect all event feed providers first
+            for provider_name, provider in self._event_feed_providers.items():
+                provider.connect()
+                logger.info(f"Connected event feed provider '{provider_name}'")
 
-        # Connect all brokers second
-        for broker_name, broker in self._brokers.items():
-            broker.connect()
-            logger.info(f"Connected broker '{broker_name}'")
+            # Connect all brokers second
+            for broker_name, broker in self._brokers.items():
+                broker.connect()
+                logger.info(f"Connected broker '{broker_name}'")
 
-        # Start strategies last
-        for name in list(self._strategies.keys()):
-            self.start_strategy(name)
+            # Start strategies last
+            for strategy_name in list(self._strategies.keys()):
+                self.start_strategy(strategy_name)
+                logger.info(f"Started strategy under name: '{strategy_name}'")
+
+            # Transition to RUNNING state after successful start
+            self._state_machine.execute_action(EngineAction.START_ENGINE)
+        except Exception:
+            # Transition to ERROR state on any failure
+            self._state_machine.execute_action(EngineAction.ERROR_OCCURRED)
+            raise
 
     def stop(self):
         """Stop the TradingEngine and all strategies.
 
         This method stops all registered strategies, disconnects brokers, and disconnects event feed providers.
         The shutdown order is: strategies → brokers → event feed providers.
+
+        Raises:
+            ValueError: If engine is not in RUNNING state.
         """
-        self._is_running = False
+        # Check: engine must be running before stopping
+        if not self._state_machine.can_execute_action(EngineAction.STOP_ENGINE):
+            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
+            raise ValueError(f"Cannot stop engine in state {self.state.name}. Valid actions: {valid_actions}")
 
-        # Stop all strategies and clean up their event feeds first
-        for strategy_name in list(self._strategies.keys()):
-            self.stop_strategy(strategy_name)
+        try:
+            # Stop all strategies and clean up their event feeds first
+            for strategy_name in list(self._strategies.keys()):
+                self.stop_strategy(strategy_name)
+                logger.info(f"Stopped strategy named '{strategy_name}'")
 
-        # Disconnect all brokers second
-        for broker_name, broker in self._brokers.items():
-            try:
+            # Disconnect all brokers second
+            for broker_name, broker in self._brokers.items():
                 broker.disconnect()
                 logger.info(f"Disconnected broker '{broker_name}'")
-            except Exception as e:
-                # Log problem and continue with other brokers - don't fail entire shutdown
-                logger.error(f"Failed to disconnect broker '{broker_name}': {e}")
 
-        # Disconnect all event feed providers last
-        for provider_name, provider in self._event_feed_providers.items():
-            try:
+            # Disconnect all event feed providers last
+            for provider_name, provider in self._event_feed_providers.items():
                 provider.disconnect()
                 logger.info(f"Disconnected event feed provider '{provider_name}'")
-            except Exception as e:
-                # Log problem and continue with other providers - don't fail entire shutdown
-                logger.error(f"Failed to disconnect event feed provider '{provider_name}': {e}")
+
+            # Transition to STOPPED state after successful stop
+            self._state_machine.execute_action(EngineAction.STOP_ENGINE)
+        except Exception:
+            # Transition to ERROR state on any failure
+            self._state_machine.execute_action(EngineAction.ERROR_OCCURRED)
+            raise
 
     # endregion
 
