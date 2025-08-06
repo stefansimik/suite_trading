@@ -443,16 +443,19 @@ class TradingEngine:
         provider = self._event_feed_providers[provider_ref]
 
         # Obtain event feed instance from provider (may raise provider-specific errors)
-        feed = provider.get_event_feed(event_type, parameters, callback)
+        # Note: The provider should create a feed that stores request info internally
+        event_feed = provider.get_event_feed(event_type, parameters, callback)
 
-        # Track the event feed
-        self._strategy_event_feeds[strategy][name] = {
+        # Store request metadata in the feed's request_info if it doesn't have it
+        event_feed.request_info = {
             "event_type": event_type,
             "parameters": parameters,
             "callback": callback,
             "provider_ref": provider_ref,
-            "feed": feed,
         }
+
+        # Track the event feed directly (simplified structure)
+        self._strategy_event_feeds[strategy][name] = event_feed
 
     def cancel_event_delivery_for_strategy(self, strategy: Strategy, name: str) -> None:
         """Cancel event delivery for the specified strategy.
@@ -480,16 +483,13 @@ class TradingEngine:
                 "with `request_event_delivery_for_strategy`.",
             )
 
-        feed = self._strategy_event_feeds[strategy][name].get("feed")
-        if feed is not None:
-            try:
-                feed.stop()
-            except AttributeError:
-                # No stop attribute; ignore to keep behavior simple
-                pass
-            except Exception as e:
-                logger.error(f"Error stopping event feed '{name}' for strategy: {e}")
-        # Remove from tracking regardless of stop outcome
+        feed = self._strategy_event_feeds[strategy][name]
+        try:
+            feed.close()
+        except Exception as e:
+            logger.error(f"Error closing event feed '{name}' for strategy: {e}")
+
+        # Remove from tracking regardless of close outcome
         del self._strategy_event_feeds[strategy][name]
 
     # endregion

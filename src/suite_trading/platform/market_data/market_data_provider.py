@@ -1,6 +1,9 @@
 """Event feed provider protocol definition."""
 
-from typing import Protocol, Callable
+from typing import Protocol, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from suite_trading.platform.event_feed.event_feed import EventFeed
 
 
 class UnsupportedEventTypeError(Exception):
@@ -68,13 +71,12 @@ class EventFeedProvider(Protocol):
         event_type: type,
         parameters: dict,
         callback: Callable,
-    ) -> object:
+    ) -> "EventFeed":
         """Create or return an event feed instance for the given request.
 
-        This is a placeholder factory method that TradingEngine will call to obtain the
-        concrete event feed instance for a strategy's request. Implementations should return
-        an opaque object that at least supports a `.stop()` method to stop the feed. They may
-        optionally support `.start()`.
+        This factory method creates an EventFeed that implements the full EventFeed protocol.
+        The returned feed must contain the original request information in its request_info
+        property for self-contained operation.
 
         Args:
             event_type: The type of events requested (e.g., NewBarEvent).
@@ -82,7 +84,8 @@ class EventFeedProvider(Protocol):
             callback: Function to be called when new events are delivered.
 
         Returns:
-            object: Event feed instance managed by the provider.
+            EventFeed: Event feed instance that implements the EventFeed protocol with
+                      request_info containing the original request metadata.
 
         Raises:
             UnsupportedEventTypeError: If the provider doesn't support $event_type.

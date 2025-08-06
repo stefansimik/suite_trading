@@ -104,3 +104,15 @@ class EventFeed(Protocol):
             Exception: Implementations should raise on unexpected cleanup failures.
         """
         ...
+
+    @property
+    def request_info(self) -> dict:
+        """Get the original request information that created this feed.
+
+        Contains the metadata from the original request that was used to create this EventFeed.
+        This allows the feed to be self-contained with its creation context.
+
+        Returns:
+            dict: Contains 'event_type', 'parameters', 'callback', 'event_feed_provider_ref'
+        """
+        ...
