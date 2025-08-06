@@ -53,32 +53,54 @@ class TradingEngine:
     def start(self):
         """Start the TradingEngine and all strategies.
 
-        This method starts all registered strategies.
+        This method connects all event feed providers and brokers, then starts all registered strategies.
+        The startup order is: event feed providers → brokers → strategies.
         """
         self._is_running = True
 
-        # Start strategies
+        # Connect all event feed providers first
+        for provider_name, provider in self._event_feed_providers.items():
+            provider.connect()
+            logger.info(f"Connected event feed provider '{provider_name}'")
+
+        # Connect all brokers second
+        for broker_name, broker in self._brokers.items():
+            broker.connect()
+            logger.info(f"Connected broker '{broker_name}'")
+
+        # Start strategies last
         for name in list(self._strategies.keys()):
             self.start_strategy(name)
-
-        # TODO:
-        #   We should start / connect all brokers / market-data-providers
-        #   The order is important, first are starting all market-data-providers, then all brokers, then strategies
 
     def stop(self):
         """Stop the TradingEngine and all strategies.
 
-        This method stops all registered strategies and cleans up their event feeds.
+        This method stops all registered strategies, disconnects brokers, and disconnects event feed providers.
+        The shutdown order is: strategies → brokers → event feed providers.
         """
         self._is_running = False
 
-        # Stop all strategies and clean up their event feeds
+        # Stop all strategies and clean up their event feeds first
         for strategy_name in list(self._strategies.keys()):
             self.stop_strategy(strategy_name)
 
-        # TODO:
-        #   We should stop / disconnect all brokers / market-data-providers
-        #   The order is important, first are stopping all strategies, then all brokers, then all market-data-providers
+        # Disconnect all brokers second
+        for broker_name, broker in self._brokers.items():
+            try:
+                broker.disconnect()
+                logger.info(f"Disconnected broker '{broker_name}'")
+            except Exception as e:
+                # Log problem and continue with other brokers - don't fail entire shutdown
+                logger.error(f"Failed to disconnect broker '{broker_name}': {e}")
+
+        # Disconnect all event feed providers last
+        for provider_name, provider in self._event_feed_providers.items():
+            try:
+                provider.disconnect()
+                logger.info(f"Disconnected event feed provider '{provider_name}'")
+            except Exception as e:
+                # Log problem and continue with other providers - don't fail entire shutdown
+                logger.error(f"Failed to disconnect event feed provider '{provider_name}': {e}")
 
     # endregion
 
