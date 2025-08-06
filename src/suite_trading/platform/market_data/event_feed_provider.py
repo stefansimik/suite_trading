@@ -43,7 +43,7 @@ class EventFeedProvider(Protocol):
 
     # region Event feed factory
 
-    def get_event_feed(
+    def create_event_feed(
         self,
         event_type: type,
         parameters: dict,

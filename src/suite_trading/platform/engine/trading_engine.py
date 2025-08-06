@@ -445,7 +445,7 @@ class TradingEngine:
 
         # Obtain event feed instance from provider (may raise provider-specific errors)
         # Note: The provider should create a feed that stores request info internally
-        event_feed = provider.get_event_feed(event_type, parameters, callback)
+        event_feed = provider.create_event_feed(event_type, parameters, callback)
 
         # Store request metadata in the feed's request_info if it doesn't have it
         event_feed.request_info = {
