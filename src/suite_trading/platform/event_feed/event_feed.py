@@ -6,19 +6,25 @@ class EventFeed(Protocol):
     """Simple streaming interface that delivers events in chronological order to strategies.
 
     This protocol is intentionally minimal and non-blocking. It supports three observable runtime
-    conditions without exposing a heavy state machine.
+    scenarios based on data availability.
 
-    States:
-    - READY: An event is immediately available -> next() returns an Event, peek() returns same Event
-    - IDLE: No event is ready now, but the feed may produce more later -> both return None while
+    Scenarios:
+    - NEXT_EVENT_READY: An event is immediately available -> next() returns an Event, peek() returns same Event
+    - WAITING_FOR_FUTURE_EVENTS: No event is ready now, but the feed may produce more later -> both return None while
       is_finished() is False
     - FINISHED: The feed will never produce more events -> both return None, is_finished() is True
+
+    | Scenario | peek() | next() | is_finished() |
+    |----------|--------|--------|---------------|
+    | NEXT_EVENT_READY | Event | Event | False |
+    | WAITING_FOR_FUTURE_EVENTS | None | None | False |
+    | FINISHED | None | None | True |
 
     How to use:
     - Call next() repeatedly to pull available events
     - Call peek() to inspect the next event without consuming it
     - If next() or peek() returns None, check is_finished():
-      - False => the feed is IDLE; keep polling later
+      - False => the feed is WAITING_FOR_FUTURE_EVENTS; keep polling later
       - True  => the feed is FINISHED; stop polling
     - Always call close() once you are done to release resources
 
@@ -56,9 +62,9 @@ class EventFeed(Protocol):
         advancing the feed position. Multiple peek() calls return the same event until next()
         consumes it.
 
-        State mapping:
-        - READY: Returns the head event without consuming it
-        - IDLE: Returns None; is_finished() is False
+        Scenario mapping:
+        - NEXT_EVENT_READY: Returns the head event without consuming it
+        - WAITING_FOR_FUTURE_EVENTS: Returns None; is_finished() is False
         - FINISHED: Returns None; is_finished() is True
 
         Guarantees:
@@ -77,10 +83,10 @@ class EventFeed(Protocol):
     def next(self) -> Optional[Event]:
         """Return the next event if one is ready.
 
-        Non-blocking. This method never waits for data. It maps runtime conditions to return
+        Non-blocking. This method never waits for data. It maps runtime scenarios to return
         values:
-        - READY: An event is available now -> returns an Event
-        - IDLE: No event is ready yet -> returns None and is_finished() is False
+        - NEXT_EVENT_READY: An event is available now -> returns an Event
+        - WAITING_FOR_FUTURE_EVENTS: No event is ready yet -> returns None and is_finished() is False
         - FINISHED: Feed will never produce more -> returns None and is_finished() is True
 
         After the feed is finished, next() continues to return None.
