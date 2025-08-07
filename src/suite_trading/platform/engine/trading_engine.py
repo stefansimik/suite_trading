@@ -53,7 +53,7 @@ class TradingEngine:
         self._brokers: Dict[str, Broker] = {}
 
         # Event feed management - track event-feeds per strategy
-        self._strategy_event_feeds: Dict[Strategy, Dict[str, EventFeed]] = {}
+        self._strategy_event_feeds: Dict[Strategy, List[EventFeed]] = {}
 
     @property
     def state(self) -> EngineState:
@@ -175,7 +175,7 @@ class TradingEngine:
         self._strategies[name] = strategy
 
         # Initialize empty event feed tracking for this strategy
-        self._strategy_event_feeds[strategy] = {}
+        self._strategy_event_feeds[strategy] = []
 
         # Transition strategy lifecycle to ADDED after successful registration
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
@@ -241,17 +241,18 @@ class TradingEngine:
         # Note: We collect all event feed errors instead of raising exceptions early.
         # Goal: Stop all event feeds first before raising any exceptions to ensure maximum cleanup.
         # This prevents leaving other event feeds unclosed when one feed fails to stop.
-        feed_entries = self._strategy_event_feeds.get(strategy, {})
+        strategy_feeds = self._strategy_event_feeds.get(strategy, [])
         feed_errors = []
-        for feed_name, entry in list(feed_entries.items()):
+        for feed in list(strategy_feeds):
+            feed_name = feed.request_info["name"]
             try:
-                entry["feed"].stop()
+                feed.close()
             except Exception as e:
-                feed_errors.append(f"Error stopping event feed '{feed_name}': {e}")
-                logger.error(f"Error stopping event feed '{feed_name}' for strategy '{name}': {e}")
+                feed_errors.append(f"Error closing event feed '{feed_name}': {e}")
+                logger.error(f"Error closing event feed '{feed_name}' for strategy '{name}': {e}")
 
-        # Clear strategy event feed tracking after attempting to stop all feeds
-        self._strategy_event_feeds[strategy] = {}
+        # Clear strategy event feed tracking after attempting to close all feeds
+        self._strategy_event_feeds[strategy] = []
 
         # Then invoke strategy's on_stop callback and transition state
         try:
@@ -450,11 +451,13 @@ class TradingEngine:
             )
 
         # Check: delivery name must be unique per strategy
-        if name in self._strategy_event_feeds[strategy]:
-            raise ValueError(
-                "Cannot call `request_event_delivery_for_strategy` because delivery name $name "
-                f"('{name}') is already used for this strategy. Choose a different name.",
-            )
+        feeds_list = self._strategy_event_feeds[strategy]
+        for existing_feed in feeds_list:
+            if existing_feed.request_info.get("name") == name:
+                raise ValueError(
+                    "Cannot call `request_event_delivery_for_strategy` because event-feed with $name "
+                    f"('{name}') is already used for this strategy. Choose a different name.",
+                )
 
         # Check: provider must exist in added event feed providers
         if provider_ref not in self._event_feed_providers:
@@ -470,16 +473,17 @@ class TradingEngine:
         # Note: The provider should create a feed that stores request info internally
         event_feed = provider.create_event_feed(event_type, parameters, callback)
 
-        # Store request metadata in the feed's request_info if it doesn't have it
+        # Store request metadata including the name
         event_feed.request_info = {
+            "name": name,
             "event_type": event_type,
             "parameters": parameters,
             "callback": callback,
             "provider_ref": provider_ref,
         }
 
-        # Track the event feed directly (simplified structure)
-        self._strategy_event_feeds[strategy][name] = event_feed
+        # Add to ordered list (order is implicit via list position)
+        feeds_list.append(event_feed)
 
     def cancel_event_delivery_for_strategy(self, strategy: Strategy, name: str) -> None:
         """Cancel event delivery for the specified strategy.
@@ -499,22 +503,49 @@ class TradingEngine:
                 "Add the strategy using `add_strategy` first.",
             )
 
-        # Check: delivery name must exist for this strategy
-        if name not in self._strategy_event_feeds[strategy]:
+        feeds_list = self._strategy_event_feeds[strategy]
+
+        # Find and remove the feed by name
+        for i, feed in enumerate(feeds_list):
+            if feed.request_info.get("name") == name:
+                try:
+                    feed.close()
+                except Exception as e:
+                    logger.error(f"Error closing event feed '{name}' for strategy: {e}")
+
+                # Remove from list
+                feeds_list.pop(i)
+                return
+
+        # If we get here, name was not found
+        raise ValueError(
+            "Cannot call `cancel_event_delivery_for_strategy` because delivery name $name "
+            f"('{name}') does not exist for this strategy. Ensure the request was created "
+            "with `request_event_delivery_for_strategy`.",
+        )
+
+    def get_event_feeds_for_strategy(self, strategy: Strategy) -> List[EventFeed]:
+        """Get event feeds for a strategy in the order they were requested.
+
+        Args:
+            strategy: The strategy to get event feeds for.
+
+        Returns:
+            List[EventFeed]: Event feeds in request order.
+
+        Raises:
+            ValueError: If $strategy is not added to this TradingEngine.
+        """
+        # Check: strategy must be added to this engine
+        if strategy not in self._strategy_event_feeds:
             raise ValueError(
-                "Cannot call `cancel_event_delivery_for_strategy` because delivery name $name "
-                f"('{name}') does not exist for this strategy. Ensure the request was created "
-                "with `request_event_delivery_for_strategy`.",
+                "Cannot call `get_event_feeds_for_strategy` because $strategy "
+                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
+                "Add the strategy using `add_strategy` first.",
             )
 
-        feed = self._strategy_event_feeds[strategy][name]
-        try:
-            feed.close()
-        except Exception as e:
-            logger.error(f"Error closing event feed '{name}' for strategy: {e}")
-
-        # Remove from tracking regardless of close outcome
-        del self._strategy_event_feeds[strategy][name]
+        # Return copy to prevent external modification
+        return list(self._strategy_event_feeds[strategy])
 
     # endregion
 
