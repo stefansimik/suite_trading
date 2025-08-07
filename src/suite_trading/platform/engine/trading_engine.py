@@ -145,6 +145,10 @@ class TradingEngine:
     def add_strategy(self, name: str, strategy: Strategy) -> None:
         """Register a strategy with the specified name.
 
+        Names enable clear logging ("Started strategy 'momentum_eurusd'") and easy strategy
+        identification without storing object references. This decoupling simplifies complex
+        scenarios like multiple instances and configuration-driven setups.
+
         Args:
             name: Unique name to identify this strategy.
             strategy: The strategy instance to register.
@@ -300,6 +304,10 @@ class TradingEngine:
     def add_event_feed_provider(self, name: str, provider: EventFeedProvider) -> None:
         """Register an EventFeedProvider with the specified name.
 
+        Names enable clear logging ("Connected event feed provider 'yahoo'") and easy provider
+        identification without storing object references. This decoupling simplifies complex
+        scenarios like multiple instances and configuration-driven setups.
+
         Args:
             name: Unique name to identify this provider.
             provider: The EventFeedProvider instance to register.
@@ -347,6 +355,10 @@ class TradingEngine:
 
     def add_broker(self, name: str, broker: Broker) -> None:
         """Register a broker with the specified name.
+
+        Names enable clear logging ("Connected broker 'interactive_brokers'") and easy broker
+        identification without storing object references. This decoupling simplifies complex
+        scenarios like multiple instances and configuration-driven setups.
 
         Args:
             name: Unique name to identify this broker.
