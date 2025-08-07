@@ -9,32 +9,70 @@ class EventFeed(Protocol):
     conditions without exposing a heavy state machine.
 
     States:
-    - READY: An event is immediately available -> next() returns an Event
-    - IDLE: No event is ready now, but the feed may produce more later -> next() returns None while
+    - READY: An event is immediately available -> next() returns an Event, peek() returns same Event
+    - IDLE: No event is ready now, but the feed may produce more later -> both return None while
       is_finished() is False
-    - FINISHED: The feed will never produce more events -> is_finished() is True
+    - FINISHED: The feed will never produce more events -> both return None, is_finished() is True
 
     How to use:
-    - Call next() repeatedly to pull available events.
-    - If next() returns None, check is_finished():
+    - Call next() repeatedly to pull available events
+    - Call peek() to inspect the next event without consuming it
+    - If next() or peek() returns None, check is_finished():
       - False => the feed is IDLE; keep polling later
       - True  => the feed is FINISHED; stop polling
-    - Always call close() once you are done to release resources.
+    - Always call close() once you are done to release resources
 
-    Example:
+    Examples:
+        # Standard consumption loop
         while not feed.is_finished():
             event = feed.next()
             if event is not None:
                 process_event(event)
         feed.close()
 
+        # Conditional lookahead
+        preview = feed.peek()
+        if preview is not None and should_defer(preview):
+            # Decide based on next event without consuming it
+            pass
+
+        event = feed.next()
+        if event is not None:
+            handle(event)
+
     Notes:
-    - Implementations must be non-blocking in next() and should fail fast on unexpected errors
-      (raise exceptions rather than silently ignoring problems).
+    - Implementations must be non-blocking in both next() and peek()
+    - Should fail fast on unexpected errors (raise exceptions rather than silently ignoring problems)
+    - Single-consumer expectation; document if implementation supports concurrency
     - This contract intentionally omits advanced controls such as request_stop() or
       finished_reason(). Add such capabilities only when you truly need them, keeping the core API
       simple.
     """
+
+    def peek(self) -> Optional[Event]:
+        """Return the next event without consuming it.
+
+        Non-blocking lookahead that returns the same event that next() would return, without
+        advancing the feed position. Multiple peek() calls return the same event until next()
+        consumes it.
+
+        State mapping:
+        - READY: Returns the head event without consuming it
+        - IDLE: Returns None; is_finished() is False
+        - FINISHED: Returns None; is_finished() is True
+
+        Guarantees:
+        - If peek() returns event E, the very next next() call must return the same E (object identity)
+        - Multiple peek() calls return the same event until consumed by next()
+        - Events arriving after peek() but before next() do not change what next() returns
+
+        Returns:
+            Optional[Event]: The next event if available, otherwise None.
+
+        Raises:
+            Exception: Implementations should raise on unexpected errors instead of hiding them.
+        """
+        ...
 
     def next(self) -> Optional[Event]:
         """Return the next event if one is ready.
