@@ -238,19 +238,30 @@ class TradingEngine:
             )
 
         # Stop all registered event feeds for this strategy first
+        # Note: We collect all event feed errors instead of raising exceptions early.
+        # Goal: Stop all event feeds first before raising any exceptions to ensure maximum cleanup.
+        # This prevents leaving other event feeds unclosed when one feed fails to stop.
         feed_entries = self._strategy_event_feeds.get(strategy, {})
+        feed_errors = []
         for feed_name, entry in list(feed_entries.items()):
             try:
                 entry["feed"].stop()
             except Exception as e:
+                feed_errors.append(f"Error stopping event feed '{feed_name}': {e}")
                 logger.error(f"Error stopping event feed '{feed_name}' for strategy '{name}': {e}")
 
-        # Clear strategy event feed tracking after stopping all feeds
+        # Clear strategy event feed tracking after attempting to stop all feeds
         self._strategy_event_feeds[strategy] = {}
 
         # Then invoke strategy's on_stop callback and transition state
         try:
             strategy.on_stop()
+
+            # Check: all event feeds must have stopped successfully before transitioning to success
+            if feed_errors:
+                error_summary = "; ".join(feed_errors)
+                raise RuntimeError(f"Strategy callback succeeded but event feed cleanup failed: {error_summary}")
+
             strategy._state_machine.execute_action(StrategyAction.STOP_STRATEGY)
         except Exception:
             strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
