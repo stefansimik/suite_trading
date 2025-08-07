@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Dict, List, Callable
+from typing import Dict, List, Callable, Optional
 
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
@@ -13,65 +13,63 @@ from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
+from suite_trading.platform.engine.event_feed_manager import EventFeedManager
 
 logger = logging.getLogger(__name__)
 
 
 class TradingEngine:
-    """Simple engine for managing and running trading strategies.
+    """Runs multiple trading strategies at the same time, each with its own timeline.
 
-    The TradingEngine coordinates strategies and provides a framework for strategy
-    execution and management.
+    TradingEngine lets you run many strategies together. Each strategy gets its own time
+    and doesn't wait for other strategies. This means you can run old backtests and live
+    trading at the same time.
 
-    **Architecture:**
-    - **Strategies**: Implement trading logic and subscribe to events via MessageBus
-    - **MessageBus**: Handles event distribution to strategies
-
-    This simple design focuses on strategy coordination and management.
+    What you can do:
+    - Run multiple backtests with different time periods at once
+    - Mix live trading with historical testing
+    - Each strategy moves through time based on its own events
+    - Strategies don't interfere with each other
     """
 
     # region Lifecycle
 
     def __init__(self):
-        """Initialize a new TradingEngine instance.
+        """Create a new TradingEngine."""
 
-        Creates its own MessageBus instance for isolated operation.
-        """
         # Engine state machine
         self._state_machine = create_engine_state_machine()
 
         # Message bus
         self.message_bus = MessageBus()
 
-        # Strategy management
-        self._strategies: Dict[str, Strategy] = {}
-
         # EventFeedProvider registry
         self._event_feed_providers: Dict[str, EventFeedProvider] = {}
 
-        # Broker registry
+        # Brokers registry
         self._brokers: Dict[str, Broker] = {}
 
-        # Event feed management - track event-feeds per strategy
-        self._strategy_event_feeds: Dict[Strategy, List[EventFeed]] = {}
+        # STRATEGIES
+        # Strategies registry
+        self._strategies: Dict[str, Strategy] = {}
+        # EventFeeds management for each Strategy
+        self._feed_manager = EventFeedManager()
+        # Tracks time for each strategy
+        self._strategy_current_time: Dict[Strategy, Optional[datetime]] = {}
 
     @property
     def state(self) -> EngineState:
-        """Get current lifecycle state.
+        """Get what state the engine is in right now.
 
         Returns:
-            EngineState: Current lifecycle state of this engine.
+            EngineState: Current state like NEW, RUNNING, or STOPPED.
         """
         return self._state_machine.current_state
 
     def start(self):
-        """Start the TradingEngine and all strategies.
+        """Start the engine and all your strategies.
 
-        This method connects all event feed providers and brokers, then starts all registered strategies.
-        The startup order is: event feed providers → brokers → strategies.
-
-        Raises:
-            ValueError: If engine is not in NEW state.
+        Connects in this order: EventFeedProvider(s) -> Brokers first -> then starts all strategies.
         """
         # Check: engine must be in NEW state before starting
         if not self._state_machine.can_execute_action(EngineAction.START_ENGINE):
@@ -79,12 +77,12 @@ class TradingEngine:
             raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
 
         try:
-            # Connect all event feed providers first
+            # Connect event-feed-providers first
             for provider_name, provider in self._event_feed_providers.items():
                 provider.connect()
                 logger.info(f"Connected event feed provider '{provider_name}'")
 
-            # Connect all brokers second
+            # Connect brokers second
             for broker_name, broker in self._brokers.items():
                 broker.connect()
                 logger.info(f"Connected broker '{broker_name}'")
@@ -94,18 +92,21 @@ class TradingEngine:
                 self.start_strategy(strategy_name)
                 logger.info(f"Started strategy under name: '{strategy_name}'")
 
-            # Transition to RUNNING state after successful start
+            # Mark engine as running
             self._state_machine.execute_action(EngineAction.START_ENGINE)
+
+            # Start processing events
+            self.run_strategy_processing_loop()
         except Exception:
-            # Transition to ERROR state on any failure
+            # Mark engine as failed
             self._state_machine.execute_action(EngineAction.ERROR_OCCURRED)
             raise
 
     def stop(self):
-        """Stop the TradingEngine and all strategies.
+        """Stop the engine and all your strategies.
 
-        This method stops all registered strategies, disconnects brokers, and disconnects event feed providers.
-        The shutdown order is: strategies → brokers → event feed providers.
+        Stops all strategies first, then disconnects from brokers and event-feed-providers.
+        Order: strategies → brokers → event-feed providers.
 
         Raises:
             ValueError: If engine is not in RUNNING state.
@@ -116,42 +117,99 @@ class TradingEngine:
             raise ValueError(f"Cannot stop engine in state {self.state.name}. Valid actions: {valid_actions}")
 
         try:
-            # Stop all strategies and clean up their event feeds first
+            # Stop all strategies and clean up their event-feeds first
             for strategy_name in list(self._strategies.keys()):
                 self.stop_strategy(strategy_name)
                 logger.info(f"Stopped strategy named '{strategy_name}'")
 
-            # Disconnect all brokers second
+            # Disconnect brokers second
             for broker_name, broker in self._brokers.items():
                 broker.disconnect()
                 logger.info(f"Disconnected broker '{broker_name}'")
 
-            # Disconnect all event feed providers last
+            # Disconnect event-feed-providers last
             for provider_name, provider in self._event_feed_providers.items():
                 provider.disconnect()
                 logger.info(f"Disconnected event feed provider '{provider_name}'")
 
-            # Transition to STOPPED state after successful stop
+            # Mark engine as stopped
             self._state_machine.execute_action(EngineAction.STOP_ENGINE)
         except Exception:
-            # Transition to ERROR state on any failure
+            # Mark engine as failed
             self._state_machine.execute_action(EngineAction.ERROR_OCCURRED)
             raise
+
+    def run_strategy_processing_loop(self) -> None:
+        """Process events for all strategies until they're finished.
+
+        How it works:
+        Each strategy gets events independently and have their own timeline.
+        Strategies just process their events one-by-one and when all event-feeds are finished,
+        strategy stops and is finished.
+
+        What happens:
+        1. For each strategy, find its oldest event from all its event-feeds
+        2. Give that event to the strategy and update its time
+        3. Keep going until all event-feeds are finished
+
+        When more events have the same time `dt_event`, then event coming from first event-feed wins.
+
+        The engine stops automatically when all event-feeds for all strategies are finished.
+
+        Raises:
+            ValueError: If engine is not in RUNNING state.
+        """
+        # Check: engine must be in RUNNING state
+        if self.state != EngineState.RUNNING:
+            raise ValueError(f"Cannot run processing loop because engine is not RUNNING. Current state: {self.state.name}")
+
+        logger.info("Starting event processing loop")
+
+        # Keep going while any strategy still has data to process
+        while self._feed_manager.has_unfinished_feeds():
+            # Go through each strategy
+            for strategy in self._strategies.values():
+                # Find the oldest event from all this strategy's event-feeds
+                # If events have the same time, use the first feed (keeps request order)
+                oldest_feed = self._feed_manager.get_next_event_feed_for_strategy(strategy)
+
+                # Process the event if we found one
+                if oldest_feed is not None:
+                    # Get the event
+                    consumed_event = oldest_feed.next()
+
+                    # Update this strategy's time
+                    self._strategy_current_time[strategy] = consumed_event.dt_event
+
+                    # Send event to strategy
+                    try:
+                        strategy.on_event(consumed_event)
+                    except Exception as e:
+                        logger.error(f"Error processing event for strategy: {e}")
+                        # Mark strategy as failed
+                        strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
+                        strategy.on_error(e)
+
+            # Remove finished event-feeds
+            self._feed_manager.cleanup_finished_feeds()
+
+        logger.info("Event processing loop completed - all feeds finished")
+
+        # Stop the engine when all data is processed
+        self.stop()
 
     # endregion
 
     # region Strategies
 
     def add_strategy(self, name: str, strategy: Strategy) -> None:
-        """Register a strategy with the specified name.
+        """Add a strategy to the engine with a name.
 
-        Names enable clear logging ("Started strategy 'momentum_eurusd'") and easy strategy
-        identification without storing object references. This decoupling simplifies complex
-        scenarios like multiple instances and configuration-driven setups.
+        Give your strategy a name so you can easily identify it in logs and manage it later.
 
         Args:
             name: Unique name to identify this strategy.
-            strategy: The strategy instance to register.
+            strategy: The strategy instance to add.
 
         Raises:
             ValueError: If a strategy with the same name already exists or $strategy is not NEW.
@@ -170,18 +228,21 @@ class TradingEngine:
                 f"{strategy.__class__.__name__}.",
             )
 
-        # Attach engine reference to strategy (no state change here)
+        # Connect strategy to this engine
         strategy._set_trading_engine(self)
         self._strategies[name] = strategy
 
-        # Initialize empty event feed tracking for this strategy
-        self._strategy_event_feeds[strategy] = []
+        # Set up time tracking for this strategy
+        self._strategy_current_time[strategy] = None
 
-        # Transition strategy lifecycle to ADDED after successful registration
+        # Set up EventFeed tracking for this strategy
+        self._feed_manager.add_strategy(strategy)
+
+        # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
 
     def start_strategy(self, name: str) -> None:
-        """Start a specific strategy by name.
+        """Start a strategy by its name.
 
         Args:
             name: Name of the strategy to start.
@@ -213,7 +274,7 @@ class TradingEngine:
             raise
 
     def stop_strategy(self, name: str) -> None:
-        """Stop a specific strategy by name and clean up its event feeds.
+        """Stop a strategy by its name and clean up its event-feeds.
 
         Args:
             name: Name of the strategy to stop.
@@ -237,28 +298,17 @@ class TradingEngine:
                 f"Cannot stop strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
             )
 
-        # Stop all registered event feeds for this strategy first
-        # Note: We collect all event feed errors instead of raising exceptions early.
-        # Goal: Stop all event feeds first before raising any exceptions to ensure maximum cleanup.
-        # This prevents leaving other event feeds unclosed when one feed fails to stop.
-        strategy_feeds = self._strategy_event_feeds.get(strategy, [])
-        feed_errors = []
-        for feed in list(strategy_feeds):
-            feed_name = feed.request_info["name"]
-            try:
-                feed.close()
-            except Exception as e:
-                feed_errors.append(f"Error closing event feed '{feed_name}': {e}")
-                logger.error(f"Error closing event feed '{feed_name}' for strategy '{name}': {e}")
+        # Stop all event-feeds for this strategy first
+        # Try to stop all feeds even if some fail, then report any errors
+        feed_errors = self._feed_manager.cleanup_all_feeds_for_strategy(strategy)
+        for error in feed_errors:
+            logger.error(f"Error during feed cleanup for strategy '{name}': {error}")
 
-        # Clear strategy event feed tracking after attempting to close all feeds
-        self._strategy_event_feeds[strategy] = []
-
-        # Then invoke strategy's on_stop callback and transition state
+        # Now stop the strategy itself
         try:
             strategy.on_stop()
 
-            # Check: all event feeds must have stopped successfully before transitioning to success
+            # Check: make sure all event-feeds stopped successfully
             if feed_errors:
                 error_summary = "; ".join(feed_errors)
                 raise RuntimeError(f"Strategy callback succeeded but event feed cleanup failed: {error_summary}")
@@ -293,16 +343,19 @@ class TradingEngine:
                 f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}",
             )
 
-        # Remove any remaining event feed tracking for safety
-        if strategy in self._strategy_event_feeds:
-            del self._strategy_event_feeds[strategy]
+        # Remove time tracking for this strategy
+        if strategy in self._strategy_current_time:
+            del self._strategy_current_time[strategy]
+
+        # Remove EventFeed tracking for this strategy
+        self._feed_manager.remove_strategy(strategy)
 
         # Remove from strategies' dictionary
         del self._strategies[name]
 
     @property
     def strategies(self) -> Dict[str, Strategy]:
-        """Get all registered strategies.
+        """Get all your strategies.
 
         Returns:
             Dictionary mapping strategy names to strategy instances.
@@ -314,15 +367,13 @@ class TradingEngine:
     # region EventFeed providers
 
     def add_event_feed_provider(self, name: str, provider: EventFeedProvider) -> None:
-        """Register an EventFeedProvider with the specified name.
+        """Add an event-feed provider to the engine with a name.
 
-        Names enable clear logging ("Connected event feed provider 'yahoo'") and easy provider
-        identification without storing object references. This decoupling simplifies complex
-        scenarios like multiple instances and configuration-driven setups.
+        Give your event-feed provider a name so you can easily identify it in logs and use it later.
 
         Args:
             name: Unique name to identify this provider.
-            provider: The EventFeedProvider instance to register.
+            provider: The EventFeedProvider instance to add.
 
         Raises:
             ValueError: If a provider with the same $name already exists.
@@ -336,7 +387,7 @@ class TradingEngine:
         self._event_feed_providers[name] = provider
 
     def remove_event_feed_provider(self, name: str) -> None:
-        """Remove an EventFeedProvider by $name.
+        """Remove an event-feed provider by name.
 
         Args:
             name: Name of the provider to remove.
@@ -354,10 +405,10 @@ class TradingEngine:
 
     @property
     def event_feed_providers(self) -> Dict[str, EventFeedProvider]:
-        """Get all registered EventFeedProviders.
+        """Get all your event-feed providers.
 
         Returns:
-            Dictionary mapping provider $name values to provider instances.
+            Dictionary mapping provider names to provider instances.
         """
         return self._event_feed_providers
 
@@ -366,15 +417,13 @@ class TradingEngine:
     # region Brokers
 
     def add_broker(self, name: str, broker: Broker) -> None:
-        """Register a broker with the specified name.
+        """Add a broker to the engine with a name.
 
-        Names enable clear logging ("Connected broker 'interactive_brokers'") and easy broker
-        identification without storing object references. This decoupling simplifies complex
-        scenarios like multiple instances and configuration-driven setups.
+        Give your broker a name so you can easily identify it in logs and use it later.
 
         Args:
             name: Unique name to identify this broker.
-            broker: The broker instance to register.
+            broker: The broker instance to add.
 
         Raises:
             ValueError: If a broker with the same name already exists.
@@ -404,7 +453,7 @@ class TradingEngine:
 
     @property
     def brokers(self) -> Dict[str, Broker]:
-        """Get all registered brokers.
+        """Get all your brokers.
 
         Returns:
             Dictionary mapping broker names to broker instances.
@@ -424,26 +473,25 @@ class TradingEngine:
         provider_ref: str,
         callback: Callable,
     ) -> None:
-        """Request event delivery for the specified strategy.
+        """Ask for events to be sent to a strategy.
 
-        This method creates and registers an event feed for a strategy using a selected
-        EventFeedProvider. The EventFeedProvider returns an opaque feed object that TradingEngine
-        stores and manages for lifecycle events (cancel/stop).
+        Creates an event-feed for your strategy using one of your event-feed providers.
+        The engine will manage this feed and send events to your strategy.
 
         Args:
-            strategy: The strategy requesting the event delivery.
-            name: Unique name for this delivery within the strategy.
+            strategy: The strategy that wants to receive events.
+            name: Unique name for this event-feed within the strategy.
             event_type: Type of events to receive (e.g., NewBarEvent).
             parameters: Dictionary with event-specific parameters.
-            provider_ref: Reference name of the provider to use for this delivery.
-            callback: Function to call when events are received. Keyword-only.
+            provider_ref: Name of the event-feed provider to use.
+            callback: Function to call when events are received.
 
         Raises:
             ValueError: If $name is already in use for this strategy, $provider_ref not found,
                        or the EventFeed cannot be created for $event_type with $parameters.
         """
         # Check: strategy must be added to this engine
-        if strategy not in self._strategy_event_feeds:
+        if strategy not in self._strategies.values():
             raise ValueError(
                 "Cannot call `request_event_delivery_for_strategy` because $strategy "
                 f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
@@ -451,7 +499,7 @@ class TradingEngine:
             )
 
         # Check: delivery name must be unique per strategy
-        feeds_list = self._strategy_event_feeds[strategy]
+        feeds_list = self._feed_manager.get_event_feeds_for_strategy(strategy)
         for existing_feed in feeds_list:
             if existing_feed.request_info.get("name") == name:
                 raise ValueError(
@@ -482,81 +530,84 @@ class TradingEngine:
             "provider_ref": provider_ref,
         }
 
-        # Add to ordered list (order is implicit via list position)
-        feeds_list.append(event_feed)
+        # Add EventFeed to strategy using manager (preserves request order)
+        self._feed_manager.add_event_feed_for_strategy(strategy, event_feed)
 
     def cancel_event_delivery_for_strategy(self, strategy: Strategy, name: str) -> None:
-        """Cancel event delivery for the specified strategy.
+        """Stop sending events to a strategy.
 
         Args:
-            strategy: The strategy that owns the event delivery.
-            name: Name of the delivery to cancel.
+            strategy: The strategy that owns the event-feed.
+            name: Name of the event-feed to cancel.
 
         Raises:
             ValueError: If $name is not found for this strategy, or $strategy is not registered.
         """
         # Check: strategy must be added to this engine
-        if strategy not in self._strategy_event_feeds:
+        if strategy not in self._strategies.values():
             raise ValueError(
                 "Cannot call `cancel_event_delivery_for_strategy` because $strategy "
                 f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
                 "Add the strategy using `add_strategy` first.",
             )
 
-        feeds_list = self._strategy_event_feeds[strategy]
-
-        # Find and remove the feed by name
-        for i, feed in enumerate(feeds_list):
+        # Find and close the feed by name before removing
+        feeds_list = self._feed_manager.get_event_feeds_for_strategy(strategy)
+        feed_to_close = None
+        for feed in feeds_list:
             if feed.request_info.get("name") == name:
-                try:
-                    feed.close()
-                except Exception as e:
-                    logger.error(f"Error closing event feed '{name}' for strategy: {e}")
+                feed_to_close = feed
+                break
 
-                # Remove from list
-                feeds_list.pop(i)
-                return
+        if feed_to_close is None:
+            raise ValueError(
+                "Cannot call `cancel_event_delivery_for_strategy` because delivery name $name "
+                f"('{name}') does not exist for this strategy. Ensure the request was created "
+                "with `request_event_delivery_for_strategy`.",
+            )
 
-        # If we get here, name was not found
-        raise ValueError(
-            "Cannot call `cancel_event_delivery_for_strategy` because delivery name $name "
-            f"('{name}') does not exist for this strategy. Ensure the request was created "
-            "with `request_event_delivery_for_strategy`.",
-        )
+        # Close the feed first
+        try:
+            feed_to_close.close()
+        except Exception as e:
+            logger.error(f"Error closing event feed '{name}' for strategy: {e}")
+
+        # Remove from manager
+        self._feed_manager.remove_event_feed_for_strategy(strategy, name)
 
     def get_event_feeds_for_strategy(self, strategy: Strategy) -> List[EventFeed]:
-        """Get event feeds for a strategy in the order they were requested.
+        """Get all event-feeds for a strategy in the order you requested them.
 
         Args:
-            strategy: The strategy to get event feeds for.
+            strategy: The strategy to get event-feeds for.
 
         Returns:
-            List[EventFeed]: Event feeds in request order.
+            List[EventFeed]: Event-feeds in request order.
 
         Raises:
             ValueError: If $strategy is not added to this TradingEngine.
         """
         # Check: strategy must be added to this engine
-        if strategy not in self._strategy_event_feeds:
+        if strategy not in self._strategies.values():
             raise ValueError(
                 "Cannot call `get_event_feeds_for_strategy` because $strategy "
                 f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
                 "Add the strategy using `add_strategy` first.",
             )
 
-        # Return copy to prevent external modification
-        return list(self._strategy_event_feeds[strategy])
+        # Delegate to manager (returns copy to prevent external modification)
+        return self._feed_manager.get_event_feeds_for_strategy(strategy)
 
     # endregion
 
     # region Orders
 
     def submit_order(self, order: Order, broker: Broker) -> None:
-        """Submit an order through the specified broker.
+        """Send an order to your broker.
 
         Args:
             order: The order to submit.
-            broker: The broker to submit the order through.
+            broker: The broker to use.
 
         Raises:
             ConnectionError: If the broker is not connected.
@@ -565,11 +616,11 @@ class TradingEngine:
         broker.submit_order(order)
 
     def cancel_order(self, order: Order, broker: Broker) -> None:
-        """Cancel an order through the specified broker.
+        """Cancel an order with your broker.
 
         Args:
             order: The order to cancel.
-            broker: The broker to cancel the order through.
+            broker: The broker to use.
 
         Raises:
             ConnectionError: If the broker is not connected.
@@ -578,11 +629,11 @@ class TradingEngine:
         broker.cancel_order(order)
 
     def modify_order(self, order: Order, broker: Broker) -> None:
-        """Modify an order through the specified broker.
+        """Change an order with your broker.
 
         Args:
             order: The order to modify with updated parameters.
-            broker: The broker to modify the order through.
+            broker: The broker to use.
 
         Raises:
             ConnectionError: If the broker is not connected.
@@ -591,13 +642,13 @@ class TradingEngine:
         broker.modify_order(order)
 
     def get_active_orders(self, broker: Broker) -> List[Order]:
-        """Get all active orders from the specified broker.
+        """Get all your active orders from a broker.
 
         Args:
             broker: The broker to get active orders from.
 
         Returns:
-            List of all active orders for the specified broker.
+            List of all active orders for this broker.
 
         Raises:
             ConnectionError: If the broker is not connected.
@@ -609,13 +660,13 @@ class TradingEngine:
     # region Helper methods
 
     def publish_bar(self, bar: Bar, provider_name: str, is_historical: bool = True) -> None:
-        """Publish a bar to the MessageBus for distribution to subscribed strategies.
+        """Send bar data to all strategies that want it.
 
-        Creates a NewBarEvent with the specified historical context and publishes it to the appropriate topic.
+        Creates an event and sends it to strategies through the message system.
 
         Args:
-            bar: The bar to publish.
-            provider_name: Name of the provider that generated this bar.
+            bar: The bar data to send.
+            provider_name: Name of the provider that created this bar.
             is_historical: Whether this bar data is historical or live. Defaults to True.
         """
         event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical, provider_name=provider_name)

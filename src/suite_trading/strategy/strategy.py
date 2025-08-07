@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import TYPE_CHECKING, List, Callable, Optional
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
@@ -10,6 +11,30 @@ if TYPE_CHECKING:
 
 
 class Strategy(ABC):
+    """Base class for all trading strategies with independent timeline management.
+
+    **Timeline Isolation:**
+    Each Strategy operates with its own independent timeline, completely isolated from other
+    strategies' timelines. This means:
+
+    - **No Global Time Synchronization**: There is no global time that syncs across all strategies
+    - **Independent Event Processing**: Each strategy processes events at its own pace and timeline
+    - **Flexible Time Ranges**: Strategies can process different time periods simultaneously
+    - **Mixed Execution Modes**: Historical backtests and live strategies can run together
+
+    **Benefits:**
+    - Run multiple historical backtests with different time periods simultaneously
+    - Combine live trading strategies with historical analysis strategies
+    - Each strategy maintains its own `current_time` based on the last processed event
+    - Strategies never interfere with each other's timeline progression
+
+    **Example Use Cases:**
+    - Strategy A: Historical backtest from 2020-2023
+    - Strategy B: Live trading starting from current time
+    - Strategy C: Historical analysis from 2019-2021
+    - All three can run simultaneously, each with their own timeline
+    """
+
     # region Lifecycle
 
     def __init__(self):
@@ -29,6 +54,29 @@ class Strategy(ABC):
             StrategyState: Current lifecycle state of this strategy.
         """
         return self._state_machine.current_state
+
+    @property
+    def current_time(self) -> Optional[datetime]:
+        """Get the current time for this strategy's independent timeline.
+
+        **Timeline Isolation:**
+        This time is completely independent from other strategies' timelines. Each strategy
+        maintains its own timeline based on the events it processes, allowing:
+
+        - Historical strategies to have their own historical time progression
+        - Live strategies to follow real-time progression
+        - Multiple strategies to operate in different time periods simultaneously
+
+        The time advances only when this specific strategy processes events, ensuring
+        complete timeline isolation between strategies.
+
+        Returns:
+            Optional[datetime]: The dt_event timestamp of the last event processed by this
+                strategy, or None if no events have been processed yet.
+        """
+        if self._trading_engine is None:
+            return None
+        return self._trading_engine._strategy_current_time.get(self, None)
 
     def is_in_terminal_state(self) -> bool:
         """Check if the strategy is in a terminal state.
