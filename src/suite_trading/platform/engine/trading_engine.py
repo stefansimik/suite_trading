@@ -541,7 +541,7 @@ class TradingEngine:
             name: Name of the event-feed to cancel.
 
         Raises:
-            ValueError: If $name is not found for this strategy, or $strategy is not registered.
+            ValueError: If $strategy is not registered.
         """
         # Check: strategy must be added to this engine
         if strategy not in self._strategies.values():
@@ -559,12 +559,10 @@ class TradingEngine:
                 feed_to_close = feed
                 break
 
+        # Handle case where feed doesn't exist (already finished/removed)
         if feed_to_close is None:
-            raise ValueError(
-                "Cannot call `cancel_event_delivery_for_strategy` because delivery name $name "
-                f"('{name}') does not exist for this strategy. Ensure the request was created "
-                "with `request_event_delivery_for_strategy`.",
-            )
+            logger.debug(f"Event delivery '{name}' for strategy {strategy.__class__.__name__} was already finished or canceled - no action needed")
+            return
 
         # Close the feed first
         try:
