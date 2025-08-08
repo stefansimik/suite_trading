@@ -18,16 +18,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3e5a99ad-acd1-45ad-875b-7ada8e7d4d81" name="Changes" comment="Implement StateMachine for Strategy state management&#10;&#10;- Add strategy_state_machine.py with StrategyState, StrategyAction enums and factory&#10;- Replace manual state management with StateMachine in Strategy and TradingEngine&#10;- Use descriptive action names (ADD_STRATEGY_TO_ENGINE, START_STRATEGY, etc.)&#10;- Remove old strategy_state.py file&#10;- Improve error messages with valid actions context">
-      <change beforePath="$PROJECT_DIR$/.junie/guidelines.md" beforeDir="false" afterPath="$PROJECT_DIR$/.junie/guidelines.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/suite_trading/domain/monetary/money.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/suite_trading/domain/monetary/money.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/suite_trading/domain/order/orders.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/suite_trading/domain/order/orders.py" afterDir="false" />
+    <list default="true" id="3e5a99ad-acd1-45ad-875b-7ada8e7d4d81" name="Changes" comment="Reorganize regions in Strategy.">
       <change beforePath="$PROJECT_DIR$/src/suite_trading/platform/engine/trading_engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/suite_trading/platform/engine/trading_engine.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/suite_trading/platform/messaging/message_bus.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/suite_trading/platform/messaging/message_bus.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/suite_trading/platform/messaging/topic_factory.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/suite_trading/platform/messaging/topic_factory.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/suite_trading/strategy/strategy.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/suite_trading/strategy/strategy.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/suite_trading/utils/state_machine.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/suite_trading/utils/state_machine.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/unit/suite_trading/messaging/test_message_bus.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/unit/suite_trading/messaging/test_message_bus.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,57 +77,58 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Notification.DisplayName-DoNotAsk-Test Runner": "Test execution finished",
-    "Notification.DoNotAsk-Test Runner": "true",
-    "Python tests.Python tests for integration.suite_trading.test_playground.test_basic_flow.executor": "Debug",
-    "Python tests.Python tests for suite_trading.test_design_architecture.test_basic_strategy_operations.executor": "Debug",
-    "Python tests.Python tests for test_design_architecture.test_basic_flow.executor": "Run",
-    "Python tests.Python tests for test_design_architecture.test_basic_strategy_operations.executor": "Debug",
-    "Python tests.Python tests for test_msgbus.test_message_bus_handles_unsubscribing_callbacks.executor": "Run",
-    "Python tests.Python tests for test_playground.test_basic_flow.executor": "Debug",
-    "Python tests.Python tests for unit.suite_trading.utils.data_generation.test_bars.test_create_bar_series_randomness.executor": "Debug",
-    "Python tests.Python tests in test.py.executor": "Debug",
-    "Python tests.Python tests in test_bar_continuity.py.executor": "Run",
-    "Python tests.Python tests in test_design_architecture.py.executor": "Debug",
-    "Python tests.Python tests in test_message_bus.py.executor": "Debug",
-    "Python tests.Python tests in test_msgbus.py.executor": "Run",
-    "Python tests.Python tests in test_new_market_data_api.py.executor": "Run",
-    "Python tests.Python tests in test_playground.py.executor": "Debug",
-    "Python tests.Python tests in tests.executor": "Run",
-    "Python tests.pytest for tests.unit.suite_trading.messaging.test_topic_protocol.test_topic_protocol_create_bar_topic.executor": "Run",
-    "Python.run.executor": "Run",
-    "Python.scratch.executor": "Run",
-    "Python.scratch_1.executor": "Run",
-    "Python.sine_wave_bar_generation.executor": "Run",
-    "Python.test_custommsgbus.executor": "Run",
-    "Python.test_msgbus.executor": "Run",
-    "Python.test_msgbus_simple.executor": "Debug",
-    "Python.verify_data_exports.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "Shell Script.Ruff format.executor": "Run",
-    "Shell Script.Run pre-commit.executor": "Run",
-    "git-widget-placeholder": "main",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "/Users/stesim/MYDATA/Projects/IT/suite_trading",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "to.speed.mode.migration.done": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Notification.DisplayName-DoNotAsk-Test Runner&quot;: &quot;Test execution finished&quot;,
+    &quot;Notification.DoNotAsk-Test Runner&quot;: &quot;true&quot;,
+    &quot;Python tests.Python tests for integration.suite_trading.test_playground.test_basic_flow.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests for suite_trading.test_design_architecture.test_basic_strategy_operations.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests for test_design_architecture.test_basic_flow.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests for test_design_architecture.test_basic_strategy_operations.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests for test_msgbus.test_message_bus_handles_unsubscribing_callbacks.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests for test_playground.test_basic_flow.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests for unit.suite_trading.utils.data_generation.test_bars.test_create_bar_series_randomness.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests in test.py.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests in test_bar_continuity.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in test_design_architecture.py.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests in test_message_bus.py.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests in test_msgbus.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in test_new_market_data_api.py.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.Python tests in test_playground.py.executor&quot;: &quot;Debug&quot;,
+    &quot;Python tests.Python tests in tests.executor&quot;: &quot;Run&quot;,
+    &quot;Python tests.pytest for tests.unit.suite_trading.messaging.test_topic_protocol.test_topic_protocol_create_bar_topic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run.executor&quot;: &quot;Run&quot;,
+    &quot;Python.scratch.executor&quot;: &quot;Run&quot;,
+    &quot;Python.scratch_1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.sine_wave_bar_generation.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_custommsgbus.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_msgbus.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_msgbus_simple.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.verify_data_exports.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;Shell Script.Ruff format.executor&quot;: &quot;Run&quot;,
+    &quot;Shell Script.Run pre-commit.executor&quot;: &quot;Run&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/stesim/MYDATA/Projects/IT/suite_trading&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;settings.editor.splitter.proportion&quot;: &quot;0.24872579&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
-      "Python"
+  &quot;keyToStringList&quot;: {
+    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
+      &quot;Python&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="PyConsoleOptionsProvider">
     <option name="myPythonConsoleState">
       <console-settings module-name="suite_trading" is-module-sdk="true">
@@ -157,7 +150,7 @@
       <recent name="$PROJECT_DIR$/src/suite_trading/core" />
     </key>
   </component>
-  <component name="RunManager" selected="Python tests.Python tests in test_new_market_data_api.py">
+  <component name="RunManager" selected="Python tests.Python tests in /Users/stesim/MYDATA/Projects/IT/suite_trading/tests/integration/test_new_market_data_api.py">
     <configuration name="Ruff format" type="ShConfigurationType">
       <option name="SCRIPT_TEXT" value="uvx ruff format" />
       <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
@@ -173,7 +166,7 @@
       <envs />
       <method v="2" />
     </configuration>
-    <configuration name="Python tests in test_new_market_data_api.py" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
+    <configuration name="Python tests in /Users/stesim/MYDATA/Projects/IT/suite_trading/tests/integration/test_new_market_data_api.py" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
       <module name="suite_trading" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -191,7 +184,7 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python tests.Python tests in test_new_market_data_api.py" />
+        <item itemvalue="Python tests.Python tests in /Users/stesim/MYDATA/Projects/IT/suite_trading/tests/integration/test_new_market_data_api.py" />
       </list>
     </recent_temporary>
   </component>
@@ -278,191 +271,9 @@
       <workItem from="1754300879419" duration="10397000" />
       <workItem from="1754389243620" duration="2799000" />
       <workItem from="1754392205138" duration="9918000" />
-      <workItem from="1754413491384" duration="36117000" />
-    </task>
-    <task id="LOCAL-00105" summary="Add `is_historical` flag to `NewBarEvent` for data context handling&#10;&#10;Enhance `NewBarEvent` with a new `is_historical` attribute to distinguish between historical and live bar data. Update the initializer, properties, equality comparison, and string representations to incorporate this flag.">
-      <option name="closed" value="true" />
-      <created>1753475979527</created>
-      <option name="number" value="00105" />
-      <option name="presentableId" value="LOCAL-00105" />
-      <option name="project" value="LOCAL" />
-      <updated>1753475979527</updated>
-    </task>
-    <task id="LOCAL-00106" summary="Add `is_historical` flag to `NewBarEvent` for data context handling&#10;&#10;Enhance `NewBarEvent` with a new `is_historical` attribute to distinguish between historical and live bar data. Update the initializer, properties, equality comparison, and string representations to incorporate this flag.">
-      <option name="closed" value="true" />
-      <created>1753476069725</created>
-      <option name="number" value="00106" />
-      <option name="presentableId" value="LOCAL-00106" />
-      <option name="project" value="LOCAL" />
-      <updated>1753476069725</updated>
-    </task>
-    <task id="LOCAL-00107" summary="Add `is_historical` flag to `NewBarEvent` for data context handling&#10;&#10;Enhance `NewBarEvent` with a new `is_historical` attribute to distinguish between historical and live bar data. Update the initializer, properties, equality comparison, and string representations to incorporate this flag.">
-      <option name="closed" value="true" />
-      <created>1753476253381</created>
-      <option name="number" value="00107" />
-      <option name="presentableId" value="LOCAL-00107" />
-      <option name="project" value="LOCAL" />
-      <updated>1753476253381</updated>
-    </task>
-    <task id="LOCAL-00108" summary="Update `.junie/guidelines.md` to include multi-line parameter formatting rules&#10;&#10;Add guidelines for adding trailing commas in multi-line parameter lists and ensuring proper formatting for long function names. Include examples to demonstrate the updated principles.">
-      <option name="closed" value="true" />
-      <created>1753479217648</created>
-      <option name="number" value="00108" />
-      <option name="presentableId" value="LOCAL-00108" />
-      <option name="project" value="LOCAL" />
-      <updated>1753479217648</updated>
-    </task>
-    <task id="LOCAL-00109" summary="Define `MarketDataProvider` protocol and document methods  &#10;&#10;Introduce `MarketDataProvider` protocol as a unified interface for market data retrieval and subscription. Add detailed method definitions for connection management, historical bar data handling, live bar subscriptions, and seamless historical-to-live transitions. Update `TODO.md` and `TODO_steps.md` to reflect these enhancements and provide in-depth documentation.">
-      <option name="closed" value="true" />
-      <created>1753479405945</created>
-      <option name="number" value="00109" />
-      <option name="presentableId" value="LOCAL-00109" />
-      <option name="project" value="LOCAL" />
-      <updated>1753479405945</updated>
-    </task>
-    <task id="LOCAL-00110" summary="Define `MarketDataProvider` protocol and document methods  &#10;&#10;Introduce `MarketDataProvider` protocol as a unified interface for market data retrieval and subscription. Add detailed method definitions for connection management, historical bar data handling, live bar subscriptions, and seamless historical-to-live transitions. Update `TODO.md` and `TODO_steps.md` to reflect these enhancements and provide in-depth documentation.">
-      <option name="closed" value="true" />
-      <created>1753479515346</created>
-      <option name="number" value="00110" />
-      <option name="presentableId" value="LOCAL-00110" />
-      <option name="project" value="LOCAL" />
-      <updated>1753479515347</updated>
-    </task>
-    <task id="LOCAL-00111" summary="Define `Broker` protocol and document core brokerage operations&#10;&#10;Introduce `Broker` protocol as a standardized interface for handling trading operations, including connection management, order execution, order modification, and position tracking. Provide detailed method definitions and docstrings to ensure clarity and consistency in broker implementations.">
-      <option name="closed" value="true" />
-      <created>1753481544484</created>
-      <option name="number" value="00111" />
-      <option name="presentableId" value="LOCAL-00111" />
-      <option name="project" value="LOCAL" />
-      <updated>1753481544484</updated>
-    </task>
-    <task id="LOCAL-00112" summary="Enhance TradingEngine with market data provider integration&#10;&#10;Add support for historical and live bar subscriptions in the TradingEngine using a MarketDataProvider. Implement subscription methods for strategies, including seamless historical-to-live transitions, and integrate MessageBus for distributing market data events. Update Strategy base class to delegate market data requests to TradingEngine. Modify `NewBarEvent` to include the `is_historical` flag for data context awareness. Add comprehensive testing with a mock provider in `test_playground.py` for validation.">
-      <option name="closed" value="true" />
-      <created>1753522455884</created>
-      <option name="number" value="00112" />
-      <option name="presentableId" value="LOCAL-00112" />
-      <option name="project" value="LOCAL" />
-      <updated>1753522455884</updated>
-    </task>
-    <task id="LOCAL-00113" summary="Add broker management to TradingEngine&#10;&#10;Implement broker registration, removal, and query methods in TradingEngine to manage multiple brokers. Add order management methods to delegate order operations (submit, cancel, modify) and retrieval of active orders to the appropriate broker. Update `TODO_steps.md` to mark Step 2.2 as complete.">
-      <option name="closed" value="true" />
-      <created>1753527767563</created>
-      <option name="number" value="00113" />
-      <option name="presentableId" value="LOCAL-00113" />
-      <option name="project" value="LOCAL" />
-      <updated>1753527767563</updated>
-    </task>
-    <task id="LOCAL-00114" summary="Enhance `publish_bar` method in `TradingEngine` to include the `is_historical` flags&#10;&#10;Update `TODO_steps.md` to mark Step 2.3 as completed. Enhance `publish_bar` method in `TradingEngine` to include the `is_historical` flag for distinguishing historical and live bar events. Modify the method to wrap bars in `NewBarEvent` for proper context awareness and publish the event via MessageBus.">
-      <option name="closed" value="true" />
-      <created>1753528636453</created>
-      <option name="number" value="00114" />
-      <option name="presentableId" value="LOCAL-00114" />
-      <option name="project" value="LOCAL" />
-      <updated>1753528636453</updated>
-    </task>
-    <task id="LOCAL-00115" summary="Add market data handling methods to Strategy base class&#10;&#10;Introduce `get_historical_bars_series`, `stream_historical_bars`, and bar subscription methods in the Strategy base class. These delegate historical and live bar data operations to the TradingEngine, enabling streamlined market data handling for strategies.">
-      <option name="closed" value="true" />
-      <created>1753529049342</created>
-      <option name="number" value="00115" />
-      <option name="presentableId" value="LOCAL-00115" />
-      <option name="project" value="LOCAL" />
-      <updated>1753529049342</updated>
-    </task>
-    <task id="LOCAL-00116" summary="Mark Step 3.1 as completed in `TODO_steps.md`&#10;&#10;Update `TODO_steps.md` to reflect the completion of Step 3.1: Adding market data request methods to the Strategy base class.">
-      <option name="closed" value="true" />
-      <created>1753529139879</created>
-      <option name="number" value="00116" />
-      <option name="presentableId" value="LOCAL-00116" />
-      <option name="project" value="LOCAL" />
-      <updated>1753529139879</updated>
-    </task>
-    <task id="LOCAL-00117" summary="Base Strategy - add `is_historical` attribute to market-data related functions">
-      <option name="closed" value="true" />
-      <created>1753529675672</created>
-      <option name="number" value="00117" />
-      <option name="presentableId" value="LOCAL-00117" />
-      <option name="project" value="LOCAL" />
-      <updated>1753529675672</updated>
-    </task>
-    <task id="LOCAL-00118" summary="Add order related methods in Strategy and remove tick-level methods&#10;&#10;Eliminate trade tick and quote tick subscription methods, events, and handlers from the Strategy base class and TradingEngine. Introduce order management methods (submit, cancel, modify) and active orders retrieval in the Strategy base class, delegating operations to TradingEngine for streamlined broker interaction.">
-      <option name="closed" value="true" />
-      <created>1753534039605</created>
-      <option name="number" value="00118" />
-      <option name="presentableId" value="LOCAL-00118" />
-      <option name="project" value="LOCAL" />
-      <updated>1753534039605</updated>
-    </task>
-    <task id="LOCAL-00119" summary="Add order related methods in Strategy and remove tick-level methods&#10;&#10;Eliminate trade tick and quote tick subscription methods, events, and handlers from the Strategy base class and TradingEngine. Introduce order management methods (submit, cancel, modify) and active orders retrieval in the Strategy base class, delegating operations to TradingEngine for streamlined broker interaction.">
-      <option name="closed" value="true" />
-      <created>1753534117171</created>
-      <option name="number" value="00119" />
-      <option name="presentableId" value="LOCAL-00119" />
-      <option name="project" value="LOCAL" />
-      <updated>1753534117171</updated>
-    </task>
-    <task id="LOCAL-00120" summary="Introduce support for multiple `MarketDataProvider` instances  &#10;&#10;Replace the single provider approach with a system allowing multiple `MarketDataProvider` instances to be registered, retrieved, and managed independently in `TradingEngine`. Update Strategy methods and TradingEngine functions to require an explicit provider, ensuring flexible data handling. Remove the optional `until_dt` parameter in favor of explicit data ranges. Delete `TODO_steps.md` as the implementation plan is no longer required.">
-      <option name="closed" value="true" />
-      <created>1753553751189</created>
-      <option name="number" value="00120" />
-      <option name="presentableId" value="LOCAL-00120" />
-      <option name="project" value="LOCAL" />
-      <updated>1753553751189</updated>
-    </task>
-    <task id="LOCAL-00121" summary="Introduce support for multiple `MarketDataProvider` instances  &#10;&#10;Replace the single provider approach with a system allowing multiple `MarketDataProvider` instances to be registered, retrieved, and managed independently in `TradingEngine`. Update Strategy methods and TradingEngine functions to require an explicit provider, ensuring flexible data handling. Remove the optional `until_dt` parameter in favor of explicit data ranges. Delete `TODO_steps.md` as the implementation plan is no longer required.">
-      <option name="closed" value="true" />
-      <created>1753554431770</created>
-      <option name="number" value="00121" />
-      <option name="presentableId" value="LOCAL-00121" />
-      <option name="project" value="LOCAL" />
-      <updated>1753554431770</updated>
-    </task>
-    <task id="LOCAL-00122" summary="Sync Junie guidelines into `CLAUDE.md`&#10;&#10;Enhance `CLAUDE.md` with detailed principles, naming conventions, documentation styles, and import structure rules to improve clarity, maintainability, and consistency. Add practical examples for key guidelines, including user-centric design decisions, naming clarity, code formatting, and Markdown standards.">
-      <option name="closed" value="true" />
-      <created>1753554459359</created>
-      <option name="number" value="00122" />
-      <option name="presentableId" value="LOCAL-00122" />
-      <option name="project" value="LOCAL" />
-      <updated>1753554459359</updated>
-    </task>
-    <task id="LOCAL-00123" summary="Overhaul `MarketDataProvider` interface and Strategy's market data handling&#10;&#10;Redesign `MarketDataProvider` interface to support a broader event-based data model. Replace bar-specific methods with generic event-based methods, including support for historical and live data streaming. Update Strategy to handle a wide range of event types, with robust subscription and cleanup tracking. Enhance `TopicFactory` to dynamically generate topics for any event type based on request details. Introduce streamlined subscription management and provider delegation in `TradingEngine`.">
-      <option name="closed" value="true" />
-      <created>1753658374526</created>
-      <option name="number" value="00123" />
-      <option name="presentableId" value="LOCAL-00123" />
-      <option name="project" value="LOCAL" />
-      <updated>1753658374526</updated>
-    </task>
-    <task id="LOCAL-00124" summary="Rename streaming methods for clarity and consistency&#10;&#10;Update live event streaming method names across `MarketDataProvider`, `TradingEngine`, and `Strategy` to improve readability and align with naming guidelines. Changes include replacing `start_streaming_live_events` with `start_live_stream` and similar adjustments for related methods. Update corresponding exceptions and comments for the new names.">
-      <option name="closed" value="true" />
-      <created>1753658624807</created>
-      <option name="number" value="00124" />
-      <option name="presentableId" value="LOCAL-00124" />
-      <option name="project" value="LOCAL" />
-      <updated>1753658624807</updated>
-    </task>
-    <task id="LOCAL-00125" summary="Simplify and clarify docstrings in `MarketDataProvider`&#10;&#10;Refine method descriptions in `MarketDataProvider` to improve readability and consistency. Update docstrings for connection management, event handling, and streaming methods with concise and clear language to align with project documentation standards.">
-      <option name="closed" value="true" />
-      <created>1753659578805</created>
-      <option name="number" value="00125" />
-      <option name="presentableId" value="LOCAL-00125" />
-      <option name="project" value="LOCAL" />
-      <updated>1753659578805</updated>
-    </task>
-    <task id="LOCAL-00126" summary="Add custom exceptions for unsupported event types and configurations&#10;&#10;Introduce `UnsupportedEventTypeError` and `UnsupportedConfigurationError` to improve error handling in `MarketDataProvider`. Replace capability validation logic with these exceptions in `TradingEngine` for consistency and clarity. Update method docstrings accordingly to document the new exceptions.">
-      <option name="closed" value="true" />
-      <created>1753661799899</created>
-      <option name="number" value="00126" />
-      <option name="presentableId" value="LOCAL-00126" />
-      <option name="project" value="LOCAL" />
-      <updated>1753661799899</updated>
-    </task>
-    <task id="LOCAL-00127" summary="Rename `request_details` to `parameters` for consistency and clarity  &#10;&#10;Replace usage of `request_details` with `parameters` across `MarketDataProvider`, `TradingEngine`, and `Strategy` to better reflect the nature of the data being passed. Update related docstrings, method signatures, and references in all relevant files to maintain consistency across the codebase.">
-      <option name="closed" value="true" />
-      <created>1753821234985</created>
-      <option name="number" value="00127" />
-      <option name="presentableId" value="LOCAL-00127" />
-      <option name="project" value="LOCAL" />
-      <updated>1753821234985</updated>
+      <workItem from="1754413491384" duration="79085000" />
+      <workItem from="1754638193104" duration="28000" />
+      <workItem from="1754638233048" duration="16807000" />
     </task>
     <task id="LOCAL-00128" summary="Reorganize and simplify sections in `TradingEngine`&#10;&#10;Refactor `TradingEngine` by renaming region headers for clarity, grouping related methods under cohesive sections, and simplifying utility and helper method placement. Restore and relocate removed methods like `_make_parameters_key`, `_generate_topic`, and `publish_bar` to enhance usability.">
       <option name="closed" value="true" />
@@ -672,7 +483,191 @@
       <option name="project" value="LOCAL" />
       <updated>1754486937186</updated>
     </task>
-    <option name="localTasksCounter" value="154" />
+    <task id="LOCAL-00154" summary="Implement TradingEngine startup/shutdown sequence">
+      <option name="closed" value="true" />
+      <created>1754512598165</created>
+      <option name="number" value="00154" />
+      <option name="presentableId" value="LOCAL-00154" />
+      <option name="project" value="LOCAL" />
+      <updated>1754512598165</updated>
+    </task>
+    <task id="LOCAL-00155" summary="TODO cleared.">
+      <option name="closed" value="true" />
+      <created>1754512747454</created>
+      <option name="number" value="00155" />
+      <option name="presentableId" value="LOCAL-00155" />
+      <option name="project" value="LOCAL" />
+      <updated>1754512747454</updated>
+    </task>
+    <task id="LOCAL-00156" summary="Replace boolean state with StateMachine in TradingEngine">
+      <option name="closed" value="true" />
+      <created>1754514263236</created>
+      <option name="number" value="00156" />
+      <option name="presentableId" value="LOCAL-00156" />
+      <option name="project" value="LOCAL" />
+      <updated>1754514263236</updated>
+    </task>
+    <task id="LOCAL-00157" summary="Simplify EventFeed architecture by moving request metadata to feeds">
+      <option name="closed" value="true" />
+      <created>1754516969806</created>
+      <option name="number" value="00157" />
+      <option name="presentableId" value="LOCAL-00157" />
+      <option name="project" value="LOCAL" />
+      <updated>1754516969806</updated>
+    </task>
+    <task id="LOCAL-00158" summary="Simplify EventFeed architecture by moving request metadata to feeds">
+      <option name="closed" value="true" />
+      <created>1754517024410</created>
+      <option name="number" value="00158" />
+      <option name="presentableId" value="LOCAL-00158" />
+      <option name="project" value="LOCAL" />
+      <updated>1754517024410</updated>
+    </task>
+    <task id="LOCAL-00159" summary="Rename market_data_provider.py to event_feed_provider.py">
+      <option name="closed" value="true" />
+      <created>1754517619326</created>
+      <option name="number" value="00159" />
+      <option name="presentableId" value="LOCAL-00159" />
+      <option name="project" value="LOCAL" />
+      <updated>1754517619326</updated>
+    </task>
+    <task id="LOCAL-00160" summary="Remove custom exceptions from EventFeedProvider">
+      <option name="closed" value="true" />
+      <created>1754518852903</created>
+      <option name="number" value="00160" />
+      <option name="presentableId" value="LOCAL-00160" />
+      <option name="project" value="LOCAL" />
+      <updated>1754518852903</updated>
+    </task>
+    <task id="LOCAL-00161" summary="Rename get_event_feed to create_event_feed in EventFeedProvider">
+      <option name="closed" value="true" />
+      <created>1754519070289</created>
+      <option name="number" value="00161" />
+      <option name="presentableId" value="LOCAL-00161" />
+      <option name="project" value="LOCAL" />
+      <updated>1754519070289</updated>
+    </task>
+    <task id="LOCAL-00162" summary="Document rationale for named registration in TradingEngine&#10;&#10;Add explanations for why strategies, brokers, and providers use names instead of&#10;direct object references in registration methods.">
+      <option name="closed" value="true" />
+      <created>1754560297837</created>
+      <option name="number" value="00162" />
+      <option name="presentableId" value="LOCAL-00162" />
+      <option name="project" value="LOCAL" />
+      <updated>1754560297837</updated>
+    </task>
+    <task id="LOCAL-00163" summary="Fix stop_strategy to collect all feed errors before failing&#10;&#10;- Attempt cleanup of all event feeds before raising exceptions&#10;- Maintain fail-fast behavior while maximizing cleanup attempts&#10;- Prevent inconsistent states from partial cleanup failures">
+      <option name="closed" value="true" />
+      <created>1754561478785</created>
+      <option name="number" value="00163" />
+      <option name="presentableId" value="LOCAL-00163" />
+      <option name="project" value="LOCAL" />
+      <updated>1754561478785</updated>
+    </task>
+    <task id="LOCAL-00164" summary="Add peek method to EventFeed protocol&#10;&#10;Enables non-consuming event lookahead for conditional processing.&#10;Includes comprehensive test suite and updated documentation.">
+      <option name="closed" value="true" />
+      <created>1754563942690</created>
+      <option name="number" value="00164" />
+      <option name="presentableId" value="LOCAL-00164" />
+      <option name="project" value="LOCAL" />
+      <updated>1754563942690</updated>
+    </task>
+    <task id="LOCAL-00165" summary="Improve EventFeed protocol documentation with clearer scenario names&#10;&#10;- Replace unclear state names (READY, IDLE) with descriptive scenario names&#10;  (NEXT_EVENT_READY, WAITING_FOR_FUTURE_EVENTS)&#10;- Add markdown table showing scenario-to-return-value mapping for better clarity&#10;- Update terminology from &quot;states&quot; to &quot;scenarios&quot; throughout docstrings&#10;- Enhance method documentation with clearer scenario explanations&#10;- Maintain same interface and behavior while improving user understanding">
+      <option name="closed" value="true" />
+      <created>1754565763150</created>
+      <option name="number" value="00165" />
+      <option name="presentableId" value="LOCAL-00165" />
+      <option name="project" value="LOCAL" />
+      <updated>1754565763151</updated>
+    </task>
+    <task id="LOCAL-00166" summary="Implement event feed ordering mechanism in TradingEngine&#10;&#10;- Change storage from Dict[str, EventFeed] to List[EventFeed] per strategy&#10;- Preserve event feed request order using list position&#10;- Store feed names in EventFeed.request_info property&#10;- Add get_event_feeds_for_strategy() method for ordered iteration&#10;- Update request/cancel/cleanup logic for list-based structure&#10;- Enable deterministic event processing based on request sequence&#10;&#10;This change provides the foundation for iterative event processing&#10;where feeds are processed in the exact order they were requested.">
+      <option name="closed" value="true" />
+      <created>1754569124131</created>
+      <option name="number" value="00166" />
+      <option name="presentableId" value="LOCAL-00166" />
+      <option name="project" value="LOCAL" />
+      <updated>1754569124131</updated>
+    </task>
+    <task id="LOCAL-00167" summary="Extract EventFeedManager and add Strategy timeline isolation">
+      <option name="closed" value="true" />
+      <created>1754602645676</created>
+      <option name="number" value="00167" />
+      <option name="presentableId" value="LOCAL-00167" />
+      <option name="project" value="LOCAL" />
+      <updated>1754602645676</updated>
+    </task>
+    <task id="LOCAL-00168" summary="Make cancel_event_delivery_for_strategy idempotent for missing feeds&#10;&#10;Replace ValueError with graceful handling when EventFeed doesn't exist.&#10;This handles the natural scenario where feeds finish automatically and&#10;get cleaned up before cancel is called.">
+      <option name="closed" value="true" />
+      <created>1754603611699</created>
+      <option name="number" value="00168" />
+      <option name="presentableId" value="LOCAL-00168" />
+      <option name="project" value="LOCAL" />
+      <updated>1754603611699</updated>
+    </task>
+    <task id="LOCAL-00169" summary="Add timeline filtering for strategy event feeds&#10;&#10;- Add remove_events_before method to EventFeed protocol&#10;- Filter obsolete events when adding feeds to strategies with existing timeline&#10;- Remove unused get_event_feeds_for_strategy method&#10;- Reorganize TradingEngine state property placement">
+      <option name="closed" value="true" />
+      <created>1754637682093</created>
+      <option name="number" value="00169" />
+      <option name="presentableId" value="LOCAL-00169" />
+      <option name="project" value="LOCAL" />
+      <updated>1754637682093</updated>
+    </task>
+    <task id="LOCAL-00170" summary="Expand Junie guidelines: f-strings and plan diffs&#10;&#10;•Add rule to always use f-strings for logs and messages with examples&#10;•Add plan and code change visualization rules with Before/After template">
+      <option name="closed" value="true" />
+      <created>1754644765488</created>
+      <option name="number" value="00170" />
+      <option name="presentableId" value="LOCAL-00170" />
+      <option name="project" value="LOCAL" />
+      <updated>1754644765488</updated>
+    </task>
+    <task id="LOCAL-00171" summary="- Rename Strategy.current_time -&gt; Strategy.last_event_time and update docs">
+      <option name="closed" value="true" />
+      <created>1754648219290</created>
+      <option name="number" value="00171" />
+      <option name="presentableId" value="LOCAL-00171" />
+      <option name="project" value="LOCAL" />
+      <updated>1754648219291</updated>
+    </task>
+    <task id="LOCAL-00172" summary="Remove redundant notes from guidelines">
+      <option name="closed" value="true" />
+      <created>1754648261092</created>
+      <option name="number" value="00172" />
+      <option name="presentableId" value="LOCAL-00172" />
+      <option name="project" value="LOCAL" />
+      <updated>1754648261092</updated>
+    </task>
+    <task id="LOCAL-00173" summary=" Add wall clock time tracking per strategy&#10; &#10; Track max dt_received per strategy in TradingEngine via _strategy_wall_clock_time&#10;Initialize and cleanup wall clock tracking on add/remove strategy&#10;Expose Strategy.wall_clock_time to access latest known wall clock time&#10;Detach engine reference on strategy removal via _clear_trading_engine">
+      <option name="closed" value="true" />
+      <created>1754651021375</created>
+      <option name="number" value="00173" />
+      <option name="presentableId" value="LOCAL-00173" />
+      <option name="project" value="LOCAL" />
+      <updated>1754651021375</updated>
+    </task>
+    <task id="LOCAL-00174" summary="Add defensive checks to engine attach/detach">
+      <option name="closed" value="true" />
+      <created>1754651697940</created>
+      <option name="number" value="00174" />
+      <option name="presentableId" value="LOCAL-00174" />
+      <option name="project" value="LOCAL" />
+      <updated>1754651697940</updated>
+    </task>
+    <task id="LOCAL-00175" summary="Document wall_clock_time; prep for new states">
+      <option name="closed" value="true" />
+      <created>1754652217609</created>
+      <option name="number" value="00175" />
+      <option name="presentableId" value="LOCAL-00175" />
+      <option name="project" value="LOCAL" />
+      <updated>1754652217609</updated>
+    </task>
+    <task id="LOCAL-00176" summary="Reorganize regions in Strategy.">
+      <option name="closed" value="true" />
+      <created>1754657289045</created>
+      <option name="number" value="00176" />
+      <option name="presentableId" value="LOCAL-00176" />
+      <option name="project" value="LOCAL" />
+      <updated>1754657289045</updated>
+    </task>
+    <option name="localTasksCounter" value="177" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -693,32 +688,32 @@
     <ignored-roots>
       <path value="$PROJECT_DIR$" />
     </ignored-roots>
-    <MESSAGE value="Simplify subscription management in `TradingEngine`  &#10;&#10;Remove unused `BarType` and `bar_subscriptions`. Streamlined and condensed event subscription tracking logic to improve readability and maintenance. No functional changes made." />
-    <MESSAGE value="Simplify subscription management and remove unused imports in `TradingEngine`&#10;&#10;Refactor subscription-related attributes in `TradingEngine` to streamline implementation and improve clarity. Remove subscription tracking for unused `BarType`. Eliminate redundant code and unused imports to improve maintainability and readability." />
-    <MESSAGE value="Remove unused BarType import and simplify subscription comments in TradingEngine&#10;&#10;Clean up redundant code by removing the unused `BarType` import. Consolidate and clarify comments for subscription tracking variables to improve readability and maintain consistency. No functional changes made." />
-    <MESSAGE value="Switch `strategies` to a dictionary for better lookup and management&#10;&#10;Update `TradingEngine` to use a dictionary for strategy registration, keyed by strategy names, improving retrieval and uniqueness enforcement. Refactor related methods (`add_strategy`, `remove_strategy`) to accommodate the new structure. Update loops and adjust docstrings for consistency." />
-    <MESSAGE value="Introduce `get_unique_name` method for better instance identification&#10;&#10;Add the `get_unique_name` method to `Strategy`, `Broker`, and `MarketDataProvider` classes to ensure unique and stable instance identifiers. Refactor `TradingEngine` to utilize these methods for registering and managing strategies, brokers, and market data providers. Update related methods and exception messages to use the new approach, simplifying and standardizing name handling." />
-    <MESSAGE value="Add guidelines for initial development mode&#10;&#10;Introduce a new section in the guidelines outlining the rules and rationale for ignoring backwards compatibility during the initial development phase. Emphasize rapid iteration, breaking changes, and prioritizing the best user experience over stability to build a strong foundation. Specify the temporary nature of these rules and the shift towards stability in later phases." />
-    <MESSAGE value="Add initial development mode guidelines to Junie guidelines&#10;&#10;Introduce a new section outlining rules and principles for initial development mode, prioritizing rapid iteration and improvement over compatibility. Specify allowances for breaking changes, API redesigns, and other adjustments to establish a solid foundation for the library." />
-    <MESSAGE value="Reorganize regions in `Strategy` for improved clarity and structure&#10;&#10;Renamed and rearranged region headers in `Strategy` to better reflect method group purposes. Restored and relocated internal methods like `_set_trading_engine` and `_distribute_event_to_specific_callbacks` to appropriate sections. No functional changes made." />
-    <MESSAGE value="Provide breakdown of market data issues and potential solutions in `TODO.md`&#10;&#10;Replace the executive summary with a detailed explanation of the challenges in market data timing, including examples of how data ordering issues affect trading strategy logic. Add a structured analysis of the problem, its root causes, and requirements for a robust solution, introducing the concept of strategy clocks and synchronized timelines." />
-    <MESSAGE value="Rename `base.py` to `strategy.py` for improved clarity and intent&#10;&#10;Replace references to `suite_trading.strategy.base` with `suite_trading.strategy.strategy` across the codebase, reflecting the role and focus of the file. Update imports in `test_playground` and `TradingEngine` for consistency." />
-    <MESSAGE value="Update `TODO.md` with a detailed breakdown of market data handling issues and solution proposals&#10;&#10;Refine the problem explanation, add clear headers, and provide an in-depth perspective on challenges with market data timing. Introduce potential solutions like strategy clocks, event feeds, and timeline synchronization to ensure chronological consistency. Expand on implementation details and planned updates for better clarity." />
-    <MESSAGE value="Make `on_event` an abstract method in `Strategy`&#10;&#10;Mark `on_event` as an abstract method, enforcing its implementation in all subclasses. Remove redundant event handling methods and internal routing logic (`_distribute_event_to_specific_callbacks`), simplifying the base class. Streamline event processing by centralizing handling in `on_event`." />
-    <MESSAGE value="Make `on_event` an abstract method to enforce implementation&#10;&#10;Ensure all strategies handle events explicitly by marking `on_event` as abstract. Prevent silent failures and improve subclass consistency." />
-    <MESSAGE value="Remove market-data handling methods&#10;from TradingEngine + MarketDataProvider&#10;&#10;Reason is, that the whole functionality is being redesigned." />
-    <MESSAGE value="Replace object self-naming with user-provided naming in TradingEngine&#10;&#10;- Change add_strategy(), add_broker(), add_market_data_provider() to require user-provided names&#10;- Remove get_unique_name() methods from Strategy, Broker, and MarketDataProvider protocols&#10;- Update remove methods to accept name strings instead of object instances&#10;- Improve error messages with clear guidance for name conflicts&#10;- Update integration tests to use new naming approach&#10;&#10;This breaking change improves API transparency by making object registration explicit&#10;and allows users to choose business-meaningful names for better debugging and maintenance.&#10;&#10;BREAKING CHANGE: All TradingEngine add/remove methods now require explicit naming" />
-    <MESSAGE value="Redesign and simplify market-data handling with 2 simple methods&#10;&#10;- Strategy.add_event_feed(...)&#10;- Strategy.remove_event_feed(...)" />
-    <MESSAGE value="Add request/cancel API for market data event delivery across Strategy–Engine–Provider" />
-    <MESSAGE value="Add new request/cancel API for market data event delivery across Strategy–Engine–Provider" />
-    <MESSAGE value="Reorder params in Strategy.request_event_delivery&#10;&#10;- Make callback keyword-only, optional; default to on_event&#10;- Mirror" />
-    <MESSAGE value="Adopt EventFeedProvider naming in TradingEngine" />
-    <MESSAGE value="Simplify EventFeed: drop connect API, add close()&#10;&#10;- Remove connect() and is_connected() from EventFeed protocol&#10;- Replace disconnect() with a single idempotent close()&#10;- Update docstrings and usage examples to reflect ready-to-use feeds&#10;- Keep next() and is_finished() as the core surface" />
-    <MESSAGE value="Clarify EventFeed docs" />
     <MESSAGE value="Add state to the Strategy" />
     <MESSAGE value="Add defensive check comments standard and apply across codebase" />
     <MESSAGE value="Implement StateMachine for Strategy state management&#10;&#10;- Add strategy_state_machine.py with StrategyState, StrategyAction enums and factory&#10;- Replace manual state management with StateMachine in Strategy and TradingEngine&#10;- Use descriptive action names (ADD_STRATEGY_TO_ENGINE, START_STRATEGY, etc.)&#10;- Remove old strategy_state.py file&#10;- Improve error messages with valid actions context" />
-    <option name="LAST_COMMIT_MESSAGE" value="Implement StateMachine for Strategy state management&#10;&#10;- Add strategy_state_machine.py with StrategyState, StrategyAction enums and factory&#10;- Replace manual state management with StateMachine in Strategy and TradingEngine&#10;- Use descriptive action names (ADD_STRATEGY_TO_ENGINE, START_STRATEGY, etc.)&#10;- Remove old strategy_state.py file&#10;- Improve error messages with valid actions context" />
+    <MESSAGE value="Implement TradingEngine startup/shutdown sequence" />
+    <MESSAGE value="TODO cleared." />
+    <MESSAGE value="Replace boolean state with StateMachine in TradingEngine" />
+    <MESSAGE value="Simplify EventFeed architecture by moving request metadata to feeds" />
+    <MESSAGE value="Rename market_data_provider.py to event_feed_provider.py" />
+    <MESSAGE value="Remove custom exceptions from EventFeedProvider" />
+    <MESSAGE value="Rename get_event_feed to create_event_feed in EventFeedProvider" />
+    <MESSAGE value="Document rationale for named registration in TradingEngine&#10;&#10;Add explanations for why strategies, brokers, and providers use names instead of&#10;direct object references in registration methods." />
+    <MESSAGE value="Fix stop_strategy to collect all feed errors before failing&#10;&#10;- Attempt cleanup of all event feeds before raising exceptions&#10;- Maintain fail-fast behavior while maximizing cleanup attempts&#10;- Prevent inconsistent states from partial cleanup failures" />
+    <MESSAGE value="Add peek method to EventFeed protocol&#10;&#10;Enables non-consuming event lookahead for conditional processing.&#10;Includes comprehensive test suite and updated documentation." />
+    <MESSAGE value="Improve EventFeed protocol documentation with clearer scenario names&#10;&#10;- Replace unclear state names (READY, IDLE) with descriptive scenario names&#10;  (NEXT_EVENT_READY, WAITING_FOR_FUTURE_EVENTS)&#10;- Add markdown table showing scenario-to-return-value mapping for better clarity&#10;- Update terminology from &quot;states&quot; to &quot;scenarios&quot; throughout docstrings&#10;- Enhance method documentation with clearer scenario explanations&#10;- Maintain same interface and behavior while improving user understanding" />
+    <MESSAGE value="Implement event feed ordering mechanism in TradingEngine&#10;&#10;- Change storage from Dict[str, EventFeed] to List[EventFeed] per strategy&#10;- Preserve event feed request order using list position&#10;- Store feed names in EventFeed.request_info property&#10;- Add get_event_feeds_for_strategy() method for ordered iteration&#10;- Update request/cancel/cleanup logic for list-based structure&#10;- Enable deterministic event processing based on request sequence&#10;&#10;This change provides the foundation for iterative event processing&#10;where feeds are processed in the exact order they were requested." />
+    <MESSAGE value="Extract EventFeedManager and add Strategy timeline isolation" />
+    <MESSAGE value="Make cancel_event_delivery_for_strategy idempotent for missing feeds&#10;&#10;Replace ValueError with graceful handling when EventFeed doesn't exist.&#10;This handles the natural scenario where feeds finish automatically and&#10;get cleaned up before cancel is called." />
+    <MESSAGE value="Add timeline filtering for strategy event feeds&#10;&#10;- Add remove_events_before method to EventFeed protocol&#10;- Filter obsolete events when adding feeds to strategies with existing timeline&#10;- Remove unused get_event_feeds_for_strategy method&#10;- Reorganize TradingEngine state property placement" />
+    <MESSAGE value="Expand Junie guidelines: f-strings and plan diffs&#10;&#10;•Add rule to always use f-strings for logs and messages with examples&#10;•Add plan and code change visualization rules with Before/After template" />
+    <MESSAGE value="- Rename Strategy.current_time -&gt; Strategy.last_event_time and update docs" />
+    <MESSAGE value="Remove redundant notes from guidelines" />
+    <MESSAGE value=" Add wall clock time tracking per strategy&#10; &#10; Track max dt_received per strategy in TradingEngine via _strategy_wall_clock_time&#10;Initialize and cleanup wall clock tracking on add/remove strategy&#10;Expose Strategy.wall_clock_time to access latest known wall clock time&#10;Detach engine reference on strategy removal via _clear_trading_engine" />
+    <MESSAGE value="Add defensive checks to engine attach/detach" />
+    <MESSAGE value="Document wall_clock_time; prep for new states" />
+    <MESSAGE value="Reorganize regions in Strategy." />
+    <option name="LAST_COMMIT_MESSAGE" value="Reorganize regions in Strategy." />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
