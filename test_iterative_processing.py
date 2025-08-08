@@ -5,7 +5,7 @@ This script tests the new run_processing_loop functionality by creating:
 - Multiple strategies with different event timelines
 - Mock EventFeeds that provide events in chronological order
 - Verification that each strategy processes events in correct order
-- Verification that current_time property works correctly
+- Verification that last_event_time property works correctly
 """
 
 import sys
@@ -74,10 +74,10 @@ class TestStrategy(Strategy):
         self.received_times: List[datetime] = []
 
     def on_event(self, event: Event):
-        """Record received events and current time."""
+        """Record received events and timeline time."""
         self.received_events.append(event)
-        self.received_times.append(self.current_time)
-        print(f"Strategy {self.name}: Received event at {event.dt_event}, current_time={self.current_time}")
+        self.received_times.append(self.last_event_time)
+        print(f"Strategy {self.name}: Received event at {event.dt_event}, last_event_time={self.last_event_time}")
 
 
 def create_test_events(base_time: datetime, count: int, interval_minutes: int) -> List[Event]:
@@ -127,8 +127,8 @@ def test_iterative_processing():
     feed_b = MockEventFeed(events_b, "feed_b")
 
     # Manually add feeds to engine (simulating what request_event_delivery would do)
-    engine._strategy_event_feeds[strategy_a] = [feed_a]
-    engine._strategy_event_feeds[strategy_b] = [feed_b]
+    engine._feed_manager.add_event_feed_for_strategy(strategy_a, feed_a)
+    engine._feed_manager.add_event_feed_for_strategy(strategy_b, feed_b)
 
     print(f"Strategy A events: {[e.dt_event for e in events_a]}")
     print(f"Strategy B events: {[e.dt_event for e in events_b]}")
@@ -168,7 +168,7 @@ def test_iterative_processing():
             print(f"ERROR: Strategy B event {i} has wrong time: {event.dt_event} != {expected_time}")
             return False
 
-    # Check that current_time was updated correctly
+    # Check that last_event_time was updated correctly
     final_time_a = strategy_a.received_times[-1] if strategy_a.received_times else None
     final_time_b = strategy_b.received_times[-1] if strategy_b.received_times else None
 
@@ -176,16 +176,16 @@ def test_iterative_processing():
     expected_final_b = events_b[-1].dt_event
 
     if final_time_a != expected_final_a:
-        print(f"ERROR: Strategy A final current_time wrong: {final_time_a} != {expected_final_a}")
+        print(f"ERROR: Strategy A final last_event_time wrong: {final_time_a} != {expected_final_a}")
         return False
 
     if final_time_b != expected_final_b:
-        print(f"ERROR: Strategy B final current_time wrong: {final_time_b} != {expected_final_b}")
+        print(f"ERROR: Strategy B final last_event_time wrong: {final_time_b} != {expected_final_b}")
         return False
 
     print("✓ All events processed correctly")
     print("✓ Events processed in chronological order per strategy")
-    print("✓ current_time property updated correctly")
+    print("✓ last_event_time property updated correctly")
     print("✓ Test PASSED!")
 
     return True

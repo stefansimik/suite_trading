@@ -53,8 +53,8 @@ class TradingEngine:
         self._strategies: Dict[str, Strategy] = {}
         # EventFeeds management for each Strategy
         self._feed_manager = EventFeedManager()
-        # Tracks time for each strategy
-        self._strategy_current_time: Dict[Strategy, Optional[datetime]] = {}
+        # Tracks last event time (timeline) per strategy
+        self._strategy_last_event_time: Dict[Strategy, Optional[datetime]] = {}
 
     def start(self):
         """Start the engine and all your strategies.
@@ -101,7 +101,9 @@ class TradingEngine:
         Raises:
             ValueError: If engine is not in RUNNING state.
         """
-        # Check: engine must be running before stopping
+        # Check: allow idempotent stop when already STOPPED; otherwise must be able to stop
+        if self.state == EngineState.STOPPED:
+            return
         if not self._state_machine.can_execute_action(EngineAction.STOP_ENGINE):
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise ValueError(f"Cannot stop engine in state {self.state.name}. Valid actions: {valid_actions}")
@@ -168,8 +170,8 @@ class TradingEngine:
                     # Get the event
                     consumed_event = oldest_feed.next()
 
-                    # Update this strategy's time
-                    self._strategy_current_time[strategy] = consumed_event.dt_event
+                    # Update this strategy's last event time (timeline)
+                    self._strategy_last_event_time[strategy] = consumed_event.dt_event
 
                     # Send event to strategy
                     try:
@@ -231,8 +233,8 @@ class TradingEngine:
         strategy._set_trading_engine(self)
         self._strategies[name] = strategy
 
-        # Set up time tracking for this strategy
-        self._strategy_current_time[strategy] = None
+        # Set up last-event-time tracking for this strategy
+        self._strategy_last_event_time[strategy] = None
 
         # Set up EventFeed tracking for this strategy
         self._feed_manager.add_strategy(strategy)
@@ -342,9 +344,9 @@ class TradingEngine:
                 f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}",
             )
 
-        # Remove time tracking for this strategy
-        if strategy in self._strategy_current_time:
-            del self._strategy_current_time[strategy]
+        # Remove last-event-time tracking for this strategy
+        if strategy in self._strategy_last_event_time:
+            del self._strategy_last_event_time[strategy]
 
         # Remove EventFeed tracking for this strategy
         self._feed_manager.remove_strategy(strategy)
@@ -529,11 +531,13 @@ class TradingEngine:
             "provider_ref": provider_ref,
         }
 
-        # Check: apply timeline filtering if strategy already has current_time
-        if strategy.current_time is not None:
-            removed_count = event_feed.remove_events_before(strategy.current_time)
+        # Check: apply timeline filtering if strategy already has last_event_time
+        if strategy.last_event_time is not None:
+            removed_count = event_feed.remove_events_before(strategy.last_event_time)
             if removed_count > 0:
-                logger.info(f"Filtered {removed_count} obsolete events for strategy timeline consistency - events before {strategy.current_time}")
+                logger.info(
+                    f"Filtered {removed_count} obsolete events before {strategy.last_event_time} to keep timeline",
+                )
 
         # Add EventFeed to strategy using manager (preserves request order)
         self._feed_manager.add_event_feed_for_strategy(strategy, event_feed)

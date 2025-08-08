@@ -154,7 +154,7 @@ class EventFeed(Protocol):
         """Remove all events with dt_event < cutoff_time.
 
         This method is used to maintain timeline consistency when strategies request new event
-        feeds during runtime. If a strategy already has a current_time, any events older than
+        feeds during runtime. If a strategy already has a last_event_time, any events older than
         that time should be filtered out to prevent timeline corruption.
 
         The method should efficiently remove events that occur before the specified cutoff time
