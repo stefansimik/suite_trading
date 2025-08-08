@@ -35,7 +35,7 @@ class Strategy(ABC):
     - All three can run simultaneously, each with their own timeline
     """
 
-    # region Lifecycle
+    # region Initialize strategy
 
     def __init__(self):
         """Initialize a new strategy.
@@ -46,6 +46,54 @@ class Strategy(ABC):
         self._trading_engine = None
         self._state_machine = create_strategy_state_machine()
 
+    # endregion
+
+    # region Attach engine
+
+    def _set_trading_engine(self, trading_engine: "TradingEngine") -> None:
+        """Attach the trading engine reference.
+
+        This method is called by TradingEngine when the strategy is added. It does not change
+        lifecycle $state. TradingEngine is responsible for transitioning to ADDED after successful
+        registration.
+
+        Args:
+            trading_engine (TradingEngine): The trading engine instance.
+
+        Raises:
+            RuntimeError: If $_trading_engine is already set or $state is not NEW.
+        """
+        # Check: engine must not be already attached
+        if self._trading_engine is not None:
+            raise RuntimeError(
+                "Cannot call `_set_trading_engine` because $_trading_engine is already set.",
+            )
+        # Check: state must be NEW when attaching to an engine
+        if self.state != StrategyState.NEW:
+            raise RuntimeError(
+                (f"Cannot call `_set_trading_engine` because $state ({self.state.name}) is not NEW. Provide a fresh instance."),
+            )
+        self._trading_engine = trading_engine
+
+    def _clear_trading_engine(self) -> None:
+        """Detach the trading engine reference.
+
+        Called by TradingEngine when the strategy is removed. Does not change lifecycle $state.
+
+        Raises:
+            RuntimeError: If $_trading_engine is None.
+        """
+        # Check: engine must be attached before clearing
+        if self._trading_engine is None:
+            raise RuntimeError(
+                "Cannot call `_clear_trading_engine` because $_trading_engine is None.",
+            )
+        self._trading_engine = None
+
+    # endregion
+
+    # region Query state
+
     @property
     def state(self) -> StrategyState:
         """Get current lifecycle state.
@@ -54,6 +102,18 @@ class Strategy(ABC):
             StrategyState: Current lifecycle state of this strategy.
         """
         return self._state_machine.current_state
+
+    def is_in_terminal_state(self) -> bool:
+        """Check if the strategy is in a terminal state.
+
+        Returns:
+            bool: True if the strategy is in a terminal state (STOPPED or ERROR).
+        """
+        return self._state_machine.is_in_terminal_state()
+
+    # endregion
+
+    # region Query time
 
     @property
     def last_event_time(self) -> Optional[datetime]:
@@ -86,13 +146,9 @@ class Strategy(ABC):
 
         return self._trading_engine._strategy_wall_clock_time[self]
 
-    def is_in_terminal_state(self) -> bool:
-        """Check if the strategy is in a terminal state.
+    # endregion
 
-        Returns:
-            bool: True if the strategy is in a terminal state (STOPPED or ERROR).
-        """
-        return self._state_machine.is_in_terminal_state()
+    # region Lifecycle hooks
 
     def on_start(self):
         """Called when the strategy is started.
@@ -129,7 +185,24 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Event delivery
+    # region Events
+
+    @abstractmethod  # Made abstract to prevent silent failures - ensures all strategies implement event handling
+    def on_event(self, event: Event):
+        """Universal callback receiving complete event wrapper.
+
+        This method receives the full event context including:
+        - dt_received (when event entered our system)
+        - dt_event (official event timestamp)
+        - Complete event metadata
+
+        This is the single central event handling method that must be implemented
+        by all strategy subclasses to handle all types of events.
+
+        Args:
+            event (Event): The complete event wrapper (NewBarEvent, NewTradeTickEvent, etc.)
+        """
+        pass
 
     def request_event_delivery(
         self,
@@ -213,23 +286,6 @@ class Strategy(ABC):
 
         # Delegate to TradingEngine - no local tracking
         self._trading_engine.cancel_event_delivery_for_strategy(self, name)
-
-    @abstractmethod  # Made abstract to prevent silent failures - ensures all strategies implement event handling
-    def on_event(self, event: Event):
-        """Universal callback receiving complete event wrapper.
-
-        This method receives the full event context including:
-        - dt_received (when event entered our system)
-        - dt_event (official event timestamp)
-        - Complete event metadata
-
-        This is the single central event handling method that must be implemented
-        by all strategy subclasses to handle all types of events.
-
-        Args:
-            event (Event): The complete event wrapper (NewBarEvent, NewTradeTickEvent, etc.)
-        """
-        pass
 
     # endregion
 
