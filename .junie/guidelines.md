@@ -25,14 +25,6 @@ Modern algorithmic trading framework in Python for backtesting and live trading.
 - **No backwards compatibility guarantees** - the result does not have to be backwards compatible
 - **Focus on getting it right** rather than maintaining legacy code that doesn't serve the current vision
 
-This approach allows us to:
-- **Iterate quickly** on design decisions without technical debt
-- **Optimize for the best user experience** without being constrained by past decisions
-- **Build a solid foundation** before committing to stability guarantees
-- **Learn and improve** from real usage patterns without legacy constraints
-
-**Note:** This rule applies only during the initial development phase. Once the library reaches a stable release, backwards compatibility and migration strategies will become important considerations.
-
 ## User-Centric Design Principle
 
 **APIs should be designed for the user, not for internal implementation convenience.**
