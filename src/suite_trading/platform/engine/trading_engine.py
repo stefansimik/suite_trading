@@ -55,6 +55,8 @@ class TradingEngine:
         self._feed_manager = EventFeedManager()
         # Tracks last event time (timeline) per strategy
         self._strategy_last_event_time: Dict[Strategy, Optional[datetime]] = {}
+        # Tracks latest known wall clock time per strategy (max of dt_received)
+        self._strategy_wall_clock_time: Dict[Strategy, Optional[datetime]] = {}
 
     def start(self):
         """Start the engine and all your strategies.
@@ -173,6 +175,11 @@ class TradingEngine:
                     # Update this strategy's last event time (timeline)
                     self._strategy_last_event_time[strategy] = consumed_event.dt_event
 
+                    # Update wall-clock-time with monotonic max of dt_received
+                    prev = self._strategy_wall_clock_time.get(strategy)
+                    if prev is None or consumed_event.dt_received > prev:
+                        self._strategy_wall_clock_time[strategy] = consumed_event.dt_received
+
                     # Send event to strategy
                     try:
                         strategy.on_event(consumed_event)
@@ -235,6 +242,9 @@ class TradingEngine:
 
         # Set up last-event-time tracking for this strategy
         self._strategy_last_event_time[strategy] = None
+
+        # Set up wall-clock-time tracking for this strategy
+        self._strategy_wall_clock_time[strategy] = None
 
         # Set up EventFeed tracking for this strategy
         self._feed_manager.add_strategy(strategy)
@@ -348,11 +358,18 @@ class TradingEngine:
         if strategy in self._strategy_last_event_time:
             del self._strategy_last_event_time[strategy]
 
+        # Remove wall-clock-time tracking for this strategy
+        if strategy in self._strategy_wall_clock_time:
+            del self._strategy_wall_clock_time[strategy]
+
         # Remove EventFeed tracking for this strategy
         self._feed_manager.remove_strategy(strategy)
 
         # Remove from strategies' dictionary
         del self._strategies[name]
+
+        # Detach engine reference from this strategy
+        strategy._clear_trading_engine()
 
     @property
     def strategies(self) -> Dict[str, Strategy]:

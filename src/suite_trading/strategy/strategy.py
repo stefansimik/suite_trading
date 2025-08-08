@@ -64,7 +64,19 @@ class Strategy(ABC):
         """
         if self._trading_engine is None:
             return None
-        return self._trading_engine._strategy_last_event_time.get(self, None)
+        return self._trading_engine._strategy_last_event_time[self]
+
+    @property
+    def wall_clock_time(self) -> Optional[datetime]:
+        """Get the latest known wall clock time for this strategy.
+
+        Returns the maximum dt_received seen across all events processed by this strategy. Use this
+        value for live cutoffs, timeouts, and latency checks. This is separate from
+        last_event_time.
+        """
+        if self._trading_engine is None:
+            return None
+        return self._trading_engine._strategy_wall_clock_time[self]
 
     def is_in_terminal_state(self) -> bool:
         """Check if the strategy is in a terminal state.
@@ -336,5 +348,12 @@ class Strategy(ABC):
             trading_engine (TradingEngine): The trading engine instance.
         """
         self._trading_engine = trading_engine
+
+    def _clear_trading_engine(self) -> None:
+        """Detach the trading engine reference.
+
+        Called by TradingEngine when the strategy is removed. Does not change lifecycle $state.
+        """
+        self._trading_engine = None
 
     # endregion
