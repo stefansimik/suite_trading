@@ -64,6 +64,7 @@ class Strategy(ABC):
         """
         if self._trading_engine is None:
             return None
+
         return self._trading_engine._strategy_last_event_time[self]
 
     @property
@@ -74,8 +75,15 @@ class Strategy(ABC):
         value for live cutoffs, timeouts, and latency checks. This is separate from
         last_event_time.
         """
+        # TODO:  Strategy state machine will be extended in the future with more granular state like: HISTORICAL / TRANSITION / LIVE
+        # This property will have to be updated then and computed based on the current state:
+        # - HISTORICAL: keep using the maximum dt_received from processed events
+        # - TRANSITION: decide behavior when this state is introduced
+        # - LIVE: use the real system clock (current NOW) for a realistic wall-clock time
+
         if self._trading_engine is None:
             return None
+
         return self._trading_engine._strategy_wall_clock_time[self]
 
     def is_in_terminal_state(self) -> bool:
