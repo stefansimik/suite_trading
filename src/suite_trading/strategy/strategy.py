@@ -35,7 +35,7 @@ class Strategy(ABC):
     - All three can run simultaneously, each with their own timeline
     """
 
-    # region Initialize strategy
+    # region Init strategy
 
     def __init__(self):
         """Initialize a new strategy.

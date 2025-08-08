@@ -73,7 +73,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Providers
+    # region EventFeedProvider(s)
 
     def add_event_feed_provider(self, name: str, provider: EventFeedProvider) -> None:
         """Add an event-feed provider to the engine with a name.
@@ -345,7 +345,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Event feeds
+    # region EventFeed(s)
 
     def request_event_delivery_for_strategy(
         self,
