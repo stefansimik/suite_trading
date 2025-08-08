@@ -182,6 +182,22 @@ def __str__(self) -> str:
     return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received})"
 ```
 
+## String interpolation and logging formatting
+
+**Rule: Always use f-strings. Never use old-style interpolation or logger format args.**
+- This rule applies everywhere: logs, exceptions, messages and general strings.
+
+### Allowed
+- f-strings: `logger.info(f"Started strategy '{name}'")`
+- Plain constant strings when no interpolation is needed
+
+### Forbidden
+- `logger.info("Started strategy '%s'", name)`
+- `logger.info("Started strategy '{}'".format(name))`
+- `"Hello, %s" % name`
+
+
+
 ## Exception Message Formatting
 
 **Rule**: All error and exception messages must be 100% clear, understandable, and fully in sync with terminology used in the codebase.
@@ -439,3 +455,63 @@ Why: Makes intent obvious, supports Fail Fast and keeps reviews unambiguous.
 - Use present tense imperative verbs: Add, Fix, Remove, Update
 - Be descriptive about what and why
 - For longer commits, add body separated by blank line
+
+
+# Plan and code change visualization
+
+**Rule**: All plans and proposed code changes must be shown with clearly formatted
+Before/After code sections so users can quickly see what will change.
+
+**Why**: Visual diffs reduce ambiguity, speed up reviews, and make intent obvious.
+
+## Before/After visualization rules
+
+For every file and code location you plan to change, include:
+1) A file header line on its own line:
+   - File: path/to/file.py
+2) A short one-line context sentence (optional but recommended).
+3) A Before code block with the closest minimal, unique snippet.
+4) An After code block with the exact new snippet.
+
+Formatting rules:
+- Use fenced code blocks. Prefer the correct language hint (python, text).
+- Precede each code block with a plain text label: "Before:" or "After:".
+- Keep each snippet concise but uniquely identifiable in the file.
+- Wrap lines at <= 100 chars (see Markdown Formatting rules).
+- If showing imports or docstrings, include only the necessary surrounding lines.
+- If the change is a deletion only, show Before and a note: "After: (removed)".
+- If the change is an addition only, show Before with closest anchor context, then After with
+  the added block; if no stable anchor exists, clearly state the insertion point
+  (e.g., "After line: 'class TradingEngine:'").
+
+## Logging and comments
+
+- When logs are affected, show Before/After snippets for the log lines too.
+- When comments or docstrings change, include them in the snippets.
+- Respect Comment Formatting and Docstring Writing Style rules.
+=
+
+## Minimal template you must follow
+
+Use this template when presenting a plan that changes code. Keep blocks short and unique.
+
+- Step X — Short description
+
+File: <full/path/to/file.py>
+Context: <what and why in one sentence>
+
+Before:
+```python
+<minimal unique snippet>
+```
+
+After:
+```python
+<updated minimal unique snippet>
+```
+
+Acceptance checks:
+- [ ] List concrete, verifiable checks relevant to this file/change
+
+Repeat the File/Before/After pattern for each touched file. Keep each code block under
+100 chars per line. Ensure imports are updated after changes.
