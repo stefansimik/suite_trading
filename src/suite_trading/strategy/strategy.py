@@ -335,9 +335,9 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Internal
+    # region TradingEngine: Attach/Detach
 
-    def _set_trading_engine(self, trading_engine: "TradingEngine"):
+    def _set_trading_engine(self, trading_engine: "TradingEngine") -> None:
         """Attach the trading engine reference.
 
         This method is called by TradingEngine when the strategy is added. It does not change
@@ -346,14 +346,35 @@ class Strategy(ABC):
 
         Args:
             trading_engine (TradingEngine): The trading engine instance.
+
+        Raises:
+            RuntimeError: If $_trading_engine is already set or $state is not NEW.
         """
+        # Check: engine must not be already attached
+        if self._trading_engine is not None:
+            raise RuntimeError(
+                "Cannot call `_set_trading_engine` because $_trading_engine is already set.",
+            )
+        # Check: state must be NEW when attaching to an engine
+        if self.state != StrategyState.NEW:
+            raise RuntimeError(
+                (f"Cannot call `_set_trading_engine` because $state ({self.state.name}) is not NEW. Provide a fresh instance."),
+            )
         self._trading_engine = trading_engine
 
     def _clear_trading_engine(self) -> None:
         """Detach the trading engine reference.
 
         Called by TradingEngine when the strategy is removed. Does not change lifecycle $state.
+
+        Raises:
+            RuntimeError: If $_trading_engine is None.
         """
+        # Check: engine must be attached before clearing
+        if self._trading_engine is None:
+            raise RuntimeError(
+                "Cannot call `_clear_trading_engine` because $_trading_engine is None.",
+            )
         self._trading_engine = None
 
     # endregion
