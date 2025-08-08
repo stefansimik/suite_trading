@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Callable, Optional
 
+from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -347,73 +348,40 @@ class TradingEngine:
 
     # region EventFeed(s)
 
-    def request_event_delivery_for_strategy(
+    def add_event_feed_for_strategy(
         self,
         strategy: Strategy,
         name: str,
-        event_type: type,
-        parameters: dict,
-        provider_ref: str,
+        event_feed: EventFeed,
         callback: Callable,
     ) -> None:
-        """Ask for events to be sent to a strategy.
-
-        Creates an event-feed for your strategy using one of your event-feed providers.
-        The engine will manage this feed and send events to your strategy.
+        """Attach an EventFeed to a strategy and register metadata.
 
         Args:
-            strategy: The strategy that wants to receive events.
-            name: Unique name for this event-feed within the strategy.
-            event_type: Type of events to receive (e.g., NewBarEvent).
-            parameters: Dictionary with event-specific parameters.
-            provider_ref: Name of the event-feed provider to use.
-            callback: Function to call when events are received.
+            strategy: The strategy that will receive events. Type: Strategy.
+            name: Unique name for this event-feed within the strategy. Type: str.
+            event_feed: The EventFeed instance to manage. Type: EventFeed.
+            callback: Function to call when events are received. Type: Callable.
 
         Raises:
-            ValueError: If $name is already in use for this strategy, $provider_ref not found,
-                       or the EventFeed cannot be created for $event_type with $parameters.
+            ValueError: If $strategy is not added to this TradingEngine or $name is duplicate.
         """
         # Check: strategy must be added to this engine
         if strategy not in self._strategies.values():
             raise ValueError(
-                "Cannot call `request_event_delivery_for_strategy` because $strategy "
+                "Cannot call `add_event_feed_for_strategy` because $strategy "
                 f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
                 "Add the strategy using `add_strategy` first.",
             )
 
         # Check: delivery name must be unique per strategy
-        feeds_list = self._feed_manager.get_event_feeds_for_strategy(strategy)
-        for existing_feed in feeds_list:
-            if existing_feed.request_info.get("name") == name:
-                raise ValueError(
-                    "Cannot call `request_event_delivery_for_strategy` because event-feed with $name "
-                    f"('{name}') is already used for this strategy. Choose a different name.",
-                )
-
-        # Check: provider must exist in added event feed providers
-        if provider_ref not in self._event_feed_providers:
+        if self._feed_manager.has_feed_name(strategy, name):
             raise ValueError(
-                "Cannot call `request_event_delivery_for_strategy` because provider reference $provider_ref "
-                f"('{provider_ref}') was not found among added event feed providers. "
-                "Add the provider using `add_event_feed_provider` or use a correct reference.",
+                "Cannot call `add_event_feed_for_strategy` because event-feed with $name "
+                f"('{name}') is already used for this strategy. Choose a different name.",
             )
 
-        provider = self._event_feed_providers[provider_ref]
-
-        # Obtain event feed instance from provider (may raise provider-specific errors)
-        # Note: The provider should create a feed that stores request info internally
-        event_feed = provider.create_event_feed(event_type, parameters, callback)
-
-        # Store request metadata including the name
-        event_feed.request_info = {
-            "name": name,
-            "event_type": event_type,
-            "parameters": parameters,
-            "callback": callback,
-            "provider_ref": provider_ref,
-        }
-
-        # Check: apply timeline filtering if strategy already has last_event_time
+        # Timeline filtering if the strategy already processed events
         if strategy.last_event_time is not None:
             removed_count = event_feed.remove_events_before(strategy.last_event_time)
             if removed_count > 0:
@@ -421,15 +389,20 @@ class TradingEngine:
                     f"Filtered {removed_count} obsolete events before {strategy.last_event_time} to keep timeline",
                 )
 
-        # Add EventFeed to strategy using manager (preserves request order)
-        self._feed_manager.add_event_feed_for_strategy(strategy, event_feed)
+        # Register the feed with metadata in the manager
+        self._feed_manager.add_event_feed_for_strategy(
+            strategy=strategy,
+            name=name,
+            event_feed=event_feed,
+            callback=callback,
+        )
 
-    def cancel_event_delivery_for_strategy(self, strategy: Strategy, name: str) -> None:
-        """Stop sending events to a strategy.
+    def remove_event_feed_from_strategy(self, strategy: Strategy, name: str) -> None:
+        """Detach and close a feed by name for a strategy.
 
         Args:
             strategy: The strategy that owns the event-feed.
-            name: Name of the event-feed to cancel.
+            name: Name of the event-feed to remove.
 
         Raises:
             ValueError: If $strategy is not registered.
@@ -437,22 +410,19 @@ class TradingEngine:
         # Check: strategy must be added to this engine
         if strategy not in self._strategies.values():
             raise ValueError(
-                "Cannot call `cancel_event_delivery_for_strategy` because $strategy "
+                "Cannot call `remove_event_feed_from_strategy` because $strategy "
                 f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
                 "Add the strategy using `add_strategy` first.",
             )
 
         # Find and close the feed by name before removing
-        feeds_list = self._feed_manager.get_event_feeds_for_strategy(strategy)
-        feed_to_close = None
-        for feed in feeds_list:
-            if feed.request_info.get("name") == name:
-                feed_to_close = feed
-                break
+        feed_to_close = self._feed_manager.get_event_feed_by_name(strategy, name)
 
         # Handle case where feed doesn't exist (already finished/removed)
         if feed_to_close is None:
-            logger.debug(f"Event delivery '{name}' for strategy {strategy.__class__.__name__} was already finished or canceled - no action needed")
+            logger.debug(
+                f"Event feed '{name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed",
+            )
             return
 
         # Close the feed first
@@ -498,7 +468,7 @@ class TradingEngine:
             self._state_machine.execute_action(EngineAction.START_ENGINE)
 
             # Start processing events
-            self.run_strategy_processing_loop()
+            self.run_event_processing_loop()
         except Exception:
             # Mark engine as failed
             self._state_machine.execute_action(EngineAction.ERROR_OCCURRED)
@@ -543,7 +513,7 @@ class TradingEngine:
             self._state_machine.execute_action(EngineAction.ERROR_OCCURRED)
             raise
 
-    def run_strategy_processing_loop(self) -> None:
+    def run_event_processing_loop(self) -> None:
         """Process events for all strategies until they're finished.
 
         How it works:
@@ -574,7 +544,7 @@ class TradingEngine:
             # Go through each strategy
             for strategy in self._strategies.values():
                 # Find the oldest event from all this strategy's event-feeds
-                # If events have the same time, use the first feed (keeps request order)
+                # If events have the same time, use the first feed (keeps order how EventFeeds were added)
                 oldest_feed = self._feed_manager.get_next_event_feed_for_strategy(strategy)
 
                 # Process the event if we found one
@@ -590,9 +560,10 @@ class TradingEngine:
                     if prev is None or consumed_event.dt_received > prev:
                         self._strategy_wall_clock_time[strategy] = consumed_event.dt_received
 
-                    # Send event to strategy
+                    # Send event via stored callback (fallback to strategy.on_event)
+                    callback = self._feed_manager.get_callback_for_feed(oldest_feed)
                     try:
-                        strategy.on_event(consumed_event)
+                        callback(consumed_event)
                     except Exception as e:
                         logger.error(f"Error processing event for strategy: {e}")
                         # Mark strategy as failed

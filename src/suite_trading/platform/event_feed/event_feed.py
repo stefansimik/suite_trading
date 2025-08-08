@@ -54,6 +54,8 @@ class EventFeed(Protocol):
     - This contract intentionally omits advanced controls such as request_stop() or
       finished_reason(). Add such capabilities only when you truly need them, keeping the core API
       simple.
+    - Engine-specific metadata like feed name or callback is not part of this protocol. The
+      EventFeedManager owns and manages such metadata.
     """
 
     def peek(self) -> Optional[Event]:
@@ -168,17 +170,5 @@ class EventFeed(Protocol):
 
         Raises:
             Exception: Implementations should raise on unexpected errors during filtering.
-        """
-        ...
-
-    @property
-    def request_info(self) -> dict:
-        """Get the original request information that created this feed.
-
-        Contains the metadata from the original request that was used to create this EventFeed.
-        This allows the feed to be self-contained with its creation context.
-
-        Returns:
-            dict: Contains 'event_type', 'parameters', 'callback', 'event_feed_provider_ref'
         """
         ...

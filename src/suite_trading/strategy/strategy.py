@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, List, Callable, Optional
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
+from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction, create_strategy_state_machine
 
 if TYPE_CHECKING:
@@ -185,7 +186,7 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Events
+    # region Event feeds
 
     @abstractmethod  # Made abstract to prevent silent failures - ensures all strategies implement event handling
     def on_event(self, event: Event):
@@ -204,88 +205,79 @@ class Strategy(ABC):
         """
         pass
 
-    def request_event_delivery(
+    def add_event_feed(
         self,
         name: str,
-        event_type: type,
-        parameters: dict,
-        provider_ref: str,
+        event_feed: EventFeed,
         callback: Optional[Callable] = None,
     ) -> None:
-        """Request event delivery for the specified parameters.
+        """Attach an EventFeed to this Strategy.
 
-        Sets up an event delivery mechanism that will call your callback function when events
-        become available. Events may arrive immediately (historical), over time (live), or may be
-        finite (historical series) or effectively unbounded (live feeds).
+        Connect an EventFeed so this strategy can start receiving events from it. You can call
+        this during `on_start` (when the strategy is ADDED) or later while RUNNING.
 
         Args:
-            name: Unique name for this delivery request within the strategy.
-            event_type: Type of events to receive (e.g., NewBarEvent).
-            parameters: Dictionary with event-specific parameters.
-            provider_ref: Reference name of the provider to use for this request.
-            callback: Function to call when events are received. If omitted, defaults to
-                self.on_event. Keyword-only.
+            name: Unique name for this feed within the strategy.
+            event_feed: The EventFeed instance to attach.
+            callback: Optional; if None, defaults to self.on_event.
 
         Raises:
-            ValueError: If $name is already in use for this strategy or the EventFeed cannot be created for $event_type with $parameters.
-            RuntimeError: If $trading_engine is None or $state is not ADDED/RUNNING.
+            RuntimeError: If $_trading_engine is None or $state does not allow adding feeds.
+            ValueError: If $name is already used for this strategy.
         """
-        # Check: trading engine must be attached before requesting event delivery
+        # Check: engine must be attached
         if self._trading_engine is None:
             raise RuntimeError(
-                "Cannot call `request_event_delivery` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `add_event_feed` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        # Check: state must allow event delivery (ADDED or RUNNING)
+        # Check: state must allow adding feeds (ADDED or RUNNING)
         if not (self._state_machine.can_execute_action(StrategyAction.START_STRATEGY) or self.state == StrategyState.RUNNING):
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
-                "Cannot call `request_event_delivery` because $state "
-                f"({self.state.name}) does not allow requesting data. "
-                f"Valid actions: {valid_actions}. Call it from `on_start` or when the strategy is RUNNING.",
+                "Cannot call `add_event_feed` because $state "
+                f"({self.state.name}) does not allow adding feeds. "
+                f"Valid actions: {valid_actions}. Call it from `on_start` "
+                "or when the strategy is RUNNING.",
             )
 
-        # Default to universal handler if not provided
+        # If we didnt specify a callback, use the default `on_event` callback
         if callback is None:
             callback = self.on_event
 
-        # Delegate to TradingEngine
-        self._trading_engine.request_event_delivery_for_strategy(
+        self._trading_engine.add_event_feed_for_strategy(
             strategy=self,
             name=name,
-            event_type=event_type,
-            parameters=parameters,
-            provider_ref=provider_ref,
+            event_feed=event_feed,
             callback=callback,
         )
 
-    def cancel_event_delivery(self, name: str) -> None:
-        """Cancel an event delivery request by name.
+    def remove_event_feed(self, name: str) -> None:
+        """Detach an EventFeed by name.
 
-        Safe to call even if the delivery has already completed naturally (e.g., historical data).
+        Safe to call even if the feed has already finished naturally (e.g., historical data).
 
         Args:
-            name: Name of the delivery request to cancel.
+            name: Name of the feed to remove.
 
         Raises:
-            ValueError: If $name is not found for this strategy.
-            RuntimeError: If $trading_engine is None or $state is not RUNNING.
+            RuntimeError: If $_trading_engine is None or $state is not RUNNING.
         """
-        # Check: trading engine must be attached before canceling event delivery
+        # Check: engine must be attached
         if self._trading_engine is None:
             raise RuntimeError(
-                "Cannot call `cancel_event_delivery` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
+                "Cannot call `remove_event_feed` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
 
-        # Check: state must be RUNNING to cancel event delivery
+        # Check: state must be RUNNING to remove feeds
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
-                f"Cannot call `cancel_event_delivery` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
+                f"Cannot call `remove_event_feed` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
             )
 
         # Delegate to TradingEngine - no local tracking
-        self._trading_engine.cancel_event_delivery_for_strategy(self, name)
+        self._trading_engine.remove_event_feed_from_strategy(self, name)
 
     # endregion
 
@@ -396,49 +388,5 @@ class Strategy(ABC):
             )
 
         return self._trading_engine.get_active_orders(broker)
-
-    # endregion
-
-    # region TradingEngine: Attach/Detach
-
-    def _set_trading_engine(self, trading_engine: "TradingEngine") -> None:
-        """Attach the trading engine reference.
-
-        This method is called by TradingEngine when the strategy is added. It does not change
-        lifecycle $state. TradingEngine is responsible for transitioning to ADDED after successful
-        registration.
-
-        Args:
-            trading_engine (TradingEngine): The trading engine instance.
-
-        Raises:
-            RuntimeError: If $_trading_engine is already set or $state is not NEW.
-        """
-        # Check: engine must not be already attached
-        if self._trading_engine is not None:
-            raise RuntimeError(
-                "Cannot call `_set_trading_engine` because $_trading_engine is already set.",
-            )
-        # Check: state must be NEW when attaching to an engine
-        if self.state != StrategyState.NEW:
-            raise RuntimeError(
-                (f"Cannot call `_set_trading_engine` because $state ({self.state.name}) is not NEW. Provide a fresh instance."),
-            )
-        self._trading_engine = trading_engine
-
-    def _clear_trading_engine(self) -> None:
-        """Detach the trading engine reference.
-
-        Called by TradingEngine when the strategy is removed. Does not change lifecycle $state.
-
-        Raises:
-            RuntimeError: If $_trading_engine is None.
-        """
-        # Check: engine must be attached before clearing
-        if self._trading_engine is None:
-            raise RuntimeError(
-                "Cannot call `_clear_trading_engine` because $_trading_engine is None.",
-            )
-        self._trading_engine = None
 
     # endregion

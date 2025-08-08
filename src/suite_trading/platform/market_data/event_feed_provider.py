@@ -52,8 +52,8 @@ class EventFeedProvider(Protocol):
         """Create or return an event feed instance for the given request.
 
         This factory method creates an EventFeed that implements the full EventFeed protocol.
-        The returned feed must contain the original request information in its request_info
-        property for self-contained operation.
+        Engine-specific metadata (like feed name or callback) is managed by the engine's
+        EventFeedManager, not by the feed object itself.
 
         Args:
             event_type: The type of events requested (e.g., NewBarEvent).
@@ -61,8 +61,7 @@ class EventFeedProvider(Protocol):
             callback: Function to be called when new events are delivered.
 
         Returns:
-            EventFeed: Event feed instance that implements the EventFeed protocol with
-                      request_info containing the original request metadata.
+            EventFeed: Event feed instance that implements the EventFeed protocol.
 
         Raises:
             ValueError: If the EventFeed cannot be created for $event_type with $parameters.
