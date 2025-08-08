@@ -1,4 +1,5 @@
 from typing import Protocol, Optional
+from datetime import datetime
 from suite_trading.domain.event import Event
 
 
@@ -146,6 +147,27 @@ class EventFeed(Protocol):
 
         Raises:
             Exception: Implementations should raise on unexpected cleanup failures.
+        """
+        ...
+
+    def remove_events_before(self, cutoff_time: datetime) -> int:
+        """Remove all events with dt_event < cutoff_time.
+
+        This method is used to maintain timeline consistency when strategies request new event
+        feeds during runtime. If a strategy already has a current_time, any events older than
+        that time should be filtered out to prevent timeline corruption.
+
+        The method should efficiently remove events that occur before the specified cutoff time
+        without affecting the feed's ability to deliver remaining events in chronological order.
+
+        Args:
+            cutoff_time: Events with dt_event before this time will be removed from the feed.
+
+        Returns:
+            int: Number of events that were removed from the feed.
+
+        Raises:
+            Exception: Implementations should raise on unexpected errors during filtering.
         """
         ...
 

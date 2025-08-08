@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Callable, Optional
 
-from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -56,15 +55,6 @@ class TradingEngine:
         self._feed_manager = EventFeedManager()
         # Tracks time for each strategy
         self._strategy_current_time: Dict[Strategy, Optional[datetime]] = {}
-
-    @property
-    def state(self) -> EngineState:
-        """Get what state the engine is in right now.
-
-        Returns:
-            EngineState: Current state like NEW, RUNNING, or STOPPED.
-        """
-        return self._state_machine.current_state
 
     def start(self):
         """Start the engine and all your strategies.
@@ -165,7 +155,7 @@ class TradingEngine:
 
         logger.info("Starting event processing loop")
 
-        # Keep going while any strategy still has data to process
+        # Keep going while any strategy still has any unfinished event-feeds
         while self._feed_manager.has_unfinished_feeds():
             # Go through each strategy
             for strategy in self._strategies.values():
@@ -197,6 +187,15 @@ class TradingEngine:
 
         # Stop the engine when all data is processed
         self.stop()
+
+    @property
+    def state(self) -> EngineState:
+        """Get what state the engine is in right now.
+
+        Returns:
+            EngineState: Current state like NEW, RUNNING, or STOPPED.
+        """
+        return self._state_machine.current_state
 
     # endregion
 
@@ -530,6 +529,12 @@ class TradingEngine:
             "provider_ref": provider_ref,
         }
 
+        # Check: apply timeline filtering if strategy already has current_time
+        if strategy.current_time is not None:
+            removed_count = event_feed.remove_events_before(strategy.current_time)
+            if removed_count > 0:
+                logger.info(f"Filtered {removed_count} obsolete events for strategy timeline consistency - events before {strategy.current_time}")
+
         # Add EventFeed to strategy using manager (preserves request order)
         self._feed_manager.add_event_feed_for_strategy(strategy, event_feed)
 
@@ -572,29 +577,6 @@ class TradingEngine:
 
         # Remove from manager
         self._feed_manager.remove_event_feed_for_strategy(strategy, name)
-
-    def get_event_feeds_for_strategy(self, strategy: Strategy) -> List[EventFeed]:
-        """Get all event-feeds for a strategy in the order you requested them.
-
-        Args:
-            strategy: The strategy to get event-feeds for.
-
-        Returns:
-            List[EventFeed]: Event-feeds in request order.
-
-        Raises:
-            ValueError: If $strategy is not added to this TradingEngine.
-        """
-        # Check: strategy must be added to this engine
-        if strategy not in self._strategies.values():
-            raise ValueError(
-                "Cannot call `get_event_feeds_for_strategy` because $strategy "
-                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
-                "Add the strategy using `add_strategy` first.",
-            )
-
-        # Delegate to manager (returns copy to prevent external modification)
-        return self._feed_manager.get_event_feeds_for_strategy(strategy)
 
     # endregion
 
