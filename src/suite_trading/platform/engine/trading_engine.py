@@ -482,6 +482,8 @@ class TradingEngine:
         # Check: allow idempotent stop when already STOPPED; otherwise must be able to stop
         if self.state == EngineState.STOPPED:
             return
+
+        # Check: engine must be in RUNNING state, when we want to stop it
         if not self._state_machine.can_execute_action(EngineAction.STOP_ENGINE):
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise ValueError(f"Cannot stop engine in state {self.state.name}. Valid actions: {valid_actions}")

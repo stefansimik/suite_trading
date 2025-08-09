@@ -24,6 +24,7 @@ class DemoBarEventFeed:
     """
 
     # region Init
+
     def __init__(
         self,
         first_bar: Bar = DEFAULT_FIRST_BAR,
@@ -107,7 +108,8 @@ class DemoBarEventFeed:
         self._closed = True
 
     def remove_events_before(self, cutoff_time: datetime) -> int:
-        """Remove all events with dt_event < cutoff_time by dropping from the head.
+        """Remove all events before $cutoff_time from this event feed.
+         That means all events meeting following condition: event.dt_event < cutoff_time
 
         Args:
             cutoff_time: Events with dt_event before this time will be removed.
