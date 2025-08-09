@@ -1,7 +1,10 @@
+# IDE folders
+/.idea/
+
 # Python virtual environment
 .venv
 
-# Ignored folders
+# Varius working folders
 __pycache__/
 dist/
 **/temp_*/
