@@ -1,17 +1,31 @@
+import logging
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.platform.event_feed.demo_bar_event_feed import DemoBarEventFeed
+from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.engine.trading_engine import TradingEngine
+
+logger = logging.getLogger(__name__)
 
 
 class DemoStrategy(Strategy):
     def on_start(self):
-        # Strategy started - ready to receive events
-        pass
+        # Add market data via event-feed
+        demo_feed: EventFeed = DemoBarEventFeed()
+        self.add_event_feed("demo_feed", demo_feed, self.on_event)
 
     def on_event(self, event):
-        # Handle all events
+        if isinstance(event, NewBarEvent):
+            self.on_bar(event.bar, event)
+        else:
+            logger.info(f"Received event: {event}")
+
+    def on_bar(self, bar, event: NewBarEvent):
+        logger.info(f"Received bar: {bar}")
         pass
 
-    def on_bar(self, bar, is_historical: bool):
+    def on_stop(self):
+        logger.info("Stopping strategy")
         pass
 
 
@@ -25,9 +39,6 @@ def test_basic_flow():
 
     # Start trading engine
     engine.start()
-
-    # Stop trading engine
-    engine.stop()
 
 
 if __name__ == "__main__":
