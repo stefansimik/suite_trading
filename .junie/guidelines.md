@@ -90,25 +90,58 @@ def __str__(self) -> str:
     return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received})"
 ```
 
-## 2.6 Documentation (docstrings)
-Use Google‑style docstrings with purpose, params, returns, exceptions, and types.
-Write in plain English for beginners.
+## 2.6 Docstrings (API Documentation)
+**Rule: Docstrings document public APIs for external developers using your code.**
 
-## 2.7 Comments (format, content, narrative, "# Check:")
+Key principles:
+- Use Google-style docstrings with purpose, params, returns, exceptions, and types
+- Write in accessible language that any developer can understand
+- Include all important information, but explain complex concepts simply
+- Make it immediately understandable without additional research
+- When needed, reference related code that provides essential context
+- Use concrete examples when helpful
 
-Comment rules:
-- Inline: 2 spaces before #; sentence case for section comments.
-- Narrative: Each 2–15 line block gets a short "why/what" comment above it.
-- Use domain terms and explicit states.
-- Reserve "# Check:" for defensive guards, placed immediately above the check.
-- Code references: Use `$parameter_name` for parameters / attributes / variables and `` `function_name` ``
-  for functions/methods in comments, docstrings, and error messages.
+Focus: Formal documentation for functions, classes, and modules that other developers will use.
 
-Example narrative:
+## 2.7 Code Comments (Narrative & Defensive)
+**Rule: Comments explain the "why" and "what" of complex code logic for maintainers.**
+
+### Purpose
+Code comments significantly reduce mental load when developers quickly read or scan code.
+Instead of having to mentally parse and understand complex logic, developers can immediately grasp the intent from clear narrative comments.
+This speeds up code comprehension, debugging, and maintenance.
+
+**AI/LLM Benefit**: Comments and code automatically stay synchronized when using AI models for refactoring or modifications,
+as the AI understands both the implementation and the documented intent.
+
+### Narrative Comments
+- Short "why/what" comment above each logical unit of code
+- Use domain terms and explicit states
+- Explain business logic and reasoning
+
+### Defensive Comments
+- Use "# Check:" prefix exclusively for validation guards
+- Place immediately above the validation check
+- Explain what condition is being validated and why it matters
+
+### Comment Formatting
+- Inline comments: 2 spaces before #
+- Section comments: Sentence case capitalization
+
+### Code Reference Formatting
+Apply universally to comments, docstrings, and error messages:
+- Parameters/attributes/variables: `$parameter_name`
+- Functions/methods: `` `function_name` ``
+
+### Examples
+
+Narrative and defensive comments together:
 ```python
 # Collect fills since last event and net the quantity
 fills = broker.get_fills_since(self._last_event_time)
 net_qty = sum(f.qty for f in fills)
+
+# Check: ensure we have quantity to trade
 if net_qty == 0:
     return
 
@@ -117,15 +150,14 @@ broker.submit(Order(instrument, side, net_qty))
 self._last_order_time = now()
 ```
 
-Example defensive check:
+Code references across contexts:
 ```python
-# Check: strategy must be added before start
-if name not in self._strategies:
-    raise KeyError(
-        f"Cannot call `start_strategy` because $name ('{name}') is not added to this ",
-        f"TradingEngine. Add it using `add_strategy` first."
-    )
+# In comments: "Process $user_input through `validate_data` function"
+# In docstrings: "The $timeout parameter controls how long `connect` waits"
+# In errors: "Cannot call `start_strategy` because $name is invalid"
 ```
+
+Focus: Complete internal code commenting strategy with universal formatting standards.
 
 ## 2.8 Exception messages
 Exception messages checklist:
