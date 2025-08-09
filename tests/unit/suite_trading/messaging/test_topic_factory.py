@@ -1,5 +1,5 @@
 from suite_trading.platform.messaging.topic_factory import TopicFactory
-from suite_trading.platform.engine.trading_engine import TradingEngine
+from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 
@@ -16,10 +16,10 @@ def test_topic_protocol_create_topic_for_bar():
     assert topic == "bar::eurusd@forex::5-minute::last"
 
 
-def test_trading_engine_publish_bar():
-    """Test that TradingEngine.publish_bar correctly publishes a bar to the message bus."""
-    # Create a trading engine
-    engine = TradingEngine()
+def test_message_bus_publish_bar_event():
+    """Test publishing a NewBarEvent to MessageBus using TopicFactory topic."""
+    # Create a message bus
+    msg_bus = MessageBus()
 
     # Create a bar type
     bar_type = create_bar_type(value=5)
@@ -45,10 +45,11 @@ def test_trading_engine_publish_bar():
 
     # Subscribe to the topic
     topic = TopicFactory.create_topic_for_bar(bar_type)
-    engine.message_bus.subscribe(topic, on_bar_event)
+    msg_bus.subscribe(topic, on_bar_event)
 
-    # Publish the bar
-    engine.publish_bar(bar, "test_provider")
+    # Publish the bar event
+    event = NewBarEvent(bar=bar, dt_received=datetime.now(tz=timezone.utc), is_historical=True, provider_name="test_provider")
+    msg_bus.publish(topic, event)
 
     # Verify that the callback was called with the correct NewBarEvent
     assert callback_called, "Callback was not called"

@@ -4,12 +4,8 @@ from typing import Dict, List, Callable, Optional
 
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
-from suite_trading.platform.messaging.message_bus import MessageBus
-from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
@@ -48,9 +44,6 @@ class TradingEngine:
 
         # Engine state machine
         self._state_machine = create_engine_state_machine()
-
-        # Message bus
-        self.message_bus = MessageBus()
 
         # EventFeedProvider registry
         self._event_feed_providers: Dict[str, EventFeedProvider] = {}
@@ -637,23 +630,5 @@ class TradingEngine:
             ConnectionError: If the broker is not connected.
         """
         return broker.get_active_orders()
-
-    # endregion
-
-    # region Messaging
-
-    def publish_bar(self, bar: Bar, provider_name: str, is_historical: bool = True) -> None:
-        """Send bar data to all strategies that want it.
-
-        Creates an event and sends it to strategies through the message system.
-
-        Args:
-            bar: The bar data to send.
-            provider_name: Name of the provider that created this bar.
-            is_historical: Whether this bar data is historical or live. Defaults to True.
-        """
-        event = NewBarEvent(bar=bar, dt_received=datetime.now(), is_historical=is_historical, provider_name=provider_name)
-        topic = TopicFactory.create_topic_for_bar(bar.bar_type)
-        self.message_bus.publish(topic, event)
 
     # endregion
