@@ -4,127 +4,28 @@ from suite_trading.domain.event import Event
 
 
 class EventFeed(Protocol):
-    """Simple streaming interface that delivers events in chronological order to strategies.
-
-    This protocol is intentionally minimal and non-blocking. It supports three observable runtime
-    scenarios based on data availability.
-
-    Scenarios:
-    - NEXT_EVENT_READY: An event is immediately available -> next() returns an Event, peek() returns same Event
-    - WAITING_FOR_FUTURE_EVENTS: No event is ready now, but the feed may produce more later -> both return None while
-      is_finished() is False
-    - FINISHED: The feed will never produce more events -> both return None, is_finished() is True
-
-    | Scenario | peek() | next() | is_finished() |
-    |----------|--------|--------|---------------|
-    | NEXT_EVENT_READY | Event | Event | False |
-    | WAITING_FOR_FUTURE_EVENTS | None | None | False |
-    | FINISHED | None | None | True |
+    """A simple, non-blocking stream of events in time order.
 
     How to use:
-    - Call next() repeatedly to pull available events
-    - Call peek() to inspect the next event without consuming it
-    - If next() or peek() returns None, check is_finished():
-      - False => the feed is WAITING_FOR_FUTURE_EVENTS; keep polling later
-      - True  => the feed is FINISHED; stop polling
-    - Always call close() once you are done to release resources
+    - Call pop() to get the next ready event.
+    - Call peek() to see the next event without consuming it.
+    - If pop()/peek() returns None and is_finished() is False, try later.
+    - If is_finished() is True, the feed has no more events.
 
-    Examples:
-        # Standard consumption loop
-        while not feed.is_finished():
-            event = feed.next()
-            if event is not None:
-                process_event(event)
-        feed.close()
-
-        # Conditional lookahead
-        preview = feed.peek()
-        if preview is not None and should_defer(preview):
-            # Decide based on next event without consuming it
-            pass
-
-        event = feed.next()
-        if event is not None:
-            handle(event)
-
-    Notes:
-    - Implementations must be non-blocking in both next() and peek()
-    - Should fail fast on unexpected errors (raise exceptions rather than silently ignoring problems)
-    - Single-consumer expectation; document if implementation supports concurrency
-    - This contract intentionally omits advanced controls such as request_stop() or
-      finished_reason(). Add such capabilities only when you truly need them, keeping the core API
-      simple.
-    - Lightweight feed-level metadata is exposed via the `metadata` property (dict | None).
-      Implementations should return None or {} when no metadata is available.
-      Typical keys include 'source_event_feed_name' and optional 'source_event_feed_id'.
-    - Engine wiring like callbacks is still managed by the EventFeedManager.
+    Tip:
+    - In tight loops, use `peek() is not None` as the readiness check.
     """
 
     def peek(self) -> Optional[Event]:
-        """Return the next event without consuming it.
-
-        Non-blocking lookahead that returns the same event that next() would return, without
-        advancing the feed position. Multiple peek() calls return the same event until next()
-        consumes it.
-
-        Scenario mapping:
-        - NEXT_EVENT_READY: Returns the head event without consuming it
-        - WAITING_FOR_FUTURE_EVENTS: Returns None; is_finished() is False
-        - FINISHED: Returns None; is_finished() is True
-
-        Guarantees:
-        - If peek() returns event E, the very next next() call must return the same E (object identity)
-        - Multiple peek() calls return the same event until consumed by next()
-        - Events arriving after peek() but before next() do not change what next() returns
-
-        Returns:
-            Optional[Event]: The next event if available, otherwise None.
-
-        Raises:
-            Exception: Implementations should raise on unexpected errors instead of hiding them.
-        """
+        """Return the next event without consuming it, or None if none is ready."""
         ...
 
-    def next(self) -> Optional[Event]:
-        """Return the next event if one is ready.
-
-        Non-blocking. This method never waits for data. It maps runtime scenarios to return
-        values:
-        - NEXT_EVENT_READY: An event is available now -> returns an Event
-        - WAITING_FOR_FUTURE_EVENTS: No event is ready yet -> returns None and is_finished() is False
-        - FINISHED: Feed will never produce more -> returns None and is_finished() is True
-
-        After the feed is finished, next() continues to return None.
-
-        Returns:
-            Optional[Event]: The next event if it is ready, otherwise None.
-
-        Raises:
-            Exception: Implementations should raise on unexpected errors instead of hiding them.
-        """
+    def pop(self) -> Optional[Event]:
+        """Return the next event and advance the feed, or None if none is ready."""
         ...
 
     def is_finished(self) -> bool:
-        """Tell whether this feed will never produce more events.
-
-        Semantics:
-        - FINISHED: Returns True when the feed will not produce any more events.
-        - Not finished: Returns False; you may poll next() again later.
-
-        Typical behavior:
-        - Historical feeds: True after all historical events are delivered.
-        - Live feeds: Usually False until the underlying source is permanently closed or exhausted.
-        - Timer or scheduled feeds: True after the last scheduled event.
-
-        Performance:
-        - Must be fast, non-blocking, and safe to call frequently by the engine.
-
-        Returns:
-            bool: True if finished; False otherwise.
-
-        Raises:
-            Exception: Implementations should raise on unexpected internal errors.
-        """
+        """Return True when this feed will not produce any more events."""
         ...
 
     @property

@@ -546,7 +546,7 @@ class TradingEngine:
                 # Process the event if we found one
                 if oldest_feed is not None:
                     # Get the event
-                    consumed_event = oldest_feed.next()
+                    consumed_event = oldest_feed.pop()
 
                     # Update this strategy's last event time (timeline)
                     self._strategy_last_event_time[strategy] = consumed_event.dt_event
