@@ -21,6 +21,28 @@ It provides a unified interface for both backtesting strategies with historical 
 - Python 3.13+
 - Dependencies managed via `uv` (see `pyproject.toml`)
 
+## Development & Testing
+
+### Running Tests
+
+The project includes comprehensive test configuration with built-in logging support. Test logging is configured in `[tool.pytest.ini_options]` section of `pyproject.toml`.
+
+```bash
+# Run all tests with default INFO-level logging
+uv run pytest
+
+# Run tests with DEBUG-level logging for detailed output
+uv run pytest --log-cli-level=DEBUG
+
+# Run specific test file
+uv run pytest tests/integration/suite_trading/test_playground.py
+
+# Run specific test with DEBUG logging
+uv run pytest tests/integration/suite_trading/test_playground.py --log-cli-level=DEBUG
+```
+
+**Available log levels:** `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+
 ## Project Status
 
 This project is in **very early development** with approximately **5% of planned functionality** implemented.
