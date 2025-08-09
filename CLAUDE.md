@@ -167,6 +167,8 @@ def __str__(self) -> str:
 - **Inline comments**: 2 spaces before `#`, sentence case for sections
 - **Narrative comments**: Short "why/what" comment above each 2-15 line block
 - **Defensive checks**: Use "# Check:" prefix for validation guards
+- **Code references**: Use `$parameter_name` for parameters / attributes / variables and `` `function_name` ``
+  for functions/methods in comments, docstrings, and error messages
 
 Example:
 ```python

@@ -101,6 +101,8 @@ Comment rules:
 - Narrative: Each 2–15 line block gets a short "why/what" comment above it.
 - Use domain terms and explicit states.
 - Reserve "# Check:" for defensive guards, placed immediately above the check.
+- Code references: Use `$parameter_name` for parameters / attributes / variables and `` `function_name` ``
+  for functions/methods in comments, docstrings, and error messages.
 
 Example narrative:
 ```python
