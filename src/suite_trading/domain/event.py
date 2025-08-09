@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Optional
 
 
 class Event(ABC):
@@ -9,24 +10,20 @@ class Event(ABC):
     across different object types (bars, ticks, quotes, time events, etc.).
 
     All event objects must be sortable to enable correct chronological processing order.
+
+    Metadata contract:
+    - Implementations may attach optional metadata as a dict with no value type restrictions.
+    - If no metadata is available, return None or an empty dict.
+    - Typical keys may include 'source_event_feed_name'.
     """
 
-    def __init__(self, provider_name: str):
-        """Initialize event with provider identification.
+    def __init__(self, metadata: Optional[dict] = None) -> None:
+        """Initialize event with optional metadata.
 
         Args:
-            provider_name: Name of the provider that generated this event.
+            metadata: Optional dictionary with event metadata. Use None or {} when absent.
         """
-        self._provider_name = provider_name
-
-    @property
-    def provider_name(self) -> str:
-        """Get the name of the provider that generated this event.
-
-        Returns:
-            str: Name of the source provider.
-        """
-        return self._provider_name
+        self._metadata: Optional[dict] = dict(metadata) if metadata is not None else None
 
     @property
     @abstractmethod
@@ -56,6 +53,15 @@ class Event(ABC):
             datetime: The event timestamp.
         """
         ...
+
+    @property
+    def metadata(self) -> Optional[dict]:
+        """Optional metadata attached to the event.
+
+        Returns:
+            Optional[dict]: A dictionary of metadata or None when absent.
+        """
+        return self._metadata
 
     def __lt__(self, other: "Event") -> bool:
         """Enable sorting by event datetime for chronological processing.

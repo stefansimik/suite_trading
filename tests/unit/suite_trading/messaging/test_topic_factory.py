@@ -48,7 +48,12 @@ def test_message_bus_publish_bar_event():
     msg_bus.subscribe(topic, on_bar_event)
 
     # Publish the bar event
-    event = NewBarEvent(bar=bar, dt_received=datetime.now(tz=timezone.utc), is_historical=True, provider_name="test_provider")
+    event = NewBarEvent(
+        bar=bar,
+        dt_received=datetime.now(tz=timezone.utc),
+        is_historical=True,
+        metadata={"source_event_feed_name": "test_feed"},
+    )
     msg_bus.publish(topic, event)
 
     # Verify that the callback was called with the correct NewBarEvent

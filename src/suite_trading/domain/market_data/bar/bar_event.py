@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
@@ -13,20 +14,26 @@ class NewBarEvent(Event):
     Attributes:
         bar (Bar): The pure bar data object containing OHLC information.
         dt_received (datetime): When the event entered our system (timezone-aware UTC).
-        provider_name (str): Name of the provider that generated this event.
         is_historical (bool): Whether this bar data is historical or live.
     """
 
-    def __init__(self, bar: Bar, dt_received: datetime, is_historical: bool, provider_name: str):
+    def __init__(
+        self,
+        bar: Bar,
+        dt_received: datetime,
+        is_historical: bool,
+        metadata: Optional[dict] = None,
+    ) -> None:
         """Initialize a new bar event.
 
         Args:
             bar: The pure bar data object containing OHLC information.
             dt_received: When the event entered our system (timezone-aware UTC).
             is_historical: Whether this bar data is historical or live.
-            provider_name: Name of the provider that generated this event.
+            metadata: Optional metadata (e.g., {'source_event_feed_name': 'feed-A'}). Use None or
+                empty dict when absent.
         """
-        super().__init__(provider_name)
+        super().__init__(metadata)
         self._bar = bar
         self._dt_received = dt_received
         self._is_historical = is_historical
@@ -63,7 +70,7 @@ class NewBarEvent(Event):
         Returns:
             str: A human-readable string representation.
         """
-        return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received}, provider_name={self.provider_name}, is_historical={self.is_historical})"
+        return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received}, is_historical={self.is_historical})"
 
     def __repr__(self) -> str:
         """Return a developer-friendly representation of the bar event.
@@ -71,7 +78,7 @@ class NewBarEvent(Event):
         Returns:
             str: A detailed string representation.
         """
-        return f"{self.__class__.__name__}(bar={self.bar!r}, dt_received={self.dt_received!r}, provider_name={self.provider_name!r}, is_historical={self.is_historical!r})"
+        return f"{self.__class__.__name__}(bar={self.bar!r}, dt_received={self.dt_received!r}, is_historical={self.is_historical!r})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another bar event.
@@ -84,9 +91,4 @@ class NewBarEvent(Event):
         """
         if not isinstance(other, NewBarEvent):
             return False
-        return (
-            self.bar == other.bar
-            and self.dt_received == other.dt_received
-            and self.provider_name == other.provider_name
-            and self.is_historical == other.is_historical
-        )
+        return self.bar == other.bar and self.dt_received == other.dt_received and self.is_historical == other.is_historical
