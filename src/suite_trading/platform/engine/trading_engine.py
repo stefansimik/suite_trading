@@ -21,15 +21,24 @@ logger = logging.getLogger(__name__)
 class TradingEngine:
     """Runs multiple trading strategies at the same time, each with its own timeline.
 
-    TradingEngine lets you run many strategies together. Each strategy gets its own time
-    and doesn't wait for other strategies. This means you can run old backtests and live
-    trading at the same time.
+    TradingEngine lets you run many strategies together. Each strategy has its own
+    independent timeline and processes events at its own pace.
+
+    How timelines work:
+    A timeline is simply a date range (from-until) that a strategy processes events through.
+    The engine creates a combined timeline from all event-feeds across all strategies.
+    This timeline starts with the first event from any event-feed and ends with the
+    last event from any event-feed. Each strategy moves through this timeline based
+    only on the events it receives.
 
     What you can do:
     - Run multiple backtests with different time periods at once
-    - Mix live trading with historical testing
-    - Each strategy moves through time based on its own events
-    - Strategies don't interfere with each other
+    - Mix live trading with historical testing strategies
+    - Each strategy processes its own events independently
+
+    By default, strategies work independently and don't interact with each other.
+    However, you can program strategies to communicate if needed - each strategy
+    simply follows its own timeline based on the events it gets.
     """
 
     # region Init engine
@@ -65,10 +74,10 @@ class TradingEngine:
 
     @property
     def state(self) -> EngineState:
-        """Get what state the engine is in right now.
+        """Get the current engine state.
 
         Returns:
-            EngineState: Current state like NEW, RUNNING, or STOPPED.
+            EngineState: Current state (NEW, RUNNING, or STOPPED).
         """
         return self._state_machine.current_state
 
@@ -77,16 +86,14 @@ class TradingEngine:
     # region EventFeedProvider(s)
 
     def add_event_feed_provider(self, name: str, provider: EventFeedProvider) -> None:
-        """Add an event-feed provider to the engine with a name.
-
-        Give your event-feed provider a name so you can easily identify it in logs and use it later.
+        """Add an event feed provider with a unique name.
 
         Args:
             name: Unique name to identify this provider.
             provider: The EventFeedProvider instance to add.
 
         Raises:
-            ValueError: If a provider with the same $name already exists.
+            ValueError: If a provider with the same name already exists.
         """
         # Check: provider name must be unique and not already added
         if name in self._event_feed_providers:
@@ -97,13 +104,13 @@ class TradingEngine:
         self._event_feed_providers[name] = provider
 
     def remove_event_feed_provider(self, name: str) -> None:
-        """Remove an event-feed provider by name.
+        """Remove an event feed provider by name.
 
         Args:
             name: Name of the provider to remove.
 
         Raises:
-            KeyError: If no provider with the given $name exists.
+            KeyError: If no provider with the given name exists.
         """
         # Check: provider name must be added before removing
         if name not in self._event_feed_providers:
@@ -115,7 +122,7 @@ class TradingEngine:
 
     @property
     def event_feed_providers(self) -> Dict[str, EventFeedProvider]:
-        """Get all your event-feed providers.
+        """Get all event feed providers.
 
         Returns:
             Dictionary mapping provider names to provider instances.
@@ -127,9 +134,7 @@ class TradingEngine:
     # region Brokers
 
     def add_broker(self, name: str, broker: Broker) -> None:
-        """Add a broker to the engine with a name.
-
-        Give your broker a name so you can easily identify it in logs and use it later.
+        """Add a broker with a unique name.
 
         Args:
             name: Unique name to identify this broker.
@@ -163,7 +168,7 @@ class TradingEngine:
 
     @property
     def brokers(self) -> Dict[str, Broker]:
-        """Get all your brokers.
+        """Get all brokers.
 
         Returns:
             Dictionary mapping broker names to broker instances.
@@ -175,16 +180,14 @@ class TradingEngine:
     # region Strategies
 
     def add_strategy(self, name: str, strategy: Strategy) -> None:
-        """Add a strategy to the engine with a name.
-
-        Give your strategy a name so you can easily identify it in logs and manage it later.
+        """Add a strategy with a unique name.
 
         Args:
             name: Unique name to identify this strategy.
             strategy: The strategy instance to add.
 
         Raises:
-            ValueError: If a strategy with the same name already exists or $strategy is not NEW.
+            ValueError: If a strategy with the same name already exists or strategy is not NEW.
         """
         # Check: strategy name must be unique and not already added
         if name in self._strategies:
@@ -217,14 +220,14 @@ class TradingEngine:
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
 
     def start_strategy(self, name: str) -> None:
-        """Start a strategy by its name.
+        """Start a strategy with specified name.
 
         Args:
             name: Name of the strategy to start.
 
         Raises:
             KeyError: If no strategy with the given name exists.
-            ValueError: If $state is not ADDED.
+            ValueError: If strategy is not in ADDED state.
         """
         # Check: strategy name must be added before starting
         if name not in self._strategies:
@@ -249,7 +252,7 @@ class TradingEngine:
             raise
 
     def stop_strategy(self, name: str) -> None:
-        """Stop a strategy by its name and clean up its event-feeds.
+        """Stop a strategy by name and clean up its event feeds.
 
         Args:
             name: Name of the strategy to stop.
@@ -301,7 +304,7 @@ class TradingEngine:
 
         Raises:
             KeyError: If no strategy with the given name exists.
-            ValueError: If $state is not STOPPED.
+            ValueError: If strategy is not in terminal state.
         """
         # Check: strategy name must be added before removing
         if name not in self._strategies:
@@ -337,7 +340,7 @@ class TradingEngine:
 
     @property
     def strategies(self) -> Dict[str, Strategy]:
-        """Get all your strategies.
+        """Get all strategies.
 
         Returns:
             Dictionary mapping strategy names to strategy instances.
