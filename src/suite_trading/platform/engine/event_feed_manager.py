@@ -65,7 +65,7 @@ class EventFeedManager:
     def add_event_feed_for_strategy(
         self,
         strategy: Strategy,
-        name: str,
+        feed_name: str,
         event_feed: EventFeed,
         callback: Callable,
     ) -> None:
@@ -73,35 +73,35 @@ class EventFeedManager:
 
         Args:
             strategy: The Strategy that wants this EventFeed.
-            name: Unique name for the EventFeed within the strategy.
+            feed_name: Unique name for the EventFeed within the strategy.
             event_feed: The EventFeed to add.
             callback: Function to call when delivering events from this feed.
         """
         # Direct access - will fail fast if strategy not added
-        # Check: name must be unique per strategy
-        if name in self._strategy_name_index[strategy]:
+        # Check: feed_name must be unique per strategy
+        if feed_name in self._strategy_name_index[strategy]:
             raise ValueError(
-                "Cannot call `add_event_feed_for_strategy` because event-feed with $name "
-                f"('{name}') is already used for this strategy. Choose a different name.",
+                "Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name "
+                f"('{feed_name}') is already used for this strategy. Choose a different name.",
             )
 
         self._strategy_event_feeds[strategy].append(event_feed)
-        self._strategy_name_index[strategy][name] = event_feed
+        self._strategy_name_index[strategy][feed_name] = event_feed
         self._feed_callback[event_feed] = callback
-        self._feed_name[event_feed] = name
+        self._feed_name[event_feed] = feed_name
 
-    def remove_event_feed_for_strategy(self, strategy: Strategy, name: str) -> bool:
+    def remove_event_feed_for_strategy(self, strategy: Strategy, feed_name: str) -> bool:
         """Remove an EventFeed from a Strategy's list by name.
 
         Args:
             strategy: The Strategy that has the EventFeed.
-            name: Name of the EventFeed to remove.
+            feed_name: Name of the EventFeed to remove.
 
         Returns:
             bool: True if we found and removed it, False if it wasn't there.
         """
         # Direct access - will fail fast if strategy not added
-        feed = self._strategy_name_index[strategy].pop(name, None)
+        feed = self._strategy_name_index[strategy].pop(feed_name, None)
         if feed is None:
             return False
         feeds_list = self._strategy_event_feeds[strategy]
@@ -223,31 +223,31 @@ class EventFeedManager:
 
         return errors
 
-    def has_feed_name(self, strategy: Strategy, name: str) -> bool:
+    def has_feed_name(self, strategy: Strategy, feed_name: str) -> bool:
         """Tell if a feed name is already used for a strategy.
 
         Args:
             strategy: Strategy to check within.
-            name: Feed name to check.
+            feed_name: Feed name to check.
 
         Returns:
             bool: True if the name exists for this strategy.
         """
         # Direct access - will fail fast if strategy not added
-        return name in self._strategy_name_index[strategy]
+        return feed_name in self._strategy_name_index[strategy]
 
-    def get_event_feed_by_name(self, strategy: Strategy, name: str) -> Optional[EventFeed]:
+    def get_event_feed_by_name(self, strategy: Strategy, feed_name: str) -> Optional[EventFeed]:
         """Get an EventFeed by name for a strategy if it exists.
 
         Args:
             strategy: Strategy that owns the feed.
-            name: Name of the feed.
+            feed_name: Name of the feed.
 
         Returns:
             Optional[EventFeed]: The feed if present, otherwise None.
         """
         # Direct access - will fail fast if strategy not added
-        return self._strategy_name_index[strategy].get(name)
+        return self._strategy_name_index[strategy].get(feed_name)
 
     def get_callback_for_feed(self, feed: EventFeed) -> Optional[Callable]:
         """Get the callback registered for a specific feed, if any.
