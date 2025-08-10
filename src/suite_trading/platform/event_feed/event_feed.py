@@ -25,7 +25,7 @@ class EventFeed(Protocol):
         ...
 
     def is_finished(self) -> bool:
-        """Return True when this feed will not produce any more events."""
+        """Return True when this feed is at the end and will not produce any more events."""
         ...
 
     @property
@@ -56,9 +56,6 @@ class EventFeed(Protocol):
                 if self._connection is not None:
                     self._connection.close()
                     self._connection = None
-
-        Returns:
-            None
 
         Raises:
             Exception: Implementations should raise on unexpected cleanup failures.

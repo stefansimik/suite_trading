@@ -56,8 +56,8 @@ class EventFeedManager:
             )
 
         for feed in self._strategy_event_feeds[strategy]:
-            self._feed_callback.pop(feed, None)
-            self._feed_name.pop(feed, None)
+            del self._feed_callback[feed]
+            del self._feed_name[feed]
         del self._strategy_event_feeds[strategy]
         if strategy in self._strategy_name_index:
             del self._strategy_name_index[strategy]
@@ -157,16 +157,35 @@ class EventFeedManager:
 
         return oldest_feed
 
-    def has_unfinished_feeds(self) -> bool:
-        """Check if there are still EventFeeds that have more events coming.
+    def has_active_feeds(self) -> bool:
+        """Return True if any tracked feed is active (i.e., not finished).
 
-        Returns:
-            bool: True if any EventFeed still has work to do.
+        Active here means "not finished (terminal)". This says nothing about if next Event is ready.
+        Use `peek() is not None` on a specific feed to check if next Event is ready.
         """
         for feeds_list in self._strategy_event_feeds.values():
             for feed in feeds_list:
                 if not feed.is_finished():
                     return True
+        return False
+
+    def has_active_feeds_for_strategy(self, strategy: Strategy) -> bool:
+        """Return True if the given strategy has any active feeds (not finished).
+
+        Active here means "not finished (terminal)". This says nothing about if next Event is ready.
+        Use `peek() is not None` on a specific feed to check if next Event is ready.
+
+        Args:
+            strategy (Strategy): Strategy to check for active feeds.
+
+        Returns:
+            bool: True if the strategy has any active feeds.
+        """
+        # Direct access - will fail fast if strategy not added
+        feeds_list = self._strategy_event_feeds.get(strategy, [])
+        for feed in feeds_list:
+            if not feed.is_finished():
+                return True
         return False
 
     def cleanup_finished_feeds(self) -> None:
@@ -183,10 +202,10 @@ class EventFeedManager:
                     # Best-effort cleanup; errors are handled by engine on explicit removal
                     pass
                 feeds_list.remove(feed)
-                name = self._feed_name.pop(feed, None)
-                self._feed_callback.pop(feed, None)
-                if name is not None:
-                    self._strategy_name_index[strategy].pop(name, None)
+                name = self._feed_name[feed]
+                del self._feed_name[feed]
+                del self._feed_callback[feed]
+                del self._strategy_name_index[strategy][name]
 
     def cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> List[str]:
         """Close all EventFeeds for a Strategy and tell you about any problems.
@@ -214,8 +233,8 @@ class EventFeedManager:
         feeds_list.clear()
         # Clean indices for this strategy
         for name, feed in list(self._strategy_name_index.get(strategy, {}).items()):
-            self._feed_callback.pop(feed, None)
-            self._feed_name.pop(feed, None)
+            del self._feed_callback[feed]
+            del self._feed_name[feed]
         if strategy in self._strategy_event_feeds:
             del self._strategy_event_feeds[strategy]
         if strategy in self._strategy_name_index:

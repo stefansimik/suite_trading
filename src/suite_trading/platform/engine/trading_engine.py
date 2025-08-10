@@ -490,9 +490,12 @@ class TradingEngine:
 
         try:
             # Stop all strategies and clean up their event-feeds first
-            for strategy_name in list(self._strategies.keys()):
-                self.stop_strategy(strategy_name)
-                logger.info(f"Stopped strategy named '{strategy_name}'")
+            for strategy_name, strategy in list(self._strategies.items()):
+                if strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
+                    self.stop_strategy(strategy_name)
+                    logger.info(f"Stopped strategy named '{strategy_name}'")
+                else:
+                    logger.debug(f"Skip stopping strategy '{strategy_name}' in state {strategy.state.name}")
 
             # Disconnect brokers second
             for broker_name, broker in self._brokers.items():
@@ -537,10 +540,14 @@ class TradingEngine:
 
         logger.info("Starting event processing loop")
 
-        # Keep going while any strategy still has any unfinished event-feeds
-        while self._feed_manager.has_unfinished_feeds():
+        # Keep going while any strategy still has any active event-feeds
+        while self._feed_manager.has_active_feeds():
             # Go through each strategy
             for strategy in self._strategies.values():
+                # Skip strategies that are not RUNNING
+                if strategy.state != StrategyState.RUNNING:
+                    continue
+
                 # Find the oldest event from all this strategy's event-feeds
                 # If events have the same time, use the first feed (keeps order how EventFeeds were added)
                 oldest_feed = self._feed_manager.get_next_event_feed_for_strategy(strategy)
@@ -567,9 +574,20 @@ class TradingEngine:
                         # Mark strategy as failed
                         strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
                         strategy.on_error(e)
+                        # Remove all feeds for this strategy to avoid blocking the loop
+                        _ = self._feed_manager.cleanup_all_feeds_for_strategy(strategy)
 
             # Remove finished event-feeds
             self._feed_manager.cleanup_finished_feeds()
+
+            # Auto-stop strategies that have no active feeds left
+            for name, strategy in list(self._strategies.items()):
+                if strategy.state == StrategyState.RUNNING and not self._feed_manager.has_active_feeds_for_strategy(strategy):
+                    try:
+                        self.stop_strategy(name)
+                        logger.info(f"Auto-stopped strategy '{name}' (all feeds finished)")
+                    except Exception as e:
+                        logger.error(f"Error auto-stopping strategy '{name}': {e}")
 
         logger.info("Event processing loop completed - all feeds finished")
 
