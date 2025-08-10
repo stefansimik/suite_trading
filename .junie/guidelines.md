@@ -41,13 +41,13 @@ def calculate_portfolio_value(positions: list) -> Decimal: ...
 def calc_pv(pos: list) -> Decimal: ...
 ```
 
-## 2.2 Standard classes only
-Rule: Use standard classes exclusively. No dataclasses allowed.
+## 2.2 Classes, dataclasses, and named tuples
+Rule: Use standard classes for fundamental domain models. Dataclasses and named tuples are
+allowed for simple config or helper/value objects.
 
 Why:
-- KISS: One pattern everywhere; nothing special to remember
-- Explicit over implicit: Initialization and validation are visible
-- Predictable, consistent behavior across all domain objects
+- Core domain needs explicit initialization and validation.
+- Dataclasses/named tuples can reduce boilerplate for auxiliary data without hiding intent.
 
 ## 2.3 Parameter formatting
 For long signatures, put one parameter per line, consistent indent, trailing comma.
@@ -75,6 +75,33 @@ Forbidden:
 - `logger.info("Started strategy '%s'", name)`
 - `logger.info("Started strategy '{}'".format(name))`
 - `"Hello, %s" % name`
+
+### Log call formatting
+If the logged message has only 1 line, keep the full logger call on a single line.
+
+Wrong:
+```python
+logger.debug(
+    f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed",
+)
+```
+
+Correct:
+```python
+logger.debug(f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed")
+```
+
+Note (exception): This rule does not apply when using implicit string concatenation across
+adjacent string literals inside parentheses to keep long messages readable.
+
+Allowed (implicit concatenation):
+```python
+logger.info(
+    f"TradingEngine STOPPED; strategies stopped={stopped}, "
+    f"brokers disconnected={disconnected_brokers}, "
+    f"event-feed-providers disconnected={disconnected_providers}",
+)
+```
 
 ## 2.5 String representation methods
 Rule: Use `self.__class__.__name__` in `__str__` and `__repr__`.
