@@ -211,7 +211,7 @@ class TradingEngine:
         self._strategy_wall_clock_time[strategy] = None
 
         # Set up EventFeed tracking for this strategy
-        self._feed_manager.add_strategy(strategy)
+        self._feed_manager.register_strategy(strategy)
 
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
@@ -335,7 +335,7 @@ class TradingEngine:
             del self._strategy_wall_clock_time[strategy]
 
         # Remove EventFeed tracking for this strategy
-        self._feed_manager.remove_strategy(strategy)
+        self._feed_manager.unregister_strategy(strategy)
 
         # Remove from strategies' dictionary
         del self._strategies[name]
@@ -394,9 +394,7 @@ class TradingEngine:
         if strategy.last_event_time is not None:
             removed_count = event_feed.remove_events_before(strategy.last_event_time)
             if removed_count > 0:
-                logger.info(
-                    f"Filtered {removed_count} obsolete events before {strategy.last_event_time} to keep timeline",
-                )
+                logger.info(f"Filtered {removed_count} obsolete events before {strategy.last_event_time} to keep timeline")
 
         # Register the feed with metadata in the manager
         self._feed_manager.add_event_feed_for_strategy(
@@ -429,9 +427,7 @@ class TradingEngine:
 
         # Handle case where feed doesn't exist (already finished/removed)
         if feed_to_close is None:
-            logger.debug(
-                f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed",
-            )
+            logger.debug(f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed")
             return
 
         # Close the feed first
@@ -583,12 +579,11 @@ class TradingEngine:
 
                 # Find the oldest event from all this strategy's event-feeds
                 # If events have the same time, use the first feed (keeps order how EventFeeds were added)
-                oldest_feed = self._feed_manager.get_next_event_feed_for_strategy(strategy)
-
                 # Process the event if we found one
-                if oldest_feed is not None:
+                if (next_feed_tuple := self._feed_manager.find_feed_with_next_event(strategy)) is not None:
+                    feed_name, feed, callback = next_feed_tuple
                     # Get the event
-                    consumed_event = oldest_feed.pop()
+                    consumed_event = feed.pop()
 
                     # Update this strategy's last event time (timeline)
                     self._strategy_last_event_time[strategy] = consumed_event.dt_event
@@ -599,8 +594,7 @@ class TradingEngine:
                     if prev is None or consumed_event.dt_received > prev:
                         self._strategy_wall_clock_time[strategy] = consumed_event.dt_received
 
-                    # Send event via stored callback (fallback to strategy.on_event)
-                    callback = self._feed_manager.get_callback_for_feed(oldest_feed)
+                    # Send event via callback
                     try:
                         callback(consumed_event)
                     except Exception as e:

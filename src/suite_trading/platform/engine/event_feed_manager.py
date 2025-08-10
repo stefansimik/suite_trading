@@ -1,9 +1,14 @@
 import logging
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable, NamedTuple
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 
 logger = logging.getLogger(__name__)
+
+
+class FeedEntry(NamedTuple):
+    feed: EventFeed
+    callback: Callable
 
 
 class EventFeedManager:
@@ -19,53 +24,38 @@ class EventFeedManager:
 
     def __init__(self):
         """Create a new EventFeedManager with no EventFeeds yet."""
-        # TODO: This is completely working, but once in the future I should think, if it possible
-        #  to design it and store data in more elegant way (not in 4 dictionaries)
+        # One structure: strategy -> { feed_name: FeedEntry(feed, callback) }
+        self._feeds: Dict[Strategy, Dict[str, FeedEntry]] = {}
 
-        # Each Strategy gets its own list of EventFeeds
-        self._strategy_event_feeds: Dict[Strategy, List[EventFeed]] = {}
-        # Name index per strategy for fast lookup and uniqueness
-        self._strategy_name_index: Dict[Strategy, Dict[str, EventFeed]] = {}
-        # Callback mapping per feed
-        self._feed_callback: Dict[EventFeed, Callable] = {}
-        # Name per feed for logging and reverse lookup
-        self._feed_name: Dict[EventFeed, str] = {}
-
-    def add_strategy(self, strategy: Strategy) -> None:
+    def register_strategy(self, strategy: Strategy) -> None:
         """Set up EventFeed tracking for a strategy.
 
         Args:
             strategy: The strategy to initialize EventFeed tracking for.
         """
         # Check: strategy must not already be tracked
-        if strategy in self._strategy_event_feeds:
+        if strategy in self._feeds:
             raise ValueError(
                 f"Cannot call `add_strategy` because $strategy ({strategy.__class__.__name__}) is already tracked by EventFeedManager",
             )
 
-        self._strategy_event_feeds[strategy] = []
-        self._strategy_name_index[strategy] = {}
+        self._feeds[strategy] = {}
         logger.debug(f"EventFeedManager added strategy {strategy.__class__.__name__}")
 
-    def remove_strategy(self, strategy: Strategy) -> None:
+    def unregister_strategy(self, strategy: Strategy) -> None:
         """Remove EventFeed tracking for a strategy.
 
         Args:
             strategy: The strategy to remove EventFeed tracking for.
         """
         # Check: strategy must be tracked before removing
-        if strategy not in self._strategy_event_feeds:
+        if strategy not in self._feeds:
             raise ValueError(
                 f"Cannot call `remove_strategy` because $strategy ({strategy.__class__.__name__}) is not tracked by EventFeedManager",
             )
 
-        count = len(self._strategy_event_feeds[strategy])
-        for feed in self._strategy_event_feeds[strategy]:
-            del self._feed_callback[feed]
-            del self._feed_name[feed]
-        del self._strategy_event_feeds[strategy]
-        if strategy in self._strategy_name_index:
-            del self._strategy_name_index[strategy]
+        count = len(self._feeds[strategy])
+        del self._feeds[strategy]
         logger.debug(f"EventFeedManager removed strategy {strategy.__class__.__name__} with {count} feed(s)")
 
     def add_event_feed_for_strategy(
@@ -75,7 +65,7 @@ class EventFeedManager:
         event_feed: EventFeed,
         callback: Callable,
     ) -> None:
-        """Add an EventFeed to a Strategy's list and register metadata.
+        """Add an EventFeed to a Strategy's registry and register metadata.
 
         Args:
             strategy: The Strategy that wants this EventFeed.
@@ -84,21 +74,20 @@ class EventFeedManager:
             callback: Function to call when delivering events from this feed.
         """
         # Direct access - will fail fast if strategy not added
+        feeds_dict = self._feeds[strategy]
+
         # Check: feed_name must be unique per strategy
-        if feed_name in self._strategy_name_index[strategy]:
+        if feed_name in feeds_dict:
             raise ValueError(
                 "Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name "
                 f"('{feed_name}') is already used for this strategy. Choose a different name.",
             )
 
-        self._strategy_event_feeds[strategy].append(event_feed)
-        self._strategy_name_index[strategy][feed_name] = event_feed
-        self._feed_callback[event_feed] = callback
-        self._feed_name[event_feed] = feed_name
+        feeds_dict[feed_name] = FeedEntry(event_feed, callback)
         logger.info(f"Added event feed $feed_name '{feed_name}' to {strategy.__class__.__name__}")
 
     def remove_event_feed_for_strategy(self, strategy: Strategy, feed_name: str) -> bool:
-        """Remove an EventFeed from a Strategy's list by name.
+        """Remove an EventFeed from a Strategy's registry by name.
 
         Args:
             strategy: The Strategy that has the EventFeed.
@@ -108,63 +97,31 @@ class EventFeedManager:
             bool: True if we found and removed it, False if it wasn't there.
         """
         # Direct access - will fail fast if strategy not added
-        feed = self._strategy_name_index[strategy].pop(feed_name, None)
-        if feed is None:
+        feeds_dict = self._feeds[strategy]
+        existed = feeds_dict.pop(feed_name, None)
+        if existed is None:
             logger.debug(f"EventFeedManager: feed '{feed_name}' not found for {strategy.__class__.__name__}")
             return False
-        feeds_list = self._strategy_event_feeds[strategy]
-        if feed in feeds_list:
-            feeds_list.remove(feed)
-        self._feed_callback.pop(feed, None)
-        self._feed_name.pop(feed, None)
         logger.info(f"Removed event feed $feed_name '{feed_name}' from {strategy.__class__.__name__}")
         return True
 
-    def get_event_feeds_for_strategy(self, strategy: Strategy) -> List[EventFeed]:
-        """Get all EventFeeds that belong to a Strategy.
-
-        Args:
-            strategy: The Strategy whose EventFeeds you want.
-
-        Returns:
-            List[EventFeed]: All EventFeeds for this Strategy, in the order they were added.
+    def find_feed_with_next_event(self, strategy: Strategy) -> Optional[tuple[str, EventFeed, Callable]]:
+        """Find the next feed (name, feed, callback) with the oldest available event.
+        Iterates feeds in insertion order.
         """
-        # Direct access - will fail fast if strategy not added
-        return list(self._strategy_event_feeds[strategy])
-
-    def get_next_event_feed_for_strategy(self, strategy: Strategy) -> Optional[EventFeed]:
-        """Find which EventFeed has the oldest event for a Strategy.
-
-        We look at all EventFeeds for this Strategy and find the one with the oldest event.
-        If two EventFeeds have events at the same time, we pick the EventFeed that was
-        added first.
-
-        Args:
-            strategy: The Strategy we're finding the next event for.
-
-        Returns:
-            Optional[EventFeed]: The EventFeed with the oldest event, or None if no events are ready.
-        """
-        # Direct access - will fail fast if strategy not added
-        event_feeds = self._strategy_event_feeds[strategy]
+        mapping = self._feeds[strategy]
         oldest_event = None
-        oldest_feed = None
-
-        # Go through EventFeeds in the order they were added
-        for feed in event_feeds:
+        winner = None  # type: Optional[tuple[str, EventFeed, Callable]]
+        for name, (feed, callback) in mapping.items():
             event = feed.peek()
-            if event is not None:
-                # Remember the first event we find
-                if oldest_event is None:
-                    oldest_event = event
-                    oldest_feed = feed
-                # Use this event if it's older
-                elif event.dt_event < oldest_event.dt_event:
-                    oldest_event = event
-                    oldest_feed = feed
-                # If events have same time, stick with the first EventFeed
+            if event is None:
+                continue
+            if oldest_event is None or event.dt_event < oldest_event.dt_event:
+                oldest_event = event
+                winner = (name, feed, callback)
+            # If events have same time, keep earlier-added feed
 
-        return oldest_feed
+        return winner
 
     def has_active_feeds(self) -> bool:
         """Return True if any tracked feed is active (i.e., not finished).
@@ -172,8 +129,8 @@ class EventFeedManager:
         Active here means "not finished (terminal)". This says nothing about if next Event is ready.
         Use `peek() is not None` on a specific feed to check if next Event is ready.
         """
-        for feeds_list in self._strategy_event_feeds.values():
-            for feed in feeds_list:
+        for mapping in self._feeds.values():
+            for feed, _ in mapping.values():
                 if not feed.is_finished():
                     return True
         return False
@@ -190,9 +147,8 @@ class EventFeedManager:
         Returns:
             bool: True if the strategy has any active feeds.
         """
-        # Direct access - will fail fast if strategy not added
-        feeds_list = self._strategy_event_feeds.get(strategy, [])
-        for feed in feeds_list:
+        mapping = self._feeds.get(strategy, {})
+        for feed, _ in mapping.values():
             if not feed.is_finished():
                 return True
         return False
@@ -200,23 +156,19 @@ class EventFeedManager:
     def cleanup_finished_feeds(self) -> None:
         """Clean up EventFeeds that are finished sending events.
 
-        We close these EventFeeds and remove them from our lists so they don't take up space.
+        We close these EventFeeds and remove them from our registry so they don't take up space.
         """
-        for strategy, feeds_list in self._strategy_event_feeds.items():
-            finished_feeds = [feed for feed in feeds_list if feed.is_finished()]
-            for feed in finished_feeds:
-                name = self._feed_name[feed]
+        for strategy, mapping in self._feeds.items():
+            finished_names = [name for name, (feed, _) in mapping.items() if feed.is_finished()]
+            for name in finished_names:
+                feed, _ = mapping[name]
                 try:
                     feed.close()
                 except Exception as e:
                     logger.error(f"Error during closing of finished event-feed with name '{name}': {e}")
 
                 # Remove this feed from our tracking
-                feeds_list.remove(feed)
-                del self._feed_name[feed]
-                del self._feed_callback[feed]
-                del self._strategy_name_index[strategy][name]
-
+                mapping.pop(name, None)
                 logger.debug(f"Cleaned up finished event-feed $feed_name '{name}' for {strategy.__class__.__name__}")
 
     def cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> List[str]:
@@ -232,30 +184,18 @@ class EventFeedManager:
             List[str]: Error messages if any EventFeeds had problems closing.
         """
         # Direct access - will fail fast if strategy not added
-        feeds_list = self._strategy_event_feeds[strategy]
-        errors = []
+        mapping = self._feeds[strategy]
+        errors: List[str] = []
         closed = 0
-        for feed in list(feeds_list):
+        for name, (feed, _) in list(mapping.items()):
             try:
                 feed.close()
                 closed += 1
             except Exception as e:
-                name = self._feed_name[feed]
                 message = f"Error closing event-feed '{name}': {e}"
                 errors.append(message)
                 logger.error(message)
-
-        # Remove this Strategy from our tracking since all its EventFeeds are closed
-        feeds_list.clear()
-        # Clean indices for this strategy
-        for name, feed in list(self._strategy_name_index.get(strategy, {}).items()):
-            del self._feed_callback[feed]
-            del self._feed_name[feed]
-        if strategy in self._strategy_event_feeds:
-            del self._strategy_event_feeds[strategy]
-        if strategy in self._strategy_name_index:
-            del self._strategy_name_index[strategy]
-
+        mapping.clear()
         logger.info(f"Cleaned up {closed} event-feed(s) for {strategy.__class__.__name__}; errors={len(errors)}")
         return errors
 
@@ -270,7 +210,7 @@ class EventFeedManager:
             bool: True if the name exists for this strategy.
         """
         # Direct access - will fail fast if strategy not added
-        return feed_name in self._strategy_name_index[strategy]
+        return feed_name in self._feeds[strategy]
 
     def get_event_feed_by_name(self, strategy: Strategy, feed_name: str) -> Optional[EventFeed]:
         """Get an EventFeed by name for a strategy if it exists.
@@ -283,26 +223,5 @@ class EventFeedManager:
             Optional[EventFeed]: The feed if present, otherwise None.
         """
         # Direct access - will fail fast if strategy not added
-        return self._strategy_name_index[strategy].get(feed_name)
-
-    def get_callback_for_feed(self, feed: EventFeed) -> Optional[Callable]:
-        """Get the callback registered for a specific feed, if any.
-
-        Args:
-            feed: The EventFeed instance.
-
-        Returns:
-            Optional[Callable]: Callback or None if not registered.
-        """
-        return self._feed_callback.get(feed)
-
-    def get_name_for_feed(self, feed: EventFeed) -> Optional[str]:
-        """Get the strategy-specific name for a feed, if known.
-
-        Args:
-            feed: The EventFeed instance.
-
-        Returns:
-            Optional[str]: Name if known, otherwise None.
-        """
-        return self._feed_name.get(feed)
+        entry = self._feeds[strategy][feed_name]
+        return entry.feed if entry else None
