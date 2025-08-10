@@ -95,6 +95,7 @@ class TradingEngine:
             )
 
         self._event_feed_providers[name] = provider
+        logger.debug(f"Added event feed provider with $name '{name}'")
 
     def remove_event_feed_provider(self, name: str) -> None:
         """Remove an event feed provider by name.
@@ -112,6 +113,7 @@ class TradingEngine:
             )
 
         del self._event_feed_providers[name]
+        logger.debug(f"Removed event feed provider with $name '{name}'")
 
     @property
     def event_feed_providers(self) -> Dict[str, EventFeedProvider]:
@@ -141,6 +143,7 @@ class TradingEngine:
             raise ValueError(f"Broker with broker name $name ('{name}') is already added to this TradingEngine. Choose a different name.")
 
         self._brokers[name] = broker
+        logger.debug(f"Added broker with $name '{name}'")
 
     def remove_broker(self, name: str) -> None:
         """Remove a broker by name.
@@ -158,6 +161,7 @@ class TradingEngine:
             )
 
         del self._brokers[name]
+        logger.debug(f"Removed broker with $name '{name}'")
 
     @property
     def brokers(self) -> Dict[str, Broker]:
@@ -211,6 +215,7 @@ class TradingEngine:
 
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
+        logger.debug(f"Added strategy under $name '{name}' of class {strategy.__class__.__name__}")
 
     def start_strategy(self, name: str) -> None:
         """Start a strategy with specified name.
@@ -237,11 +242,14 @@ class TradingEngine:
                 f"Cannot start strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
             )
 
+        logger.info(f"Starting strategy $name '{name}' (class {strategy.__class__.__name__})")
         try:
             strategy.on_start()
             strategy._state_machine.execute_action(StrategyAction.START_STRATEGY)
-        except Exception:
+            logger.debug(f"Strategy '{name}' transitioned to {strategy.state.name}")
+        except Exception as e:
             strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
+            logger.error(f"Error in `start_strategy` for $name '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}")
             raise
 
     def stop_strategy(self, name: str) -> None:
@@ -269,6 +277,8 @@ class TradingEngine:
                 f"Cannot stop strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
             )
 
+        logger.info(f"Stopping strategy $name '{name}' (class {strategy.__class__.__name__})")
+
         # Stop all event-feeds for this strategy first
         # Try to stop all feeds even if some fail, then report any errors
         feed_errors = self._feed_manager.cleanup_all_feeds_for_strategy(strategy)
@@ -285,8 +295,10 @@ class TradingEngine:
                 raise RuntimeError(f"Strategy callback succeeded but event feed cleanup failed: {error_summary}")
 
             strategy._state_machine.execute_action(StrategyAction.STOP_STRATEGY)
-        except Exception:
+            logger.debug(f"Strategy '{name}' transitioned to {strategy.state.name}")
+        except Exception as e:
             strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
+            logger.error(f"Error in `stop_strategy` for $name '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}")
             raise
 
     def remove_strategy(self, name: str) -> None:
@@ -330,6 +342,7 @@ class TradingEngine:
 
         # Detach engine reference from this strategy
         strategy._clear_trading_engine()
+        logger.debug(f"Removed strategy under $name '{name}' of class {strategy.__class__.__name__}")
 
     @property
     def strategies(self) -> Dict[str, Strategy]:
@@ -444,6 +457,11 @@ class TradingEngine:
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
 
+        logger.info(
+            f"Starting TradingEngine: {len(self._event_feed_providers)} event-feed-provider(s), "
+            f"{len(self._brokers)} broker(s), {len(self._strategies)} strategy(ies)",
+        )
+
         try:
             # Connect event-feed-providers first
             for provider_name, provider in self._event_feed_providers.items():
@@ -456,12 +474,15 @@ class TradingEngine:
                 logger.info(f"Connected broker '{broker_name}'")
 
             # Start strategies last
+            started = 0
             for strategy_name in list(self._strategies.keys()):
                 self.start_strategy(strategy_name)
                 logger.info(f"Started strategy under name: '{strategy_name}'")
+                started += 1
 
             # Mark engine as running
             self._state_machine.execute_action(EngineAction.START_ENGINE)
+            logger.info(f"TradingEngine is RUNNING; started {started} strategy(ies)")
 
             # Start processing events
             self.run_event_processing_loop()
@@ -481,6 +502,7 @@ class TradingEngine:
         """
         # Check: allow idempotent stop when already STOPPED; otherwise must be able to stop
         if self.state == EngineState.STOPPED:
+            logger.debug("Skip `stop` because engine is already STOPPED")
             return
 
         # Check: engine must be in RUNNING state, when we want to stop it
@@ -490,25 +512,36 @@ class TradingEngine:
 
         try:
             # Stop all strategies and clean up their event-feeds first
+            stopped = 0
             for strategy_name, strategy in list(self._strategies.items()):
                 if strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
                     self.stop_strategy(strategy_name)
                     logger.info(f"Stopped strategy named '{strategy_name}'")
+                    stopped += 1
                 else:
                     logger.debug(f"Skip stopping strategy '{strategy_name}' in state {strategy.state.name}")
 
             # Disconnect brokers second
+            disconnected_brokers = 0
             for broker_name, broker in self._brokers.items():
                 broker.disconnect()
                 logger.info(f"Disconnected broker '{broker_name}'")
+                disconnected_brokers += 1
 
             # Disconnect event-feed-providers last
+            disconnected_providers = 0
             for provider_name, provider in self._event_feed_providers.items():
                 provider.disconnect()
-                logger.info(f"Disconnected event feed provider '{provider_name}'")
+                logger.info(f"Disconnected event-feed-provider '{provider_name}'")
+                disconnected_providers += 1
 
             # Mark engine as stopped
             self._state_machine.execute_action(EngineAction.STOP_ENGINE)
+            logger.info(
+                f"TradingEngine STOPPED; strategies stopped={stopped}, "
+                f"brokers disconnected={disconnected_brokers}, "
+                f"event-feed-providers disconnected={disconnected_providers}",
+            )
         except Exception:
             # Mark engine as failed
             self._state_machine.execute_action(EngineAction.ERROR_OCCURRED)
@@ -559,6 +592,7 @@ class TradingEngine:
 
                     # Update this strategy's last event time (timeline)
                     self._strategy_last_event_time[strategy] = consumed_event.dt_event
+                    logger.debug(f"Advanced timeline for {strategy.__class__.__name__} to {consumed_event.dt_event.isoformat()}")
 
                     # Update wall-clock-time with monotonic max of dt_received
                     prev = self._strategy_wall_clock_time.get(strategy)

@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Callable, Optional
@@ -9,6 +10,8 @@ from suite_trading.strategy.strategy_state_machine import StrategyState, Strateg
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
+
+logger = logging.getLogger(__name__)
 
 
 class Strategy(ABC):
@@ -159,7 +162,7 @@ class Strategy(ABC):
         This method should be overridden by subclasses to implement
         initialization logic when the strategy starts.
         """
-        pass
+        logger.debug(f"{self.__class__.__name__} default `on_start` called in state {self.state.name}")
 
     def on_stop(self):
         """Called when the strategy is stopped.
@@ -171,8 +174,7 @@ class Strategy(ABC):
         automatically by TradingEngine. Only clean up strategy-specific resources here.
         """
         # All infrastructure cleanup now handled externally
-        # Override this method to add strategy-specific cleanup only
-        pass
+        logger.debug(f"{self.__class__.__name__} default `on_stop` called in state {self.state.name}")
 
     def on_error(self, exc: Exception) -> None:
         """Called when the strategy transitions to ERROR after an unhandled exception.
@@ -184,7 +186,7 @@ class Strategy(ABC):
         Args:
             exc (Exception): The exception that caused the strategy to enter ERROR.
         """
-        pass
+        logger.error(f"{self.__class__.__name__} `on_error` in state {self.state.name}: {exc}")
 
     # endregion
 

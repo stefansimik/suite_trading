@@ -1,6 +1,9 @@
+import logging
 from typing import Dict, List, Optional, Callable
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
+
+logger = logging.getLogger(__name__)
 
 
 class EventFeedManager:
@@ -42,6 +45,7 @@ class EventFeedManager:
 
         self._strategy_event_feeds[strategy] = []
         self._strategy_name_index[strategy] = {}
+        logger.debug(f"EventFeedManager added strategy {strategy.__class__.__name__}")
 
     def remove_strategy(self, strategy: Strategy) -> None:
         """Remove EventFeed tracking for a strategy.
@@ -55,12 +59,14 @@ class EventFeedManager:
                 f"Cannot call `remove_strategy` because $strategy ({strategy.__class__.__name__}) is not tracked by EventFeedManager",
             )
 
+        count = len(self._strategy_event_feeds[strategy])
         for feed in self._strategy_event_feeds[strategy]:
             del self._feed_callback[feed]
             del self._feed_name[feed]
         del self._strategy_event_feeds[strategy]
         if strategy in self._strategy_name_index:
             del self._strategy_name_index[strategy]
+        logger.debug(f"EventFeedManager removed strategy {strategy.__class__.__name__} with {count} feed(s)")
 
     def add_event_feed_for_strategy(
         self,
@@ -89,6 +95,7 @@ class EventFeedManager:
         self._strategy_name_index[strategy][feed_name] = event_feed
         self._feed_callback[event_feed] = callback
         self._feed_name[event_feed] = feed_name
+        logger.info(f"Added event feed $feed_name '{feed_name}' to {strategy.__class__.__name__}")
 
     def remove_event_feed_for_strategy(self, strategy: Strategy, feed_name: str) -> bool:
         """Remove an EventFeed from a Strategy's list by name.
@@ -103,12 +110,14 @@ class EventFeedManager:
         # Direct access - will fail fast if strategy not added
         feed = self._strategy_name_index[strategy].pop(feed_name, None)
         if feed is None:
+            logger.debug(f"EventFeedManager: feed '{feed_name}' not found for {strategy.__class__.__name__}")
             return False
         feeds_list = self._strategy_event_feeds[strategy]
         if feed in feeds_list:
             feeds_list.remove(feed)
         self._feed_callback.pop(feed, None)
         self._feed_name.pop(feed, None)
+        logger.info(f"Removed event feed $feed_name '{feed_name}' from {strategy.__class__.__name__}")
         return True
 
     def get_event_feeds_for_strategy(self, strategy: Strategy) -> List[EventFeed]:
@@ -196,16 +205,16 @@ class EventFeedManager:
         for strategy, feeds_list in self._strategy_event_feeds.items():
             finished_feeds = [feed for feed in feeds_list if feed.is_finished()]
             for feed in finished_feeds:
+                name = self._feed_name[feed]
                 try:
                     feed.close()
-                except Exception:
-                    # Best-effort cleanup; errors are handled by engine on explicit removal
-                    pass
+                except Exception as e:
+                    logger.error(f"Error during closing of finished event-feed with name '{name}': {e}")
                 feeds_list.remove(feed)
-                name = self._feed_name[feed]
                 del self._feed_name[feed]
                 del self._feed_callback[feed]
                 del self._strategy_name_index[strategy][name]
+                logger.debug(f"Cleaned up finished event-feed $feed_name '{name}' for {strategy.__class__.__name__}")
 
     def cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> List[str]:
         """Close all EventFeeds for a Strategy and tell you about any problems.
@@ -222,12 +231,16 @@ class EventFeedManager:
         # Direct access - will fail fast if strategy not added
         feeds_list = self._strategy_event_feeds[strategy]
         errors = []
+        closed = 0
         for feed in list(feeds_list):
             try:
                 feed.close()
+                closed += 1
             except Exception as e:
-                name = self._feed_name.get(feed, "<unknown>")
-                errors.append(f"Error closing feed '{name}': {e}")
+                name = self._feed_name[feed]
+                message = f"Error closing event-feed '{name}': {e}"
+                errors.append(message)
+                logger.error(message)
 
         # Remove this Strategy from our tracking since all its EventFeeds are closed
         feeds_list.clear()
@@ -240,6 +253,7 @@ class EventFeedManager:
         if strategy in self._strategy_name_index:
             del self._strategy_name_index[strategy]
 
+        logger.info(f"Cleaned up {closed} event-feed(s) for {strategy.__class__.__name__}; errors={len(errors)}")
         return errors
 
     def has_feed_name(self, strategy: Strategy, feed_name: str) -> bool:
