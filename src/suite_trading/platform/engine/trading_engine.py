@@ -45,13 +45,12 @@ class TradingEngine:
         # Engine state machine
         self._state_machine = create_engine_state_machine()
 
-        # EventFeedProvider registry
-        self._event_feed_providers: Dict[str, EventFeedProvider] = {}
+        # EventFeedProvider registry (type-keyed, one instance per class)
+        self._event_feed_providers: dict[type[EventFeedProvider], EventFeedProvider] = {}
 
-        # Brokers registry
-        self._brokers: Dict[str, Broker] = {}
+        # Brokers registry (type-keyed, one instance per class)
+        self._brokers: dict[type[Broker], Broker] = {}
 
-        # STRATEGIES
         # Strategies registry
         self._strategies: Dict[str, Strategy] = {}
         # EventFeeds management for each Strategy
@@ -78,49 +77,49 @@ class TradingEngine:
 
     # region EventFeedProvider(s)
 
-    def add_event_feed_provider(self, name: str, provider: EventFeedProvider) -> None:
-        """Add an event feed provider with a unique name.
+    def add_event_feed_provider(self, provider: EventFeedProvider) -> None:
+        """Add an event feed provider (one per provider class).
 
         Args:
-            name: Unique name to identify this provider.
             provider: The EventFeedProvider instance to add.
 
         Raises:
-            ValueError: If a provider with the same name already exists.
+            ValueError: If a provider of the same class was already added.
         """
-        # Check: provider name must be unique and not already added
-        if name in self._event_feed_providers:
+        key = type(provider)
+        # Check: only one provider per concrete class
+        if key in self._event_feed_providers:
             raise ValueError(
-                f"EventFeedProvider with provider name $name ('{name}') is already added to this TradingEngine. Choose a different name.",
+                f"Cannot call `add_event_feed_provider` because a provider of class {key.__name__} is already added to this TradingEngine",
             )
 
-        self._event_feed_providers[name] = provider
-        logger.debug(f"Added event feed provider with $name '{name}'")
+        self._event_feed_providers[key] = provider
+        logger.debug(f"Added event feed provider of class {key.__name__}")
 
-    def remove_event_feed_provider(self, name: str) -> None:
-        """Remove an event feed provider by name.
+    def remove_event_feed_provider(self, provider_type: type[EventFeedProvider]) -> None:
+        """Remove an event feed provider by type.
 
         Args:
-            name: Name of the provider to remove.
+            provider_type: The provider class to remove.
 
         Raises:
-            KeyError: If no provider with the given name exists.
+            KeyError: If no provider of the given class exists.
         """
-        # Check: provider name must be added before removing
-        if name not in self._event_feed_providers:
+        # Check: provider type must be added before removing
+        if provider_type not in self._event_feed_providers:
             raise KeyError(
-                f"Cannot call `remove_event_feed_provider` because provider name $name ('{name}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.",
+                f"Cannot call `remove_event_feed_provider` because $provider_type ('{provider_type.__name__}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.",
             )
 
-        del self._event_feed_providers[name]
-        logger.debug(f"Removed event feed provider with $name '{name}'")
+        del self._event_feed_providers[provider_type]
+        logger.debug(f"Removed event feed provider of class {provider_type.__name__}")
 
     @property
-    def event_feed_providers(self) -> Dict[str, EventFeedProvider]:
-        """Get all event feed providers.
+    def event_feed_providers(self) -> dict[type[EventFeedProvider], EventFeedProvider]:
+        """Get all event feed providers keyed by provider type.
 
         Returns:
-            Dictionary mapping provider names to provider instances.
+            dict[type[EventFeedProvider], EventFeedProvider]: Mapping from provider class to instance.
         """
         return self._event_feed_providers
 
@@ -128,47 +127,49 @@ class TradingEngine:
 
     # region Brokers
 
-    def add_broker(self, name: str, broker: Broker) -> None:
-        """Add a broker with a unique name.
+    def add_broker(self, broker: Broker) -> None:
+        """Add a broker (one per broker class).
 
         Args:
-            name: Unique name to identify this broker.
             broker: The broker instance to add.
 
         Raises:
-            ValueError: If a broker with the same name already exists.
+            ValueError: If a broker of the same class was already added.
         """
-        # Check: broker name must be unique and not already added
-        if name in self._brokers:
-            raise ValueError(f"Broker with broker name $name ('{name}') is already added to this TradingEngine. Choose a different name.")
-
-        self._brokers[name] = broker
-        logger.debug(f"Added broker with $name '{name}'")
-
-    def remove_broker(self, name: str) -> None:
-        """Remove a broker by name.
-
-        Args:
-            name: Name of the broker to remove.
-
-        Raises:
-            KeyError: If no broker with the given name exists.
-        """
-        # Check: broker name must be added before removing
-        if name not in self._brokers:
-            raise KeyError(
-                f"Cannot call `remove_broker` because broker name $name ('{name}') is not added to this TradingEngine. Add the broker using `add_broker` first.",
+        key = type(broker)
+        # Check: only one broker per concrete class
+        if key in self._brokers:
+            raise ValueError(
+                f"Cannot call `add_broker` because a broker of class {key.__name__} is already added to this TradingEngine",
             )
 
-        del self._brokers[name]
-        logger.debug(f"Removed broker with $name '{name}'")
+        self._brokers[key] = broker
+        logger.debug(f"Added broker of class {key.__name__}")
+
+    def remove_broker(self, broker_type: type[Broker]) -> None:
+        """Remove a broker by type.
+
+        Args:
+            broker_type: The broker class to remove.
+
+        Raises:
+            KeyError: If no broker of the given class exists.
+        """
+        # Check: broker type must be added before removing
+        if broker_type not in self._brokers:
+            raise KeyError(
+                f"Cannot call `remove_broker` because $broker_type ('{broker_type.__name__}') is not added to this TradingEngine. Add the broker using `add_broker` first.",
+            )
+
+        del self._brokers[broker_type]
+        logger.debug(f"Removed broker of class {broker_type.__name__}")
 
     @property
-    def brokers(self) -> Dict[str, Broker]:
-        """Get all brokers.
+    def brokers(self) -> dict[type[Broker], Broker]:
+        """Get all brokers keyed by broker type.
 
         Returns:
-            Dictionary mapping broker names to broker instances.
+            dict[type[Broker], Broker]: Mapping from broker class to instance.
         """
         return self._brokers
 
@@ -460,14 +461,14 @@ class TradingEngine:
 
         try:
             # Connect event-feed-providers first
-            for provider_name, provider in self._event_feed_providers.items():
+            for provider_type, provider in self._event_feed_providers.items():
                 provider.connect()
-                logger.info(f"Connected event feed provider '{provider_name}'")
+                logger.info(f"Connected event feed provider {provider_type.__name__}")
 
             # Connect brokers second
-            for broker_name, broker in self._brokers.items():
+            for broker_type, broker in self._brokers.items():
                 broker.connect()
-                logger.info(f"Connected broker '{broker_name}'")
+                logger.info(f"Connected broker {broker_type.__name__}")
 
             # Start strategies last
             started = 0
@@ -519,16 +520,16 @@ class TradingEngine:
 
             # Disconnect brokers second
             disconnected_brokers = 0
-            for broker_name, broker in self._brokers.items():
+            for broker_type, broker in self._brokers.items():
                 broker.disconnect()
-                logger.info(f"Disconnected broker '{broker_name}'")
+                logger.info(f"Disconnected broker {broker_type.__name__}")
                 disconnected_brokers += 1
 
             # Disconnect event-feed-providers last
             disconnected_providers = 0
-            for provider_name, provider in self._event_feed_providers.items():
+            for provider_type, provider in self._event_feed_providers.items():
                 provider.disconnect()
-                logger.info(f"Disconnected event-feed-provider '{provider_name}'")
+                logger.info(f"Disconnected event-feed-provider {provider_type.__name__}")
                 disconnected_providers += 1
 
             # Mark engine as stopped
