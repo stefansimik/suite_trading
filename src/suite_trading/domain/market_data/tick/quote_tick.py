@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Union
 
 from suite_trading.domain.instrument import Instrument
+from suite_trading.utils.datetime_format import format_dt
 
 
 class QuoteTick:
@@ -107,9 +108,8 @@ class QuoteTick:
         Returns:
             str: A human-readable string representation.
         """
-        return (
-            f"{self.__class__.__name__}({self.instrument}, {self.bid_price}x{self.bid_volume} / {self.ask_price}x{self.ask_volume}, {self.timestamp})"
-        )
+        ts = format_dt(self.timestamp)
+        return f"{self.__class__.__name__}({self.instrument}, {self.bid_price}x{self.bid_volume} / {self.ask_price}x{self.ask_volume}, {ts})"
 
     def __repr__(self) -> str:
         """Return a developer-friendly representation of the quote tick.

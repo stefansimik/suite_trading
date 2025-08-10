@@ -6,6 +6,7 @@ from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.price_type import PriceType
+from suite_trading.utils.datetime_format import format_range
 
 
 class Bar:
@@ -162,7 +163,8 @@ class Bar:
             str: A human-readable string representation.
         """
         volume_str = f", volume={self.volume}" if self.volume is not None else ""
-        return f"{self.__class__.__name__}({self.bar_type}, {self.start_dt}-{self.end_dt}, OHLC={self.open}/{self.high}/{self.low}/{self.close}{volume_str})"
+        dt_str = format_range(self.start_dt, self.end_dt)
+        return f"{self.__class__.__name__}({self.bar_type}, {dt_str}, OHLC={self.open}/{self.high}/{self.low}/{self.close}{volume_str})"
 
     def __repr__(self) -> str:
         """Return a developer-friendly representation of the bar.

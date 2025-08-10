@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Union
 
 from suite_trading.domain.instrument import Instrument
+from suite_trading.utils.datetime_format import format_dt
 
 
 class TradeTick:
@@ -76,7 +77,8 @@ class TradeTick:
         Returns:
             str: A human-readable string representation.
         """
-        return f"{self.__class__.__name__}({self.instrument}, {self.price} x {self.volume}, {self.timestamp})"
+        ts = format_dt(self.timestamp)
+        return f"{self.__class__.__name__}({self.instrument}, {self.price} x {self.volume}, {ts})"
 
     def __repr__(self) -> str:
         """Return a developer-friendly representation of the trade tick.

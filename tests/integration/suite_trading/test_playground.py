@@ -18,14 +18,13 @@ class DemoStrategy(Strategy):
         if isinstance(event, NewBarEvent):
             self.on_bar(event.bar, event)
         else:
-            logger.info(f"Received event: {event}")
+            logger.debug(f"Received event: {event}")
 
     def on_bar(self, bar, event: NewBarEvent):
-        logger.info(f"Received bar: {bar}")
+        logger.debug(f"Received bar: {bar}")
         pass
 
     def on_stop(self):
-        logger.info("Stopping strategy")
         pass
 
 
