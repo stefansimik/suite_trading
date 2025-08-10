@@ -608,10 +608,10 @@ class TradingEngine:
                         # Mark strategy as failed
                         strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
                         strategy.on_error(e)
-                        # Remove all feeds for this strategy to avoid blocking the loop
+                        # Terminate all feeds for this strategy in case of error
                         _ = self._feed_manager.cleanup_all_feeds_for_strategy(strategy)
 
-            # Remove finished event-feeds
+            # Routine cleanup for finished event-feeds
             self._feed_manager.cleanup_finished_feeds()
 
             # Auto-stop strategies that have no active feeds left

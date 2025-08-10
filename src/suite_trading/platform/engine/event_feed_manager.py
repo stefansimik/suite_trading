@@ -210,10 +210,13 @@ class EventFeedManager:
                     feed.close()
                 except Exception as e:
                     logger.error(f"Error during closing of finished event-feed with name '{name}': {e}")
+
+                # Remove this feed from our tracking
                 feeds_list.remove(feed)
                 del self._feed_name[feed]
                 del self._feed_callback[feed]
                 del self._strategy_name_index[strategy][name]
+
                 logger.debug(f"Cleaned up finished event-feed $feed_name '{name}' for {strategy.__class__.__name__}")
 
     def cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> List[str]:
