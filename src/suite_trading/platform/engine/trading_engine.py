@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Callable, Optional
 
@@ -12,6 +13,19 @@ from suite_trading.platform.engine.engine_state_machine import EngineState, Engi
 from suite_trading.platform.engine.event_feed_manager import EventFeedManager
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class StrategyClocks:
+    last_event_time: Optional[datetime] = None
+    wall_clock_time: Optional[datetime] = None
+
+    def update_on_event(self, dt_event: datetime, dt_received: datetime) -> None:
+        # Advance timeline to official event time
+        self.last_event_time = dt_event
+        # Keep monotonic max of when the system received events
+        if self.wall_clock_time is None or dt_received > self.wall_clock_time:
+            self.wall_clock_time = dt_received
 
 
 class TradingEngine:
@@ -55,10 +69,8 @@ class TradingEngine:
         self._strategies: Dict[str, Strategy] = {}
         # EventFeeds management for each Strategy
         self._feed_manager = EventFeedManager()
-        # Tracks last event time (timeline) per strategy
-        self._strategy_last_event_time: Dict[Strategy, Optional[datetime]] = {}
-        # Tracks latest known wall clock time per strategy (max of dt_received)
-        self._strategy_wall_clock_time: Dict[Strategy, Optional[datetime]] = {}
+        # Tracks per-strategy clocks (timeline and wall-clock)
+        self._strategy_time: Dict[Strategy, StrategyClocks] = {}
 
     # endregion
 
@@ -205,11 +217,8 @@ class TradingEngine:
         strategy._set_trading_engine(self)
         self._strategies[name] = strategy
 
-        # Set up last-event-time tracking for this strategy
-        self._strategy_last_event_time[strategy] = None
-
-        # Set up wall-clock-time tracking for this strategy
-        self._strategy_wall_clock_time[strategy] = None
+        # Set up clocks tracking for this strategy
+        self._strategy_time[strategy] = StrategyClocks()
 
         # Set up EventFeed tracking for this strategy
         self._feed_manager.register_strategy(strategy)
@@ -327,13 +336,9 @@ class TradingEngine:
                 f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}",
             )
 
-        # Remove last-event-time tracking for this strategy
-        if strategy in self._strategy_last_event_time:
-            del self._strategy_last_event_time[strategy]
-
-        # Remove wall-clock-time tracking for this strategy
-        if strategy in self._strategy_wall_clock_time:
-            del self._strategy_wall_clock_time[strategy]
+        # Remove clocks tracking for this strategy
+        if strategy in self._strategy_time:
+            del self._strategy_time[strategy]
 
         # Remove EventFeed tracking for this strategy
         self._feed_manager.unregister_strategy(strategy)
@@ -586,14 +591,8 @@ class TradingEngine:
                     # Get the event
                     consumed_event = feed.pop()
 
-                    # Update this strategy's last event time (timeline)
-                    self._strategy_last_event_time[strategy] = consumed_event.dt_event
-                    logger.debug(f"Advanced timeline for {strategy.__class__.__name__} to {consumed_event.dt_event.isoformat()}")
-
-                    # Update wall-clock-time with monotonic max of dt_received
-                    prev = self._strategy_wall_clock_time.get(strategy)
-                    if prev is None or consumed_event.dt_received > prev:
-                        self._strategy_wall_clock_time[strategy] = consumed_event.dt_received
+                    # Update clocks for this strategy (timeline and wall-clock)
+                    self._strategy_time[strategy].update_on_event(consumed_event.dt_event, consumed_event.dt_received)
 
                     # Send event via callback
                     try:
