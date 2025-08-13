@@ -242,7 +242,7 @@ class TradingEngine:
 
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
-        logger.debug(f"Added strategy under $name '{name}' of class {strategy.__class__.__name__}")
+        logger.debug(f"Added Strategy named '{name}' (class {strategy.__class__.__name__})")
 
     def start_strategy(self, name: str) -> None:
         """Start a strategy with specified name.
@@ -269,14 +269,16 @@ class TradingEngine:
                 f"Cannot start strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
             )
 
-        logger.info(f"Starting strategy $name '{name}' (class {strategy.__class__.__name__})")
+        logger.info(f"Starting Strategy named '{name}' (class {strategy.__class__.__name__})")
         try:
             strategy.on_start()
             strategy._state_machine.execute_action(StrategyAction.START_STRATEGY)
-            logger.debug(f"Strategy '{name}' transitioned to {strategy.state.name}")
+            logger.debug(f"Strategy named '{name}' transitioned to {strategy.state.name}")
         except Exception as e:
             strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
-            logger.error(f"Error in `start_strategy` for $name '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}")
+            logger.error(
+                f"Error in `start_strategy` for Strategy named '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}",
+            )
             raise
 
     def stop_strategy(self, name: str) -> None:
@@ -304,13 +306,13 @@ class TradingEngine:
                 f"Cannot stop strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
             )
 
-        logger.info(f"Stopping strategy named '{name}'.")
+        logger.info(f"Stopping Strategy named '{name}'")
 
         # Stop all event-feeds for this strategy first
         # Try to stop all feeds even if some fail, then report any errors
         feeds_cleanup_errors = self._cleanup_all_feeds_for_strategy(strategy)
         for error in feeds_cleanup_errors:
-            logger.error(f"Error during feed cleanup for strategy '{name}': {error}")
+            logger.error(f"Error during event-feed cleanup for Strategy named '{name}': {error}")
 
         # Now stop the strategy itself
         try:
@@ -322,10 +324,12 @@ class TradingEngine:
                 raise RuntimeError(f"Strategy `on_stop` callback succeeded, but event feeds cleanup failed: {error_summary}")
 
             strategy._state_machine.execute_action(StrategyAction.STOP_STRATEGY)
-            logger.debug(f"Strategy '{name}' transitioned to {strategy.state.name}")
+            logger.debug(f"Strategy named '{name}' transitioned to {strategy.state.name}")
         except Exception as e:
             strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
-            logger.error(f"Error in `stop_strategy` for $name '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}")
+            logger.error(
+                f"Error in `stop_strategy` for Strategy named '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}",
+            )
             raise
 
     def remove_strategy(self, name: str) -> None:
@@ -363,7 +367,7 @@ class TradingEngine:
 
         # Detach engine reference from this strategy
         strategy._clear_trading_engine()
-        logger.debug(f"Removed strategy under $name '{name}' of class {strategy.__class__.__name__}")
+        logger.debug(f"Removed Strategy named '{name}' (class {strategy.__class__.__name__})")
 
     @property
     def strategies(self) -> bidict[str, Strategy]:
@@ -408,7 +412,7 @@ class TradingEngine:
             started = 0
             for strategy_name in list(self._name_strategies_bidict.keys()):
                 self.start_strategy(strategy_name)
-                logger.info(f"Started strategy under name: '{strategy_name}'")
+                logger.info(f"Started Strategy named '{strategy_name}'")
                 started += 1
 
             # Mark engine as running
@@ -447,10 +451,10 @@ class TradingEngine:
             for strategy_name, strategy in list(self._name_strategies_bidict.items()):
                 if strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
                     self.stop_strategy(strategy_name)
-                    logger.info(f"Stopped strategy named '{strategy_name}'")
+                    logger.info(f"Stopped Strategy named '{strategy_name}'")
                     stopped += 1
                 else:
-                    logger.debug(f"Skip stopping strategy '{strategy_name}' in state {strategy.state.name}")
+                    logger.debug(f"Skip stopping Strategy named '{strategy_name}' in state {strategy.state.name}")
 
             # Disconnect brokers second
             disconnected_brokers = 0
@@ -522,7 +526,7 @@ class TradingEngine:
                         callback(oldest_event)
                     except Exception as e:
                         strategy_name = self._name_strategies_bidict.inv[strategy]
-                        logger.error(f"Exception raised during processing event for strategy named '{strategy_name}'. | Exception:  {e}")
+                        logger.error(f"Exception raised during processing event for Strategy named '{strategy_name}'. | Exception: {e}")
                         # Mark strategy as failed
                         strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
                         strategy.on_error(e)
@@ -540,13 +544,11 @@ class TradingEngine:
                     if all_events_feeds_are_finished_for_strategy:
                         try:
                             self.stop_strategy(name)
-                            logger.info(
-                                f"Strategy named '{name}' was automatically stopped, because all event-feeds for this Strategy were finished)",
-                            )
+                            logger.info(f"Strategy named '{name}' was automatically stopped because all EventFeeds were finished")
                         except Exception as e:
-                            logger.error(f"Error auto-stopping strategy '{name}': {e}")
+                            logger.error(f"Error auto-stopping Strategy named '{name}': {e}")
 
-        logger.info("Event processing loop completed - all feeds finished")
+        logger.info("Event processing loop completed - all EventFeeds finished")
 
         # Stop the engine when all data is processed
         self.stop()
@@ -597,7 +599,8 @@ class TradingEngine:
 
         # Register locally
         feeds_dict[feed_name] = FeedCallbackTuple(event_feed, callback)
-        logger.info(f"Added event feed $feed_name '{feed_name}' to {strategy.__class__.__name__}")
+        strategy_name = self._name_strategies_bidict.inv[strategy]
+        logger.info(f"Added EventFeed named '{feed_name}' to Strategy named '{strategy_name}'")
 
     def remove_event_feed_from_strategy(self, strategy: Strategy, feed_name: str) -> None:
         """Detach and close a feed by name for a strategy.
@@ -623,21 +626,25 @@ class TradingEngine:
 
         # Handle case where feed doesn't exist (already finished/removed)
         if feed_to_close is None:
-            logger.debug(f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed")
+            strategy_name = self._name_strategies_bidict.inv[strategy]
+            logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished or removed - no action needed")
             return
 
         # Close the feed first
         try:
             feed_to_close.close()
         except Exception as e:
-            logger.error(f"Error closing event feed '{feed_name}' for strategy: {e}")
+            strategy_name = self._name_strategies_bidict.inv[strategy]
+            logger.error(f"Error closing EventFeed named '{feed_name}' for Strategy named '{strategy_name}': {e}")
 
         # Remove from local registry
         removed = self._strategy_feeds_dict[strategy].pop(feed_name, None)
         if removed is None:
-            logger.debug(f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed")
+            strategy_name = self._name_strategies_bidict.inv[strategy]
+            logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished or removed - no action needed")
         else:
-            logger.info(f"Removed event feed $feed_name '{feed_name}' from {strategy.__class__.__name__}")
+            strategy_name = self._name_strategies_bidict.inv[strategy]
+            logger.info(f"Removed EventFeed named '{feed_name}' from Strategy named '{strategy_name}'")
 
     # endregion
 
@@ -692,9 +699,10 @@ class TradingEngine:
                 try:
                     event_feed.close()
                 except Exception as e:
-                    logger.error(f"Error closing finished event-feed $feed_name '{feed_name}' in `_cleanup_finished_feeds`: {e}")
+                    logger.error(f"Error closing finished EventFeed named '{feed_name}' in `_cleanup_finished_feeds`: {e}")
                 del name_vs_entry[feed_name]
-                logger.debug(f"Cleaned up finished event-feed with name '{feed_name}' for {strategy.__class__.__name__}")
+                strategy_name = self._name_strategies_bidict.inv[strategy]
+                logger.debug(f"Cleaned up finished EventFeed named '{feed_name}' for Strategy named '{strategy_name}'")
 
     def _cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> List[str]:
         # Close everything for a strategy; collect errors
@@ -706,11 +714,12 @@ class TradingEngine:
                 feed.close()
                 closed += 1
             except Exception as e:
-                msg = f"Error closing event-feed '{name}': {e}"
+                msg = f"Error closing EventFeed named '{name}': {e}"
                 errors.append(msg)
                 logger.error(msg)
         mapping.clear()
-        logger.info(f"Cleaned up {closed} event-feed(s) for {strategy.__class__.__name__}; errors={len(errors)}")
+        strategy_name = self._name_strategies_bidict.inv[strategy]
+        logger.info(f"Cleaned up {closed} EventFeed(s) for Strategy named '{strategy_name}'; errors={len(errors)}")
         return errors
 
     # endregion
