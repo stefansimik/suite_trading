@@ -70,7 +70,7 @@ class TradingEngine:
         # EventFeeds management for each Strategy
         self._feed_manager = EventFeedManager()
         # Tracks per-strategy clocks (timeline and wall-clock)
-        self._strategy_time: Dict[Strategy, StrategyClocks] = {}
+        self._strategy_clocks: Dict[Strategy, StrategyClocks] = {}
 
     # endregion
 
@@ -218,7 +218,7 @@ class TradingEngine:
         self._strategies[name] = strategy
 
         # Set up clocks tracking for this strategy
-        self._strategy_time[strategy] = StrategyClocks()
+        self._strategy_clocks[strategy] = StrategyClocks()
 
         # Set up EventFeed tracking for this strategy
         self._feed_manager.register_strategy(strategy)
@@ -337,8 +337,8 @@ class TradingEngine:
             )
 
         # Remove clocks tracking for this strategy
-        if strategy in self._strategy_time:
-            del self._strategy_time[strategy]
+        if strategy in self._strategy_clocks:
+            del self._strategy_clocks[strategy]
 
         # Remove EventFeed tracking for this strategy
         self._feed_manager.unregister_strategy(strategy)
@@ -592,7 +592,7 @@ class TradingEngine:
                     consumed_event = feed.pop()
 
                     # Update clocks for this strategy (timeline and wall-clock)
-                    self._strategy_time[strategy].update_on_event(consumed_event.dt_event, consumed_event.dt_received)
+                    self._strategy_clocks[strategy].update_on_event(consumed_event.dt_event, consumed_event.dt_received)
 
                     # Send event via callback
                     try:
