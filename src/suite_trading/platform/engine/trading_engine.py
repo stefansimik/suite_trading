@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Callable, Optional
+from typing import Dict, List, Callable, Optional, NamedTuple
 
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
@@ -10,9 +10,21 @@ from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
-from suite_trading.platform.engine.event_feed_manager import EventFeedManager
 
 logger = logging.getLogger(__name__)
+
+# TODO
+#  Fix all problems, where we are logging Strategies like this: `{strategy.__class__.__name__}`
+#  This is not sufficient, as we can have more variously configured Strategy instances of the same class,
+#  so we have to recognize them by name;
+#  One option is to use bi-directional dictionary for 1:1 mapping between Strategies and their names.
+#   We will need to implement this structure, but then using it will be simple like: `d[key]` or `d.inverse[value]`
+#  Another possible action would be remove manual naming of Strategies and add to them abstract function: `get_unique_name()`
+
+
+class FeedAndCallbackTuple(NamedTuple):
+    feed: EventFeed
+    callback: Callable
 
 
 @dataclass
@@ -67,8 +79,8 @@ class TradingEngine:
 
         # Strategies registry
         self._strategies: Dict[str, Strategy] = {}
-        # EventFeeds management for each Strategy
-        self._feed_manager = EventFeedManager()
+        # EventFeeds per Strategy: strategy -> { feed_name: FeedAndCallbackTuple }
+        self._feeds: Dict[Strategy, Dict[str, FeedAndCallbackTuple]] = {}
         # Tracks per-strategy clocks (timeline and wall-clock)
         self._strategy_clocks: Dict[Strategy, StrategyClocks] = {}
 
@@ -221,7 +233,7 @@ class TradingEngine:
         self._strategy_clocks[strategy] = StrategyClocks()
 
         # Set up EventFeed tracking for this strategy
-        self._feed_manager.register_strategy(strategy)
+        self._feeds[strategy] = {}
 
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
@@ -291,7 +303,7 @@ class TradingEngine:
 
         # Stop all event-feeds for this strategy first
         # Try to stop all feeds even if some fail, then report any errors
-        feeds_cleanup_errors = self._feed_manager.cleanup_all_feeds_for_strategy(strategy)
+        feeds_cleanup_errors = self._cleanup_all_feeds_for_strategy(strategy)
         for error in feeds_cleanup_errors:
             logger.error(f"Error during feed cleanup for strategy '{name}': {error}")
 
@@ -341,7 +353,7 @@ class TradingEngine:
             del self._strategy_clocks[strategy]
 
         # Remove EventFeed tracking for this strategy
-        self._feed_manager.unregister_strategy(strategy)
+        del self._feeds[strategy]
 
         # Remove from strategies' dictionary
         del self._strategies[name]
@@ -490,14 +502,15 @@ class TradingEngine:
         logger.info("Starting event processing loop")
 
         # While any active event-feeds exist, keep processing events
-        while self._feed_manager.has_active_feeds():
+        # TODO, let's make this more clear with helpe variable: any_active_event_feeds_exist OR make a helper method for this
+        while any(not entry.feed.is_finished() for mapping in self._feeds.values() for entry in mapping.values()):
             # Go over all strategies in RUNNING state
-            running_strategies = [name for name, strategy in self._strategies.items() if strategy.state == StrategyState.RUNNING]
+            running_strategies = [s for s in self._strategies.values() if s.state == StrategyState.RUNNING]
             for strategy in running_strategies:
                 # Find the oldest event from all this strategy's event-feeds
                 # If events have the same time, use the first feed (keeps order how EventFeeds were added)
                 # Process the event if we found one
-                if (next_feed_tuple := self._feed_manager.find_feed_with_next_event(strategy)) is not None:
+                if (next_feed_tuple := self._find_feed_with_next_event(strategy)) is not None:
                     feed_name, feed, callback = next_feed_tuple
                     # Get the event
                     consumed_event = feed.pop()
@@ -514,19 +527,23 @@ class TradingEngine:
                         strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
                         strategy.on_error(e)
                         # Terminate all feeds for this strategy in case of error
-                        _ = self._feed_manager.cleanup_all_feeds_for_strategy(strategy)
+                        # TODO I don't like this code. Re-evaluate, why we don't need the resulting value
+                        _ = self._cleanup_all_feeds_for_strategy(strategy)
 
             # Routine cleanup for finished event-feeds
-            self._feed_manager.cleanup_finished_feeds()
+            self._cleanup_finished_feeds()
 
             # Auto-stop strategies that have no active feeds left
             for name, strategy in list(self._strategies.items()):
-                if strategy.state == StrategyState.RUNNING and not self._feed_manager.has_active_feeds_for_strategy(strategy):
-                    try:
-                        self.stop_strategy(name)
-                        logger.info(f"Auto-stopped strategy '{name}' (all feeds finished)")
-                    except Exception as e:
-                        logger.error(f"Error auto-stopping strategy '{name}': {e}")
+                if strategy.state == StrategyState.RUNNING:
+                    # TODO: refactor to "strategy_has_all_event_feeds_finished" logic
+                    has_active = any(not e.feed.is_finished() for e in self._feeds.get(strategy, {}).values())
+                    if not has_active:
+                        try:
+                            self.stop_strategy(name)
+                            logger.info(f"Auto-stopped strategy '{name}' (all feeds finished)")
+                        except Exception as e:
+                            logger.error(f"Error auto-stopping strategy '{name}': {e}")
 
         logger.info("Event processing loop completed - all feeds finished")
 
@@ -536,6 +553,55 @@ class TradingEngine:
     # endregion
 
     # region EventFeeds / per Strategy
+
+    # region EventFeeds — per Strategy management
+
+    def _find_feed_with_next_event(self, strategy: Strategy) -> Optional[tuple[str, EventFeed, Callable]]:
+        # Find the next feed (name, feed, callback) with the oldest available event.
+        mapping = self._feeds[strategy]
+        oldest_event = None
+        winner = None  # type: Optional[tuple[str, EventFeed, Callable]]
+        for name, (feed, callback) in mapping.items():
+            event = feed.peek()
+            if event is None:
+                continue
+            if oldest_event is None or event.dt_event < oldest_event.dt_event:
+                oldest_event = event
+                winner = (name, feed, callback)
+            # If dt_event ties, insertion-order (first-added) wins
+        return winner
+
+    def _cleanup_finished_feeds(self) -> None:
+        # Close and remove feeds that report finished state
+        for strategy, name_vs_entry in self._feeds.items():
+            finished = [n for n, entry in name_vs_entry.items() if entry.feed.is_finished()]
+            for feed_name in finished:
+                event_feed = name_vs_entry[feed_name].feed
+                try:
+                    event_feed.close()
+                except Exception as e:
+                    logger.error(f"Error closing finished event-feed $feed_name '{feed_name}' in `_cleanup_finished_feeds`: {e}")
+                del name_vs_entry[feed_name]
+                logger.debug(f"Cleaned up finished event-feed with name '{feed_name}' for {strategy.__class__.__name__}")
+
+    def _cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> List[str]:
+        # Close everything for a strategy; collect errors
+        mapping = self._feeds[strategy]
+        errors: List[str] = []
+        closed = 0
+        for name, (feed, _) in list(mapping.items()):
+            try:
+                feed.close()
+                closed += 1
+            except Exception as e:
+                msg = f"Error closing event-feed '{name}': {e}"
+                errors.append(msg)
+                logger.error(msg)
+        mapping.clear()
+        logger.info(f"Cleaned up {closed} event-feed(s) for {strategy.__class__.__name__}; errors={len(errors)}")
+        return errors
+
+    # endregion
 
     def add_event_feed_for_strategy(
         self,
@@ -564,7 +630,8 @@ class TradingEngine:
             )
 
         # Check: feed_name must be unique per strategy
-        if self._feed_manager.has_feed_name(strategy, feed_name):
+        feeds_dict = self._feeds[strategy]
+        if feed_name in feeds_dict:
             raise ValueError(
                 "Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name "
                 f"('{feed_name}') is already used for this strategy. Choose a different name.",
@@ -576,13 +643,9 @@ class TradingEngine:
             if removed_count > 0:
                 logger.info(f"Filtered {removed_count} obsolete events before {strategy.last_event_time} to keep timeline")
 
-        # Register the feed with metadata in the manager
-        self._feed_manager.add_event_feed_for_strategy(
-            strategy=strategy,
-            feed_name=feed_name,
-            event_feed=event_feed,
-            callback=callback,
-        )
+        # Register locally
+        feeds_dict[feed_name] = self.FeedAndCallbackTuple(event_feed, callback)
+        logger.info(f"Added event feed $feed_name '{feed_name}' to {strategy.__class__.__name__}")
 
     def remove_event_feed_from_strategy(self, strategy: Strategy, feed_name: str) -> None:
         """Detach and close a feed by name for a strategy.
@@ -602,8 +665,9 @@ class TradingEngine:
                 "Add the strategy using `add_strategy` first.",
             )
 
-        # Find and close the feed by name before removing
-        feed_to_close = self._feed_manager.get_event_feed_by_name(strategy, feed_name)
+        # Find entry directly
+        entry = self._feeds[strategy].get(feed_name)
+        feed_to_close = entry.feed if entry else None
 
         # Handle case where feed doesn't exist (already finished/removed)
         if feed_to_close is None:
@@ -616,8 +680,12 @@ class TradingEngine:
         except Exception as e:
             logger.error(f"Error closing event feed '{feed_name}' for strategy: {e}")
 
-        # Remove from manager
-        self._feed_manager.remove_event_feed_for_strategy(strategy, feed_name)
+        # Remove from local registry
+        removed = self._feeds[strategy].pop(feed_name, None)
+        if removed is None:
+            logger.debug(f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed")
+        else:
+            logger.info(f"Removed event feed $feed_name '{feed_name}' from {strategy.__class__.__name__}")
 
     # endregion
 
