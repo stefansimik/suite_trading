@@ -54,7 +54,7 @@ class Strategy(ABC):
 
     # region Attach engine
 
-    def _set_trading_engine(self, trading_engine: TradingEngine) -> None:
+    def _set_trading_engine(self, trading_engine: "TradingEngine") -> None:
         """
         Attaches the TradingEngine so this Strategy can interact with platform features.
 
