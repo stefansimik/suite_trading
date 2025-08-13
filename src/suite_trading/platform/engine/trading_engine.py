@@ -51,7 +51,7 @@ class TradingEngine:
     simply follows its own timeline based on the events it gets.
     """
 
-    # region Init engine
+    # region Init
 
     def __init__(self):
         """Create a new TradingEngine."""
@@ -361,93 +361,7 @@ class TradingEngine:
 
     # endregion
 
-    # region EventFeed(s)
-
-    def add_event_feed_for_strategy(
-        self,
-        strategy: Strategy,
-        feed_name: str,
-        event_feed: EventFeed,
-        callback: Callable,
-    ) -> None:
-        """Attach an EventFeed to a strategy and register metadata.
-
-        Args:
-            strategy: The strategy that will receive events. Type: Strategy.
-            feed_name: Unique name for this event-feed within the strategy. Type: str.
-            event_feed: The EventFeed instance to manage. Type: EventFeed.
-            callback: Function to call when events are received. Type: Callable.
-
-        Raises:
-            ValueError: If $strategy is not added to this TradingEngine or $feed_name is duplicate.
-        """
-        # Check: strategy must be added to this engine
-        if strategy not in self._strategies.values():
-            raise ValueError(
-                "Cannot call `add_event_feed_for_strategy` because $strategy "
-                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
-                "Add the strategy using `add_strategy` first.",
-            )
-
-        # Check: feed_name must be unique per strategy
-        if self._feed_manager.has_feed_name(strategy, feed_name):
-            raise ValueError(
-                "Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name "
-                f"('{feed_name}') is already used for this strategy. Choose a different name.",
-            )
-
-        # Timeline filtering if the strategy already processed events
-        if strategy.last_event_time is not None:
-            removed_count = event_feed.remove_events_before(strategy.last_event_time)
-            if removed_count > 0:
-                logger.info(f"Filtered {removed_count} obsolete events before {strategy.last_event_time} to keep timeline")
-
-        # Register the feed with metadata in the manager
-        self._feed_manager.add_event_feed_for_strategy(
-            strategy=strategy,
-            feed_name=feed_name,
-            event_feed=event_feed,
-            callback=callback,
-        )
-
-    def remove_event_feed_from_strategy(self, strategy: Strategy, feed_name: str) -> None:
-        """Detach and close a feed by name for a strategy.
-
-        Args:
-            strategy: The strategy that owns the event-feed.
-            feed_name: Name of the event-feed to remove.
-
-        Raises:
-            ValueError: If $strategy is not registered.
-        """
-        # Check: strategy must be added to this engine
-        if strategy not in self._strategies.values():
-            raise ValueError(
-                "Cannot call `remove_event_feed_from_strategy` because $strategy "
-                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
-                "Add the strategy using `add_strategy` first.",
-            )
-
-        # Find and close the feed by name before removing
-        feed_to_close = self._feed_manager.get_event_feed_by_name(strategy, feed_name)
-
-        # Handle case where feed doesn't exist (already finished/removed)
-        if feed_to_close is None:
-            logger.debug(f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed")
-            return
-
-        # Close the feed first
-        try:
-            feed_to_close.close()
-        except Exception as e:
-            logger.error(f"Error closing event feed '{feed_name}' for strategy: {e}")
-
-        # Remove from manager
-        self._feed_manager.remove_event_feed_for_strategy(strategy, feed_name)
-
-    # endregion
-
-    # region Run engine
+    # region Lifecycle
 
     def start(self):
         """Start the engine and all your strategies.
@@ -621,6 +535,92 @@ class TradingEngine:
 
         # Stop the engine when all data is processed
         self.stop()
+
+    # endregion
+
+    # region EventFeeds / per Strategy
+
+    def add_event_feed_for_strategy(
+        self,
+        strategy: Strategy,
+        feed_name: str,
+        event_feed: EventFeed,
+        callback: Callable,
+    ) -> None:
+        """Attach an EventFeed to a strategy and register metadata.
+
+        Args:
+            strategy: The strategy that will receive events. Type: Strategy.
+            feed_name: Unique name for this event-feed within the strategy. Type: str.
+            event_feed: The EventFeed instance to manage. Type: EventFeed.
+            callback: Function to call when events are received. Type: Callable.
+
+        Raises:
+            ValueError: If $strategy is not added to this TradingEngine or $feed_name is duplicate.
+        """
+        # Check: strategy must be added to this engine
+        if strategy not in self._strategies.values():
+            raise ValueError(
+                "Cannot call `add_event_feed_for_strategy` because $strategy "
+                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
+                "Add the strategy using `add_strategy` first.",
+            )
+
+        # Check: feed_name must be unique per strategy
+        if self._feed_manager.has_feed_name(strategy, feed_name):
+            raise ValueError(
+                "Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name "
+                f"('{feed_name}') is already used for this strategy. Choose a different name.",
+            )
+
+        # Timeline filtering if the strategy already processed events
+        if strategy.last_event_time is not None:
+            removed_count = event_feed.remove_events_before(strategy.last_event_time)
+            if removed_count > 0:
+                logger.info(f"Filtered {removed_count} obsolete events before {strategy.last_event_time} to keep timeline")
+
+        # Register the feed with metadata in the manager
+        self._feed_manager.add_event_feed_for_strategy(
+            strategy=strategy,
+            feed_name=feed_name,
+            event_feed=event_feed,
+            callback=callback,
+        )
+
+    def remove_event_feed_from_strategy(self, strategy: Strategy, feed_name: str) -> None:
+        """Detach and close a feed by name for a strategy.
+
+        Args:
+            strategy: The strategy that owns the event-feed.
+            feed_name: Name of the event-feed to remove.
+
+        Raises:
+            ValueError: If $strategy is not registered.
+        """
+        # Check: strategy must be added to this engine
+        if strategy not in self._strategies.values():
+            raise ValueError(
+                "Cannot call `remove_event_feed_from_strategy` because $strategy "
+                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
+                "Add the strategy using `add_strategy` first.",
+            )
+
+        # Find and close the feed by name before removing
+        feed_to_close = self._feed_manager.get_event_feed_by_name(strategy, feed_name)
+
+        # Handle case where feed doesn't exist (already finished/removed)
+        if feed_to_close is None:
+            logger.debug(f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed")
+            return
+
+        # Close the feed first
+        try:
+            feed_to_close.close()
+        except Exception as e:
+            logger.error(f"Error closing event feed '{feed_name}' for strategy: {e}")
+
+        # Remove from manager
+        self._feed_manager.remove_event_feed_for_strategy(strategy, feed_name)
 
     # endregion
 

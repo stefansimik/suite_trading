@@ -39,7 +39,7 @@ class Strategy(ABC):
     - All three can run simultaneously, each with their own timeline
     """
 
-    # region Init strategy
+    # region Init
 
     def __init__(self):
         """Initialize a new strategy.
@@ -105,7 +105,7 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Time/Clocks`
+    # region Times
 
     @property
     def last_event_time(self) -> Optional[datetime]:
