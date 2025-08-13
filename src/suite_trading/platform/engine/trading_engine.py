@@ -74,7 +74,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Query state
+    # region State
 
     @property
     def state(self) -> EngineState:
@@ -330,7 +330,7 @@ class TradingEngine:
         strategy = self._strategies[name]
 
         # Check: strategy must be in terminal state before removing
-        if not strategy.is_in_terminal_state():
+        if not strategy._state_machine.is_in_terminal_state():
             valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
             raise ValueError(
                 f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}",

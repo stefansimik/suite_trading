@@ -54,16 +54,12 @@ class Strategy(ABC):
 
     # region Attach engine
 
-    def _set_trading_engine(self, trading_engine: "TradingEngine") -> None:
-        """Set TradingEngine reference for this Strategy.
-
+    def _set_trading_engine(self, trading_engine: TradingEngine) -> None:
+        """
         Attaches the TradingEngine so this Strategy can interact with platform features.
 
-        Args:
-            trading_engine (TradingEngine): TradingEngine instance to set.
-
         Raises:
-            RuntimeError: If $_trading_engine is already set or $state is not NEW.
+            RuntimeError: If $_trading_engine is already set or $state of Strategy is not NEW.
         """
         # Check: if TradingEngine is not already set in this Strategy - because we want to set it now
         if self._trading_engine is not None:
@@ -83,8 +79,6 @@ class Strategy(ABC):
     def _clear_trading_engine(self) -> None:
         """Detach the trading engine reference.
 
-        Called by TradingEngine when the strategy is removed. Does not change lifecycle $state.
-
         Raises:
             RuntimeError: If $_trading_engine is None.
         """
@@ -98,7 +92,7 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Query state
+    # region State
 
     @property
     def state(self) -> StrategyState:
@@ -109,21 +103,13 @@ class Strategy(ABC):
         """
         return self._state_machine.current_state
 
-    def is_in_terminal_state(self) -> bool:
-        """Check if the strategy is in a terminal state.
-
-        Returns:
-            bool: True if the strategy is in a terminal state (STOPPED or ERROR).
-        """
-        return self._state_machine.is_in_terminal_state()
-
     # endregion
 
-    # region Query time
+    # region Time/Clocks`
 
     @property
     def last_event_time(self) -> Optional[datetime]:
-        """Get the timeline time for this strategy.
+        """Get time (`dt_event`) of the last event for this strategy.
 
         Returns the dt_event of the last processed event for this strategy. Advances only when this
         strategy processes an event. Each strategy has its own independent timeline.
@@ -135,7 +121,7 @@ class Strategy(ABC):
 
     @property
     def wall_clock_time(self) -> Optional[datetime]:
-        """Get the latest known wall clock time for this strategy.
+        """Get the latest known wall clock time (max `dt_received` from all events) for this strategy.
 
         Returns the maximum dt_received seen across all events processed by this strategy. Use this
         value for live cutoffs, timeouts, and latency checks. This is separate from
@@ -190,7 +176,7 @@ class Strategy(ABC):
 
     # endregion
 
-    # region Event feeds
+    # region Events & EventFeeds
 
     @abstractmethod  # Made abstract to prevent silent failures - ensures all strategies implement event handling
     def on_event(self, event: Event):
