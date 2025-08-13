@@ -154,22 +154,22 @@ class EventFeedManager:
         return False
 
     def cleanup_finished_feeds(self) -> None:
-        """Clean up EventFeeds that are finished sending events.
+        """Clean up finished EventFeeds.
 
         We close these EventFeeds and remove them from our registry so they don't take up space.
         """
-        for strategy, mapping in self._feeds.items():
-            finished_names = [name for name, (feed, _) in mapping.items() if feed.is_finished()]
-            for name in finished_names:
-                feed, _ = mapping[name]
+        for strategy, name_vs_feedentry_dict in self._feeds.items():
+            finished_feed_names = [feed_name for feed_name, feed_entry in name_vs_feedentry_dict.items() if feed_entry.feed.is_finished()]
+            for feed_name in finished_feed_names:
+                event_feed = name_vs_feedentry_dict[feed_name].feed
                 try:
-                    feed.close()
+                    event_feed.close()
                 except Exception as e:
-                    logger.error(f"Error during closing of finished event-feed with name '{name}': {e}")
+                    logger.error(f"Error closing finished event-feed $feed_name '{feed_name}' in `cleanup_finished_feeds`: {e}")
 
                 # Remove this feed from our tracking
-                mapping.pop(name, None)
-                logger.debug(f"Cleaned up finished event-feed $feed_name '{name}' for {strategy.__class__.__name__}")
+                del name_vs_feedentry_dict[feed_name]
+                logger.debug(f"Cleaned up finished event-feed with name '{feed_name}' for {strategy.__class__.__name__}")
 
     def cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> List[str]:
         """Close all EventFeeds for a Strategy and tell you about any problems.

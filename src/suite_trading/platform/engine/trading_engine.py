@@ -291,18 +291,18 @@ class TradingEngine:
 
         # Stop all event-feeds for this strategy first
         # Try to stop all feeds even if some fail, then report any errors
-        feed_errors = self._feed_manager.cleanup_all_feeds_for_strategy(strategy)
-        for error in feed_errors:
+        feeds_cleanup_errors = self._feed_manager.cleanup_all_feeds_for_strategy(strategy)
+        for error in feeds_cleanup_errors:
             logger.error(f"Error during feed cleanup for strategy '{name}': {error}")
 
         # Now stop the strategy itself
         try:
             strategy.on_stop()
 
-            # Check: make sure all event-feeds stopped successfully
-            if feed_errors:
-                error_summary = "; ".join(feed_errors)
-                raise RuntimeError(f"Strategy callback succeeded but event feed cleanup failed: {error_summary}")
+            # If not all event-feeds stopped successfully, then raise
+            if feeds_cleanup_errors:
+                error_summary = "; ".join(feeds_cleanup_errors)
+                raise RuntimeError(f"Strategy `on_stop` callback succeeded, but event feeds cleanup failed: {error_summary}")
 
             strategy._state_machine.execute_action(StrategyAction.STOP_STRATEGY)
             logger.debug(f"Strategy '{name}' transitioned to {strategy.state.name}")
@@ -489,14 +489,11 @@ class TradingEngine:
 
         logger.info("Starting event processing loop")
 
-        # Keep going while any strategy still has any active event-feeds
+        # While any active event-feeds exist, keep processing events
         while self._feed_manager.has_active_feeds():
-            # Go through each strategy
-            for strategy in self._strategies.values():
-                # Skip strategies that are not RUNNING
-                if strategy.state != StrategyState.RUNNING:
-                    continue
-
+            # Go over all strategies in RUNNING state
+            running_strategies = [name for name, strategy in self._strategies.items() if strategy.state == StrategyState.RUNNING]
+            for strategy in running_strategies:
                 # Find the oldest event from all this strategy's event-feeds
                 # If events have the same time, use the first feed (keeps order how EventFeeds were added)
                 # Process the event if we found one

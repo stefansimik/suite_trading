@@ -157,7 +157,9 @@ class Strategy(ABC):
         cleanup logic when the strategy stops.
 
         Note: All infrastructure cleanup (event feeds, subscriptions) is handled
-        automatically by TradingEngine. Only clean up strategy-specific resources here.
+        automatically by TradingEngine. All event-feeds are already closed by the
+        engine before this is called; do not close/remove feeds here. Only clean up
+        strategy-specific resources here.
         """
         # All infrastructure cleanup now handled externally
         logger.debug(f"{self.__class__.__name__} default `on_stop` called in state {self.state.name}")
