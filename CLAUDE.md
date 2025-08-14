@@ -18,6 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Code Quality
 - Linting and formatting: Ruff (configured in pyproject.toml)
 - Line length limit: 150 characters
+- Markdown line length limit: 100 characters
 - Python path includes `src/` for imports
 
 ### Project Requirements
@@ -76,12 +77,21 @@ algorithmic trading framework built in Python for backtesting and live trading.
 - **YAGNI**: Implement only when actually needed
 - **DRY**: Eliminate duplication of information, logic, and business rules
 - **Fail fast**: Detect and report errors immediately
+- **Intuitive domain model**: Keep domain objects simple and understandable
 - **Single responsibility**: Each class has one reason to change
+- **Separation of concerns**: Split responsibilities across the system
+- **Principle of least surprise**: Make behavior match user expectations
 - **User-centric design**: APIs designed for users, not internal convenience
 
 ### Breaking Changes Allowed
 During initial development, backward compatibility is out of scope. Remove or redesign
 anything to get the design right.
+
+### User-centric API Design
+**Rule: Design APIs for the user, not for internal convenience.**
+
+Prefer user-friendly choices when cost is low, they fit the existing style, and do not add
+ongoing complexity.
 
 ## Coding Standards
 
@@ -124,7 +134,7 @@ Why:
 - Core domain needs explicit initialization and validation.
 - Dataclasses/named tuples can reduce boilerplate for auxiliary data without hiding intent.
 
-### String Interpolation
+### String Interpolation and Logging Rules
 **Rule: Always use f-strings. Never use old-style interpolation.**
 
 Applies everywhere: logs, exceptions, messages, general strings.
@@ -138,25 +148,64 @@ logger.info("Started strategy '%s'", strategy_name)
 logger.info("Started strategy '{}'".format(strategy_name))
 ```
 
-#### Log call formatting
-If the logged message has only 1 line, keep the full logger call on a single line.
+#### Detailed Logging Standards
+**Rule: Logs must be precise, consistent, and easy to scan. Use f-strings everywhere.**
+
+**Always use f-strings**
+- Applies to logs, exceptions, messages, and general strings.
+- Never use logger format args or str.format/percent formatting.
+
+Allowed:
+- `logger.info(f"Started Strategy named '{name}'")`
+- Plain constant strings when no interpolation is needed
+
+Forbidden:
+- `logger.info("Started Strategy '%s'", name)`
+- `logger.info("Started Strategy '{}'".format(name))`
+- `"Hello, %s" % name`
+
+**Identify domain objects by name (instance) vs class (type)**
+- When referring to a specific instance: use "ClassName named '{name}'".
+  - Examples: "Strategy named '{strategy_name}'", "EventFeed named '{feed_name}'".
+- When referring to the concept/type only: use the capitalized class name.
+  - Examples: Strategy, EventFeed, Broker, EventFeedProvider.
+- When you must include the class of an instance, make it explicit: "(class {obj.__class__.__name__})".
+
+**Pluralization of class concepts**
+- Use capitalized class with (s) as needed when referring to counts: "EventFeed(s)",
+  "Strategy(ies)", "broker(s)" only if not a class concept.
+
+**Message structure**
+- Prefer the pattern: "<Verb> <ClassName> named '{name}' <short context>".
+  - Example: `logger.info(f"Added EventFeed named '{feed_name}' to Strategy named '{s_name}'")`
+- For state transitions: "ClassName named '{name}' transitioned to <STATE>".
+- For errors: start with action/context, then the object, then the error.
+  - Example: `logger.error(f"Error closing EventFeed named '{name}': {e}")`
+
+**Capitalization and terminology**
+- Capitalize domain class names (Strategy, EventFeed, Broker, EventFeedProvider) when used as nouns.
+- Use "event-feed" (hyphenated) for generic prose; use "EventFeed" when referring to the class.
+
+**One-line rule for single-message logs**
+- If the logged message is a single string, keep the whole logger call on one line.
 
 Wrong:
 ```python
 logger.debug(
-    f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed",
+    f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished",
 )
 ```
 
 Correct:
 ```python
-logger.debug(f"Event feed '{feed_name}' for strategy {strategy.__class__.__name__} was already finished or removed - no action needed")
+logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished")
 ```
 
-Note (exception): This rule does not apply when using implicit string concatenation across
-adjacent string literals inside parentheses to keep long messages readable.
+**Implicit concatenation (exception)**
+- Allowed only for multi-part messages with distinct segments, placed on separate lines for
+  readability inside parentheses. Do not split a single message across multiple lines.
 
-Allowed (implicit concatenation):
+Allowed:
 ```python
 logger.info(
     f"TradingEngine STOPPED; strategies stopped={stopped}, "
@@ -164,6 +213,17 @@ logger.info(
     f"event-feed-providers disconnected={disconnected_providers}",
 )
 ```
+
+**Length and clarity**
+- Keep each log line <= 100 chars; shorten wording if needed.
+- Prefer concrete, unambiguous wording; avoid pronouns like "it" when a named object exists.
+
+**Examples (Do/Don't)**
+- Do: `logger.info(f"Started Strategy named '{name}'")`
+- Do: `logger.error(f"Error auto-stopping Strategy named '{name}': {e}")`
+- Do: `logger.debug(f"Cleaned up finished EventFeed named '{feed_name}' for Strategy named '{s}'")`
+- Don't: `logger.info(f"Started strategy '{name}'")`  # wrong casing/pattern
+- Don't: `logger.debug("EventFeed '%s' removed", feed_name)`  # format args
 
 ### Parameter Formatting
 For functions with multiple parameters, use one parameter per line with trailing comma:
