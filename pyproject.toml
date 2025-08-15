@@ -39,7 +39,7 @@ log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 [tool.ruff]
 fix = true
 show-fixes = true
-line-length = 150
+line-length = 9999
 
 [tool.setuptools.packages.find]
 where = ["src"]

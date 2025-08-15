@@ -101,8 +101,8 @@ Capitalization and terminology
 - Capitalize domain class names (Strategy, EventFeed, Broker, EventFeedProvider) when used as nouns.
 - Use "event-feed" (hyphenated) for generic prose; use "EventFeed" when referring to the class.
 
-One‑line rule for single‑message logs
-- If the logged message is a single string, keep the whole logger call on one line.
+One‑line rule for all logger calls
+- All logger calls must be on a single line, regardless of message length.
 
 Wrong:
 ```python
@@ -116,21 +116,9 @@ Correct:
 logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished")
 ```
 
-Implicit concatenation (exception)
-- Allowed only for multi‑part messages with distinct segments, placed on separate lines for
-  readability inside parentheses. Do not split a single message across multiple lines.
-
-Allowed:
-```python
-logger.info(
-    f"TradingEngine STOPPED; strategies stopped={stopped}, "
-    f"brokers disconnected={disconnected_brokers}, "
-    f"event-feed-providers disconnected={disconnected_providers}",
-)
-```
 
 Length and clarity
-- Keep each log line <= 100 chars; shorten wording if needed.
+- Do not wrap logger calls; a logger call must be one line even if >100 chars. Prefer concise wording.
 - Prefer concrete, unambiguous wording; avoid pronouns like "it" when a named object exists.
 
 Examples (Do/Don't)

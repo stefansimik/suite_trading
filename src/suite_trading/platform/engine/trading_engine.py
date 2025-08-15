@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 #   We will need to implement this structure, but then using it will be simple like: `d[key]` or `d.inverse[value]`
 #  Another possible action would be remove manual naming of Strategies and add to them abstract function: `get_unique_name()`
 
+# region Helper classes
+
 
 class FeedCallbackTuple(NamedTuple):
     feed: EventFeed
@@ -43,6 +45,9 @@ class StrategyClocks:
         # Keep monotonic max of when the system received events
         if self.wall_clock_time is None or dt_received > self.wall_clock_time:
             self.wall_clock_time = dt_received
+
+
+# endregion
 
 
 class TradingEngine:
@@ -86,7 +91,7 @@ class TradingEngine:
         self._name_strategies_bidict: bidict[str, Strategy] = bidict()
         # EventFeeds per Strategy: strategy -> { feed_name: FeedAndCallbackTuple }
         self._strategy_feeds_dict: Dict[Strategy, Dict[str, FeedCallbackTuple]] = {}
-        # Tracks per-strategy clocks (timeline and wall-clock)
+        # Tracks per-strategy clocks (last_event and wall-clock)
         self._strategy_clocks_dict: Dict[Strategy, StrategyClocks] = {}
 
     # endregion
@@ -225,9 +230,7 @@ class TradingEngine:
         # Check: strategy must be NEW before attaching
         if strategy.state != StrategyState.NEW:
             raise ValueError(
-                "Cannot call `add_strategy` because $strategy is not NEW. Current $state is "
-                f"{strategy.state.name}. Provide a fresh instance of "
-                f"{strategy.__class__.__name__}.",
+                "Cannot call `add_strategy` because $strategy is not NEW. Current $state is {strategy.state.name}. Provide a fresh instance of {strategy.__class__.__name__}.",
             )
 
         # Connect strategy to this engine
@@ -265,9 +268,7 @@ class TradingEngine:
         # Check: strategy must be able to start
         if not strategy._state_machine.can_execute_action(StrategyAction.START_STRATEGY):
             valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
-            raise ValueError(
-                f"Cannot start strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
-            )
+            raise ValueError(f"Cannot start strategy in state {strategy.state.name}. Valid actions: {valid_actions}")
 
         logger.info(f"Starting Strategy named '{name}' (class {strategy.__class__.__name__})")
         try:
@@ -276,9 +277,7 @@ class TradingEngine:
             logger.debug(f"Strategy named '{name}' transitioned to {strategy.state.name}")
         except Exception as e:
             strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
-            logger.error(
-                f"Error in `start_strategy` for Strategy named '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}",
-            )
+            logger.error(f"Error in `start_strategy` for Strategy named '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}")
             raise
 
     def stop_strategy(self, name: str) -> None:
@@ -293,18 +292,14 @@ class TradingEngine:
         """
         # Check: strategy name must be added before stopping
         if name not in self._name_strategies_bidict:
-            raise KeyError(
-                f"Strategy named '{name}' is unknown.",
-            )
+            raise KeyError(f"Strategy named '{name}' is unknown.")
 
         strategy = self._name_strategies_bidict[name]
 
         # Check: strategy must be able to stop
         if not strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
             valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
-            raise ValueError(
-                f"Cannot stop strategy in state {strategy.state.name}. Valid actions: {valid_actions}",
-            )
+            raise ValueError(f"Cannot stop strategy in state {strategy.state.name}. Valid actions: {valid_actions}")
 
         logger.info(f"Stopping Strategy named '{name}'")
 
@@ -314,10 +309,9 @@ class TradingEngine:
         for error in feeds_cleanup_errors:
             logger.error(f"Error during event-feed cleanup for Strategy named '{name}': {error}")
 
-        # Now stop the strategy itself
         try:
+            # Now stop the strategy itself
             strategy.on_stop()
-
             # If some error were found (from closing event-feeds), then raise an exception
             if feeds_cleanup_errors:
                 error_summary = "; ".join(feeds_cleanup_errors)
@@ -327,9 +321,7 @@ class TradingEngine:
             logger.debug(f"Strategy named '{name}' transitioned to {strategy.state.name}")
         except Exception as e:
             strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
-            logger.error(
-                f"Error in `stop_strategy` for Strategy named '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}",
-            )
+            logger.error(f"Error in `stop_strategy` for Strategy named '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}")
             raise
 
     def remove_strategy(self, name: str) -> None:
@@ -344,9 +336,7 @@ class TradingEngine:
         """
         # Check: strategy name must be added before removing
         if name not in self._name_strategies_bidict:
-            raise KeyError(
-                f"Cannot call `remove_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
-            )
+            raise KeyError(f"Cannot call `remove_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.")
 
         strategy = self._name_strategies_bidict[name]
 
@@ -392,10 +382,7 @@ class TradingEngine:
             valid_actions = [a.value for a in self._engine_state_machine.get_valid_actions()]
             raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
 
-        logger.info(
-            f"Starting TradingEngine: {len(self._event_feed_providers_dict)} event-feed-provider(s), "
-            f"{len(self._brokers_dict)} broker(s), {len(self._name_strategies_bidict)} strategy(ies)",
-        )
+        logger.info(f"Starting TradingEngine: {len(self._event_feed_providers_dict)} event-feed-provider(s), {len(self._brokers_dict)} broker(s), {len(self._name_strategies_bidict)} strategy(ies)")
 
         try:
             # Connect event-feed-providers first
@@ -472,11 +459,7 @@ class TradingEngine:
 
             # Mark engine as stopped
             self._engine_state_machine.execute_action(EngineAction.STOP_ENGINE)
-            logger.info(
-                f"TradingEngine STOPPED; strategies stopped={stopped}, "
-                f"brokers disconnected={disconnected_brokers}, "
-                f"event-feed-providers disconnected={disconnected_providers}",
-            )
+            logger.info(f"TradingEngine STOPPED; strategies stopped={stopped}, brokers disconnected={disconnected_brokers}, event-feed-providers disconnected={disconnected_providers}")
         except Exception:
             # Mark engine as failed
             self._engine_state_machine.execute_action(EngineAction.ERROR_OCCURRED)
@@ -578,17 +561,14 @@ class TradingEngine:
         # Check: strategy must be added to this engine
         if strategy not in self._name_strategies_bidict.values():
             raise ValueError(
-                "Cannot call `add_event_feed_for_strategy` because $strategy "
-                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
-                "Add the strategy using `add_strategy` first.",
+                "Cannot call `add_event_feed_for_strategy` because $strategy ({strategy.__class__.__name__}) is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
             )
 
         # Check: feed_name must be unique per strategy
         feeds_dict = self._strategy_feeds_dict[strategy]
         if feed_name in feeds_dict:
             raise ValueError(
-                "Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name "
-                f"('{feed_name}') is already used for this strategy. Choose a different name.",
+                "Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name ('{feed_name}') is already used for this strategy. Choose a different name.",
             )
 
         # Timeline filtering if the strategy already processed events
@@ -615,9 +595,7 @@ class TradingEngine:
         # Check: strategy must be added to this engine
         if strategy not in self._name_strategies_bidict.values():
             raise ValueError(
-                "Cannot call `remove_event_feed_from_strategy` because $strategy "
-                f"({strategy.__class__.__name__}) is not added to this TradingEngine. "
-                "Add the strategy using `add_strategy` first.",
+                "Cannot call `remove_event_feed_from_strategy` because $strategy ({strategy.__class__.__name__}) is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
             )
 
         # Find entry directly
