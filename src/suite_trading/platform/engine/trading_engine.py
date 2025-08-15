@@ -306,8 +306,7 @@ class TradingEngine:
         # Stop all event-feeds for this strategy first
         # Try to stop all feeds even if some fail, then report any errors
         feeds_cleanup_errors = self._cleanup_all_feeds_for_strategy(strategy)
-        for error in feeds_cleanup_errors:
-            logger.error(f"Error during event-feed cleanup for Strategy named '{name}': {error}")
+        # Do not re-log individual errors here; they are already logged with feed + strategy context
 
         try:
             # Now stop the strategy itself
@@ -677,7 +676,8 @@ class TradingEngine:
                 try:
                     event_feed.close()
                 except Exception as e:
-                    logger.error(f"Error closing finished EventFeed named '{feed_name}' in `_cleanup_finished_feeds`: {e}")
+                    strategy_name = self._name_strategies_bidict.inv[strategy]
+                    logger.error(f"Error closing finished EventFeed named '{feed_name}' for Strategy named '{strategy_name}' in `_cleanup_finished_feeds`: {e}")
                 del name_vs_entry[feed_name]
                 strategy_name = self._name_strategies_bidict.inv[strategy]
                 logger.debug(f"Cleaned up finished EventFeed named '{feed_name}' for Strategy named '{strategy_name}'")
@@ -692,7 +692,8 @@ class TradingEngine:
                 feed.close()
                 closed += 1
             except Exception as e:
-                msg = f"Error closing EventFeed named '{name}': {e}"
+                strategy_name = self._name_strategies_bidict.inv[strategy]
+                msg = f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}': {e}"
                 errors.append(msg)
                 logger.error(msg)
         mapping.clear()
