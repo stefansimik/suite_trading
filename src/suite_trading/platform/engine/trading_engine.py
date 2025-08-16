@@ -501,7 +501,7 @@ class TradingEngine:
                     try:
                         callback(oldest_event)
                     except Exception as e:
-                        strategy_name = self._name_strategies_bidict.inv[strategy]
+                        strategy_name = self._get_strategy_name(strategy)
                         logger.error(f"Exception raised during processing event for Strategy named '{strategy_name}'. | Exception: {e}")
                         # Mark strategy as failed
                         strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
@@ -573,7 +573,7 @@ class TradingEngine:
 
         # Register locally
         feeds_dict[feed_name] = FeedCallbackTuple(event_feed, callback)
-        strategy_name = self._name_strategies_bidict.inv[strategy]
+        strategy_name = self._get_strategy_name(strategy)
         logger.info(f"Added EventFeed named '{feed_name}' to Strategy named '{strategy_name}'")
 
     def remove_event_feed_from_strategy(self, strategy: Strategy, feed_name: str) -> None:
@@ -598,7 +598,7 @@ class TradingEngine:
 
         # Handle case where feed doesn't exist (already finished/removed)
         if feed_to_close is None:
-            strategy_name = self._name_strategies_bidict.inv[strategy]
+            strategy_name = self._get_strategy_name(strategy)
             logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished or removed - no action needed")
             return
 
@@ -606,21 +606,31 @@ class TradingEngine:
         try:
             feed_to_close.close()
         except Exception as e:
-            strategy_name = self._name_strategies_bidict.inv[strategy]
+            strategy_name = self._get_strategy_name(strategy)
             logger.error(f"Error closing EventFeed named '{feed_name}' for Strategy named '{strategy_name}': {e}")
 
         # Remove from local registry
         removed = self._strategy_feeds_dict[strategy].pop(feed_name, None)
         if removed is None:
-            strategy_name = self._name_strategies_bidict.inv[strategy]
+            strategy_name = self._get_strategy_name(strategy)
             logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished or removed - no action needed")
         else:
-            strategy_name = self._name_strategies_bidict.inv[strategy]
+            strategy_name = self._get_strategy_name(strategy)
             logger.info(f"Removed EventFeed named '{feed_name}' from Strategy named '{strategy_name}'")
 
     # endregion
 
-    # region EventFeeds Utils
+    # region Lookup utils
+
+    def _get_strategy_name(self, strategy: Strategy) -> str:
+        try:
+            return self._name_strategies_bidict.inv[strategy]
+        except KeyError:
+            raise KeyError(f"Cannot call `_get_strategy_name` because $strategy (class {strategy.__class__.__name__}) is not registered in this TradingEngine")
+
+    # endregion
+
+    # region EventFeeds utils
 
     def _any_active_event_feeds_exist_for_strategy(self, strategy: Strategy):
         strategy_has_at_least_one_active_event_feed = any(not t.feed.is_finished() for t in self._strategy_feeds_dict.get(strategy, {}).values())
@@ -671,10 +681,10 @@ class TradingEngine:
                 try:
                     event_feed.close()
                 except Exception as e:
-                    strategy_name = self._name_strategies_bidict.inv[strategy]
+                    strategy_name = self._get_strategy_name(strategy)
                     logger.error(f"Error closing finished EventFeed named '{feed_name}' for Strategy named '{strategy_name}' in `_cleanup_finished_feeds`: {e}")
                 del name_vs_entry[feed_name]
-                strategy_name = self._name_strategies_bidict.inv[strategy]
+                strategy_name = self._get_strategy_name(strategy)
                 logger.debug(f"Cleaned up finished EventFeed named '{feed_name}' for Strategy named '{strategy_name}'")
 
     def _cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> int:
@@ -689,10 +699,10 @@ class TradingEngine:
                 count_feeds_closed_ok += 1
             except Exception as e:
                 count_feeds_closed_with_exc += 1
-                strategy_name = self._name_strategies_bidict.inv[strategy]
+                strategy_name = self._get_strategy_name(strategy)
                 logger.error(f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}': {e}")
         name_feeds_dict.clear()
-        strategy_name = self._name_strategies_bidict.inv[strategy]
+        strategy_name = self._get_strategy_name(strategy)
         logger.info(f"Cleaned up {count_feeds_closed_ok} EventFeed(s) for Strategy named '{strategy_name}'; errors={count_feeds_closed_with_exc}")
         return count_feeds_closed_with_exc
 
