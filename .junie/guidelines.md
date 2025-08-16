@@ -217,6 +217,33 @@ raise ValueError(f"Cannot call `start_strategy` because $state ('{self.state}') 
 ## 2.9 Markdown formatting
 Keep all Markdown lines (including code) <= 100 chars. Break lines at natural points.
 
+## 2.10 Datetime formatting in `__str__` and `__repr__`
+Rule: If an object includes datetimes in its string representations, they must be formatted
+with utilities from `src/suite_trading/utils/datetime_format.py`.
+
+Why:
+- Consistency across the codebase
+- Predictable, human-readable output
+- Avoids ad-hoc or locale-dependent formatting
+
+Requirements:
+- Use `format_dt(dt)` for a single timestamp
+- Use `format_range(start_dt, end_dt)` for intervals
+
+Canonical example:
+- `Bar.__str__` uses `format_range(start_dt, end_dt)` correctly
+- `Bar.__repr__` is updated to use the same utility for datetimes
+
+Examples:
+```python
+# Single timestamp
+return f"{self.__class__.__name__}(id={self.id}, at={format_dt(self.timestamp)})"
+
+# Range
+dt_str = format_range(self.start_dt, self.end_dt)
+return f"{self.__class__.__name__}({self.kind}, {dt_str})"
+```
+
 # 3. Code organization (supporting)
 
 ## 3.1 Regions
