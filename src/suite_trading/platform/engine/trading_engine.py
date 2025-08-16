@@ -303,19 +303,13 @@ class TradingEngine:
 
         logger.info(f"Stopping Strategy named '{name}'")
 
-        # Stop all event-feeds for this strategy first
-        # Try to stop all feeds even if some fail, then report any errors
-        feeds_cleanup_errors = self._cleanup_all_feeds_for_strategy(strategy)
-        # Do not re-log individual errors here; they are already logged with feed + strategy context
+        # Close feeds first (best effort), then stop the strategy; raise once if there were close errors
+        error_count = self._cleanup_all_feeds_for_strategy(strategy)
 
         try:
-            # Now stop the strategy itself
             strategy.on_stop()
-            # If some error were found (from closing event-feeds), then raise an exception
-            if feeds_cleanup_errors:
-                error_summary = "; ".join(feeds_cleanup_errors)
-                raise RuntimeError(f"Strategy `on_stop` callback succeeded, but event feeds cleanup failed: {error_summary}")
-
+            if error_count > 0:
+                raise RuntimeError(f"Strategy `on_stop` succeeded, but {error_count} EventFeed(s) failed to close for Strategy named '{name}'")
             strategy._state_machine.execute_action(StrategyAction.STOP_STRATEGY)
             logger.debug(f"Strategy named '{name}' transitioned to {strategy.state.name}")
         except Exception as e:
@@ -512,9 +506,10 @@ class TradingEngine:
                         # Mark strategy as failed
                         strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
                         strategy.on_error(e)
-                        # Terminate all feeds for this strategy in case of error
-                        # TODO I don't like this code. Re-evaluate, why we don't need the resulting value
-                        _ = self._cleanup_all_feeds_for_strategy(strategy)
+                        # Terminate all feeds for this strategy in case of error (per-feed errors are already logged)
+                        error_count = self._cleanup_all_feeds_for_strategy(strategy)
+                        if error_count > 0:
+                            logger.debug(f"Closed feeds after on_error callback for Strategy named '{strategy_name}'; errors={error_count}")
 
             # Routine cleanup for finished event-feeds
             self._cleanup_finished_feeds()
@@ -682,24 +677,24 @@ class TradingEngine:
                 strategy_name = self._name_strategies_bidict.inv[strategy]
                 logger.debug(f"Cleaned up finished EventFeed named '{feed_name}' for Strategy named '{strategy_name}'")
 
-    def _cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> List[str]:
-        # Close everything for a strategy; collect errors
-        mapping = self._strategy_feeds_dict[strategy]
-        errors: List[str] = []
-        closed = 0
-        for name, (feed, _) in list(mapping.items()):
+    def _cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> int:
+        count_feeds_closed_with_exc = 0
+        count_feeds_closed_ok = 0
+
+        # Go over all feeds of strategy
+        name_feeds_dict = self._strategy_feeds_dict[strategy]
+        for name, (feed, _) in list(name_feeds_dict.items()):
             try:
                 feed.close()
-                closed += 1
+                count_feeds_closed_ok += 1
             except Exception as e:
+                count_feeds_closed_with_exc += 1
                 strategy_name = self._name_strategies_bidict.inv[strategy]
-                msg = f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}': {e}"
-                errors.append(msg)
-                logger.error(msg)
-        mapping.clear()
+                logger.error(f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}': {e}")
+        name_feeds_dict.clear()
         strategy_name = self._name_strategies_bidict.inv[strategy]
-        logger.info(f"Cleaned up {closed} EventFeed(s) for Strategy named '{strategy_name}'; errors={len(errors)}")
-        return errors
+        logger.info(f"Cleaned up {count_feeds_closed_ok} EventFeed(s) for Strategy named '{strategy_name}'; errors={count_feeds_closed_with_exc}")
+        return count_feeds_closed_with_exc
 
     # endregion
 
