@@ -1,5 +1,3 @@
-# Junie Guidelines
-
 Project: Modern algorithmic trading framework in Python for backtesting and live trading.
 
 # 1. Golden rules and priorities
@@ -21,7 +19,7 @@ allowed; remove or redesign anything to get the design right.
 ## 1.3 User‑centric API design
 Rule: Design APIs for the user, not for internal convenience.
 
-Prefer user‑friendly choices when cost is low, they fit the existing style, and do not add
+Prefer user‑friendly choices when cost is low, they fit the existing style and do not add
 ongoing complexity.
 
 # 2. Code writing rules (critical)
@@ -43,11 +41,8 @@ def calc_pv(pos: list) -> Decimal: ...
 
 ## 2.2 Classes, dataclasses, and named tuples
 Rule: Use standard classes for fundamental domain models. Dataclasses and named tuples are
-allowed for simple config or helper/value objects.
+allowed for simple config or helper/value objects only.
 
-Why:
-- Core domain needs explicit initialization and validation.
-- Dataclasses/named tuples can reduce boilerplate for auxiliary data without hiding intent.
 
 ## 2.3 Parameter formatting
 For long signatures, put one parameter per line, consistent indent, trailing comma.
@@ -79,9 +74,9 @@ Forbidden:
 - `logger.info("Started Strategy '{}'".format(name))`
 - `"Hello, %s" % name`
 
-Identify domain objects by name (instance) vs class (type)
-- When referring to a specific instance: use "ClassName named '{name}'".
-  - Examples: "Strategy named '{strategy_name}'", "EventFeed named '{feed_name}'".
+Identify domain objects in logging messages:
+- When referring to Strategies and EventFeeds, use this type of message:
+  - "Strategy named '{strategy_name}'", "EventFeed named '{feed_name}'".
 - When referring to the concept/type only: use the capitalized class name.
   - Examples: Strategy, EventFeed, Broker, EventFeedProvider.
 - When you must include the class of an instance, make it explicit: "(class {obj.__class__.__name__})".
@@ -102,7 +97,8 @@ Capitalization and terminology
 - Use "event-feed" (hyphenated) for generic prose; use "EventFeed" when referring to the class.
 
 One‑line rule for all logger calls
-- All logger calls must be on a single line, regardless of message length.
+- All logger calls must be on a **single line**, regardless of message length.
+- Do not wrap logger calls; a logger call must be one line even if >100 chars.
 
 Wrong:
 ```python
@@ -116,17 +112,12 @@ Correct:
 logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished")
 ```
 
-
-Length and clarity
-- Do not wrap logger calls; a logger call must be one line even if >100 chars. Prefer concise wording.
-- Prefer concrete, unambiguous wording; avoid pronouns like "it" when a named object exists.
-
 Examples (Do/Don't)
 - Do: `logger.info(f"Started Strategy named '{name}'")`
 - Do: `logger.error(f"Error auto-stopping Strategy named '{name}': {e}")`
 - Do: `logger.debug(f"Cleaned up finished EventFeed named '{feed_name}' for Strategy named '{s}'")`
 - Don't: `logger.info(f"Started strategy '{name}'")`  # wrong casing/pattern
-- Don't: `logger.debug("EventFeed '%s' removed", feed_name)`  # format args
+- Don't: `logger.debug("EventFeed '%s' removed", feed_name)`  # can use only f-strings
 
 ## 2.5 String representation methods
 Rule: Use `self.__class__.__name__` in `__str__` and `__repr__`.
@@ -145,17 +136,16 @@ def __str__(self) -> str:
 ## 2.6 Docstrings (API Documentation)
 **Rule: Docstrings document public APIs for external developers using your code.**
 
-Key principles:
+Key requirement for docstrings:
 - Use Google-style docstrings with purpose, params, returns, exceptions, and types
-- Write in accessible language that any developer can understand
+- Write in accessible language that ANY developer can understand
 - Include all important information, but explain complex concepts simply
 - Make it immediately understandable without additional research
 - When needed, reference related code that provides essential context
 - Use concrete examples when helpful
+.
 
-Focus: Formal documentation for functions, classes, and modules that other developers will use.
-
-## 2.7 Code Comments (Narrative & Defensive)
+## 2.7 Code Comments
 **Rule: Comments explain the "why" and "what" of complex code logic for maintainers.**
 
 ### Purpose
@@ -216,13 +206,12 @@ Exception messages checklist:
 - 100% clear, use project terms, guide the fix.
 - Include function name in backticks.
 - Identify variables with $ and real names; include values when helpful.
+- Message inside Exception must be on a **single line**, regardless of message length.
+- Do not wrap message in exception ; message must be one line even if >999 chars.
 
 Template:
 ```python
-raise ValueError(
-    f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. "
-    f"Call `reset` or create a new Strategy."
-)
+raise ValueError(f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. Call `reset` or create a new Strategy.")
 ```
 
 ## 2.9 Markdown formatting
