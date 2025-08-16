@@ -172,10 +172,9 @@ class Bar:
         Returns:
             str: A detailed string representation.
         """
-        return (
-            f"{self.__class__.__name__}(bar_type={self.bar_type!r}, start_dt={self.start_dt!r}, end_dt={self.end_dt!r}, "
-            f"open={self.open}, high={self.high}, low={self.low}, close={self.close}, volume={self.volume})"
-        )
+        # Use consistent datetime formatting in developer representation
+        _dt = format_range(self.start_dt, self.end_dt)
+        return f"{self.__class__.__name__}(bar_type={self.bar_type!r}, dt={_dt}, open={self.open}, high={self.high}, low={self.low}, close={self.close}, volume={self.volume})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another bar.
@@ -188,13 +187,4 @@ class Bar:
         """
         if not isinstance(other, Bar):
             return False
-        return (
-            self.bar_type == other.bar_type
-            and self.start_dt == other.start_dt
-            and self.end_dt == other.end_dt
-            and self.open == other.open
-            and self.high == other.high
-            and self.low == other.low
-            and self.close == other.close
-            and self.volume == other.volume
-        )
+        return self.bar_type == other.bar_type and self.start_dt == other.start_dt and self.end_dt == other.end_dt and self.open == other.open and self.high == other.high and self.low == other.low and self.close == other.close and self.volume == other.volume

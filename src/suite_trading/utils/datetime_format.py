@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 
 # One place to change the visible UTC indicator
-_UTC_SUFFIX = "Z"  # ISO-8601 Zulu; change to " UTC" if preferred
+_UTC_SUFFIX = "Z"  # Z = ISO-8601 Zulu; change to " UTC" if preferred
 
 
 def is_utc(dt: datetime) -> bool:
