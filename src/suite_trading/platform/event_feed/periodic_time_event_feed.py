@@ -72,6 +72,8 @@ class PeriodicTimeEventFeed:
         Use `peek()` to check readiness and `pop()` to consume. If $end_datetime is set,
         it is inclusive: the tick at exactly $end_datetime may be emitted and then the
         feed is finished. If $end_datetime is None, the feed runs until `close()`.
+        Additionally, when $finish_with_feed is provided, this feed stops producing
+        events as soon as that EventFeed reports `is_finished() is True`.
 
     Args:
         start_datetime (datetime): First scheduled tick (UTC).
@@ -79,6 +81,8 @@ class PeriodicTimeEventFeed:
         end_datetime (datetime | None): Optional inclusive stop time (UTC).
         metadata (dict | None): Optional feed metadata; defaults to
             {"source_event_feed_name": "periodic-time-feed"}.
+        finish_with_feed (EventFeed | None): Another feed to observe; when it finishes,
+            this feed marks itself finished (non‑blocking check in `_check_finished_guard`).
 
     Raises:
         ValueError: If any datetime is not UTC or if $interval is non‑positive.
@@ -90,6 +94,7 @@ class PeriodicTimeEventFeed:
         interval: timedelta,
         end_datetime: Optional[datetime] = None,
         metadata: Optional[dict] = None,
+        finish_with_feed: Optional[EventFeed] = None,
     ) -> None:
         # Check: $start_datetime must be timezone-aware UTC to avoid ambiguous scheduling
         require_utc(start_datetime)
@@ -119,6 +124,7 @@ class PeriodicTimeEventFeed:
         self._next_tick_dt: datetime = start_datetime
 
         self._next_pre_generated_event: Optional[TimeTickEvent] = None
+        self._finish_with_feed: Optional[EventFeed] = finish_with_feed
 
     # region Core helpers
 
@@ -130,9 +136,17 @@ class PeriodicTimeEventFeed:
         """
         if self._closed or self._finished:
             return True
+
+        # Auto-finish this feed - in sync with other feed (if configured).
+        if self._finish_with_feed is not None and self._finish_with_feed.is_finished():
+            self._finished = True
+            return True
+
+        # Auto-finish when next tick exceeds the configured end boundary
         if (self._end_dt is not None) and (self._next_tick_dt > self._end_dt):
             self._finished = True
             return True
+
         return False
 
     # endregion

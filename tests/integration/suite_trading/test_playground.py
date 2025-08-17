@@ -28,6 +28,7 @@ class DemoStrategy(Strategy):
             start_datetime=start_dt_of_demo_bar_event_feed,
             interval=timedelta(seconds=10),
             end_datetime=start_dt_of_demo_bar_event_feed + timedelta(minutes=20),
+            finish_with_feed=bars_feed,
         )
         self.add_event_feed("time_feed", time_feed, self.on_event)
         self.time_feed = time_feed  # Remember feed
@@ -35,9 +36,6 @@ class DemoStrategy(Strategy):
     def on_event(self, event):
         if isinstance(event, NewBarEvent):
             self.on_bar(event.bar, event)
-            # Auto-stop time-feed, when bars-feed is finished
-            if self.bars_feed.is_finished():
-                self.time_feed.close()
         elif isinstance(event, TimeTickEvent):
             logger.debug(f"Received time tick: {event}")
         else:
@@ -45,6 +43,7 @@ class DemoStrategy(Strategy):
 
     def on_bar(self, bar, event: NewBarEvent):
         logger.debug(f"Received bar: {bar}")
+        # Time-feed will auto-finish when bars-feed finishes via $finish_with_feed.
         pass
 
     def on_stop(self):
