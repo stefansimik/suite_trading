@@ -11,16 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class DemoStrategy(Strategy):
-    def __init__(self):
-        super().__init__()
-        self.bars_feed = None
-        self.time_feed = None
-
     def on_start(self):
         # Add data: 1-minute bars (demo data)
         bars_feed: EventFeed = DemoBarEventFeed(num_bars=20)
-        self.add_event_feed("bars_feed", bars_feed, self.on_event)
-        self.bars_feed = bars_feed  # Remember feed
+        self.add_event_feed("bars_feed", bars_feed)
 
         # Add data: Time events each 10 seconds
         start_dt_of_demo_bar_event_feed = bars_feed.peek().bar.end_dt

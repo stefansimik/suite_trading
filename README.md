@@ -31,39 +31,59 @@ uv run pytest
 ```
 
 ### Basic Usage
-
 ```python
+import logging
+from datetime import timedelta
+
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.platform.engine.trading_engine import TradingEngine
-from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.event_feed.demo_bar_event_feed import DemoBarEventFeed
 from suite_trading.platform.event_feed.event_feed import EventFeed
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.platform.event_feed.periodic_time_event_feed import PeriodicTimeEventFeed
+from suite_trading.strategy.strategy import Strategy
 
-# Create a strategy with demo market data
-class MyStrategy(Strategy):
+logger = logging.getLogger(__name__)
+
+
+class DemoStrategy(Strategy):
+    def __init__(self):
+        super().__init__()
+        self.bars_feed = None
+        self.time_feed = None
+
     def on_start(self):
-        # Add market data
-        demo_feed: EventFeed = DemoBarEventFeed(num_bars=20)  # Provides series of bars for testing
-        self.add_event_feed("demo_feed", demo_feed, self.on_event)
+        # Add data: 1-minute bars (demo data)
+        bars_feed: EventFeed = DemoBarEventFeed(num_bars=20)
+        self.add_event_feed("bars_feed", bars_feed, self.on_event)
+        self.bars_feed = bars_feed  # Remember feed
+
+        # Add data: Time events each 10 seconds aligned to bars timeline
+        start_dt = bars_feed.peek().bar.end_dt
+        time_feed: EventFeed = PeriodicTimeEventFeed(
+            start_datetime=start_dt,
+            interval=timedelta(seconds=10),
+            end_datetime=start_dt + timedelta(minutes=20),
+            finish_with_feed=bars_feed,
+        )
+        self.add_event_feed("time_feed", time_feed, self.on_event)
+        self.time_feed = time_feed  # Remember feed
 
     def on_event(self, event):
         if isinstance(event, NewBarEvent):
             self.on_bar(event.bar, event)
         else:
-            print(f"Received event: {event}")
+            logger.debug(f"Received (unhandled) event: {event}")
 
     def on_bar(self, bar, event: NewBarEvent):
-        print(f"Received bar: {bar}")
-        # Your trading logic here
+        logger.debug(f"Received bar: {bar}")
 
     def on_stop(self):
-        print("Strategy stopped!")
+        pass
 
-# Create and configure the trading engine
-engine = TradingEngine()
-engine.add_strategy("my_strategy", MyStrategy())
 
-# Start the engine (demo data will begin flowing)
+# Create and run the trading engine
+engine: TradingEngine = TradingEngine()
+engine.add_strategy("demo_strategy", DemoStrategy())
 engine.start()
 ```
 
