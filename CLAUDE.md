@@ -141,11 +141,11 @@ Applies everywhere: logs, exceptions, messages, general strings.
 
 ```python
 # ✅ Good
-logger.info(f"Started strategy '{strategy_name}'")
+logger.info(f"Started Strategy named '{strategy_name}'")
 
 # ❌ Bad
-logger.info("Started strategy '%s'", strategy_name)
-logger.info("Started strategy '{}'".format(strategy_name))
+logger.info("Started Strategy '%s'", strategy_name)
+logger.info("Started Strategy '{}'".format(strategy_name))
 ```
 
 #### Detailed Logging Standards
@@ -186,8 +186,9 @@ Forbidden:
 - Capitalize domain class names (Strategy, EventFeed, Broker, EventFeedProvider) when used as nouns.
 - Use "event-feed" (hyphenated) for generic prose; use "EventFeed" when referring to the class.
 
-**One-line rule for single-message logs**
-- If the logged message is a single string, keep the whole logger call on one line.
+**One-line rule for all logger calls**
+- All logger calls must be on a single line, regardless of message length.
+- Do not wrap logger calls; a logger call must be one line even if >100 chars.
 
 Wrong:
 ```python
@@ -200,23 +201,6 @@ Correct:
 ```python
 logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished")
 ```
-
-**Implicit concatenation (exception)**
-- Allowed only for multi-part messages with distinct segments, placed on separate lines for
-  readability inside parentheses. Do not split a single message across multiple lines.
-
-Allowed:
-```python
-logger.info(
-    f"TradingEngine STOPPED; strategies stopped={stopped}, "
-    f"brokers disconnected={disconnected_brokers}, "
-    f"event-feed-providers disconnected={disconnected_providers}",
-)
-```
-
-**Length and clarity**
-- Keep each log line <= 100 chars; shorten wording if needed.
-- Prefer concrete, unambiguous wording; avoid pronouns like "it" when a named object exists.
 
 **Examples (Do/Don't)**
 - Do: `logger.info(f"Started Strategy named '{name}'")`
@@ -245,6 +229,29 @@ Use `self.__class__.__name__` for maintainability:
 ```python
 def __str__(self) -> str:
     return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received})"
+```
+
+### Datetime formatting in `__str__` and `__repr__`
+Rule: If an object includes datetimes in its string representations, they must be formatted
+with utilities from `src/suite_trading/utils/datetime_format.py`.
+
+Why:
+- Consistency across the codebase
+- Predictable, human-readable output
+- Avoids ad-hoc or locale-dependent formatting
+
+Requirements:
+- Use `format_dt(dt)` for a single timestamp
+- Use `format_range(start_dt, end_dt)` for intervals
+
+Examples:
+```python
+# Single timestamp
+return f"{self.__class__.__name__}(id={self.id}, at={format_dt(self.timestamp)})"
+
+# Range
+dt_str = format_range(self.start_dt, self.end_dt)
+return f"{self.__class__.__name__}({self.kind}, {dt_str})"
 ```
 
 ### Docstrings (API Documentation)
@@ -326,10 +333,7 @@ Format errors with:
 4. Clear root cause and solution guidance
 
 ```python
-raise ValueError(
-    f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. "
-    f"Call `reset` or create a new Strategy."
-)
+raise ValueError(f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. Call `reset` or create a new Strategy.")
 ```
 
 ### Import and Package Structure
