@@ -213,7 +213,7 @@ Current status (as of 2025-08-18):
 - Ready to try: TradingEngine, Strategy lifecycle, Event model (Bar/TradeTick/QuoteTick),
   EventFeed(s), MessageBus, and demo data feeds (e.g., DemoBarEventFeed).
 - Not yet available: EventFeedProvider(s) for live/historical integrations, Broker(s),
-  advanced order types, performance analytics.
+  advanced order types, indicators, performance analytics.
 
 **Completed:**
 - ✅ Complete event-driven architecture with chronological processing
@@ -230,7 +230,8 @@ Current status (as of 2025-08-18):
 2. **Broker(s)** ❌ — Live order execution with multiple brokers + SimulatedBroker (simulated
    execution, positions, portfolio)
 3. **Advanced order types** ❌ — Stop-loss, take-profit, bracket orders
-4. **Performance analytics** ❌ — Strategy performance metrics and reporting
+4. **Indicators library** ❌ — Built-in technical indicators (SMA, EMA, RSI, MACD); composable API
+5. **Performance analytics** ❌ — Strategy performance metrics and reporting
 
 ## License
 
