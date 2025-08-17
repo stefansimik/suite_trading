@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Union
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.utils.datetime_format import format_dt
+from suite_trading.utils.datetime_utils import format_dt
 
 
 class QuoteTick:
@@ -117,10 +117,7 @@ class QuoteTick:
         Returns:
             str: A detailed string representation.
         """
-        return (
-            f"{self.__class__.__name__}(instrument={self.instrument!r}, bid_price={self.bid_price}, ask_price={self.ask_price}, "
-            f"bid_volume={self.bid_volume}, ask_volume={self.ask_volume}, timestamp={self.timestamp!r})"
-        )
+        return f"{self.__class__.__name__}(instrument={self.instrument!r}, bid_price={self.bid_price}, ask_price={self.ask_price}, bid_volume={self.bid_volume}, ask_volume={self.ask_volume}, timestamp={self.timestamp!r})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another quote tick.
@@ -133,11 +130,4 @@ class QuoteTick:
         """
         if not isinstance(other, QuoteTick):
             return False
-        return (
-            self.instrument == other.instrument
-            and self.bid_price == other.bid_price
-            and self.ask_price == other.ask_price
-            and self.bid_volume == other.bid_volume
-            and self.ask_volume == other.ask_volume
-            and self.timestamp == other.timestamp
-        )
+        return self.instrument == other.instrument and self.bid_price == other.bid_price and self.ask_price == other.ask_price and self.bid_volume == other.bid_volume and self.ask_volume == other.ask_volume and self.timestamp == other.timestamp

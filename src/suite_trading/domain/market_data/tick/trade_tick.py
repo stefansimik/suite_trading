@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Union
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.utils.datetime_format import format_dt
+from suite_trading.utils.datetime_utils import format_dt
 
 
 class TradeTick:

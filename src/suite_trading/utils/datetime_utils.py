@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, tzinfo
 
 # One place to change the visible UTC indicator
 _UTC_SUFFIX = "Z"  # Z = ISO-8601 Zulu; change to " UTC" if preferred
@@ -33,6 +33,96 @@ def require_utc(dt: datetime) -> None:
     """
     if not is_utc(dt):
         raise ValueError(f"$dt ('{dt}') is not timezone-aware UTC.")
+
+
+# region UTC creation and conversion
+
+
+def utc_now() -> datetime:
+    """Return the current time as a timezone-aware UTC datetime.
+
+    Returns:
+        datetime: A datetime with tzinfo == UTC.
+    """
+    return datetime.now(timezone.utc)
+
+
+def utc_from_timestamp(ts: float | int) -> datetime:
+    """Create an aware UTC datetime from a UNIX timestamp.
+
+    Args:
+        ts (float | int): Seconds since epoch.
+
+    Returns:
+        datetime: A datetime with tzinfo == UTC.
+    """
+    return datetime.fromtimestamp(float(ts), tz=timezone.utc)
+
+
+def make_utc(
+    year: int,
+    month: int,
+    day: int,
+    hour: int = 0,
+    minute: int = 0,
+    second: int = 0,
+    microsecond: int = 0,
+) -> datetime:
+    """Construct a timezone-aware UTC datetime from components.
+
+    Args:
+        year (int): Year.
+        month (int): Month.
+        day (int): Day.
+        hour (int, optional): Hour. Defaults to 0.
+        minute (int, optional): Minute. Defaults to 0.
+        second (int, optional): Second. Defaults to 0.
+        microsecond (int, optional): Microsecond. Defaults to 0.
+
+    Returns:
+        datetime: A datetime with tzinfo == UTC.
+    """
+    return datetime(
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        microsecond,
+        tzinfo=timezone.utc,
+    )
+
+
+def to_utc(dt: datetime, *, naive_tz: tzinfo | None = None) -> datetime:
+    """Convert $dt to timezone-aware UTC.
+
+    Behavior:
+    - If $dt is aware: converted via `astimezone(UTC)`.
+    - If $dt is naive and $naive_tz is None: raises ValueError (fail fast).
+    - If $dt is naive and $naive_tz is provided: attaches $naive_tz, then converts to UTC.
+
+    Args:
+        dt (datetime): The datetime to convert.
+        naive_tz (tzinfo | None, optional): Timezone to assume for naive $dt.
+
+    Returns:
+        datetime: A datetime with tzinfo == UTC.
+
+    Raises:
+        ValueError: If $dt is naive and $naive_tz is None.
+    """
+    if dt.tzinfo is None:
+        if naive_tz is None:
+            raise ValueError(f"Cannot call `to_utc` because $dt ('{dt}') is naive and $naive_tz is None. Pass a timezone via $naive_tz or provide an aware datetime.")
+        dt = dt.replace(tzinfo=naive_tz)
+    return dt.astimezone(timezone.utc)
+
+
+# endregion
+
+
+# region Formatting
 
 
 def _round_to_milliseconds(dt: datetime) -> tuple[datetime, int]:
@@ -78,14 +168,6 @@ def format_dt(dt: datetime) -> str:
 
     Raises:
         ValueError: If $dt is not timezone-aware UTC.
-
-    Examples:
-        >>> format_dt(datetime(2024, 1, 2, 3, 4, 0, tzinfo=timezone.utc))
-        '2024-01-02 03:04Z'
-        >>> format_dt(datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc))
-        '2024-01-02 03:04:05Z'
-        >>> format_dt(datetime(2024, 1, 2, 3, 4, 5, 123456, tzinfo=timezone.utc))
-        '2024-01-02 03:04:05.123Z'
     """
     require_utc(dt)
 
@@ -122,18 +204,6 @@ def format_range(start: datetime, end: datetime) -> str:
 
     Raises:
         ValueError: If $start or $end is not timezone-aware UTC, or if $end < $start.
-
-    Examples:
-        >>> format_range(
-        ...     datetime(2024, 1, 2, 3, 4, 0, tzinfo=timezone.utc),
-        ...     datetime(2024, 1, 2, 3, 9, 0, tzinfo=timezone.utc),
-        ... )
-        '2024-01-02 03:04-03:09Z'
-        >>> format_range(
-        ...     datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc),
-        ...     datetime(2024, 1, 2, 3, 6, 7, tzinfo=timezone.utc),
-        ... )
-        '2024-01-02 03:04:05-03:06:07Z'
     """
 
     # Check: both datetimes must be UTC + have to be chronologically ordered
@@ -182,3 +252,6 @@ def format_range(start: datetime, end: datetime) -> str:
         return f"{start_date} {start_time}-{end_time}{_UTC_SUFFIX}"
     else:
         return f"{start_date} {start_time}-{end_date} {end_time}{_UTC_SUFFIX}"
+
+
+# endregion
