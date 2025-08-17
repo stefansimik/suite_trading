@@ -76,9 +76,9 @@ class PeriodicTimeEventFeed:
         events as soon as that EventFeed reports `is_finished() is True`.
 
     Args:
-        start_datetime (datetime): First scheduled tick (UTC).
+        start_dt (datetime): First scheduled tick (UTC).
         interval (timedelta): Positive interval between ticks (> 0).
-        end_datetime (datetime | None): Optional inclusive stop time (UTC).
+        end_dt (datetime | None): Optional inclusive stop time (UTC).
         metadata (dict | None): Optional feed metadata; defaults to
             {"source_event_feed_name": "periodic-time-feed"}.
         finish_with_feed (EventFeed | None): Another feed to observe; when it finishes,
@@ -90,14 +90,14 @@ class PeriodicTimeEventFeed:
 
     def __init__(
         self,
-        start_datetime: datetime,
+        start_dt: datetime,
         interval: timedelta,
-        end_datetime: Optional[datetime] = None,
+        end_dt: Optional[datetime] = None,
         metadata: Optional[dict] = None,
         finish_with_feed: Optional[EventFeed] = None,
     ) -> None:
         # Check: $start_datetime must be timezone-aware UTC to avoid ambiguous scheduling
-        require_utc(start_datetime)
+        require_utc(start_dt)
 
         # Check: $interval must be a timedelta to enforce an unambiguous schedule unit
         if not isinstance(interval, timedelta):
@@ -108,23 +108,23 @@ class PeriodicTimeEventFeed:
             raise ValueError("Cannot call `PeriodicTimeEventFeed.__init__` because $interval is non-positive.")
 
         # Check: $end_datetime (when provided) must be UTC and >= $start_datetime
-        if end_datetime is not None:
-            require_utc(end_datetime)
-            if end_datetime < start_datetime:
+        if end_dt is not None:
+            require_utc(end_dt)
+            if end_dt < start_dt:
                 raise ValueError("Cannot call `PeriodicTimeEventFeed.__init__` because $end_datetime < $start_datetime.")
 
+        # Copy input params
+        self._start_dt: datetime = start_dt
+        self._interval: timedelta = interval
+        self._end_dt: Optional[datetime] = end_dt
+        self._metadata: Optional[dict] = metadata
+        self._finish_with_feed: Optional[EventFeed] = finish_with_feed
+
         # Internal state
+        self._next_tick_dt: datetime = start_dt
+        self._next_event: Optional[TimeTickEvent] = None
         self._closed: bool = False
         self._finished: bool = False
-        self._metadata: Optional[dict] = metadata
-        self._interval: timedelta = interval
-
-        self._start_dt: datetime = start_datetime
-        self._end_dt: Optional[datetime] = end_datetime
-        self._next_tick_dt: datetime = start_datetime
-
-        self._next_pre_generated_event: Optional[TimeTickEvent] = None
-        self._finish_with_feed: Optional[EventFeed] = finish_with_feed
 
     # region Core helpers
 
@@ -165,8 +165,8 @@ class PeriodicTimeEventFeed:
         if self._check_finished_guard():
             return None
 
-        if self._next_pre_generated_event is not None:
-            return self._next_pre_generated_event
+        if self._next_event is not None:
+            return self._next_event
 
         # Generate events on-the-fly when wall-clock reaches $next_tick; never pre-buffer
         now = datetime.now(timezone.utc)
@@ -174,9 +174,9 @@ class PeriodicTimeEventFeed:
             return None
 
         # Generate next event
-        self._next_pre_generated_event = TimeTickEvent(dt_event=self._next_tick_dt, dt_received=self._next_tick_dt, metadata=self._metadata)
+        self._next_event = TimeTickEvent(dt_event=self._next_tick_dt, dt_received=self._next_tick_dt, metadata=self._metadata)
 
-        return self._next_pre_generated_event
+        return self._next_event
 
     def pop(self) -> Optional[Event]:
         """Return the next event and advance the schedule, or None if not ready.
@@ -195,7 +195,7 @@ class PeriodicTimeEventFeed:
             return None
 
         # Consume cached event and advance schedule
-        self._next_pre_generated_event = None
+        self._next_event = None
         self._next_tick_dt = self._next_tick_dt + self._interval
 
         # Mark feed as finished, if beyond end_dt
@@ -225,7 +225,7 @@ class PeriodicTimeEventFeed:
 
     def close(self) -> None:
         """Release resources used by this feed (idempotent, non-blocking)."""
-        self._next_pre_generated_event = None
+        self._next_event = None
         self._finished = True
         self._closed = True
 
@@ -250,7 +250,7 @@ class PeriodicTimeEventFeed:
         if self._end_dt is not None and cutoff_time > self._end_dt:
             # Jumping beyond the configured range finishes the feed immediately
             self._finished = True
-            self._next_pre_generated_event = None
+            self._next_event = None
             return
 
         if self._next_tick_dt >= cutoff_time:
@@ -262,7 +262,7 @@ class PeriodicTimeEventFeed:
         steps_float = delta.total_seconds() / step_s
         steps = int(steps_float) if steps_float.is_integer() else int(steps_float) + 1
         self._next_tick_dt = self._next_tick_dt + steps * self._interval
-        self._next_pre_generated_event = None
+        self._next_event = None
 
         if self._end_dt is not None and self._next_tick_dt > self._end_dt:
             self._finished = True
