@@ -2,7 +2,8 @@
 
 **S**imple, **U**nderstandable, **I**ntuitive **T**rading **E**ngine
 
-> ⚠️ **Work in Progress**: This project is in active development (~60-70% complete). Core event-driven architecture and strategy framework are implemented.
+> ⚠️ **Work in Progress** (as of 2025-08-18): This project is in active development (~60-70%
+> complete). Core event-driven architecture and strategy framework are implemented.
 
 ## Overview
 
@@ -12,7 +13,7 @@ SUITE Trading is a modern algorithmic trading framework built on **event-driven 
 
 ### Requirements
 
-- Python 3.13+
+- Python 3.13.x (exact)
 - Dependencies managed via `uv` (see `pyproject.toml`)
 
 ### Installation
@@ -86,7 +87,7 @@ engine.start()
 
 SUITE Trading uses an **event-driven architecture**.
 
-- All market data flows through timestamped `Event` objects into `Strategy` callbacks (default `on_event()` method`).
+- All market data flows through timestamped `Event` objects into `Strategy` callbacks (default `on_event()` method).
 - Each `Strategy` runs in isolation from other strategies
 - Each `Strategy` processes own events in chronological order (sorted by `Event.dt_event`) and maintains its own timeline
 - Source of events for each strategy is an `EventFeed`. One strategy can have multiple `EventFeed`s.
@@ -100,13 +101,15 @@ SUITE Trading uses an **event-driven architecture**.
 
 ### Core Components
 
-- `TradingEngine`: Central coordinator managing strategies, event feeds, and brokers
-- `Strategy`: Base class with independent timeline and universal `on_event()` method
-- `EventFeed`: Serves as generic convenience factories for EventFeeds.
-- `EventFeedProvider`: Provides chronologically ordered event streams for backtesting and live data.
-- `Event`: Base class for all data (Bar, TradeTick, QuoteTick) with chronological sorting
-- `MessageBus`: Topic-based routing system with wildcard pattern support (`bar::EURUSD@FOREX::5-MINUTE::LAST`)
-- `Domain models`: Complete financial object hierarchy (Instruments, Orders, Money, etc.)
+- `TradingEngine`: Central coordinator that manages Strategy(ies), EventFeed(s), and broker(s).
+- `Strategy`: Base class with an independent timeline and a universal `on_event()` method.
+- `EventFeed`: Strategy-attached data source that delivers chronologically ordered events to a
+  Strategy, optionally applying timeline filters. It can consume one or more EventFeedProvider(s).
+- `EventFeedProvider`: Producer of chronologically ordered event streams (historical or live).
+- `Event`: Base class for all market data (Bar, TradeTick, QuoteTick) with chronological sorting.
+- `MessageBus`: Topic-based routing system with wildcard patterns
+  (`bar::EURUSD@FOREX::5-MINUTE::LAST`).
+- `Domain models`: Financial object hierarchy (Instruments, Orders, Money, etc.).
 
 ### Data Flow
 
@@ -116,12 +119,12 @@ SUITE Trading provides **three main data flow paths** for different use cases:
 2. Broker integration
 3. MessageBus
 
-**1. EventFeed** - Universal event source for strategies
+**1. EventFeed** — Strategy-attached event source
 ```
 EventFeed produces Events → which are delivered to Strategy.on_event()
 ```
 
-**2. Broker integration** - Order execution
+**2. Broker integration** — Order execution
 ```
 Strategy → generates Orders → Broker (Live / Simulated) → publish ExecutionEvent
 ```
@@ -129,7 +132,7 @@ Strategy → generates Orders → Broker (Live / Simulated) → publish Executio
 - Order state management and fill event processing
 - Position and portfolio tracking
 
-**3. MessageBus** - Publish / subscribe event delivery
+**3. MessageBus** — Publish/subscribe event delivery
 ```
 Publishers → MessageBus Topics → Subscribers → Event Handlers
 ```
@@ -171,6 +174,9 @@ uv run pytest tests/integration/suite_trading/test_playground.py
 uv run pytest tests/integration/suite_trading/test_playground.py --log-cli-level=DEBUG
 ```
 
+Tip: See an end-to-end runnable example under tests:
+- `tests/integration/suite_trading/test_playground.py`
+
 **Available log levels:** `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 
 ## Project Status
@@ -178,6 +184,12 @@ uv run pytest tests/integration/suite_trading/test_playground.py --log-cli-level
 This project is in **active development** with approximately **60-70% of core functionality** implemented.
 
 ### Development status & roadmap
+
+Current status (as of 2025-08-18):
+- Ready to try: TradingEngine, Strategy lifecycle, Event model (Bar/TradeTick/QuoteTick),
+  EventFeed(s), MessageBus, and demo data feeds (e.g., DemoBarEventFeed).
+- Not yet available: EventFeedProvider(s) for live/historical integrations, Broker(s),
+  advanced order types, performance analytics.
 
 **Completed:**
 - ✅ Complete event-driven architecture with chronological processing
@@ -190,10 +202,11 @@ This project is in **active development** with approximately **60-70% of core fu
 - ✅ Market data events (Bar, TradeTick, QuoteTick) with proper event wrappers
 
 **Next Priority (Roadmap):**
-1. **EventFeedProvider(s)** ❌ - Real-time market data integration
-2. **Broker(s)** ❌ - Live order execution with multiple brokers + SimulatedBroker (with simulated execution, positions and portfolio)
-3. **Advanced order types** ❌ - Stop-loss, take-profit, bracket orders
-4. **Performance analytics** ❌ - Strategy performance metrics and reporting
+1. **EventFeedProvider(s)** ❌ — Real-time market data integration
+2. **Broker(s)** ❌ — Live order execution with multiple brokers + SimulatedBroker (simulated
+   execution, positions, portfolio)
+3. **Advanced order types** ❌ — Stop-loss, take-profit, bracket orders
+4. **Performance analytics** ❌ — Strategy performance metrics and reporting
 
 ## License
 
