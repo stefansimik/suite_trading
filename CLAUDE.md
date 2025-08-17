@@ -224,10 +224,13 @@ def __init__(
 ```
 
 ### String Representation Methods
-Use `self.__class__.__name__` for maintainability:
+Use `self.__class__.__name__` in both `__str__` and `__repr__` for maintainability:
 
 ```python
 def __str__(self) -> str:
+    return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received})"
+
+def __repr__(self) -> str:
     return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received})"
 ```
 
@@ -243,6 +246,10 @@ Why:
 Requirements:
 - Use `format_dt(dt)` for a single timestamp
 - Use `format_range(start_dt, end_dt)` for intervals
+
+Canonical example:
+- `Bar.__str__` uses `format_range(start_dt, end_dt)` correctly
+- `Bar.__repr__` is updated to use the same utility for datetimes
 
 Examples:
 ```python
@@ -326,11 +333,12 @@ Code references across contexts:
 Focus: Complete internal code commenting strategy with universal formatting standards.
 
 ### Exception Messages
-Format errors with:
-1. Function name in backticks: `` `function_name` ``
-2. Variables with `$` prefix: `$market_data_provider`
-3. Actual values when helpful: `f"$state ('{self.state}')"`
-4. Clear root cause and solution guidance
+Checklist:
+- Message inside Exception must be on a single line, regardless of message length.
+- Do not wrap message in exception; keep it as a single line even if >999 chars.
+- Include function name in backticks: `` `function_name` ``.
+- Identify variables with `$` and real names; include values when helpful.
+- Be 100% clear, use project terms, and guide the fix.
 
 ```python
 raise ValueError(f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. Call `reset` or create a new Strategy.")
@@ -352,6 +360,9 @@ from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading import TradingEngine
 from suite_trading.domain import Bar
 ```
+
+#### Import hygiene
+- After changes, remove unused imports and add missing ones.
 
 #### Package Structure
 - Only create `__init__.py` files for executable code (version info, imports)
