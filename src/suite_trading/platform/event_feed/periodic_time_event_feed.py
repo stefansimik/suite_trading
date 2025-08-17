@@ -150,12 +150,13 @@ class PeriodicTimeEventFeed:
         """
         if self._check_finished_guard():
             return None
+
         if self._next_pre_generated_event is not None:
             return self._next_pre_generated_event
 
         # Generate events on-the-fly when wall-clock reaches $next_tick; never pre-buffer
         now = datetime.now(timezone.utc)
-        if now < self._next_tick_dt:
+        if now < self._next_tick_dt:  # Not yet time for next tick
             return None
 
         # Generate next event
@@ -174,6 +175,7 @@ class PeriodicTimeEventFeed:
         """
         if self._check_finished_guard():
             return None
+
         event = self.peek()
         if event is None:
             return None
@@ -213,33 +215,32 @@ class PeriodicTimeEventFeed:
         self._finished = True
         self._closed = True
 
-    def remove_events_before(self, cutoff_time: datetime) -> int:
+    def remove_events_before(self, cutoff_time: datetime) -> None:
         """Advance internal schedule to the first tick >= $cutoff_time.
 
-        This function does not remove buffered items (we never buffer), so it always returns 0.
         For bounded feeds with an inclusive $end_datetime, advancing beyond the end marks the
         feed finished.
 
         Args:
             cutoff_time (datetime): Events with dt_event before this time will be skipped (UTC).
 
-        Returns:
-            int: Always 0 (no buffered events are removed).
-
         Raises:
             ValueError: If $cutoff_time is not timezone-aware UTC.
         """
         # Check: $cutoff_time must be timezone-aware UTC to preserve consistent ordering
         require_utc(cutoff_time)
+
         if self._closed or self._finished:
-            return 0
+            return
+
         if self._end_dt is not None and cutoff_time > self._end_dt:
             # Jumping beyond the configured range finishes the feed immediately
             self._finished = True
             self._next_pre_generated_event = None
-            return 0
+            return
+
         if self._next_tick_dt >= cutoff_time:
-            return 0
+            return
 
         # Compute how many intervals to jump, rounding up to reach first tick >= $cutoff_time
         delta = cutoff_time - self._next_tick_dt
@@ -251,15 +252,14 @@ class PeriodicTimeEventFeed:
 
         if self._end_dt is not None and self._next_tick_dt > self._end_dt:
             self._finished = True
-        return 0
 
     # endregion
 
     # region String representations
     def __str__(self) -> str:
         if self._end_dt is not None:
-            rng = format_range(self._start_dt, self._end_dt)
-            return f"{self.__class__.__name__}(range={rng}, interval={self._interval}, next_tick={format_dt(self._next_tick_dt)}, finished={self._finished}, closed={self._closed})"
+            start_end_range_str = format_range(self._start_dt, self._end_dt)
+            return f"{self.__class__.__name__}(range={start_end_range_str}, interval={self._interval}, next_tick={format_dt(self._next_tick_dt)}, finished={self._finished}, closed={self._closed})"
         return f"{self.__class__.__name__}(start={format_dt(self._start_dt)}, interval={self._interval}, next_tick={format_dt(self._next_tick_dt)}, finished={self._finished}, closed={self._closed})"
 
     def __repr__(self) -> str:

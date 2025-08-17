@@ -62,7 +62,7 @@ class EventFeed(Protocol):
         """
         ...
 
-    def remove_events_before(self, cutoff_time: datetime) -> int:
+    def remove_events_before(self, cutoff_time: datetime) -> None:
         """Remove all events before $cutoff_time from this event feed.
 
         Why this matters:
@@ -84,10 +84,7 @@ class EventFeed(Protocol):
 
         Args:
             cutoff_time: Events with dt_event before this time will be removed from the feed.
-                        This is typically the strategy's current timeline position.
-
-        Returns:
-            int: Number of events that were removed from the feed.
+                This is typically the strategy's current timeline position.
 
         Raises:
             Exception: Implementations should raise on unexpected errors during filtering.

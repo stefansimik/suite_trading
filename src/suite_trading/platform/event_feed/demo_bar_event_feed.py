@@ -4,8 +4,10 @@ from __future__ import annotations
 # Uses a deque to store remaining events; pop() pops from the left.
 
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Callable, Deque, Optional
+
+from suite_trading.utils.datetime_utils import require_utc
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
@@ -107,39 +109,26 @@ class DemoBarEventFeed:
         self._events.clear()
         self._closed = True
 
-    def remove_events_before(self, cutoff_time: datetime) -> int:
+    def remove_events_before(self, cutoff_time: datetime) -> None:
         """Remove all events before $cutoff_time from this event feed.
-         That means all events meeting following condition: event.dt_event < cutoff_time
+
+        That means all events meeting the condition: event.dt_event < $cutoff_time.
 
         Args:
             cutoff_time: Events with dt_event before this time will be removed.
-
-        Returns:
-            Number of events removed from the remaining queue.
 
         Raises:
             ValueError: If $cutoff_time is not timezone-aware UTC.
         """
         # Check: $cutoff_time must be timezone-aware UTC
-        if cutoff_time.tzinfo is None or cutoff_time.tzinfo.utcoffset(cutoff_time) is None:
-            raise ValueError(
-                "Cannot call `DemoBarEventFeed.remove_events_before` because $cutoff_time is not timezone-aware. Use UTC-aware datetime.",
-            )
-        if cutoff_time.tzinfo != timezone.utc:
-            raise ValueError(
-                "Cannot call `DemoBarEventFeed.remove_events_before` because $cutoff_time "
-                f"has tzinfo ('{cutoff_time.tzinfo}') not equal to UTC. Use UTC.",
-            )
+        require_utc(cutoff_time)
 
         if self._closed or not self._events:
-            return 0
+            return
 
-        removed = 0
         # Remove from the front while events are older than cutoff
         while self._events and self._events[0].dt_event < cutoff_time:
             self._events.popleft()
-            removed += 1
-        return removed
 
     # endregion
 

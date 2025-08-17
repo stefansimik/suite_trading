@@ -567,9 +567,7 @@ class TradingEngine:
 
         # Timeline filtering if the strategy already processed events
         if strategy.last_event_time is not None:
-            removed_count = event_feed.remove_events_before(strategy.last_event_time)
-            if removed_count > 0:
-                logger.info(f"Filtered {removed_count} obsolete events before {strategy.last_event_time} to keep timeline")
+            event_feed.remove_events_before(strategy.last_event_time)
 
         # Register locally
         feeds_dict[feed_name] = FeedCallbackTuple(event_feed, callback)
