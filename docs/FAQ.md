@@ -25,11 +25,15 @@ ideas and workflows, not code. Lines are wrapped to keep text readable.
 - Where the data is stored is entirely up to the feed. For CSV, data lives in the file on
   disk and is read (streamed or preloaded) by the EventFeed. For other sources, it could be
   a database, an API, or a message bus.
+- An official, generic CsvFileEventFeed is planned (see ROADMAP Phase 0) to provide this out
+  of the box.
 
 ## How are bar time intervals defined? Do bars overlap?
 
 - Bars use a left-closed, right-closed interval: [start_dt, end_dt], both endpoints
   inclusive. A bar ends exactly at its end_dt.
+- Boundary rule: a tick with timestamp exactly equal to end_dt belongs to that closing bar
+  and never to the next bar. No tick should ever be included in two bars.
 - The framework does not force contiguous bars. Time gaps are allowed when your data source
   has gaps (for example, no trading activity or missing sessions).
 - To prevent overlap, construct consecutive bars so that the next bar starts strictly after
