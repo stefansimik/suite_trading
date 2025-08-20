@@ -109,6 +109,10 @@ engine.start()
 
 ## Architecture
 
+Additional docs:
+- FAQ: docs/FAQ.md
+- Bar interval convention: docs/bar-time-intervals.md
+
 SUITE Trading uses an **event-driven architecture**.
 
 - All market data flows through timestamped `Event` objects into `Strategy` callbacks (default `on_event()` method).
