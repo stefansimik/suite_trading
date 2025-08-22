@@ -20,13 +20,12 @@ ideas and workflows, not code. Lines are wrapped to keep text readable.
 
 ## Can I load bars from CSV? Where does the data live?
 
-- Yes. Build an EventFeed that reads CSV rows and emits bar events. The framework is
-  intentionally generic: you bring your own data via a feed.
-- Where the data is stored is entirely up to the feed. For CSV, data lives in the file on
-  disk and is read (streamed or preloaded) by the EventFeed. For other sources, it could be
-  a database, an API, or a message bus.
-- An official, generic CsvFileEventFeed is planned (see ROADMAP Phase 0) to provide this out
-  of the box.
+- Yes. Load your CSV into a pandas DataFrame with columns: start_dt, end_dt, open, high, low,
+  close (volume optional). Ensure the DataFrame is sorted by end_dt (ascending). Then create
+  BarsFromDataFrameEventFeed(df, bar_type) to stream NewBarEvent into your Strategy.
+- Example in test: `uv run pytest tests/unit/suite_trading/platform/event_feed/bars_from_csv/test_bars_fom_csv.py`
+- The framework is intentionally generic: you bring your own data via an EventFeed. You can
+  adapt any source (CSV, database, API) as long as you construct the required DataFrame.
 
 ## How are bar time intervals defined? Do bars overlap?
 
