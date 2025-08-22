@@ -188,19 +188,13 @@ Events are processed sequentially within each strategy's timeline:
 
 The project includes comprehensive test configuration with built-in logging support. Test logging is configured in `[tool.pytest.ini_options]` section of `pyproject.toml`.
 
-```bash
-# Run all tests with default INFO-level logging
-uv run pytest
+| Scenario                                 | Command                                                                             |
+|:-----------------------------------------|:------------------------------------------------------------------------------------|
+| Run all tests (default INFO logging)     | `uv run pytest`                                                                     |
+| Run a specific test file                 | `uv run pytest tests/integration/suite_trading/test_playground.py`                  |
+| Run a specific test function from a file | `uv run pytest tests/integration/suite_trading/test_playground.py::test_basic_flow` |
 
-# Run tests with DEBUG-level logging for detailed output
-uv run pytest --log-cli-level=DEBUG
-
-# Run specific test file
-uv run pytest tests/integration/suite_trading/test_playground.py
-
-# Run specific test with DEBUG logging
-uv run pytest tests/integration/suite_trading/test_playground.py --log-cli-level=DEBUG
-```
+Note: You can append `--log-cli-level=DEBUG` to any command above to override the logging level.
 
 Tip: See an end-to-end runnable example under tests:
 - `tests/integration/suite_trading/test_playground.py`
