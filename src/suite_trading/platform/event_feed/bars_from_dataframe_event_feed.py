@@ -4,7 +4,7 @@ from __future__ import annotations
 # Keeps an index pointer and a cached next event for efficient peek/pop.
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Callable
 import logging
 
 import pandas as pd
@@ -67,6 +67,9 @@ class BarsFromDataFrameEventFeed:
         self._row_index_of_next_event: int = 0
         self._next_bar_event: Optional[Event] = None
 
+        # Listeners (notified on each consumed event)
+        self._listeners: dict[str, Callable[[Event], None]] = {}
+
     # endregion
 
     # region Internal helpers
@@ -107,6 +110,28 @@ class BarsFromDataFrameEventFeed:
         self._next_bar_event = self._build_event_from_row(row)
         return self._next_bar_event
 
+    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
+        """Register $listener under $key. Called after each successful `pop`.
+
+        Raises:
+            ValueError: If $key is empty or already registered.
+        """
+        if not key:
+            raise ValueError("Cannot call `add_listener` because $key is empty")
+        if key in self._listeners:
+            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
+        self._listeners[key] = listener
+
+    def remove_listener(self, key: str) -> None:
+        """Unregister listener under $key.
+
+        Raises:
+            ValueError: If $key is unknown.
+        """
+        if key not in self._listeners:
+            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
+        del self._listeners[key]
+
     def pop(self) -> Optional[Event]:
         """Return the next event and advance the feed, or None if none is ready."""
         event = self.peek()
@@ -115,6 +140,13 @@ class BarsFromDataFrameEventFeed:
         # Consume the cached event + advance the row pointer
         self._next_bar_event = None
         self._row_index_of_next_event += 1
+        # Notify listeners (catch/log and continue)
+        if self._listeners:
+            for k, fn in list(self._listeners.items()):
+                try:
+                    fn(event)
+                except Exception as e:
+                    logger.error(f"Error in listener '{k}' for BarsFromDataFrameEventFeed: {e}")
         return event
 
     def is_finished(self) -> bool:

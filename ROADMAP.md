@@ -2,22 +2,19 @@
 
 A clean, high-level plan for initial development. Phases are intentionally small and focused.
 
+
+
+## Phase 0 — Generic CSVFileEventFeed - ✅ DONE
+
+This was implemented by class: BarsFromDataFrameEventFeed.
+
 ## Phase 1 — Bar aggregation
 
-Goal: Create BarAggregatorEventFeed that consumes another EventFeed (emitting NewBarEvent) and
-produces aggregated BarEvent(s).
-
-Strategy must receive:
-- Aggregated bars (e.g., 5-min bar)
-- Individual source bars used to build the aggregate (e.g., original 1‑min bars)
-
-Design options to evaluate:
-- Connect both feeds via a MessageBus
-- Instruct the original 1‑min feed to forward/copy individual bars to the aggregator
-- Do aggregation inside Strategy (no BarAggregatorEventFeed)
-
-Success criteria:
-- Simple, generic, intuitive architecture that is easy to extend
+- MinuteBarAggregationEventFeed - Review
+- Implement other aggregators
+  - HourBarAggregationEventFeed
+  - DayBarAggregationEventFeed
+  - VolumeBarAggregationEventFeed
 
 ---
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections import deque
 from datetime import datetime
 from typing import Callable, Deque, Optional
+import logging
 
 from suite_trading.utils.datetime_utils import require_utc
 
@@ -17,6 +18,9 @@ from suite_trading.utils.data_generation.bars import (
     DEFAULT_FIRST_BAR,
 )
 from suite_trading.utils.data_generation.price_patterns import zig_zag_function
+
+
+logger = logging.getLogger(__name__)
 
 
 class DemoBarEventFeed:
@@ -64,13 +68,16 @@ class DemoBarEventFeed:
         # Wrap bars into events; dt_received equals dt_event for deterministic historical data
         self._events: Deque[NewBarEvent] = deque(
             NewBarEvent(
-                bar=b,
-                dt_received=b.end_dt,
+                bar=bar,
+                dt_received=bar.end_dt,
                 is_historical=True,
                 metadata=self._metadata,
             )
-            for b in bars
+            for bar in bars
         )
+
+        # Listeners (notified on each consumed event)
+        self._listeners: dict[str, Callable[[Event], None]] = {}
 
     # endregion
 
@@ -82,11 +89,47 @@ class DemoBarEventFeed:
             return None
         return self._events[0]
 
+    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
+        """Register $listener under $key. Called after each successful `pop`.
+
+        Raises:
+            ValueError: If $key is empty or already registered.
+        """
+        if not key:
+            raise ValueError("Cannot call `add_listener` because $key is empty")
+        if key in self._listeners:
+            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
+
+        self._listeners[key] = listener
+
+    def remove_listener(self, key: str) -> None:
+        """Unregister listener under $key.
+
+        Raises:
+            ValueError: If $key is unknown.
+        """
+        if key not in self._listeners:
+            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
+
+        del self._listeners[key]
+
     def pop(self) -> Optional[Event]:
         """Return the next event and advance the feed, or None if none is ready."""
         if self._closed or not self._events:
             return None
-        return self._events.popleft()
+
+        # Consume event
+        event = self._events.popleft()
+
+        # Notify listeners
+        if self._listeners:
+            for k, fn in list(self._listeners.items()):
+                try:
+                    fn(event)
+                except Exception as e:
+                    logger.error(f"Error in listener '{k}' for DemoBarEventFeed: {e}")
+
+        return event
 
     def next(self) -> Optional[Event]:
         """Deprecated: use pop(). Temporary shim for compatibility."""
@@ -133,6 +176,7 @@ class DemoBarEventFeed:
     # endregion
 
     # region String representations
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(remaining={len(self._events)}, closed={self._closed})"
 

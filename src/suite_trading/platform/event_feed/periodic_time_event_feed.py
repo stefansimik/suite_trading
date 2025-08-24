@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Callable
+import logging
 
 from suite_trading.domain.event import Event
 from suite_trading.platform.event_feed.event_feed import EventFeed  # noqa: F401 (protocol reference)
 from suite_trading.utils.datetime_utils import require_utc, format_dt, format_range
+
+
+logger = logging.getLogger(__name__)
 
 
 class TimeTickEvent(Event):
@@ -126,6 +130,9 @@ class PeriodicTimeEventFeed:
         self._closed: bool = False
         self._finished: bool = False
 
+        # Listeners (notified on each consumed event)
+        self._listeners: dict[str, Callable[[Event], None]] = {}
+
     # region Core helpers
 
     def _check_finished_guard(self) -> bool:
@@ -202,6 +209,14 @@ class PeriodicTimeEventFeed:
         if self._end_dt is not None and self._next_tick_dt > self._end_dt:
             self._finished = True
 
+        # Notify listeners (catch/log and continue)
+        if self._listeners:
+            for k, fn in list(self._listeners.items()):
+                try:
+                    fn(event)
+                except Exception as e:
+                    logger.error(f"Error in listener '{k}' for PeriodicTimeEventFeed: {e}")
+
         return event
 
     def is_finished(self) -> bool:
@@ -213,6 +228,39 @@ class PeriodicTimeEventFeed:
             bool: Finished state flag.
         """
         return self._finished or self._closed
+
+    # region Observe consumption
+
+    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
+        """Register $listener under $key. Called after each successful `pop`.
+
+        Args:
+            key: Unique, non-empty identifier for this listener.
+            listener: Callable that accepts the consumed Event.
+
+        Raises:
+            ValueError: If $key is empty or already registered.
+        """
+        if not key:
+            raise ValueError("Cannot call `add_listener` because $key is empty")
+        if key in self._listeners:
+            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
+        self._listeners[key] = listener
+
+    def remove_listener(self, key: str) -> None:
+        """Unregister listener under $key.
+
+        Args:
+            key: Identifier of the listener to remove.
+
+        Raises:
+            ValueError: If $key is unknown.
+        """
+        if key not in self._listeners:
+            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
+        del self._listeners[key]
+
+    # endregion
 
     @property
     def metadata(self) -> Optional[dict]:
