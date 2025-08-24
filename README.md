@@ -191,8 +191,8 @@ The project includes comprehensive test configuration with built-in logging supp
 | Scenario                                 | Command                                                                             |
 |:-----------------------------------------|:------------------------------------------------------------------------------------|
 | Run all tests (default INFO logging)     | `uv run pytest`                                                                     |
-| Run a specific test file                 | `uv run pytest tests/integration/suite_trading/test_playground.py`                  |
-| Run a specific test function from a file | `uv run pytest tests/integration/suite_trading/test_playground.py::test_basic_flow` |
+| Run a specific test file                 | `uv run pytest tests/test_basic_flow.py`                                            |
+| Run a specific test function from a file | `uv run pytest tests/test_basic_flow.py::test_basic_flow` |
 
 Note: You can append `--log-cli-level=DEBUG` to any command above to override the logging level.
 
