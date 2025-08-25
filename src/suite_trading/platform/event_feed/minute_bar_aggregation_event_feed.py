@@ -137,6 +137,7 @@ class MinuteBarAggregationEventFeed:
         # First partial window policy tracking
         self._saw_first_window: bool = False
         self._emitted_first_window: bool = False
+        self._first_window_is_partial: Optional[bool] = None
 
         # Closed flag
         self._closed: bool = False
@@ -170,8 +171,17 @@ class MinuteBarAggregationEventFeed:
         # Align to right-closed N-minute window (no empty-window emission policy)
         window_start, window_end = self._align_right_closed_window(bar.end_dt)
 
+        # Capture whether first window is being initialized now
+        is_first_init = self._window_end is None
+
         # Roll window if needed (finalizes current and starts a new accumulator)
         self._roll_window_if_needed(window_start, window_end)
+
+        # If initializing the first window, decide if it is partial or full
+        if is_first_init:
+            # _src_minutes is set in _ensure_target_bar_type; safe after first bar
+            expected_first_end = window_start + timedelta(minutes=self._src_minutes)  # type: ignore[arg-type]
+            self._first_window_is_partial = bar.end_dt != expected_first_end
 
         # Accumulate current bar
         self._acc.add(bar)
@@ -182,7 +192,7 @@ class MinuteBarAggregationEventFeed:
 
         # Check: if bar ends exactly at window_end, finalize now
         if self._window_end is not None and bar.end_dt == self._window_end:
-            self._finalize_current_window(allow_first_partial=self._emit_first_partial)
+            self._finalize_current_window(allow_first_partial=False)
             # Prepare next window anchor; accumulator restarts upon next bar
             self._acc.start(self._window_end)
             self._window_end = self._window_end + timedelta(minutes=self._window_minutes)
@@ -318,7 +328,7 @@ class MinuteBarAggregationEventFeed:
             return
         # Check: if we moved to a later window, finalize current before switching
         if window_end > self._window_end:
-            self._finalize_current_window(allow_first_partial=self._emit_first_partial)
+            self._finalize_current_window(allow_first_partial=False)
             self._acc.start(window_start)
             self._window_end = window_end
 
@@ -399,7 +409,9 @@ class MinuteBarAggregationEventFeed:
             return
 
         is_first = self._saw_first_window and not self._emitted_first_window
-        if is_first and not allow_first_partial:
+        is_first_partial = bool(self._first_window_is_partial) if is_first else False
+        # Skip only if first window is truly partial and policy forbids it
+        if is_first and is_first_partial and not allow_first_partial:
             self._emitted_first_window = True
             return
 
