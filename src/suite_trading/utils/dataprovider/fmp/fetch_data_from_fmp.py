@@ -310,5 +310,5 @@ def bulk_load(_period: str, _symbol: str,
 
 # main call
 result = bulk_load(_period=PERIOD, _symbol=SYMBOL, from_date=FROM_DT, to_date=TO_DT)
-path = write_bars_to_csv(result, PERIOD, f"{CSV_OUTPUT_PATH}/bars_{SYMBOL}_{FROM_DT}_{TO_DT}.csv")
+path = write_bars_to_csv(result, PERIOD, f"{CSV_OUTPUT_PATH}/bars_{SYMBOL}_{PERIOD}_{FROM_DT}_{TO_DT}.csv")
 print (path)
