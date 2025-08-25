@@ -100,7 +100,7 @@ class BarsFromDataFrameEventFeed:
         self._row_index_of_next_event: int = 0
         self._next_bar_event: Optional[Event] = None
 
-        # Listeners (notified on each consumed event)
+        # Listeners of this event-feed (in case some other objects needs to be notified about consumed/popped events)
         self._listeners: dict[str, Callable[[Event], None]] = {}
 
     # endregion

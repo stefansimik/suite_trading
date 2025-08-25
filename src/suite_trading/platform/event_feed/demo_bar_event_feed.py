@@ -73,7 +73,7 @@ class DemoBarEventFeed:
             for bar in bars
         )
 
-        # Listeners (notified on each consumed event)
+        # Listeners of this event-feed (in case some other objects needs to be notified about consumed/popped events)
         self._listeners: dict[str, Callable[[Event], None]] = {}
 
     # endregion
