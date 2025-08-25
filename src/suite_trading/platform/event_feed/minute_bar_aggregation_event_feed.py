@@ -116,10 +116,7 @@ class MinuteBarAggregationEventFeed:
         self._emit_first_partial: bool = emit_first_partial
 
         # Auto-generated listener key
-        self._listener_key: str = f"minute-agg-{window_minutes}m-{id(self)}"
-
-        # Auto-generated listener key: Class + Instrument + Window + id
-        self._listener_key: str = f"{self.__class__.__name__}-{source_feed._bar_type.instrument}-{window_minutes}m-{id(self):x}"
+        self._listener_key: str = f"minute-agg-{window_minutes}m-{id(self):x}"
 
         # Output queue
         self._queue: Deque[NewBarEvent] = deque()
