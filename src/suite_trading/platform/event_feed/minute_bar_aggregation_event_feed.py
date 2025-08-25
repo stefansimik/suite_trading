@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import datetime, timedelta
-from decimal import Decimal
 from typing import Callable, Deque, Optional
 import logging
-from dataclasses import dataclass
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
@@ -13,65 +11,12 @@ from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.utils.datetime_utils import require_utc, format_dt
+from suite_trading.domain.market_data.bar.ohlcv_accumulator import OhlcvAccumulator
 
 
 logger = logging.getLogger(__name__)
 
 MINUTES_PER_DAY = 24 * 60  # Improves readability of window validations
-
-
-@dataclass
-class Accumulator:
-    """Collect O/H/L/C/Volume across a window and build an aggregated Bar."""
-
-    start_dt: Optional[datetime] = None
-    open: Optional[Decimal] = None
-    high: Optional[Decimal] = None
-    low: Optional[Decimal] = None
-    close: Optional[Decimal] = None
-    volume: Decimal = Decimal("0")
-
-    def start(self, start_dt: datetime) -> None:
-        # Reset values for a new window starting at $start_dt
-        self.start_dt = start_dt
-        self.open = None
-        self.high = None
-        self.low = None
-        self.close = None
-        self.volume = Decimal("0")
-
-    def add(self, bar: Bar) -> None:
-        # If first bar -> set initial values
-        if self.open is None:
-            # Set initial OHLC prices
-            self.open = bar.open
-            self.high = bar.high
-            self.low = bar.low
-            self.close = bar.close
-        else:
-            # If non-first bar -> update OHLC prices
-            self.high = bar.high if bar.high > self.high else self.high
-            self.low = bar.low if bar.low < self.low else self.low
-            self.close = bar.close
-
-        # Accumulate volume
-        if bar.volume is not None:
-            self.volume += bar.volume
-
-    def is_empty(self) -> bool:
-        return self.open is None
-
-    def to_aggregated_bar(self, bar_type: BarType, end_dt: datetime) -> Bar:
-        return Bar(
-            bar_type=bar_type,
-            start_dt=self.start_dt,  # type: ignore[arg-type]
-            end_dt=end_dt,
-            open=self.open,  # type: ignore[arg-type]
-            high=self.high,  # type: ignore[arg-type]
-            low=self.low,  # type: ignore[arg-type]
-            close=self.close,  # type: ignore[arg-type]
-            volume=self.volume,
-        )
 
 
 class MinuteBarAggregationEventFeed:
@@ -103,6 +48,10 @@ class MinuteBarAggregationEventFeed:
             raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes ('{window_minutes}') does not evenly divide a day; require {MINUTES_PER_DAY} % window_minutes == 0.")
 
         self._window_minutes = window_minutes
+        # Source feed reference and optional per-event callback
+        self._source = source_feed
+        self._callback: Optional[Callable[[Event], None]] = None
+        self._emit_first_partial: bool = bool(emit_first_partial)
 
         # Auto-generated listener key
         self._listener_key: str = f"minute-agg-{window_minutes}m-{id(self):x}"
@@ -115,7 +64,7 @@ class MinuteBarAggregationEventFeed:
 
         # Accumulator state for the current window
         self._window_end: Optional[datetime] = None
-        self._acc: Accumulator = Accumulator()
+        self._acc: OhlcvAccumulator = OhlcvAccumulator()
         self._last_dt_received: Optional[datetime] = None
         self._last_is_historical: Optional[bool] = None
 
@@ -183,7 +132,7 @@ class MinuteBarAggregationEventFeed:
         if self._window_end is not None and bar.end_dt == self._window_end:
             self._finalize_current_window(allow_first_partial=False)
             # Prepare next window anchor; accumulator restarts upon next bar
-            self._acc.start(self._window_end)
+            self._acc.start_window(self._window_end)
             self._window_end = self._window_end + timedelta(minutes=self._window_minutes)
 
     # endregion
@@ -293,7 +242,7 @@ class MinuteBarAggregationEventFeed:
         # If current window already ended before/equal cutoff, drop accumulator; also mark first window emitted
         if self._window_end is not None and self._window_end <= cutoff_time:
             # Replace accumulator with a fresh one to drop partial state
-            self._acc = Accumulator()
+            self._acc = OhlcvAccumulator()
             self._last_dt_received = None
             self._last_is_historical = None
             if not self._emitted_first_window and self._saw_first_window:
@@ -312,13 +261,13 @@ class MinuteBarAggregationEventFeed:
         # Check: first window initialization
         if self._window_end is None:
             self._window_end = window_end
-            self._acc.start(window_start)
+            self._acc.start_window(window_start)
             self._saw_first_window = True
             return
         # Check: if we moved to a later window, finalize current before switching
         if window_end > self._window_end:
             self._finalize_current_window(allow_first_partial=False)
-            self._acc.start(window_start)
+            self._acc.start_window(window_start)
             self._window_end = window_end
 
     def _ensure_target_bar_type(self, bar_type: BarType) -> None:
@@ -394,7 +343,7 @@ class MinuteBarAggregationEventFeed:
                 is allowed to emit. If False, the first window is marked as emitted
                 without producing an event.
         """
-        if self._window_end is None or self._acc.is_empty():
+        if self._window_end is None or not self._acc.has_data():
             return
 
         is_first = self._saw_first_window and not self._emitted_first_window
@@ -405,7 +354,7 @@ class MinuteBarAggregationEventFeed:
             return
 
         # Build Bar and NewBarEvent using accumulator
-        aggregated_bar = self._acc.to_aggregated_bar(self._target_bar_type, self._window_end)  # type: ignore[arg-type]
+        aggregated_bar = self._acc.build_bar(self._target_bar_type, self._window_end)  # type: ignore[arg-type]
         dt_recv, is_hist = self._select_event_attrs()
         require_utc(dt_recv)
         aggregated_event = NewBarEvent(bar=aggregated_bar, dt_received=dt_recv, is_historical=is_hist)
@@ -427,7 +376,7 @@ class MinuteBarAggregationEventFeed:
         if context == "finish" and not self._source.is_finished():
             return
         # Check: only emit when we have a non-empty accumulator and a window end
-        if self._window_end is not None and not self._acc.is_empty():
+        if self._window_end is not None and self._acc.has_data():
             self._finalize_current_window(allow_first_partial=True)
 
     # endregion
