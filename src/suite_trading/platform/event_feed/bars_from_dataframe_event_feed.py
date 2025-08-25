@@ -26,20 +26,30 @@ class BarsFromDataFrameEventFeed:
 
     Input DataFrame has to meet these requirements:
     - Columns: start_dt, end_dt, open, high, low, close. Optional: volume.
-    - Sorting: $end_dt must be monotonic non-decreasing (ascending; ties allowed).
+    - Sorting: $end_dt should be monotonic non-decreasing (ascending; ties allowed). If not,
+      by default the feed will auto-sort by 'end_dt' (set $auto_sort=False to require pre-sorted data).
     - Validation: `Bar` performs domain checks (UTC tz-awareness, ranges, invariants). If data
       violates domain rules, `Bar` raises when events are built.
     """
 
     # region Init
 
-    def __init__(self, df: pd.DataFrame, bar_type: BarType, metadata: Optional[dict] = None) -> None:
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        bar_type: BarType,
+        metadata: Optional[dict] = None,
+        auto_sort: bool = True,
+    ) -> None:
         """Initialize the feed.
 
         Args:
         - $df (pd.DataFrame): Source data with one row per bar. See class docstring for DataFrame requirements.
         - $bar_type (BarType): Identifies instrument, timeframe, and price type for all bars.
         - $metadata (dict | None): Optional metadata attached to each emitted `NewBarEvent`.
+        - $auto_sort (bool): When True (default), automatically sort $df by 'end_dt' ascending if
+          it is not already monotonic non-decreasing. The input DataFrame is not mutated; a sorted
+          copy is used internally.
         """
 
         # Check: $df must be a pandas DataFrame
@@ -54,9 +64,14 @@ class BarsFromDataFrameEventFeed:
             raise ValueError(f"The provided DataFrame is missing required columns: {missing_cols}. Please ensure your DataFrame contains these columns: start_dt, end_dt, open, high, low, close. The 'volume' column is optional.")
 
         # Check: $end_dt must be sorted ascending (monotonic non-decreasing)
-        end_dt = df["end_dt"]
-        if not end_dt.is_monotonic_increasing:
-            raise ValueError("The DataFrame must be sorted by the 'end_dt' column in ascending order. Please sort your DataFrame by 'end_dt' before creating the event feed. You can use: df.sort_values('end_dt')")
+        end_dt_series = df["end_dt"]
+        if not end_dt_series.is_monotonic_increasing:
+            if auto_sort:
+                # Use a stable sort to preserve order of ties.
+                df = df.sort_values("end_dt", kind="stable").reset_index(drop=True)
+                logger.debug("Auto-sorted DataFrame by 'end_dt' for BarsFromDataFrameEventFeed")
+            else:
+                raise ValueError("Input DataFrame contains bars that are not in chronological order. Data must be sorted by the 'end_dt' column in ascending order. Solution: Please sort your DataFrame by 'end_dt' before creating the event feed, e.g., df.sort_values('end_dt').")
 
         # Copies of constructor params
         self._df: pd.DataFrame = df
