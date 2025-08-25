@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Union
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.utils.datetime_utils import format_dt, require_utc
+from suite_trading.utils.datetime_utils import format_dt, expect_utc
 
 
 class TradeTick:
@@ -31,17 +31,13 @@ class TradeTick:
         Raises:
             ValueError: If trade tick data is invalid.
         """
-        # Store instrument and timestamp
+        # Store instrument and timestamp (validate while assigning)
         self._instrument = instrument
-        self._timestamp = timestamp
+        self._timestamp = expect_utc(timestamp)
 
         # Explicit type conversion
         self._price = Decimal(str(price))
         self._volume = Decimal(str(volume))
-
-        # Explicit validation
-        # Ensure timestamp is strictly UTC (no conversion here)
-        require_utc(self._timestamp)
 
         # Validate volume
         if self._volume <= 0:

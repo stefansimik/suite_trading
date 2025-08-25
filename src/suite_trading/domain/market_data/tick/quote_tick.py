@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Union
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.utils.datetime_utils import format_dt, require_utc
+from suite_trading.utils.datetime_utils import format_dt, expect_utc
 
 
 class QuoteTick:
@@ -45,17 +45,13 @@ class QuoteTick:
         """
         # Store instrument and timestamp
         self._instrument = instrument
-        self._timestamp = timestamp
+        self._timestamp = expect_utc(timestamp)
 
         # Explicit type conversion
         self._bid_price = Decimal(str(bid_price))
         self._ask_price = Decimal(str(ask_price))
         self._bid_volume = Decimal(str(bid_volume))
         self._ask_volume = Decimal(str(ask_volume))
-
-        # Explicit validation
-        # Ensure timestamp is strictly UTC (no conversion here)
-        require_utc(self._timestamp)
 
         # Validate volumes
         if self._bid_volume <= 0:

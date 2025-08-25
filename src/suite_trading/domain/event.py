@@ -2,7 +2,7 @@ from abc import ABC
 from datetime import datetime
 from typing import Optional
 
-from suite_trading.utils.datetime_utils import require_utc
+from suite_trading.utils.datetime_utils import expect_utc
 
 
 class Event(ABC):
@@ -17,10 +17,8 @@ class Event(ABC):
 
     def __init__(self, dt_event: datetime, dt_received: datetime, metadata: Optional[dict] = None) -> None:
         # Check: enforce UTC invariants at the boundary for all events
-        require_utc(dt_event)
-        require_utc(dt_received)
-        self._dt_event: datetime = dt_event
-        self._dt_received: datetime = dt_received
+        self._dt_event: datetime = expect_utc(dt_event)
+        self._dt_received: datetime = expect_utc(dt_received)
         self._metadata: Optional[dict] = dict(metadata) if metadata is not None else None
 
     @property

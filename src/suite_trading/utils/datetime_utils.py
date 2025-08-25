@@ -35,6 +35,25 @@ def require_utc(dt: datetime) -> None:
         raise ValueError(f"$dt ('{dt}') is not timezone-aware UTC.")
 
 
+def expect_utc(dt: datetime) -> datetime:
+    """Validate that $dt is timezone-aware UTC and return it.
+
+    This is an assignment-friendly validator: use when you want to both check and
+    pass the validated datetime along in a single expression.
+
+    Args:
+        dt (datetime): The datetime to validate.
+
+    Returns:
+        datetime: The same $dt, guaranteed to be timezone-aware UTC.
+
+    Raises:
+        ValueError: If $dt is not timezone-aware UTC.
+    """
+    require_utc(dt)
+    return dt
+
+
 # region UTC creation and conversion
 
 

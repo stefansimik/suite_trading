@@ -6,7 +6,7 @@ from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.utils.datetime_utils import format_range, require_utc
+from suite_trading.utils.datetime_utils import format_range, expect_utc
 
 
 class Bar:
@@ -63,8 +63,8 @@ class Bar:
         """
         # Store bar_type and datetime values
         self._bar_type = bar_type
-        self._start_dt = start_dt
-        self._end_dt = end_dt
+        self._start_dt = expect_utc(start_dt)
+        self._end_dt = expect_utc(end_dt)
 
         # Explicit type conversion for prices
         self._open = Decimal(str(open))
@@ -72,11 +72,6 @@ class Bar:
         self._low = Decimal(str(low))
         self._close = Decimal(str(close))
         self._volume = Decimal(str(volume)) if volume is not None else None
-
-        # Explicit validation
-        # Ensure datetimes are strictly UTC (no conversion here)
-        require_utc(self._start_dt)
-        require_utc(self._end_dt)
 
         # Ensure end_dt is after start_dt
         if self._end_dt <= self._start_dt:

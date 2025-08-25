@@ -71,13 +71,13 @@ class BarsFromDataFrameEventFeed:
         # Normalize to UTC for 'start_dt' and 'end_dt' columns
         for col in ("start_dt", "end_dt"):
             s = df[col]
-            if pd.api.types.is_datetime64tz_dtype(s):
-                # tz-aware
+            # If tz-aware datetimes
+            if isinstance(s.dtype, pd.DatetimeTZDtype):
                 if str(s.dt.tz) != "UTC":
                     df[col] = s.dt.tz_convert("UTC")
                     logger.debug(f"Converted column '{col}' to UTC in BarsFromDataFrameEventFeed")
+            # if naive datetime
             else:
-                # naive datetime
                 if source_tz is None:
                     raise ValueError("Cannot call `BarsFromDataFrameEventFeed.__init__` because column $" + col + " is naive; provide $source_tz to localize before conversion to UTC")
                 df[col] = s.dt.tz_localize(source_tz).dt.tz_convert("UTC")
