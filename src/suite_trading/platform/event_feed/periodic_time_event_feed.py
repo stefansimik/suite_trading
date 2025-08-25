@@ -40,13 +40,7 @@ class TimeTickEvent(Event):
         Raises:
             ValueError: If any datetime is not timezone-aware UTC.
         """
-        # Check: $dt_event must be UTC; the schedule is defined strictly in UTC
-        require_utc(dt_event)
-        # Check: $dt_received must be UTC; we store actual arrival time in consistent timezone
-        require_utc(dt_received)
-        super().__init__(metadata)
-        self._dt_event = dt_event
-        self._dt_received = dt_received
+        super().__init__(dt_event=dt_event, dt_received=dt_received, metadata=metadata)
 
     @property
     def dt_event(self) -> datetime:

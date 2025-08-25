@@ -33,9 +33,9 @@ class NewBarEvent(Event):
             metadata: Optional metadata (e.g., {'source_event_feed_name': 'feed-A'}). Use None or
                 empty dict when absent.
         """
-        super().__init__(metadata)
+        # dt_event for bar events equals the bar end timestamp by definition
+        super().__init__(dt_event=bar.end_dt, dt_received=dt_received, metadata=metadata)
         self._bar = bar
-        self._dt_received = dt_received
         self._is_historical = is_historical
 
     @property

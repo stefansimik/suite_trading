@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Union
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.utils.datetime_utils import format_dt
+from suite_trading.utils.datetime_utils import format_dt, require_utc
 
 
 class TradeTick:
@@ -40,9 +40,8 @@ class TradeTick:
         self._volume = Decimal(str(volume))
 
         # Explicit validation
-        # Ensure timestamp is timezone-aware
-        if self._timestamp.tzinfo is None:
-            raise ValueError(f"$timestamp must be timezone-aware, but provided value is: {self._timestamp}")
+        # Ensure timestamp is strictly UTC (no conversion here)
+        require_utc(self._timestamp)
 
         # Validate volume
         if self._volume <= 0:

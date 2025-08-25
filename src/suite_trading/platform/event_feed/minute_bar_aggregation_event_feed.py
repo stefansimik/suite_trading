@@ -416,6 +416,7 @@ class MinuteBarAggregationEventFeed:
         # Build Bar and NewBarEvent using accumulator
         aggregated_bar = self._acc.to_bar(self._target_bar_type, self._window_end)  # type: ignore[arg-type]
         dt_recv, is_hist = self._select_event_attrs()
+        require_utc(dt_recv)
         aggregated_event = NewBarEvent(bar=aggregated_bar, dt_received=dt_recv, is_historical=is_hist, metadata=self._metadata)
         self._queue.append(aggregated_event)
 

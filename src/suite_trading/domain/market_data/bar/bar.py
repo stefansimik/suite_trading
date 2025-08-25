@@ -6,7 +6,7 @@ from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.utils.datetime_utils import format_range
+from suite_trading.utils.datetime_utils import format_range, require_utc
 
 
 class Bar:
@@ -74,11 +74,9 @@ class Bar:
         self._volume = Decimal(str(volume)) if volume is not None else None
 
         # Explicit validation
-        # Ensure datetimes are timezone-aware
-        if self._start_dt.tzinfo is None:
-            raise ValueError(f"$start_dt must be timezone-aware, but provided value is: {self._start_dt}")
-        if self._end_dt.tzinfo is None:
-            raise ValueError(f"$end_dt must be timezone-aware, but provided value is: {self._end_dt}")
+        # Ensure datetimes are strictly UTC (no conversion here)
+        require_utc(self._start_dt)
+        require_utc(self._end_dt)
 
         # Ensure end_dt is after start_dt
         if self._end_dt <= self._start_dt:

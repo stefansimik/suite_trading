@@ -3,7 +3,7 @@ from __future__ import annotations
 # BarsFromDataFrameEventFeed: Stream historical bars from an in-memory pandas DataFrame.
 # Keeps an index pointer and a cached next event for efficient peek/pop.
 
-from datetime import datetime
+from datetime import datetime, tzinfo
 from typing import Optional, Callable
 import logging
 
@@ -40,6 +40,7 @@ class BarsFromDataFrameEventFeed:
         bar_type: BarType,
         metadata: Optional[dict] = None,
         auto_sort: bool = True,
+        source_tz: Optional[str | tzinfo] = None,
     ) -> None:
         """Initialize the feed.
 
@@ -50,6 +51,10 @@ class BarsFromDataFrameEventFeed:
         - $auto_sort (bool): When True (default), automatically sort $df by 'end_dt' ascending if
           it is not already monotonic non-decreasing. The input DataFrame is not mutated; a sorted
           copy is used internally.
+        - $source_tz (str | tzinfo | None): Used only when 'start_dt'/'end_dt' are naive. The
+          columns will be localized to $source_tz and converted to UTC. If datetimes are tz-aware
+          and not UTC, they are converted to UTC automatically. If datetimes are naive and
+          $source_tz is None, a ValueError is raised.
         """
 
         # Check: $df must be a pandas DataFrame
@@ -62,6 +67,21 @@ class BarsFromDataFrameEventFeed:
         if missing:
             missing_cols = ", ".join(sorted(missing))
             raise ValueError(f"The provided DataFrame is missing required columns: {missing_cols}. Please ensure your DataFrame contains these columns: start_dt, end_dt, open, high, low, close. The 'volume' column is optional.")
+
+        # Normalize to UTC for 'start_dt' and 'end_dt' columns
+        for col in ("start_dt", "end_dt"):
+            s = df[col]
+            if pd.api.types.is_datetime64tz_dtype(s):
+                # tz-aware
+                if str(s.dt.tz) != "UTC":
+                    df[col] = s.dt.tz_convert("UTC")
+                    logger.debug(f"Converted column '{col}' to UTC in BarsFromDataFrameEventFeed")
+            else:
+                # naive datetime
+                if source_tz is None:
+                    raise ValueError("Cannot call `BarsFromDataFrameEventFeed.__init__` because column $" + col + " is naive; provide $source_tz to localize before conversion to UTC")
+                df[col] = s.dt.tz_localize(source_tz).dt.tz_convert("UTC")
+                logger.debug(f"Localized column '{col}' from '{source_tz}' and converted to UTC in BarsFromDataFrameEventFeed")
 
         # Check: $end_dt must be sorted ascending (monotonic non-decreasing)
         end_dt_series = df["end_dt"]
