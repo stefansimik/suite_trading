@@ -93,7 +93,6 @@ class MinuteBarAggregationEventFeed:
         *,  # Forces next params are only keyword args
         emit_first_partial: bool = False,
         callback: Optional[Callable[[Event], None]] = None,
-        metadata: Optional[dict] = None,
     ) -> None:
         """Initialize the aggregator.
 
@@ -114,7 +113,6 @@ class MinuteBarAggregationEventFeed:
         self._source: EventFeed = source_feed
         self._window_minutes: int = window_minutes
         self._callback: Optional[Callable[[Event], None]] = callback
-        self._metadata: Optional[dict] = metadata
         self._emit_first_partial: bool = emit_first_partial
 
         # Auto-generated listener key
@@ -256,11 +254,6 @@ class MinuteBarAggregationEventFeed:
         del self._listeners[key]
 
     # endregion
-
-    @property
-    def metadata(self) -> Optional[dict]:
-        """Optional metadata describing this feed."""
-        return self._metadata
 
     @property
     def window_minutes(self) -> int:
@@ -417,7 +410,7 @@ class MinuteBarAggregationEventFeed:
         aggregated_bar = self._acc.to_bar(self._target_bar_type, self._window_end)  # type: ignore[arg-type]
         dt_recv, is_hist = self._select_event_attrs()
         require_utc(dt_recv)
-        aggregated_event = NewBarEvent(bar=aggregated_bar, dt_received=dt_recv, is_historical=is_hist, metadata=self._metadata)
+        aggregated_event = NewBarEvent(bar=aggregated_bar, dt_received=dt_recv, is_historical=is_hist)
         self._queue.append(aggregated_event)
 
         if is_first:
@@ -451,6 +444,6 @@ class MinuteBarAggregationEventFeed:
     def __repr__(self) -> str:
         queued_count = len(self._queue)
         end_str = format_dt(self._window_end) if self._window_end else "None"
-        return f"{self.__class__.__name__}(window_minutes={self._window_minutes!r}, listener_key={self._listener_key!r}, current_window_end={end_str!r}, queued={queued_count!r}, metadata={self._metadata!r})"
+        return f"{self.__class__.__name__}(window_minutes={self._window_minutes!r}, listener_key={self._listener_key!r}, current_window_end={end_str!r}, queued={queued_count!r})"
 
     # endregion

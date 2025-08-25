@@ -38,7 +38,6 @@ class BarsFromDataFrameEventFeed:
         self,
         df: pd.DataFrame,
         bar_type: BarType,
-        metadata: Optional[dict] = None,
         auto_sort: bool = True,
         source_tz: Optional[str | tzinfo] = None,
     ) -> None:
@@ -96,7 +95,6 @@ class BarsFromDataFrameEventFeed:
         # Copies of constructor params
         self._df: pd.DataFrame = df
         self._bar_type = bar_type
-        self._metadata: Optional[dict] = metadata
 
         # Internal state
         self._row_index_of_next_event: int = 0
@@ -125,7 +123,7 @@ class BarsFromDataFrameEventFeed:
             volume=row["volume"] if "volume" in row.index else None,
         )
         # For historical data, set dt_received equal to dt_event (bar end)
-        event = NewBarEvent(bar=bar, dt_received=row["end_dt"], is_historical=True, metadata=self._metadata)
+        event = NewBarEvent(bar=bar, dt_received=row["end_dt"], is_historical=True)
         return event
 
     # endregion
@@ -196,11 +194,6 @@ class BarsFromDataFrameEventFeed:
         row_index_is_at_end_of_dataframe = self._row_index_of_next_event >= len(self._df)
         return row_index_is_at_end_of_dataframe
 
-    @property
-    def metadata(self) -> Optional[dict]:
-        """Optional metadata describing this feed."""
-        return self._metadata
-
     def close(self) -> None:
         """Release resources used by this feed. Idempotent and non-blocking."""
         # Idempotent: safe to call multiple times
@@ -238,6 +231,6 @@ class BarsFromDataFrameEventFeed:
 
     def __repr__(self) -> str:
         total_rows = len(self._df) if self._df is not None else 0
-        return f"{self.__class__.__name__}(bar_type={self._bar_type}, rows={total_rows}, next_index={self._row_index_of_next_event}, metadata={self._metadata!r})"
+        return f"{self.__class__.__name__}(bar_type={self._bar_type}, rows={total_rows}, next_index={self._row_index_of_next_event})"
 
     # endregion

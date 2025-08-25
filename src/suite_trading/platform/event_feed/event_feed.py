@@ -76,20 +76,6 @@ class EventFeed(Protocol):
 
     # endregion
 
-    # region Access metadata
-
-    @property
-    def metadata(self) -> Optional[dict]:
-        """Optional metadata describing this feed.
-
-        - Plain dict with no value type restrictions.
-        - Return None or {} when absent.
-        - Typical keys may include 'source_event_feed_provider_name'.
-        """
-        ...
-
-    # endregion
-
     # region Close feed
 
     def close(self) -> None:

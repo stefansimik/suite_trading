@@ -36,7 +36,6 @@ class DemoBarEventFeed:
         first_bar: Bar = DEFAULT_FIRST_BAR,
         num_bars: int = 20,
         price_pattern_func: Callable = zig_zag_function,
-        metadata: Optional[dict] = None,
     ) -> None:
         """Initialize feed and pre-generate events.
 
@@ -57,7 +56,6 @@ class DemoBarEventFeed:
 
         # Initialize feed as not closed yet
         self._closed: bool = False
-        self._metadata: Optional[dict] = metadata
 
         bars = create_bar_series(
             first_bar=first_bar,
@@ -71,7 +69,6 @@ class DemoBarEventFeed:
                 bar=bar,
                 dt_received=bar.end_dt,
                 is_historical=True,
-                metadata=self._metadata,
             )
             for bar in bars
         )
@@ -139,11 +136,6 @@ class DemoBarEventFeed:
         """True when no more events will be produced."""
         return not self._events
 
-    @property
-    def metadata(self) -> Optional[dict]:
-        """Optional metadata describing this feed."""
-        return self._metadata
-
     def close(self) -> None:
         """Release resources (idempotent, non-blocking)."""
         if self._closed:
@@ -181,6 +173,6 @@ class DemoBarEventFeed:
         return f"{self.__class__.__name__}(remaining={len(self._events)}, closed={self._closed})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(remaining={len(self._events)!r}, closed={self._closed!r}, metadata={self._metadata!r})"
+        return f"{self.__class__.__name__}(remaining={len(self._events)!r}, closed={self._closed!r})"
 
     # endregion

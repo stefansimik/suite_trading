@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
@@ -22,7 +21,6 @@ class NewBarEvent(Event):
         bar: Bar,
         dt_received: datetime,
         is_historical: bool,
-        metadata: Optional[dict] = None,
     ) -> None:
         """Initialize a new bar event.
 
@@ -30,11 +28,9 @@ class NewBarEvent(Event):
             bar: The pure bar data object containing OHLC information.
             dt_received: When the event entered our system (timezone-aware UTC).
             is_historical: Whether this bar data is historical or live.
-            metadata: Optional metadata (e.g., {'source_event_feed_name': 'feed-A'}). Use None or
-                empty dict when absent.
         """
         # dt_event for bar events equals the bar end timestamp by definition
-        super().__init__(dt_event=bar.end_dt, dt_received=dt_received, metadata=metadata)
+        super().__init__(dt_event=bar.end_dt, dt_received=dt_received)
         self._bar = bar
         self._is_historical = is_historical
 

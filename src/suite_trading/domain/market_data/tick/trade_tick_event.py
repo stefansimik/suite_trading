@@ -22,7 +22,7 @@ class NewTradeTickEvent(Event):
             trade_tick: The pure trade tick data object containing trade information.
             dt_received: When the event entered our system (timezone-aware UTC).
         """
-        super().__init__(dt_event=trade_tick.timestamp, dt_received=dt_received, metadata=None)
+        super().__init__(dt_event=trade_tick.timestamp, dt_received=dt_received)
         self._trade_tick = trade_tick
 
     @property

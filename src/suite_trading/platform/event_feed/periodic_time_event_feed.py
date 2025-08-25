@@ -28,19 +28,17 @@ class TimeTickEvent(Event):
         self,
         dt_event: datetime,
         dt_received: datetime,
-        metadata: Optional[dict] = None,
     ) -> None:
         """Initialize a time tick event.
 
         Args:
             dt_event (datetime): The scheduled tick time (timezone-aware UTC).
             dt_received (datetime): When the event entered the system (timezone-aware UTC).
-            metadata (dict | None): Optional metadata; use None or {} when absent.
 
         Raises:
             ValueError: If any datetime is not timezone-aware UTC.
         """
-        super().__init__(dt_event=dt_event, dt_received=dt_received, metadata=metadata)
+        super().__init__(dt_event=dt_event, dt_received=dt_received)
 
     @property
     def dt_event(self) -> datetime:
@@ -58,7 +56,7 @@ class TimeTickEvent(Event):
         return f"{self.__class__.__name__}(dt_event={format_dt(self._dt_event)}, dt_received={format_dt(self._dt_received)})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(dt_event={format_dt(self._dt_event)}, dt_received={format_dt(self._dt_received)}, metadata={self._metadata!r})"
+        return f"{self.__class__.__name__}(dt_event={format_dt(self._dt_event)}, dt_received={format_dt(self._dt_received)})"
 
     # endregion
 
@@ -91,7 +89,6 @@ class PeriodicTimeEventFeed:
         start_dt: datetime,
         interval: timedelta,
         end_dt: Optional[datetime] = None,
-        metadata: Optional[dict] = None,
         finish_with_feed: Optional[EventFeed] = None,
     ) -> None:
         # Check: $start_datetime must be timezone-aware UTC to avoid ambiguous scheduling
@@ -115,7 +112,6 @@ class PeriodicTimeEventFeed:
         self._start_dt: datetime = start_dt
         self._interval: timedelta = interval
         self._end_dt: Optional[datetime] = end_dt
-        self._metadata: Optional[dict] = metadata
         self._finish_with_feed: Optional[EventFeed] = finish_with_feed
 
         # Internal state
@@ -175,7 +171,7 @@ class PeriodicTimeEventFeed:
             return None
 
         # Generate next event
-        self._next_event = TimeTickEvent(dt_event=self._next_tick_dt, dt_received=self._next_tick_dt, metadata=self._metadata)
+        self._next_event = TimeTickEvent(dt_event=self._next_tick_dt, dt_received=self._next_tick_dt)
 
         return self._next_event
 
@@ -256,15 +252,6 @@ class PeriodicTimeEventFeed:
 
     # endregion
 
-    @property
-    def metadata(self) -> Optional[dict]:
-        """Optional metadata describing this feed.
-
-        Returns:
-            dict | None: Feed-level metadata or None when absent.
-        """
-        return self._metadata
-
     def close(self) -> None:
         """Release resources used by this feed (idempotent, non-blocking)."""
         self._next_event = None
@@ -319,6 +306,6 @@ class PeriodicTimeEventFeed:
         return f"{self.__class__.__name__}(start={format_dt(self._start_dt)}, interval={self._interval}, next_tick={format_dt(self._next_tick_dt)}, finished={self._finished}, closed={self._closed})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(start={format_dt(self._start_dt)}, end={(format_dt(self._end_dt) if self._end_dt is not None else None)!r}, interval={self._interval!r}, next_tick={format_dt(self._next_tick_dt)}, finished={self._finished!r}, closed={self._closed!r}, metadata={self._metadata!r})"
+        return f"{self.__class__.__name__}(start={format_dt(self._start_dt)}, end={(format_dt(self._end_dt) if self._end_dt is not None else None)!r}, interval={self._interval!r}, next_tick={format_dt(self._next_tick_dt)}, finished={self._finished!r}, closed={self._closed!r})"
 
     # endregion
