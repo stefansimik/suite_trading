@@ -52,7 +52,6 @@ def test_message_bus_publish_bar_event():
         bar=bar,
         dt_received=datetime.now(tz=timezone.utc),
         is_historical=True,
-        metadata={"source_event_feed_name": "test_feed"},
     )
     msg_bus.publish(topic, event)
 
