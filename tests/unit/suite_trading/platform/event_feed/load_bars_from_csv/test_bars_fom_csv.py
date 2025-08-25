@@ -24,7 +24,7 @@ INSTRUMENT = Instrument("EURUSD", "FOREX", 0.00001, 1)
 BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST)
 
 
-class BarsFromCsvFileStrategy(Strategy):
+class DemoStrategy(Strategy):
     def __init__(self) -> None:
         super().__init__()
         self._bars_processed: int = 0
@@ -67,14 +67,14 @@ def test_dataframe_feed_demo():
     engine: TradingEngine = TradingEngine()
 
     # Add strategy that uses only BarsFromDataFrameEventFeed
-    strategy: Strategy = BarsFromCsvFileStrategy()
+    strategy: Strategy = DemoStrategy()
     engine.add_strategy("bars_from_csv_strategy", strategy)
 
     # Start trading engine (should process exactly 10 bars from CSV)
     engine.start()
 
     # Assertions
-    assert isinstance(strategy, BarsFromCsvFileStrategy)
+    assert isinstance(strategy, DemoStrategy)
 
     # Calculate expected number of bars from the same CSV used by the strategy
     expected_bars = len(pd.read_csv(CSV_PATH, parse_dates=["start_dt", "end_dt"]))
