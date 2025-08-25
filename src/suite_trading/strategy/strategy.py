@@ -215,6 +215,7 @@ class Strategy(ABC):
                 "binance_btcusdt_1m".
             event_feed (EventFeed): The EventFeed instance to attach.
             callback (Optional[Callable]): Optional event handler. If None, uses `self.on_event`.
+                If you explicitly don't need to callback for informing your strategy, then you can use `callback =lambda e: None`.
 
         Raises:
             RuntimeError: If $_trading_engine is None or $state does not allow adding feeds.
@@ -230,10 +231,7 @@ class Strategy(ABC):
         if not (self._state_machine.can_execute_action(StrategyAction.START_STRATEGY) or self.state == StrategyState.RUNNING):
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
             raise RuntimeError(
-                "Cannot call `add_event_feed` because $state "
-                f"({self.state.name}) does not allow adding feeds. "
-                f"Valid actions: {valid_actions}. Call it from `on_start` "
-                "or when the strategy is RUNNING.",
+                f"Cannot call `add_event_feed` because $state ({self.state.name}) does not allow adding feeds. Valid actions: {valid_actions}. Call it from `on_start` or when the strategy is RUNNING.",
             )
 
         # If callback function was not provided, let's use the default `on_event` callback
