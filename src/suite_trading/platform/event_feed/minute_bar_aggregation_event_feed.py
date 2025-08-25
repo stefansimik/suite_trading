@@ -12,11 +12,12 @@ from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
-from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.utils.datetime_utils import require_utc, format_dt
 
 
 logger = logging.getLogger(__name__)
+
+MINUTES_PER_DAY = 24 * 60  # Improves readability of window validations
 
 
 @dataclass
@@ -40,23 +41,27 @@ class Accumulator:
         self.volume = Decimal("0")
 
     def add(self, bar: Bar) -> None:
-        # Accumulate bar into O/H/L/C/Volume
+        # If first bar -> set initial values
         if self.open is None:
+            # Set initial OHLC prices
             self.open = bar.open
             self.high = bar.high
             self.low = bar.low
             self.close = bar.close
         else:
+            # If non-first bar -> update OHLC prices
             self.high = bar.high if bar.high > self.high else self.high
             self.low = bar.low if bar.low < self.low else self.low
             self.close = bar.close
+
+        # Accumulate volume
         if bar.volume is not None:
             self.volume += bar.volume
 
     def is_empty(self) -> bool:
         return self.open is None
 
-    def to_bar(self, bar_type: BarType, end_dt: datetime) -> Bar:
+    def to_aggregated_bar(self, bar_type: BarType, end_dt: datetime) -> Bar:
         return Bar(
             bar_type=bar_type,
             start_dt=self.start_dt,  # type: ignore[arg-type]
@@ -86,34 +91,18 @@ class MinuteBarAggregationEventFeed:
 
     # region Init
 
-    def __init__(
-        self,
-        source_feed: EventFeed,
-        window_minutes: int,
-        *,  # Forces next params are only keyword args
-        emit_first_partial: bool = False,
-        callback: Optional[Callable[[Event], None]] = None,
-    ) -> None:
-        """Initialize the aggregator.
+    def __init__(self, source_feed, window_minutes: int, emit_first_partial: bool = False):
+        # Validate window size in small, readable steps
+        if not isinstance(window_minutes, int):
+            raise ValueError("Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes must be an int.")
+        if window_minutes <= 0:
+            raise ValueError("Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes must be > 0.")
+        if window_minutes >= MINUTES_PER_DAY:
+            raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes ('{window_minutes}') must be < {MINUTES_PER_DAY}.")
+        if (MINUTES_PER_DAY % window_minutes) != 0:
+            raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes ('{window_minutes}') does not evenly divide a day; require {MINUTES_PER_DAY} % window_minutes == 0.")
 
-        Args:
-            source_feed: EventFeed producing NewBarEvent(s) with Bar.unit == MINUTE.
-            window_minutes: Target minute window; 0 < window_minutes < 24*60 and (24*60) % window_minutes == 0.
-            callback: Optional function called after this feed's `pop()` returns an event.
-            metadata: Optional metadata dict added to aggregated events.
-            emit_first_partial: If True, emit the first partial window when it completes or
-                on source finish. Otherwise, do not emit the first partial window.
-
-        Raises:
-            ValueError: If $window_minutes is unsupported.
-        """
-        if not isinstance(window_minutes, int) or window_minutes <= 0 or window_minutes >= 24 * 60 or ((24 * 60) % window_minutes != 0):
-            raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes ('{window_minutes}') is not supported; use minute values where (24*60) % window_minutes == 0 and window_minutes < (24*60).")
-
-        self._source: EventFeed = source_feed
-        self._window_minutes: int = window_minutes
-        self._callback: Optional[Callable[[Event], None]] = callback
-        self._emit_first_partial: bool = emit_first_partial
+        self._window_minutes = window_minutes
 
         # Auto-generated listener key
         self._listener_key: str = f"minute-agg-{window_minutes}m-{id(self):x}"
@@ -416,7 +405,7 @@ class MinuteBarAggregationEventFeed:
             return
 
         # Build Bar and NewBarEvent using accumulator
-        aggregated_bar = self._acc.to_bar(self._target_bar_type, self._window_end)  # type: ignore[arg-type]
+        aggregated_bar = self._acc.to_aggregated_bar(self._target_bar_type, self._window_end)  # type: ignore[arg-type]
         dt_recv, is_hist = self._select_event_attrs()
         require_utc(dt_recv)
         aggregated_event = NewBarEvent(bar=aggregated_bar, dt_received=dt_recv, is_historical=is_hist)
