@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Callable, Deque, Optional
 import logging
+from dataclasses import dataclass
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
@@ -18,16 +19,69 @@ from suite_trading.utils.datetime_utils import require_utc, format_dt
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class Accumulator:
+    """Collect O/H/L/C/Volume across a window and build an aggregated Bar."""
+
+    start_dt: Optional[datetime] = None
+    open: Optional[Decimal] = None
+    high: Optional[Decimal] = None
+    low: Optional[Decimal] = None
+    close: Optional[Decimal] = None
+    volume: Decimal = Decimal("0")
+
+    def start(self, start_dt: datetime) -> None:
+        # Reset values for a new window starting at $start_dt
+        self.start_dt = start_dt
+        self.open = None
+        self.high = None
+        self.low = None
+        self.close = None
+        self.volume = Decimal("0")
+
+    def add(self, bar: Bar) -> None:
+        # Accumulate bar into O/H/L/C/Volume
+        if self.open is None:
+            self.open = bar.open
+            self.high = bar.high
+            self.low = bar.low
+            self.close = bar.close
+        else:
+            self.high = bar.high if bar.high > self.high else self.high
+            self.low = bar.low if bar.low < self.low else self.low
+            self.close = bar.close
+        if bar.volume is not None:
+            self.volume += bar.volume
+
+    def is_empty(self) -> bool:
+        return self.open is None
+
+    def to_bar(self, bar_type: BarType, end_dt: datetime) -> Bar:
+        return Bar(
+            bar_type=bar_type,
+            start_dt=self.start_dt,  # type: ignore[arg-type]
+            end_dt=end_dt,
+            open=self.open,  # type: ignore[arg-type]
+            high=self.high,  # type: ignore[arg-type]
+            low=self.low,  # type: ignore[arg-type]
+            close=self.close,  # type: ignore[arg-type]
+            volume=self.volume,
+        )
+
+
 class MinuteBarAggregationEventFeed:
-    """Aggregate minute bars into N-minute bars aligned to hour boundaries.
+    """Aggregate minute bars into N-minute bars aligned to day boundaries (midnight UTC).
 
     This EventFeed observes a $source_feed via the listener seam and produces aggregated
-    NewBarEvent(s) for N-minute windows where 0 < N < 60 and 60 % N == 0.
+    NewBarEvent(s) for N-minute windows where 0 < N < 24*60 and (24*60) % N == 0.
 
-    Only one edge-case policy is implemented: the first partial window handling.
-    - Default: do not emit the first partial window (emit_first_partial=False)
-    - If emit_first_partial=True: emit the first partial window when it completes (on window
-      advance) or when the source finishes.
+    Policies:
+    - First partial window: default is to NOT emit the first partial window. If
+      $emit_first_partial is True, the first partial window is emitted when it completes
+      (on window advance or equality) or when the source finishes/closes.
+    - Gap/no-empty-windows: we never emit empty windows. If the input skips ahead by multiple
+      windows, we finalize the current window (if any) and jump to the new window without
+      producing events for the missing empty windows.
     """
 
     # region Init
@@ -45,7 +99,7 @@ class MinuteBarAggregationEventFeed:
 
         Args:
             source_feed: EventFeed producing NewBarEvent(s) with Bar.unit == MINUTE.
-            window_minutes: Target minute window size; must satisfy 0 < window_minutes < 60 and 60 % window_minutes == 0.
+            window_minutes: Target minute window; 0 < window_minutes < 24*60 and (24*60) % window_minutes == 0.
             callback: Optional function called after this feed's `pop()` returns an event.
             metadata: Optional metadata dict added to aggregated events.
             emit_first_partial: If True, emit the first partial window when it completes or
@@ -54,8 +108,8 @@ class MinuteBarAggregationEventFeed:
         Raises:
             ValueError: If $window_minutes is unsupported.
         """
-        if not isinstance(window_minutes, int) or window_minutes <= 0 or window_minutes >= 60 or (60 % window_minutes != 0):
-            raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes ('{window_minutes}') is not supported; use minute values where 60 % window_minutes == 0 and window_minutes < 60.")
+        if not isinstance(window_minutes, int) or window_minutes <= 0 or window_minutes >= 24 * 60 or ((24 * 60) % window_minutes != 0):
+            raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes ('{window_minutes}') is not supported; use minute values where (24*60) % window_minutes == 0 and window_minutes < (24*60).")
 
         self._source: EventFeed = source_feed
         self._window_minutes: int = window_minutes
@@ -63,8 +117,11 @@ class MinuteBarAggregationEventFeed:
         self._metadata: Optional[dict] = metadata
         self._emit_first_partial: bool = emit_first_partial
 
-        # Auto-generated listener key for readable diagnostics
+        # Auto-generated listener key
         self._listener_key: str = f"minute-agg-{window_minutes}m-{id(self)}"
+
+        # Auto-generated listener key: Class + Instrument + Window + id
+        self._listener_key: str = f"{self.__class__.__name__}-{source_feed._bar_type.instrument}-{window_minutes}m-{id(self):x}"
 
         # Output queue
         self._queue: Deque[NewBarEvent] = deque()
@@ -73,13 +130,8 @@ class MinuteBarAggregationEventFeed:
         self._listeners: dict[str, Callable[[Event], None]] = {}
 
         # Accumulator state for the current window
-        self._current_window_end: Optional[datetime] = None
-        self._acc_open: Optional[Decimal] = None
-        self._acc_high: Optional[Decimal] = None
-        self._acc_low: Optional[Decimal] = None
-        self._acc_close: Optional[Decimal] = None
-        self._acc_volume: Decimal = Decimal("0")
-        self._acc_start_dt: Optional[datetime] = None
+        self._window_end: Optional[datetime] = None
+        self._acc: Accumulator = Accumulator()
         self._last_dt_received: Optional[datetime] = None
         self._last_is_historical: Optional[bool] = None
 
@@ -88,8 +140,8 @@ class MinuteBarAggregationEventFeed:
         self._target_bar_type: Optional[BarType] = None
 
         # First partial window policy tracking
-        self._first_window_seen: bool = False
-        self._first_window_emitted: bool = False
+        self._saw_first_window: bool = False
+        self._emitted_first_window: bool = False
 
         # Closed flag
         self._closed: bool = False
@@ -120,46 +172,25 @@ class MinuteBarAggregationEventFeed:
         # Validate and prepare target BarType; keep on_source_event linear
         self._ensure_target_bar_type(bar_type)
 
-        # Align current bar to N-minute window with right-closed semantics
-        window_start, window_end = self._align_window_right_closed(bar.end_dt)
+        # Align to right-closed N-minute window (no empty-window emission policy)
+        window_start, window_end = self._align_right_closed_window(bar.end_dt)
 
-        # Initialize accumulator if needed
-        if self._current_window_end is None:
-            self._current_window_end = window_end
-            self._acc_start_dt = window_start
-            self._first_window_seen = True
+        # Roll window if needed (finalizes current and starts a new accumulator)
+        self._roll_window_if_needed(window_start, window_end)
 
-        # If we moved to a later window, finalize previous
-        if window_end > self._current_window_end:
-            self._finalize_current_window()
-            self._acc_start_dt = window_start
-            self._current_window_end = window_end
-            # Reset accumulator values for the new window
-            self._reset_accumulator()
+        # Accumulate current bar
+        self._acc.add(bar)
 
-        # Accumulate this bar into current window
-        if self._acc_open is None:
-            self._acc_open = bar.open
-            self._acc_high = bar.high
-            self._acc_low = bar.low
-            self._acc_close = bar.close
-        else:
-            self._acc_high = bar.high if bar.high > self._acc_high else self._acc_high
-            self._acc_low = bar.low if bar.low < self._acc_low else self._acc_low
-            self._acc_close = bar.close
-        if bar.volume is not None:
-            self._acc_volume += bar.volume
-
+        # Update event attributes for downstream aggregated event
         self._last_dt_received = event.dt_received
         self._last_is_historical = event.is_historical
 
-        # If this bar ended exactly at the current window end, finalize now
-        if self._current_window_end is not None and bar.end_dt == self._current_window_end:
-            self._finalize_current_window()
-            # Prepare next window accumulator
-            self._acc_start_dt = self._current_window_end
-            self._current_window_end = self._current_window_end + timedelta(minutes=self._window_minutes)
-            self._reset_accumulator()
+        # Check: if bar ends exactly at window_end, finalize now
+        if self._window_end is not None and bar.end_dt == self._window_end:
+            self._finalize_current_window(allow_first_partial=self._emit_first_partial)
+            # Prepare next window anchor; accumulator restarts upon next bar
+            self._acc.start(self._window_end)
+            self._window_end = self._window_end + timedelta(minutes=self._window_minutes)
 
     # endregion
 
@@ -168,7 +199,7 @@ class MinuteBarAggregationEventFeed:
     def peek(self) -> Optional[Event]:
         """Return the next aggregated event without consuming it, or None if none is ready."""
         # If source is finished and we have a first-window partial to emit, finalize now
-        self._emit_first_partial_if_needed_on_finish()
+        self._maybe_emit_first_partial("finish")
         if not self._queue:
             return None
         return self._queue[0]
@@ -176,7 +207,7 @@ class MinuteBarAggregationEventFeed:
     def pop(self) -> Optional[Event]:
         """Return the next aggregated event and advance this feed, or None if none is ready."""
         # If source is finished and we have a first-window partial to emit, finalize now
-        self._emit_first_partial_if_needed_on_finish()
+        self._maybe_emit_first_partial("finish")
         if not self._queue:
             return None
         next_event = self._queue.popleft()
@@ -197,7 +228,7 @@ class MinuteBarAggregationEventFeed:
 
     def is_finished(self) -> bool:
         """True when source is finished and no aggregated events remain to be emitted."""
-        self._emit_first_partial_if_needed_on_finish()
+        self._maybe_emit_first_partial("finish")
         return self._source.is_finished() and not self._queue
 
     # region Observe consumption
@@ -231,12 +262,31 @@ class MinuteBarAggregationEventFeed:
         """Optional metadata describing this feed."""
         return self._metadata
 
+    @property
+    def window_minutes(self) -> int:
+        """Target window size in minutes.
+
+        Returns:
+            int: The N in N-minute aggregation.
+        """
+        return self._window_minutes
+
+    @property
+    def target_bar_type(self) -> Optional[BarType]:
+        """The aggregated BarType once known (after first event)."""
+        return self._target_bar_type
+
+    @property
+    def queue_size(self) -> int:
+        """Number of aggregated events waiting to be consumed."""
+        return len(self._queue)
+
     def close(self) -> None:
         """Release resources and unsubscribe. Idempotent."""
         if self._closed:
             return
         # Emit first partial on close if requested and not already emitted
-        self._emit_first_partial_if_needed(force=True)
+        self._maybe_emit_first_partial("close")
         try:
             self._source.remove_listener(self._listener_key)
         except Exception as exc:
@@ -252,34 +302,35 @@ class MinuteBarAggregationEventFeed:
         while self._queue and self._queue[0].dt_event < cutoff_time:
             self._queue.popleft()
         # If current window already ended before/equal cutoff, drop accumulator; also mark first window emitted
-        if self._current_window_end is not None and self._current_window_end <= cutoff_time:
-            self._acc_open = None
-            self._acc_high = None
-            self._acc_low = None
-            self._acc_close = None
-            self._acc_volume = Decimal("0")
-            self._acc_start_dt = None
+        if self._window_end is not None and self._window_end <= cutoff_time:
+            # Replace accumulator with a fresh one to drop partial state
+            self._acc = Accumulator()
             self._last_dt_received = None
             self._last_is_historical = None
-            if not self._first_window_emitted and self._first_window_seen:
-                self._first_window_emitted = True
+            if not self._emitted_first_window and self._saw_first_window:
+                self._emitted_first_window = True
 
     # endregion
 
     # region Helpers
 
-    def _reset_accumulator(self) -> None:
-        """Reset accumulator state for the current window (except $acc_start_dt).
+    def _roll_window_if_needed(self, window_start: datetime, window_end: datetime) -> None:
+        """Advance to $window_end if needed and manage accumulator lifecycle.
 
-        Keeps the lifecycle DRY and consistent across window transitions and closures.
+        Policy: We do not emit empty windows. If the input skips ahead, we finalize the current
+        window (if any) and jump to the new window, leaving gaps with no event.
         """
-        self._acc_open = None
-        self._acc_high = None
-        self._acc_low = None
-        self._acc_close = None
-        self._acc_volume = Decimal("0")
-        self._last_dt_received = None
-        self._last_is_historical = None
+        # Check: first window initialization
+        if self._window_end is None:
+            self._window_end = window_end
+            self._acc.start(window_start)
+            self._saw_first_window = True
+            return
+        # Check: if we moved to a later window, finalize current before switching
+        if window_end > self._window_end:
+            self._finalize_current_window(allow_first_partial=self._emit_first_partial)
+            self._acc.start(window_start)
+            self._window_end = window_end
 
     def _ensure_target_bar_type(self, bar_type: BarType) -> None:
         """Validate source bar type and create/verify target BarType.
@@ -311,20 +362,21 @@ class MinuteBarAggregationEventFeed:
                 if bar_type.price_type != self._target_bar_type.price_type:
                     raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.on_source_event` because source $price_type ('{bar_type.price_type.name}') changed and does not match target price_type ('{self._target_bar_type.price_type.name}').")
 
-    def _align_window_right_closed(self, end_dt: datetime) -> tuple[datetime, datetime]:
-        """Align $end_dt to a right-closed N-minute window on the hour boundary.
+    def _align_right_closed_window(self, end_dt: datetime) -> tuple[datetime, datetime]:
+        """Align $end_dt to a right-closed N-minute window anchored to midnight UTC.
 
-        Example for N=5:
-        - 10:00 maps to window [09:55, 10:00]
-        - 10:07 maps to window [10:05, 10:10]
+        Examples:
+        - For N=5 (divides 60): identical result to previous hour-anchored logic.
+        - For N=90: windows end at 00:00, 01:30, 03:00, ... relative to midnight UTC.
         """
         # Check: ensure $end_dt is UTC-aware as required project-wide
         require_utc(end_dt)
-        hour_start = end_dt.replace(minute=0, second=0, microsecond=0)
-        minute = end_dt.minute
-        # Ceil to the nearest multiple of N minutes within the hour (minute=0 -> 0)
-        rounded = ((minute + self._window_minutes - 1) // self._window_minutes) * self._window_minutes
-        window_end = hour_start + timedelta(minutes=rounded)
+        # Anchor to start of the UTC day and compute minutes since midnight
+        day_start = end_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        minutes_since_midnight = int((end_dt - day_start).total_seconds() // 60)
+        # Ceil to nearest multiple of N minutes counted from midnight
+        rounded_minutes = ((minutes_since_midnight + self._window_minutes - 1) // self._window_minutes) * self._window_minutes
+        window_end = day_start + timedelta(minutes=rounded_minutes)
         window_start = window_end - timedelta(minutes=self._window_minutes)
         return window_start, window_end
 
@@ -332,71 +384,59 @@ class MinuteBarAggregationEventFeed:
         """Select aggregated event attributes based on last source event.
 
         Policy:
-        - If $last_is_historical is True or None (unknown), treat aggregated event as historical
-          and set dt_received to $current_window_end.
-        - If $last_is_historical is False (live), use $last_dt_received if available; otherwise
-          fall back to $current_window_end.
+        - If $last_is_historical is True or None (unknown), treat aggregated event as
+          historical and set dt_received to $window_end.
+        - If $last_is_historical is False (live), use $last_dt_received if available;
+          otherwise fall back to $window_end.
 
         Returns:
         - tuple[datetime, bool]: (dt_received, is_historical)
         """
         # Check: ensure we have a window end; caller `_finalize_current_window` guards this
         is_hist = bool(self._last_is_historical) if self._last_is_historical is not None else True
-        dt_recv = self._current_window_end if is_hist else (self._last_dt_received or self._current_window_end)
-        # mypy: both branches guarantee non-None due to guard in finalize
+        dt_recv = self._window_end if is_hist else (self._last_dt_received or self._window_end)
         return dt_recv, is_hist
 
-    def _finalize_current_window(self) -> None:
-        """Finalize the current window and enqueue depending on first-partial policy."""
-        if self._current_window_end is None or self._acc_open is None:
+    def _finalize_current_window(self, allow_first_partial: bool) -> None:
+        """Finalize the current window and enqueue an aggregated event.
+
+        Args:
+            allow_first_partial: If True, the first partial window (if currently active)
+                is allowed to emit. If False, the first window is marked as emitted
+                without producing an event.
+        """
+        if self._window_end is None or self._acc.is_empty():
             return
 
-        # Decide whether to enqueue based on first-partial policy
-        is_first_window = self._first_window_seen and not self._first_window_emitted
-        if is_first_window and not self._emit_first_partial:
-            # Skip emitting the first partial window
-            self._first_window_emitted = True
+        is_first = self._saw_first_window and not self._emitted_first_window
+        if is_first and not allow_first_partial:
+            self._emitted_first_window = True
             return
 
-        # Build Bar and NewBarEvent
-        aggregated_bar = Bar(
-            bar_type=self._target_bar_type,  # type: ignore[arg-type]
-            start_dt=self._acc_start_dt,  # type: ignore[arg-type]
-            end_dt=self._current_window_end,
-            open=self._acc_open,  # type: ignore[arg-type]
-            high=self._acc_high,  # type: ignore[arg-type]
-            low=self._acc_low,  # type: ignore[arg-type]
-            close=self._acc_close,  # type: ignore[arg-type]
-            volume=self._acc_volume,
-        )
-        # Historical flag and dt_received policies via helper
+        # Build Bar and NewBarEvent using accumulator
+        aggregated_bar = self._acc.to_bar(self._target_bar_type, self._window_end)  # type: ignore[arg-type]
         dt_recv, is_hist = self._select_event_attrs()
         aggregated_event = NewBarEvent(bar=aggregated_bar, dt_received=dt_recv, is_historical=is_hist, metadata=self._metadata)
         self._queue.append(aggregated_event)
 
-        if is_first_window:
-            self._first_window_emitted = True
+        if is_first:
+            self._emitted_first_window = True
 
-    def _emit_first_partial_if_needed_on_finish(self) -> None:
-        """If the source is finished, emit the first partial window once when requested."""
+    def _maybe_emit_first_partial(self, context: str) -> None:
+        """Emit the first partial window depending on $context and policy.
+
+        Args:
+            context: One of {"advance", "finish", "close"} indicating when the check runs.
+        """
         if not self._emit_first_partial:
             return
-        if self._first_window_emitted or not self._first_window_seen:
+        if self._emitted_first_window or not self._saw_first_window:
             return
-        if not self._source.is_finished():
+        if context == "finish" and not self._source.is_finished():
             return
-        # If we have an unfinalized first window (no advancement yet), finalize it now
-        if self._current_window_end is not None and self._acc_open is not None:
-            self._finalize_current_window()
-
-    def _emit_first_partial_if_needed(self, force: bool = False) -> None:
-        """Emit first partial if requested and not yet emitted; used on close()."""
-        if not self._emit_first_partial:
-            return
-        if self._first_window_emitted or not self._first_window_seen:
-            return
-        if force and self._current_window_end is not None and self._acc_open is not None:
-            self._finalize_current_window()
+        # Check: only emit when we have a non-empty accumulator and a window end
+        if self._window_end is not None and not self._acc.is_empty():
+            self._finalize_current_window(allow_first_partial=True)
 
     # endregion
 
@@ -404,12 +444,12 @@ class MinuteBarAggregationEventFeed:
 
     def __str__(self) -> str:
         queued_count = len(self._queue)
-        end_str = format_dt(self._current_window_end) if self._current_window_end else "None"
+        end_str = format_dt(self._window_end) if self._window_end else "None"
         return f"{self.__class__.__name__}(window_minutes={self._window_minutes}, current_window_end={end_str}, queued={queued_count})"
 
     def __repr__(self) -> str:
         queued_count = len(self._queue)
-        end_str = format_dt(self._current_window_end) if self._current_window_end else "None"
+        end_str = format_dt(self._window_end) if self._window_end else "None"
         return f"{self.__class__.__name__}(window_minutes={self._window_minutes!r}, listener_key={self._listener_key!r}, current_window_end={end_str!r}, queued={queued_count!r}, metadata={self._metadata!r})"
 
     # endregion
