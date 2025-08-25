@@ -15,6 +15,14 @@ from suite_trading.strategy.strategy import Strategy
 
 logger = logging.getLogger(__name__)
 
+# CSV file used in this test module
+CSV_FILE_NAME = "demo_bars.csv"
+CSV_PATH = Path(__file__).with_name(CSV_FILE_NAME)
+
+# Describe BarType for bars constructed in the CSV file
+INSTRUMENT = Instrument("EURUSD", "FOREX", 0.00001, 1)
+BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST)
+
 
 class BarsFromCsvFileStrategy(Strategy):
     def __init__(self) -> None:
@@ -28,15 +36,12 @@ class BarsFromCsvFileStrategy(Strategy):
         # FEED STRATEGY FROM BARS LOADED FROM CSV FILE
 
         # Step 1: Load DataFrame from CSV file, which contains bar-data
-        csv_path = Path(__file__).with_name("demo_bars.csv")
-        df = pd.read_csv(csv_path, parse_dates=["start_dt", "end_dt"])
+        df = pd.read_csv(CSV_PATH, parse_dates=["start_dt", "end_dt"])
 
-        # Step 2: Define BarType for loaded bars
-        instrument = Instrument("EURUSD", "FOREX", 0.00001, 1)
-        bar_type = BarType(instrument, 1, BarUnit.MINUTE, PriceType.LAST)
+        # Step 2: Use declared BAR_TYPE for loaded bars
 
         # Step 3: Create EventFeed, that generates bars and feeds them to the strategy
-        bars_feed: EventFeed = BarsFromDataFrameEventFeed(df=df, bar_type=bar_type)
+        bars_feed: EventFeed = BarsFromDataFrameEventFeed(df=df, bar_type=BAR_TYPE)
         self.add_event_feed("bars_from_csv_feed", bars_feed)
 
     # Standard callback for all events
@@ -70,4 +75,8 @@ def test_dataframe_feed_demo():
 
     # Assertions
     assert isinstance(strategy, BarsFromCsvFileStrategy)
-    assert strategy.bars_processed == 10
+
+    # Calculate expected number of bars from the same CSV used by the strategy
+    expected_bars = len(pd.read_csv(CSV_PATH, parse_dates=["start_dt", "end_dt"]))
+
+    assert strategy.bars_processed == expected_bars
