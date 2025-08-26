@@ -10,6 +10,7 @@ from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.utils.datetime_utils import require_utc, format_dt
 from suite_trading.domain.market_data.bar.ohlcv_accumulator import OhlcvAccumulator
 
@@ -37,58 +38,49 @@ class MinuteBarAggregationEventFeed:
     # region Init
 
     def __init__(self, source_feed, window_minutes: int, emit_first_partial: bool = False):
-        # Validate window size in small, readable steps
-        if not isinstance(window_minutes, int):
-            raise ValueError("Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes must be an int.")
-        if window_minutes <= 0:
-            raise ValueError("Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes must be > 0.")
-        if window_minutes >= MINUTES_PER_DAY:
-            raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes ('{window_minutes}') must be < {MINUTES_PER_DAY}.")
-        if (MINUTES_PER_DAY % window_minutes) != 0:
-            raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.__init__` because $window_minutes ('{window_minutes}') does not evenly divide a day; require {MINUTES_PER_DAY} % window_minutes == 0.")
+        # SET INPUT PARAMETERS
+        self._source_feed: EventFeed = source_feed
+        self._window_minutes: int = self._expect_day_divisible_window_minutes(window_minutes)
+        self._emit_first_partial: bool = emit_first_partial
 
-        self._window_minutes = window_minutes
-        # Source feed reference and optional per-event callback
-        self._source = source_feed
-        self._callback: Optional[Callable[[Event], None]] = None
-        self._emit_first_partial: bool = bool(emit_first_partial)
-
-        # Auto-generated listener key
+        # This aggregation event-feed registers itself as a listener on the source feed
         self._listener_key: str = f"minute-agg-{window_minutes}m-{id(self):x}"
+        self._source_feed.add_listener(self._listener_key, self.on_source_event)
 
-        # Output queue
-        self._queue: Deque[NewBarEvent] = deque()
-
-        # Registered listeners notified on each successful pop()
+        # Listeners of this event-feed (in case some other objects needs to be notified about consumed/popped events)
         self._listeners: dict[str, Callable[[Event], None]] = {}
 
-        # Accumulator state for the current window
+        # LOCAL STATE
+
+        # Queued aggregated events waiting to be consumed (FIFO)
+        self._queue: Deque[NewBarEvent] = deque()
+
+        # State for the currently open aggregation window
         self._window_end: Optional[datetime] = None
         self._acc: OhlcvAccumulator = OhlcvAccumulator()
+
+        # Attributes from last source event for aggregation
         self._last_dt_received: Optional[datetime] = None
         self._last_is_historical: Optional[bool] = None
-
-        # Source/target typing
         self._src_minutes: Optional[int] = None
         self._target_bar_type: Optional[BarType] = None
 
-        # First partial window policy tracking
+        # Tracking for first‑window emission policy
         self._saw_first_window: bool = False
         self._emitted_first_window: bool = False
         self._first_window_is_partial: Optional[bool] = None
 
-        # Closed flag
+        # Lifecycle flag for the EventFeed
         self._closed: bool = False
-
-        # Subscribe to source
-        self._source.add_listener(self._listener_key, self.on_source_event)
 
     # endregion
 
     # region Listener
 
     def on_source_event(self, event: Event) -> None:
-        """Handle source events, aggregating NewBarEvent(s) into N-minute bars.
+        """Handle source events and aggregating NewBarEvent(s) into N-minute bars.
+        Source events are coming from underlying $source_feed, where this feed is registered as a listener.
+
 
         Raises:
             ValueError: On unsupported event types or incompatible source timeframe.
@@ -97,8 +89,9 @@ class MinuteBarAggregationEventFeed:
         if self._closed:
             return
 
+        # We can aggregate only NewBarEvent(s).
         if not isinstance(event, NewBarEvent):
-            raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.on_source_event` because event type '{type(event).__name__}' is not supported; expected NewBarEvent.")
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $event (class '{type(event).__name__}') is not a NewBarEvent. Register this feed on an EventFeed that produces NewBarEvent(s).")
 
         bar: Bar = event.bar
         bar_type: BarType = bar.bar_type
@@ -161,18 +154,13 @@ class MinuteBarAggregationEventFeed:
                     listener_fn(next_event)
                 except Exception as exc:
                     logger.error(f"Error notifying listener '{key}' for EventFeed (class {self.__class__.__name__}): {exc}")
-        # Call optional callback after listeners
-        if self._callback is not None:
-            try:
-                self._callback(next_event)
-            except Exception as exc:
-                logger.error(f"Error in callback for EventFeed (class {self.__class__.__name__}): {exc}")
+
         return next_event
 
     def is_finished(self) -> bool:
         """True when source is finished and no aggregated events remain to be emitted."""
         self._maybe_emit_first_partial("finish")
-        return self._source.is_finished() and not self._queue
+        return self._source_feed.is_finished() and not self._queue
 
     # region Observe consumption
 
@@ -226,7 +214,7 @@ class MinuteBarAggregationEventFeed:
         # Emit first partial on close if requested and not already emitted
         self._maybe_emit_first_partial("close")
         try:
-            self._source.remove_listener(self._listener_key)
+            self._source_feed.remove_listener(self._listener_key)
         except Exception as exc:
             # Listener might already be removed; log and continue
             logger.debug(f"Close attempted to remove listener '{self._listener_key}' for EventFeed (class {self.__class__.__name__}) and got: {exc}")
@@ -251,6 +239,28 @@ class MinuteBarAggregationEventFeed:
     # endregion
 
     # region Helpers
+
+    def _expect_day_divisible_window_minutes(self, window_minutes: int) -> int:
+        """Validate $window_minutes for day-aligned N-minute aggregation.
+
+        Args:
+            window_minutes: Target window size in minutes.
+
+        Raises:
+            ValueError: If $window_minutes is not an int, <= 0, >= MINUTES_PER_DAY, or does not
+                evenly divide a day (i.e., 24*60 % N != 0).
+        """
+        # Validate window size in small, readable steps for clarity and precise error reporting
+        if not isinstance(window_minutes, int):
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $window_minutes must be an int (minutes).")
+        if window_minutes <= 0:
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $window_minutes ('{window_minutes}') must be > 0.")
+        if window_minutes >= MINUTES_PER_DAY:
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $window_minutes ('{window_minutes}') must be < {MINUTES_PER_DAY} (minutes per day).")
+        if (MINUTES_PER_DAY % window_minutes) != 0:
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $window_minutes ('{window_minutes}') must evenly divide a day (i.e., {MINUTES_PER_DAY} % $window_minutes == 0).")
+
+        return window_minutes
 
     def _roll_window_if_needed(self, window_start: datetime, window_end: datetime) -> None:
         """Advance to $window_end if needed and manage accumulator lifecycle.
@@ -283,22 +293,22 @@ class MinuteBarAggregationEventFeed:
         """
         # Check: unit must be MINUTE for minute aggregation
         if bar_type.unit is not BarUnit.MINUTE:
-            raise ValueError("Cannot call `MinuteBarAggregationEventFeed.on_source_event` because source bar unit is not MINUTE.")
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because source bar $unit ('{bar_type.unit.name}') is not MINUTE. Provide minute bars.")
 
         if self._src_minutes is None:
             self._src_minutes = int(bar_type.value)
             # Check source resolution finer than target and divisibility
             if not (self._src_minutes < self._window_minutes and (self._window_minutes % self._src_minutes == 0)):
-                raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.on_source_event` because source timeframe {self._src_minutes}-MINUTE is not finer than target {self._window_minutes}-MINUTE or not an integer multiple.")
+                raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $src_minutes ('{self._src_minutes}') must be < $window_minutes ('{self._window_minutes}') and a divisor of it (i.e., $window_minutes % $src_minutes == 0).")
             # Build target BarType preserving instrument and price_type
             self._target_bar_type = BarType(bar_type.instrument, self._window_minutes, BarUnit.MINUTE, bar_type.price_type)
         else:
             # Check instrument and price_type consistency
             if self._target_bar_type is not None:
                 if bar_type.instrument != self._target_bar_type.instrument:
-                    raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.on_source_event` because source $instrument ('{bar_type.instrument}') changed and does not match target instrument ('{self._target_bar_type.instrument}').")
+                    raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $instrument changed from '{self._target_bar_type.instrument}' to '{bar_type.instrument}'. Mix of instruments is not supported; keep a single instrument per feed.")
                 if bar_type.price_type != self._target_bar_type.price_type:
-                    raise ValueError(f"Cannot call `MinuteBarAggregationEventFeed.on_source_event` because source $price_type ('{bar_type.price_type.name}') changed and does not match target price_type ('{self._target_bar_type.price_type.name}').")
+                    raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $price_type changed from '{self._target_bar_type.price_type.name}' to '{bar_type.price_type.name}'. Use a consistent price_type for all source bars.")
 
     def _align_right_closed_window(self, end_dt: datetime) -> tuple[datetime, datetime]:
         """Align $end_dt to a right-closed N-minute window anchored to midnight UTC.
@@ -373,7 +383,7 @@ class MinuteBarAggregationEventFeed:
             return
         if self._emitted_first_window or not self._saw_first_window:
             return
-        if context == "finish" and not self._source.is_finished():
+        if context == "finish" and not self._source_feed.is_finished():
             return
         # Check: only emit when we have a non-empty accumulator and a window end
         if self._window_end is not None and self._acc.has_data():
