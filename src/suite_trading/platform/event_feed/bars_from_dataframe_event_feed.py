@@ -176,10 +176,6 @@ class BarsFromDataFrameEventFeed:
         self._row_index_of_next_event = new_index
         self._next_bar_event = None
 
-    # endregion
-
-    # region Observe consumed events
-
     def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
         """Register $listener under $key. Called after each successful `pop`.
 

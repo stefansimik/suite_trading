@@ -137,8 +137,6 @@ class DemoBarEventFeed:
         while self._events and self._events[0].dt_event < cutoff_time:
             self._events.popleft()
 
-    # region Observe consumed events
-
     def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
         """Register $listener under $key. Called after each successful `pop`.
 

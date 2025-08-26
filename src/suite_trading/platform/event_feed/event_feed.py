@@ -7,16 +7,11 @@ class EventFeed(Protocol):
     """A simple, non-blocking stream of events in time order.
 
     How to use:
-    - Call pop() to get the next ready event.
     - Call peek() to see the next event without consuming it.
+    - Call pop() to get the next ready event.
     - If pop()/peek() returns None and is_finished() is False, try later.
     - If is_finished() is True, the feed has no more events.
-
-    Tip:
-    - In tight loops, use `peek()` is not None as the readiness check.
     """
-
-    # region Consume events
 
     def peek(self) -> Optional[Event]:
         """Return the next event without consuming it, or None if none is ready."""
@@ -26,36 +21,23 @@ class EventFeed(Protocol):
         """Return the next event and advance the feed, or None if none is ready."""
         ...
 
-    # endregion
-
-    # region Query state
-
     def is_finished(self) -> bool:
-        """Return True when this feed is at the end and will not produce any more events."""
+        """Return True when this feed is at the end and will not produce any more events.
+        If event-feed is closed, it is considered also finished."""
         ...
 
-    # endregion
+    def close(self) -> None:
+        """Release resources used by this feed.
 
-    # region Observe consumption
+        Requirements:
+        - Idempotent: Safe to call multiple times.
+        - Non-blocking: Should not wait for long-running operations.
+        - Responsibility: Close connections, files, threads, or other external resources.
 
-    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key.
-
-        Contract:
-        - Called synchronously after each successful `pop()` with the consumed Event.
-        - $key must be unique and non-empty; raise ValueError on duplicates or empty keys.
-        - Listeners must be fast/non-blocking; implementations must catch, log, and continue on listener exceptions.
-        - Listeners are invoked in registration order.
+        Raises:
+        - Exception: Implementations should raise on unexpected cleanup failures.
         """
         ...
-
-    def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key. Raise ValueError if $key is unknown."""
-        ...
-
-    # endregion
-
-    # region Control timeline
 
     def remove_events_before(self, cutoff_time: datetime) -> None:
         """Remove all events before $cutoff_time from this event feed.
@@ -74,21 +56,17 @@ class EventFeed(Protocol):
         """
         ...
 
-    # endregion
+    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
+        """Register $listener under $key.
 
-    # region Close feed
-
-    def close(self) -> None:
-        """Release resources used by this feed.
-
-        Requirements:
-        - Idempotent: Safe to call multiple times.
-        - Non-blocking: Should not wait for long-running operations.
-        - Responsibility: Close connections, files, threads, or other external resources.
-
-        Raises:
-        - Exception: Implementations should raise on unexpected cleanup failures.
+        Contract:
+        - Called synchronously after each successful `pop()` with the consumed Event.
+        - $key must be unique and non-empty; raise ValueError on duplicates or empty keys.
+        - Listeners must be fast/non-blocking; implementations must catch, log, and continue on listener exceptions.
+        - Listeners are invoked in registration order.
         """
         ...
 
-    # endregion
+    def remove_listener(self, key: str) -> None:
+        """Unregister listener under $key. Log warning if $key is unknown."""
+        ...
