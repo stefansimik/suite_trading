@@ -84,6 +84,8 @@ class PeriodicTimeEventFeed:
         ValueError: If any datetime is not UTC or if $interval is non‑positive.
     """
 
+    # region Init
+
     def __init__(
         self,
         start_dt: datetime,
@@ -123,32 +125,9 @@ class PeriodicTimeEventFeed:
         # Listeners of this event-feed (in case some other objects needs to be notified about consumed/popped events)
         self._listeners: dict[str, Callable[[Event], None]] = {}
 
-    # region Core helpers
-
-    def _check_finished_guard(self) -> bool:
-        """Return True if the feed cannot produce more events (closed or finished).
-
-        If $end_datetime is configured and the scheduled $next_tick moved beyond it, mark the
-        feed as finished.
-        """
-        if self._closed or self._finished:
-            return True
-
-        # Auto-finish this feed - in sync with other feed (if configured).
-        if self._finish_with_feed is not None and self._finish_with_feed.is_finished():
-            self._finished = True
-            return True
-
-        # Auto-finish when next tick exceeds the configured end boundary
-        if (self._end_dt is not None) and (self._next_tick_dt > self._end_dt):
-            self._finished = True
-            return True
-
-        return False
-
     # endregion
 
-    # region EventFeed API
+    # region EventFeed protocol
 
     def peek(self) -> Optional[Event]:
         """Return the next event if ready, else None.
@@ -219,39 +198,6 @@ class PeriodicTimeEventFeed:
         """
         return self._finished or self._closed
 
-    # region Observe consumption
-
-    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key. Called after each successful `pop`.
-
-        Args:
-            key: Unique, non-empty identifier for this listener.
-            listener: Callable that accepts the consumed Event.
-
-        Raises:
-            ValueError: If $key is empty or already registered.
-        """
-        if not key:
-            raise ValueError("Cannot call `add_listener` because $key is empty")
-        if key in self._listeners:
-            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
-        self._listeners[key] = listener
-
-    def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key.
-
-        Args:
-            key: Identifier of the listener to remove.
-
-        Raises:
-            ValueError: If $key is unknown.
-        """
-        if key not in self._listeners:
-            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
-        del self._listeners[key]
-
-    # endregion
-
     def close(self) -> None:
         """Release resources used by this feed (idempotent, non-blocking)."""
         self._next_event = None
@@ -295,6 +241,64 @@ class PeriodicTimeEventFeed:
 
         if self._end_dt is not None and self._next_tick_dt > self._end_dt:
             self._finished = True
+
+    # endregion
+
+    # region Observe consumed events
+
+    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
+        """Register $listener under $key. Called after each successful `pop`.
+
+        Args:
+            key: Unique, non-empty identifier for this listener.
+            listener: Callable that accepts the consumed Event.
+
+        Raises:
+            ValueError: If $key is empty or already registered.
+        """
+        if not key:
+            raise ValueError("Cannot call `add_listener` because $key is empty")
+        if key in self._listeners:
+            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
+        self._listeners[key] = listener
+
+    def remove_listener(self, key: str) -> None:
+        """Unregister listener under $key.
+
+        Args:
+            key: Identifier of the listener to remove.
+
+        Raises:
+            ValueError: If $key is unknown.
+        """
+        if key not in self._listeners:
+            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
+        del self._listeners[key]
+
+    # endregion
+
+    # region Internal
+
+    def _check_finished_guard(self) -> bool:
+        """Return True if the feed cannot produce more events (closed or finished).
+
+        If $end_datetime is configured and the scheduled $next_tick moved beyond it, mark the
+        feed as finished.
+        """
+        if self._closed or self._finished:
+            return True
+
+        # Auto-finish this feed - in sync with other feed (if configured).
+        if self._finish_with_feed is not None and self._finish_with_feed.is_finished():
+            self._finished = True
+            return True
+
+        # Auto-finish when next tick exceeds the configured end boundary
+        if (self._end_dt is not None) and (self._next_tick_dt > self._end_dt):
+            self._finished = True
+            return True
+
+        return False
 
     # endregion
 

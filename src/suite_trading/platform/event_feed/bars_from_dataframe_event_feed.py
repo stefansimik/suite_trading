@@ -105,29 +105,6 @@ class BarsFromDataFrameEventFeed:
 
     # endregion
 
-    # region Internal helpers
-
-    def _build_event_from_row(self, row: pd.Series) -> Event:
-        """Build a NewBarEvent from a DataFrame row.
-
-        The Bar constructor will validate domain constraints; we pass values through as-is.
-        """
-        bar = Bar(
-            bar_type=self._bar_type,
-            start_dt=row["start_dt"],
-            end_dt=row["end_dt"],
-            open=row["open"],
-            high=row["high"],
-            low=row["low"],
-            close=row["close"],
-            volume=row["volume"] if "volume" in row.index else None,
-        )
-        # For historical data, set dt_received equal to dt_event (bar end)
-        event = NewBarEvent(bar=bar, dt_received=row["end_dt"], is_historical=True)
-        return event
-
-    # endregion
-
     # region EventFeed protocol
 
     def peek(self) -> Optional[Event]:
@@ -142,28 +119,6 @@ class BarsFromDataFrameEventFeed:
         row = self._df.iloc[self._row_index_of_next_event]
         self._next_bar_event = self._build_event_from_row(row)
         return self._next_bar_event
-
-    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key. Called after each successful `pop`.
-
-        Raises:
-            ValueError: If $key is empty or already registered.
-        """
-        if not key:
-            raise ValueError("Cannot call `add_listener` because $key is empty")
-        if key in self._listeners:
-            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
-        self._listeners[key] = listener
-
-    def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key.
-
-        Raises:
-            ValueError: If $key is unknown.
-        """
-        if key not in self._listeners:
-            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
-        del self._listeners[key]
 
     def pop(self) -> Optional[Event]:
         """Return the next event and advance the feed, or None if none is ready."""
@@ -220,6 +175,55 @@ class BarsFromDataFrameEventFeed:
         # Move forward: set pointer to new_index and invalidate cache
         self._row_index_of_next_event = new_index
         self._next_bar_event = None
+
+    # endregion
+
+    # region Observe consumed events
+
+    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
+        """Register $listener under $key. Called after each successful `pop`.
+
+        Raises:
+            ValueError: If $key is empty or already registered.
+        """
+        if not key:
+            raise ValueError("Cannot call `add_listener` because $key is empty")
+        if key in self._listeners:
+            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
+        self._listeners[key] = listener
+
+    def remove_listener(self, key: str) -> None:
+        """Unregister listener under $key.
+
+        Raises:
+            ValueError: If $key is unknown.
+        """
+        if key not in self._listeners:
+            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
+        del self._listeners[key]
+
+    # endregion
+
+    # region Internal helpers
+
+    def _build_event_from_row(self, row: pd.Series) -> Event:
+        """Build a NewBarEvent from a DataFrame row.
+
+        The Bar constructor will validate domain constraints; we pass values through as-is.
+        """
+        bar = Bar(
+            bar_type=self._bar_type,
+            start_dt=row["start_dt"],
+            end_dt=row["end_dt"],
+            open=row["open"],
+            high=row["high"],
+            low=row["low"],
+            close=row["close"],
+            volume=row["volume"] if "volume" in row.index else None,
+        )
+        # For historical data, set dt_received equal to dt_event (bar end)
+        event = NewBarEvent(bar=bar, dt_received=row["end_dt"], is_historical=True)
+        return event
 
     # endregion
 

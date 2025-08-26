@@ -78,7 +78,7 @@ class DemoBarEventFeed:
 
     # endregion
 
-    # region EventFeed API
+    # region EventFeed protocol
 
     def peek(self) -> Optional[Event]:
         """Return the next event without consuming it, or None if none is ready."""
@@ -108,32 +108,6 @@ class DemoBarEventFeed:
         """True when no more events will be produced."""
         return not self._events
 
-    # region Observe consumption
-
-    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key. Called after each successful `pop`.
-
-        Raises:
-            ValueError: If $key is empty or already registered.
-        """
-        if not key:
-            raise ValueError("Cannot call `add_listener` because $key is empty")
-        if key in self._listeners:
-            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
-        self._listeners[key] = listener
-
-    def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key.
-
-        Raises:
-            ValueError: If $key is unknown.
-        """
-        if key not in self._listeners:
-            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
-        del self._listeners[key]
-
-    # endregion
-
     def close(self) -> None:
         """Release resources (idempotent, non-blocking)."""
         if self._closed:
@@ -162,6 +136,30 @@ class DemoBarEventFeed:
         # Remove from the front while events are older than cutoff
         while self._events and self._events[0].dt_event < cutoff_time:
             self._events.popleft()
+
+    # region Observe consumed events
+
+    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
+        """Register $listener under $key. Called after each successful `pop`.
+
+        Raises:
+            ValueError: If $key is empty or already registered.
+        """
+        if not key:
+            raise ValueError("Cannot call `add_listener` because $key is empty")
+        if key in self._listeners:
+            raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
+        self._listeners[key] = listener
+
+    def remove_listener(self, key: str) -> None:
+        """Unregister listener under $key.
+
+        Raises:
+            ValueError: If $key is unknown.
+        """
+        if key not in self._listeners:
+            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
+        del self._listeners[key]
 
     # endregion
 
