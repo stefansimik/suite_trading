@@ -24,3 +24,32 @@ def round_to_increment(price: Union[float, Decimal], increment: Decimal) -> Deci
 
     # Convert back to price by multiplying by increment
     return rounded_increments * increment
+
+
+def ceil_to_multiple(n: int, m: int) -> int:
+    """
+    Ceil $n to the next multiple of $m. If $n is already a multiple, returns $n.
+
+    Args:
+        n: The integer to round up.
+        m: The positive multiple base.
+
+    Returns:
+        The smallest integer that is a multiple of $m and >= $n.
+
+    Raises:
+        ValueError: If $m <= 0.
+
+    Examples:
+        >>> ceil_to_multiple(0, 5)
+        0
+        >>> ceil_to_multiple(1, 5)
+        5
+        >>> ceil_to_multiple(5, 5)
+        5
+        >>> ceil_to_multiple(14, 5)
+        15
+    """
+    if m <= 0:
+        raise ValueError("m must be a positive integer")
+    return ((n + m - 1) // m) * m
