@@ -258,8 +258,10 @@ class PeriodicTimeEventFeed:
         """
         if not key:
             raise ValueError("Cannot call `add_listener` because $key is empty")
+
         if key in self._listeners:
             raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
+
         self._listeners[key] = listener
 
     def remove_listener(self, key: str) -> None:
@@ -273,6 +275,7 @@ class PeriodicTimeEventFeed:
         """
         if key not in self._listeners:
             raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
+
         del self._listeners[key]
 
     # endregion
