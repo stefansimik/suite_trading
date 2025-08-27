@@ -18,7 +18,7 @@ class OhlcvAccumulator:
     # region Init
 
     def __init__(self) -> None:
-        # First BarType in the window
+        # First BarType
         self.first_bar_type: Optional[BarType] = None
 
         # OHLCV values
@@ -27,6 +27,10 @@ class OhlcvAccumulator:
         self.low: Optional[Decimal] = None
         self.close: Optional[Decimal] = None
         self.volume: Decimal = Decimal("0")
+
+        # Window
+        self.window_start_dt: Optional[datetime] = None
+        self.window_end_dt: Optional[datetime] = None
 
     # endregion
 
@@ -43,6 +47,10 @@ class OhlcvAccumulator:
         self.low = None
         self.close = None
         self.volume = Decimal("0")
+
+        # Window
+        self.window_start_dt: Optional[datetime] = None
+        self.window_end_dt: Optional[datetime] = None
 
     def add(self, bar: Bar) -> None:
         """Add $bar and update open/high/low/close and sum volume.
@@ -64,14 +72,25 @@ class OhlcvAccumulator:
             self.low = bar.low
             self.close = bar.close
             self.volume += bar.volume
+
+            # Set window start/end
+            self.window_start_dt = bar.start_dt
+            self.window_end_dt = bar.end_dt
         else:
             # Check: last added bar-type is the same as first bar-type
             self._require_same_bartype(bar.bar_type)
+
             # Accumulate HLCV (Open price is fixed already)
             self.high = bar.high if bar.high > self.high else self.high
             self.low = bar.low if bar.low < self.low else self.low
             self.close = bar.close
             self.volume += bar.volume
+
+            # Set window start/end
+            if bar.start_dt < self.window_start_dt:
+                self.window_start_dt = bar.start_dt
+            if bar.end_dt > self.window_end_dt:
+                self.window_end_dt = bar.end_dt
 
     def get_aggregated_bar(self, bar_type: BarType, start_dt: datetime, end_dt: datetime) -> Bar:
         """Build one Bar for [$start_dt, $end_dt] using the accumulated OHLCV.
@@ -120,7 +139,7 @@ class OhlcvAccumulator:
         Raises:
             ValueError: If $bar_type is different from $self.first_bar_type.
         """
-        if not self.first_bar_type != bar_type:
+        if self.first_bar_type != bar_type:
             raise ValueError(f"{self.__class__.__name__} cannot accept mixed bar-types in one window. | First bar-type: {self.first_bar_type} | Later bar-type: {bar_type}")
 
     # endregion

@@ -106,11 +106,17 @@ def test_minute_bar_aggregation_first_minute_is_1(count_1min_bars, expected_coun
     assert strategy._count_5min_bars_processed == expected_count_5min_bars
 
 
-@pytest.mark.parametrize("emit_first_partial", [False, True])
-def test_minute_bar_aggregation_first_minute_is_3_emit_first_partial_cases(emit_first_partial: bool):
+@pytest.mark.parametrize(
+    "emit_first_partial, count_1min_bars, expected_count_5min_bars",
+    [
+        (False, 20, 3),
+        (True, 20, 4),
+    ],
+)
+def test_minute_bar_aggregation_first_minute_is_3_emit_first_partial_cases(emit_first_partial: bool, count_1min_bars: int, expected_count_5min_bars: int):
     engine = TradingEngine()
     strategy = ConfigurableStrategy(
-        count_1min_bars=20,
+        count_1min_bars=count_1min_bars,
         first_bar_end_minute=3,
         emit_first_partial=emit_first_partial,
     )
@@ -118,5 +124,5 @@ def test_minute_bar_aggregation_first_minute_is_3_emit_first_partial_cases(emit_
 
     engine.start()
 
-    assert strategy._count_1min_bars_processed == 20
-    assert strategy._count_5min_bars_processed == 3
+    assert strategy._count_1min_bars_processed == count_1min_bars
+    assert strategy._count_5min_bars_processed == expected_count_5min_bars
