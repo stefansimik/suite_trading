@@ -17,8 +17,6 @@ from suite_trading.utils.math import ceil_to_multiple
 
 logger = logging.getLogger(__name__)
 
-MINUTES_PER_DAY = 24 * 60  # Improves readability of window validations
-
 
 class MinuteBarAggregationEventFeed:
     # region Init
@@ -199,6 +197,8 @@ class MinuteBarAggregationEventFeed:
             ValueError: If $window_minutes is not an int, <= 0, >= MINUTES_PER_DAY, or does not
                 evenly divide a day (i.e., 24*60 % N != 0).
         """
+        MINUTES_PER_DAY = 24 * 60
+
         # Validate window size in small, readable steps for clarity and precise error reporting
         if not isinstance(window_minutes, int):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $window_minutes must be an int (minutes).")
