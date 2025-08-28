@@ -1,7 +1,7 @@
 import math
 
 from suite_trading.utils.data_generation.price_patterns import linear_function, sine_wave_function, zig_zag_function
-from suite_trading.utils.data_generation.bars import create_bar_series, DEFAULT_FIRST_BAR
+from suite_trading.utils.data_generation.bar_generation import create_bar_series, DEFAULT_FIRST_BAR
 
 
 def test_linear_function():

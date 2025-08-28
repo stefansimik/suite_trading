@@ -197,7 +197,8 @@ self.add_event_feed("historical_data", feed)
 2) Generating demo data
 
 ```python
-from suite_trading.utils.data_generation.bars import DEFAULT_FIRST_BAR
+from suite_trading.utils.data_generation.bar_generation import DEFAULT_FIRST_BAR
+
 
 demo_feed = GeneratedBarsEventFeed(
     first_bar=DEFAULT_FIRST_BAR,
@@ -252,7 +253,7 @@ from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import 
     MinuteBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
-from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
+from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar
 
 
 class AggregationStrategy(Strategy):

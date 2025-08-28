@@ -1,6 +1,6 @@
 from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.platform.messaging.message_bus import MessageBus
-from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
+from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 
 

@@ -16,7 +16,7 @@
 import sys
 import os
 from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.utils.data_generation.bars import create_bar, create_bar_series
+from suite_trading.utils.data_generation.bar_generation import create_bar, create_bar_series
 from suite_trading.utils.data_generation.price_patterns import linear_function, sine_wave_function, zig_zag_function
 import plotly.graph_objects as go
 import pandas as pd

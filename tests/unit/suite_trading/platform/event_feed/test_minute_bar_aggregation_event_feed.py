@@ -34,7 +34,7 @@ from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import 
     MinuteBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
-from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
+from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar
 
 logger = logging.getLogger(__name__)
 

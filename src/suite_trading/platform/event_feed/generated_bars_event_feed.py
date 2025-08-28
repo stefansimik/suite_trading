@@ -13,7 +13,7 @@ from suite_trading.utils.datetime_utils import require_utc
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.utils.data_generation.bars import (
+from suite_trading.utils.data_generation.bar_generation import (
     create_bar_series,
     DEFAULT_FIRST_BAR,
 )
