@@ -3,7 +3,7 @@ from datetime import timedelta
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.platform.event_feed.generated_bars_event_feed import GeneratedBarsEventFeed
 from suite_trading.platform.event_feed.event_feed import EventFeed
-from suite_trading.platform.event_feed.periodic_time_event_feed import PeriodicTimeEventFeed
+from suite_trading.platform.event_feed.periodic_time_event_feed import FixedIntervalEventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.engine.trading_engine import TradingEngine
 
@@ -20,7 +20,7 @@ class DemoStrategy(Strategy):
         self.add_event_feed("bars_feed", bars_feed)
 
         # Add data to strategy: Time notifications each 10 seconds
-        time_feed: EventFeed = PeriodicTimeEventFeed(
+        time_feed: EventFeed = FixedIntervalEventFeed(
             start_dt=bars_feed.peek().bar.end_dt,  # Align first time notification with first bar
             interval=timedelta(seconds=10),  # Le'ts have time notifications each 10 seconds
             finish_with_feed=bars_feed,  # Stop time notifications, when $bars_feed is finished

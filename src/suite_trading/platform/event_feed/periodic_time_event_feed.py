@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class TimeTickEvent(Event):
-    """Time notification produced by PeriodicTimeEventFeed.
+    """Time notification produced by FixedIntervalEventFeed.
 
     Purpose:
         Represent a scheduled time tick with its official time ($dt_event) and the
@@ -61,7 +61,7 @@ class TimeTickEvent(Event):
     # endregion
 
 
-class PeriodicTimeEventFeed:
+class FixedIntervalEventFeed:
     """Emit TimeTickEvent at a fixed interval (on‑the‑fly, non‑blocking).
 
     Usage:
@@ -98,17 +98,17 @@ class PeriodicTimeEventFeed:
 
         # Check: $interval must be a timedelta to enforce an unambiguous schedule unit
         if not isinstance(interval, timedelta):
-            raise ValueError("Cannot call `PeriodicTimeEventFeed.__init__` because $interval is not timedelta.")
+            raise ValueError("Cannot call `FixedIntervalEventFeed.__init__` because $interval is not timedelta.")
 
         # Check: $interval must be > 0 to make forward progress
         if interval <= timedelta(0):
-            raise ValueError("Cannot call `PeriodicTimeEventFeed.__init__` because $interval is non-positive.")
+            raise ValueError("Cannot call `FixedIntervalEventFeed.__init__` because $interval is non-positive.")
 
         # Check: $end_datetime (when provided) must be UTC and >= $start_datetime
         if end_dt is not None:
             require_utc(end_dt)
             if end_dt < start_dt:
-                raise ValueError("Cannot call `PeriodicTimeEventFeed.__init__` because $end_datetime < $start_datetime.")
+                raise ValueError("Cannot call `FixedIntervalEventFeed.__init__` because $end_datetime < $start_datetime.")
 
         # Copy input params
         self._start_dt: datetime = start_dt
