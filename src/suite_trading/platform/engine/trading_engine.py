@@ -223,18 +223,14 @@ class TradingEngine:
         """
         # Check: strategy name must be unique and not already added
         if name in self._name_strategies_bidict:
-            raise ValueError(
-                f"Cannot call `add_strategy` because strategy name $name ('{name}') is already added to this TradingEngine. Choose a different name.",
-            )
+            raise ValueError(f"Cannot call `add_strategy` because Strategy named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
         # Check: strategy must be NEW before attaching
         if strategy.state != StrategyState.NEW:
-            raise ValueError(
-                "Cannot call `add_strategy` because $strategy is not NEW. Current $state is {strategy.state.name}. Provide a fresh instance of {strategy.__class__.__name__}.",
-            )
+            raise ValueError("Cannot call `add_strategy` because $strategy is not NEW. Current $state is {strategy.state.name}. Provide a fresh instance of {strategy.__class__.__name__}.")
 
         # Connect strategy to this engine
-        strategy._set_trading_engine(self)
+        strategy.set_trading_engine(self)
         self._name_strategies_bidict[name] = strategy
 
         # Set up clocks tracking for this strategy
@@ -245,7 +241,7 @@ class TradingEngine:
 
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
-        logger.debug(f"Added Strategy named '{name}' (class {strategy.__class__.__name__})")
+        logger.debug(f"TradingEngine added Strategy named '{name}' (class {strategy.__class__.__name__})")
 
     def start_strategy(self, name: str) -> None:
         """Start a strategy with specified name.
@@ -303,19 +299,17 @@ class TradingEngine:
 
         logger.info(f"Stopping Strategy named '{name}'")
 
-        # Close feeds first (best effort), then stop the strategy; raise once if there were close errors
-        error_count = self._cleanup_all_feeds_for_strategy(strategy)
-
         try:
             strategy.on_stop()
-            if error_count > 0:
-                raise RuntimeError(f"Strategy `on_stop` succeeded, but {error_count} EventFeed(s) failed to close for Strategy named '{name}'")
             strategy._state_machine.execute_action(StrategyAction.STOP_STRATEGY)
             logger.debug(f"Strategy named '{name}' transitioned to {strategy.state.name}")
         except Exception as e:
             strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
-            logger.error(f"Error in `stop_strategy` for Strategy named '{name}' (class {strategy.__class__.__name__}, state {strategy.state.name}): {e}")
+            logger.error(f"Strategy named '{name}' transitioned to {strategy.state.name} | Exception: {e}")
             raise
+
+        # Cleanup all feeds
+        self._close_and_remove_all_feeds_for_strategy(strategy)
 
     def remove_strategy(self, name: str) -> None:
         """Remove a strategy by name.
@@ -489,40 +483,37 @@ class TradingEngine:
             # Go over all strategies in RUNNING state
             running_strategies = [s for s in self._name_strategies_bidict.values() if s.state == StrategyState.RUNNING]
             for strategy in running_strategies:
+                strategy_name = self._get_strategy_name(strategy)
+
                 # Find the oldest event and if found, then process it
                 if (next_feed_tuple := self._find_feed_with_oldest_event(strategy)) is not None:
                     feed_name, feed, callback = next_feed_tuple
-                    oldest_event = feed.pop()
+                    next_event = feed.pop()
 
-                    # Update clocks for this strategy (timeline and wall-clock)
-                    self._strategy_clocks_dict[strategy].update_on_event(oldest_event.dt_event, oldest_event.dt_received)
+                    # Update clocks for this strategy
+                    self._strategy_clocks_dict[strategy].update_on_event(next_event.dt_event, next_event.dt_received)
 
-                    # Process event in callback
+                    # Process event in its callback
                     try:
-                        callback(oldest_event)
+                        callback(next_event)
                     except Exception as e:
-                        strategy_name = self._get_strategy_name(strategy)
-                        logger.error(f"Exception raised during processing event for Strategy named '{strategy_name}'. | Exception: {e}")
-                        # Mark strategy as failed
+                        logger.error(f"Exception raised during processing event: {next_event} for Strategy named '{strategy_name}'. | Exception: {e}")
+                        # Move strategy to error state
                         strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
+                        # Allow strategy to handler error state (do some cleanup)
                         strategy.on_error(e)
-                        # Terminate all feeds for this strategy in case of error (per-feed errors are already logged)
-                        self._cleanup_all_feeds_for_strategy(strategy)
+                        # Cleanup all feeds for this strategy
+                        self._close_and_remove_all_feeds_for_strategy(strategy)
 
                     # Notify EventFeed listeners after strategy callback
                     try:
                         for listener in feed.get_listeners():
                             try:
-                                listener(oldest_event)
+                                listener(next_event)
                             except Exception as le:
-                                strategy_name = self._get_strategy_name(strategy)
                                 logger.error(f"Error in EventFeed listener for Strategy named '{strategy_name}' on EventFeed named '{feed_name}': {le}")
                     except Exception as outer:
-                        strategy_name = self._get_strategy_name(strategy)
                         logger.error(f"Error retrieving listeners for Strategy named '{strategy_name}' on EventFeed named '{feed_name}': {outer}")
-
-            # Routine cleanup for finished event-feeds
-            self._cleanup_finished_feeds()
 
             # Auto-stop strategies that have no active event-feeds left
             for name, strategy in list(self._name_strategies_bidict.items()):
@@ -594,37 +585,26 @@ class TradingEngine:
         Raises:
             ValueError: If $strategy is not registered.
         """
-        # Check: strategy must be added to this engine
-        if strategy not in self._name_strategies_bidict.values():
-            raise ValueError(
-                "Cannot call `remove_event_feed_from_strategy` because $strategy ({strategy.__class__.__name__}) is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
-            )
+        strategy_name = self._get_strategy_name(strategy)
 
-        # Find entry directly
-        entry = self._strategy_feeds_dict[strategy].get(feed_name)
-        feed_to_close = entry.feed if entry else None
-
-        # Handle case where feed doesn't exist (already finished/removed)
-        if feed_to_close is None:
-            strategy_name = self._get_strategy_name(strategy)
-            logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished or removed - no action needed")
+        # Handle case where feed doesn't exist
+        feed_callback_tuple = self._strategy_feeds_dict[strategy].get(feed_name, None)
+        feed_does_not_exist = feed_callback_tuple is None
+        if feed_does_not_exist:
+            logger.warning(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' cannot be removed, as there no such EventFeed.")
             return
 
-        # Close the feed first
         try:
+            # Close the feed
+            feed_to_close = feed_callback_tuple.feed
             feed_to_close.close()
         except Exception as e:
-            strategy_name = self._get_strategy_name(strategy)
-            logger.error(f"Error closing EventFeed named '{feed_name}' for Strategy named '{strategy_name}': {e}")
+            # Just log error, there is no way how to fix this
+            logger.error(f"Error happened while closing EventFeed named '{feed_name}' for Strategy named '{strategy_name}': {e}")
 
-        # Remove from local registry
-        removed = self._strategy_feeds_dict[strategy].pop(feed_name, None)
-        if removed is None:
-            strategy_name = self._get_strategy_name(strategy)
-            logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished or removed - no action needed")
-        else:
-            strategy_name = self._get_strategy_name(strategy)
-            logger.info(f"Removed EventFeed named '{feed_name}' from Strategy named '{strategy_name}'")
+        # Remove EventFeed from strategy
+        del self._strategy_feeds_dict[strategy][feed_name]
+        logger.info(f"EventFeed named '{feed_name}' was removed from Strategy named '{strategy_name}'")
 
     # endregion
 
@@ -680,39 +660,19 @@ class TradingEngine:
 
         return winner_tuple
 
-    def _cleanup_finished_feeds(self) -> None:
-        # Close and remove feeds that report finished state
-        for strategy, name_vs_entry in self._strategy_feeds_dict.items():
-            finished = [n for n, entry in name_vs_entry.items() if entry.feed.is_finished()]
-            for feed_name in finished:
-                event_feed = name_vs_entry[feed_name].feed
-                try:
-                    event_feed.close()
-                except Exception as e:
-                    strategy_name = self._get_strategy_name(strategy)
-                    logger.error(f"Error closing finished EventFeed named '{feed_name}' for Strategy named '{strategy_name}' in `_cleanup_finished_feeds`: {e}")
-                del name_vs_entry[feed_name]
-                strategy_name = self._get_strategy_name(strategy)
-                logger.debug(f"Cleaned up finished EventFeed named '{feed_name}' for Strategy named '{strategy_name}'")
+    def _close_and_remove_all_feeds_for_strategy(self, strategy: Strategy) -> None:
+        strategy_name = self._get_strategy_name(strategy)
 
-    def _cleanup_all_feeds_for_strategy(self, strategy: Strategy) -> int:
-        count_feeds_closed_with_exc = 0
-        count_feeds_closed_ok = 0
-
-        # Go over all feeds of strategy
+        # Close all feeds for this Strategy
         name_feeds_dict = self._strategy_feeds_dict[strategy]
         for name, (feed, _) in list(name_feeds_dict.items()):
             try:
                 feed.close()
-                count_feeds_closed_ok += 1
             except Exception as e:
-                count_feeds_closed_with_exc += 1
-                strategy_name = self._get_strategy_name(strategy)
                 logger.error(f"Error during closing EventFeed named '{name}' for Strategy named '{strategy_name}': {e}")
+
+        # Remove all feeds for this Strategy
         name_feeds_dict.clear()
-        strategy_name = self._get_strategy_name(strategy)
-        logger.info(f"Cleaned up {count_feeds_closed_ok} all EventFeed(s) for Strategy named '{strategy_name}'; errors={count_feeds_closed_with_exc}")
-        return count_feeds_closed_with_exc
 
     # endregion
 
