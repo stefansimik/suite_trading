@@ -64,7 +64,7 @@ class ConfigurableStrategy(Strategy):
         src_feed = DemoBarEventFeed(first_bar=first_bar, num_bars=self._count_1min_bars)
         self.add_event_feed("source_1min", src_feed)  # source 1-min feed (we still count its events)
 
-        # Aggregate to 5-minute bars with optional first-partial emission
+        # Aggregate to 5-minute bars
         agg_feed = MinuteBarAggregationEventFeed(
             source_feed=src_feed,
             window_minutes=5,

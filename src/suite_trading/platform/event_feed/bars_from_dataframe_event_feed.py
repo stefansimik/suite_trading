@@ -191,14 +191,10 @@ class BarsFromDataFrameEventFeed:
         self._listeners[key] = listener
 
     def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key.
-
-        Raises:
-            ValueError: If $key is unknown.
-        """
+        """Unregister listener under $key. Log warning if $key is unknown."""
         if key not in self._listeners:
-            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
-
+            logger.warning(f"Attempted to remove unknown listener $key ('{key}') from EventFeed (class {self.__class__.__name__})")
+            return
         del self._listeners[key]
 
     # endregion

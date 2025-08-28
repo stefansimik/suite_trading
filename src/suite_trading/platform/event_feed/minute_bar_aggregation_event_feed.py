@@ -155,7 +155,7 @@ class MinuteBarAggregationEventFeed:
 
         # Remove events older than cutoff
         if self._aggregated_bars_queue:
-            while self._aggregated_bars_queue[0].dt_event < cutoff_time:
+            while self._aggregated_bars_queue and self._aggregated_bars_queue[0].dt_event < cutoff_time:
                 self._aggregated_bars_queue.popleft()
 
     def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
@@ -173,14 +173,10 @@ class MinuteBarAggregationEventFeed:
         self._listeners[key] = listener
 
     def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key.
-
-        Raises:
-            ValueError: If $key is unknown.
-        """
+        """Unregister listener under $key. Log warning if $key is unknown."""
         if key not in self._listeners:
-            raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
-
+            logger.warning(f"Attempted to remove unknown listener $key ('{key}') from EventFeed (class {self.__class__.__name__})")
+            return
         del self._listeners[key]
 
     # endregion
@@ -256,11 +252,9 @@ class MinuteBarAggregationEventFeed:
     # region String representations
 
     def __str__(self) -> str:
-        # TODO: Implement
-        ...
+        return f"{self.__class__.__name__}(window_minutes={self._window_minutes}, queued={len(self._aggregated_bars_queue)}, closed={self._closed}, count_aggregated_bars={self.count_aggregated_bars})"
 
     def __repr__(self) -> str:
-        # TODO: Implement
-        ...
+        return f"{self.__class__.__name__}(window_minutes={self._window_minutes!r}, queued={len(self._aggregated_bars_queue)!r}, closed={self._closed!r}, count_aggregated_bars={self.count_aggregated_bars!r})"
 
     # endregion
