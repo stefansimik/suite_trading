@@ -94,14 +94,6 @@ class DemoBarEventFeed:
         # Consume event
         event = self._events.popleft()
 
-        # Notify listeners
-        if self._listeners:
-            for k, fn in list(self._listeners.items()):
-                try:
-                    fn(event)
-                except Exception as e:
-                    logger.error(f"Error in listener '{k}' for DemoBarEventFeed: {e}")
-
         return event
 
     def is_finished(self) -> bool:
@@ -157,6 +149,9 @@ class DemoBarEventFeed:
             logger.warning(f"Attempted to remove unknown listener $key ('{key}') from EventFeed (class {self.__class__.__name__})")
             return
         del self._listeners[key]
+
+    def get_listeners(self) -> list[Callable[[Event], None]]:
+        return list(self._listeners.values())
 
     # endregion
 

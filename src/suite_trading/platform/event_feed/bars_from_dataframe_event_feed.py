@@ -128,13 +128,6 @@ class BarsFromDataFrameEventFeed:
         # Consume the cached event + advance the row pointer
         self._next_bar_event = None
         self._row_index_of_next_event += 1
-        # Notify listeners (catch/log and continue)
-        if self._listeners:
-            for k, fn in list(self._listeners.items()):
-                try:
-                    fn(event)
-                except Exception as e:
-                    logger.error(f"Error in listener '{k}' for BarsFromDataFrameEventFeed: {e}")
         return event
 
     def is_finished(self) -> bool:
@@ -196,6 +189,9 @@ class BarsFromDataFrameEventFeed:
             logger.warning(f"Attempted to remove unknown listener $key ('{key}') from EventFeed (class {self.__class__.__name__})")
             return
         del self._listeners[key]
+
+    def get_listeners(self) -> list[Callable[[Event], None]]:
+        return list(self._listeners.values())
 
     # endregion
 

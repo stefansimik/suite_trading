@@ -56,17 +56,6 @@ class EventFeed(Protocol):
         """
         ...
 
-    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key.
-
-        Contract:
-        - Called synchronously after each successful `pop()` with the consumed Event.
-        - $key must be unique and non-empty; raise ValueError on duplicates or empty keys.
-        - Listeners must be fast/non-blocking; implementations must catch, log, and continue on listener exceptions.
-        - Listeners are invoked in registration order.
-        """
-        ...
-
-    def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key. Log warning if $key is unknown."""
+    def get_listeners(self) -> list[Callable[[Event], None]]:
+        """Return all registered listeners for this EventFeed in registration order."""
         ...

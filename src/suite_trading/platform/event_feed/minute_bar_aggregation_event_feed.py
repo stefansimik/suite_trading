@@ -117,14 +117,6 @@ class MinuteBarAggregationEventFeed:
         # Consume leftmost value
         next_event = self._aggregated_bars_queue.popleft()
 
-        # Notify listeners (catch/log and continue)
-        if self._listeners:
-            for key, listener_fn in list(self._listeners.items()):
-                try:
-                    listener_fn(next_event)
-                except Exception as exc:
-                    logger.error(f"Error notifying listener '{key}' for EventFeed (class {self.__class__.__name__}): {exc}")
-
         return next_event
 
     def is_finished(self) -> bool:
@@ -178,6 +170,9 @@ class MinuteBarAggregationEventFeed:
             logger.warning(f"Attempted to remove unknown listener $key ('{key}') from EventFeed (class {self.__class__.__name__})")
             return
         del self._listeners[key]
+
+    def get_listeners(self) -> list[Callable[[Event], None]]:
+        return list(self._listeners.values())
 
     # endregion
 

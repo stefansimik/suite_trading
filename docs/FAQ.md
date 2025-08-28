@@ -52,9 +52,8 @@ An `EventFeed` is a simple, non‑blocking stream of events with these methods:
 - `close() -> None` — Free resources. Idempotent and non‑blocking.
 - `remove_events_before(cutoff_time: datetime) -> None`
   - Drop events earlier than a cutoff (used when adding feeds late).
-- `add_listener(key: str, listener: Callable[[Event], None]) -> None`
-  - Called right after `pop()`. Fast, non‑blocking listener contract.
-- `remove_listener(key: str) -> None`
+- `get_listeners() -> list[Callable[[Event], None]]`
+  - Return all registered listeners for this EventFeed in registration order (read‑only view).
 
 Implement this protocol and your data source can feed a strategy with any data (historical bars, live
 ticks, time signals, news) from any data sources (like CSVs, databases, webhooks, ///)
@@ -72,6 +71,12 @@ complete control. You can:
 ---
 
 ### Automatic synchronization
+
+Note on listeners and invocation order
+- Implementations may still offer `add_listener`/`remove_listener` for registration convenience, but listener invocation is no longer done inside `EventFeed.pop()`.
+- The `TradingEngine` is responsible for invoking EventFeed listeners. It calls `feed.get_listeners()` and invokes each listener right after the strategy callback processes the popped event.
+- Ordering: listeners are invoked in the order returned by `get_listeners()` (registration order).
+- Error handling: listener exceptions are caught and logged; the engine keeps running.
 
 Here’s where the magic happens — the `TradingEngine` automatically synchronizes ALL your
 added `EventFeed`(s) per `Strategy`:
@@ -107,7 +112,7 @@ added `EventFeed`(s) per `Strategy`:
 3) `MinuteBarAggregationEventFeed`
 - Purpose: aggregate minute bars (e.g., 1‑min) to N‑minute bars (e.g., 5‑min).
 - How it works:
-  - Registers as a listener on the source feed via `add_listener(...)`
+  - Registers as a listener on the source feed via the implementation's `add_listener(...)` (concrete feeds may expose registration helpers even though the EventFeed Protocol only requires `get_listeners()`)
   - Accumulates OHLCV and emits on N‑minute boundaries
   - Emits `NewBarEvent` with source `dt_received` and `is_historical`
   - `emit_first_partial` decides whether the very first partial bar is emitted
@@ -285,7 +290,7 @@ engine.start()
 ```
 
 What to notice:
-- The aggregation feed registers as a listener on the source via `add_listener(...)`
+- The aggregation feed registers as a listener on the source via the implementation's `add_listener(...)` (engine invokes listeners after strategy callback)
 - The strategy receives both 1‑min and 5‑min `NewBarEvent`(s), interleaved in time order
 - `emit_first_partial` lets you emit the initial partial window when desired
 
@@ -395,7 +400,6 @@ Aggregation rules (5‑min windows), straight from `MinuteBarAggregationEventFee
 - A bar ending exactly at a window boundary triggers bar emission
 - First partial window emission is controlled by parameter `emit_first_partial`
 
----
 
 ### Key benefits
 

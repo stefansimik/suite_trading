@@ -511,6 +511,18 @@ class TradingEngine:
                         if error_count > 0:
                             logger.debug(f"Closed feeds after on_error callback for Strategy named '{strategy_name}'; errors={error_count}")
 
+                    # Notify EventFeed listeners after strategy callback
+                    try:
+                        for listener in feed.get_listeners():
+                            try:
+                                listener(oldest_event)
+                            except Exception as le:
+                                strategy_name = self._get_strategy_name(strategy)
+                                logger.error(f"Error in EventFeed listener for Strategy named '{strategy_name}' on EventFeed named '{feed_name}': {le}")
+                    except Exception as outer:
+                        strategy_name = self._get_strategy_name(strategy)
+                        logger.error(f"Error retrieving listeners for Strategy named '{strategy_name}' on EventFeed named '{feed_name}': {outer}")
+
             # Routine cleanup for finished event-feeds
             self._cleanup_finished_feeds()
 

@@ -178,14 +178,6 @@ class PeriodicTimeEventFeed:
         if self._end_dt is not None and self._next_tick_dt > self._end_dt:
             self._finished = True
 
-        # Notify listeners (catch/log and continue)
-        if self._listeners:
-            for k, fn in list(self._listeners.items()):
-                try:
-                    fn(event)
-                except Exception as e:
-                    logger.error(f"Error in listener '{k}' for PeriodicTimeEventFeed: {e}")
-
         return event
 
     def is_finished(self) -> bool:
@@ -277,6 +269,9 @@ class PeriodicTimeEventFeed:
             raise ValueError(f"Cannot call `remove_listener` because $key ('{key}') is unknown. Ensure you registered the listener before removing it.")
 
         del self._listeners[key]
+
+    def get_listeners(self) -> list[Callable[[Event], None]]:
+        return list(self._listeners.values())
 
     # endregion
 
