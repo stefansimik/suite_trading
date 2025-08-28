@@ -38,7 +38,7 @@ from datetime import timedelta
 
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.platform.engine.trading_engine import TradingEngine
-from suite_trading.platform.event_feed.demo_bar_event_feed import DemoBarEventFeed
+from suite_trading.platform.event_feed.generated_bars_event_feed import GeneratedBarsEventFeed
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.platform.event_feed.periodic_time_event_feed import PeriodicTimeEventFeed
 from suite_trading.strategy.strategy import Strategy
@@ -54,17 +54,16 @@ class DemoStrategy(Strategy):
         logger.debug("Strategy starting...")
 
         # Add data to strategy: 1-minute bars (demo data)
-        bars_feed: EventFeed = DemoBarEventFeed(num_bars=20)
+        bars_feed: EventFeed = GeneratedBarsEventFeed(num_bars=20)
         self.add_event_feed("bars_feed", bars_feed)
 
         # Add data to strategy: Time notifications each 10 seconds
         time_feed: EventFeed = PeriodicTimeEventFeed(
             start_dt=bars_feed.peek().bar.end_dt,  # Align first time notification with first bar
-            interval=timedelta(seconds=10),        # Le'ts have time notifications each 10 seconds
-            finish_with_feed=bars_feed,            # Stop time notifications, when $bars_feed is finished
+            interval=timedelta(seconds=10),  # Le'ts have time notifications each 10 seconds
+            finish_with_feed=bars_feed,  # Stop time notifications, when $bars_feed is finished
         )
         self.add_event_feed("time_feed", time_feed)
-
 
     # Standard callback for all events
     def on_event(self, event):
@@ -74,11 +73,9 @@ class DemoStrategy(Strategy):
             # Handle all other events here
             logger.debug(f"Received (unhandled) event: {event}")
 
-
     # Custom handler for bars
     def on_bar(self, bar):
         logger.debug(f"Received bar: {bar}")
-
 
     # Standard callback, when strategy stops
     def on_stop(self):
@@ -209,7 +206,7 @@ This project is in **active development** with approximately **60-70% of core fu
 
 Current status (as of 2025-08-18):
 - Ready to try: TradingEngine, Strategy lifecycle, Event model (Bar/TradeTick/QuoteTick),
-  EventFeed(s), MessageBus, and demo data feeds (e.g., DemoBarEventFeed).
+  EventFeed(s), MessageBus, and demo data feeds (e.g., GeneratedBarsEventFeed).
 - Not yet available: EventFeedProvider(s) for live/historical integrations, Broker(s),
   advanced order types, indicators, performance analytics.
 

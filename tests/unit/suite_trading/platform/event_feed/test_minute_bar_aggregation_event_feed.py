@@ -1,7 +1,7 @@
 """Tests for MinuteBarAggregationEventFeed aggregation behavior.
 
 Logical structure:
-- We generate 1-minute bars using DemoBarEventFeed. The starting minute (end time minute)
+- We generate 1-minute bars using GeneratedBarsEventFeed. The starting minute (end time minute)
   of the first 1-minute bar is configurable.
 - We aggregate those 1-minute bars into 5-minute bars aligned to day boundaries (ends at
   minutes 5, 10, 15, ...). The aggregator can optionally emit the first partial window via
@@ -29,7 +29,7 @@ import pytest
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.platform.engine.trading_engine import TradingEngine
-from suite_trading.platform.event_feed.demo_bar_event_feed import DemoBarEventFeed
+from suite_trading.platform.event_feed.generated_bars_event_feed import GeneratedBarsEventFeed
 from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import (
     MinuteBarAggregationEventFeed,
 )
@@ -61,7 +61,7 @@ class ConfigurableStrategy(Strategy):
         first_bar = create_bar(bar_type=bt_1m, end_dt=first_end_dt)
 
         # Create the 1-minute demo feed with the configured number of bars
-        src_feed = DemoBarEventFeed(first_bar=first_bar, num_bars=self._count_1min_bars)
+        src_feed = GeneratedBarsEventFeed(first_bar=first_bar, num_bars=self._count_1min_bars)
         self.add_event_feed("source_1min", src_feed)  # source 1-min feed (we still count its events)
 
         # Aggregate to 5-minute bars

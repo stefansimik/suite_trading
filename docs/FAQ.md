@@ -105,7 +105,7 @@ added `EventFeed`(s) per `Strategy`:
   - Can auto‑sort by `end_dt` (`auto_sort=True` by default)
   - Emits events with `is_historical=True`
 
-2) `DemoBarEventFeed`
+2) `GeneratedBarsEventFeed`
 - Purpose: generate a synthetic bar series in memory (great for demos and tests).
 - Uses a `deque`; `peek()` returns the left element, `pop()` consumes it.
 
@@ -199,7 +199,7 @@ self.add_event_feed("historical_data", feed)
 ```python
 from suite_trading.utils.data_generation.bars import DEFAULT_FIRST_BAR
 
-demo_feed = DemoBarEventFeed(
+demo_feed = GeneratedBarsEventFeed(
     first_bar=DEFAULT_FIRST_BAR,
     num_bars=100,  # Generate 100 bars
 )
@@ -247,12 +247,13 @@ from datetime import datetime, timezone
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.platform.engine.trading_engine import TradingEngine
-from suite_trading.platform.event_feed.demo_bar_event_feed import DemoBarEventFeed
+from suite_trading.platform.event_feed.generated_bars_event_feed import GeneratedBarsEventFeed
 from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import (
     MinuteBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.utils.data_generation.bars import create_bar_type, create_bar
+
 
 class AggregationStrategy(Strategy):
     def __init__(self) -> None:
@@ -265,7 +266,7 @@ class AggregationStrategy(Strategy):
         first_end = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc)
         first_bar = create_bar(bar_type=bt_1m, end_dt=first_end)
 
-        src = DemoBarEventFeed(first_bar=first_bar, num_bars=20)
+        src = GeneratedBarsEventFeed(first_bar=first_bar, num_bars=20)
         self.add_event_feed("1m", src)
 
         agg = MinuteBarAggregationEventFeed(
@@ -283,6 +284,7 @@ class AggregationStrategy(Strategy):
                     self.n_1m += 1
                 if int(event.bar.bar_type.value) == 5:
                     self.n_5m += 1
+
 
 engine = TradingEngine()
 engine.add_strategy("agg", AggregationStrategy())

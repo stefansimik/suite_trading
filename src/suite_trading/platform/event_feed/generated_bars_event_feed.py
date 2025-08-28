@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# DemoBarEventFeed: In-memory, historical bar events using generated demo bars.
+# GeneratedBarsEventFeed: In-memory, historical bar events using generated demo bars.
 # Uses a deque to store remaining events; pop() pops from the left.
 
 from collections import deque
@@ -23,7 +23,7 @@ from suite_trading.utils.data_generation.price_patterns import zig_zag_function
 logger = logging.getLogger(__name__)
 
 
-class DemoBarEventFeed:
+class GeneratedBarsEventFeed:
     """Historical, in-memory EventFeed producing NewBarEvent from generated demo bars.
 
     Non-blocking operations; single-consumer expectation.
@@ -52,7 +52,7 @@ class DemoBarEventFeed:
         """
         # Check: $num_bars must be >= 1
         if num_bars is None or num_bars < 1:
-            raise ValueError(f"Cannot call `DemoBarEventFeed.__init__` because $num_bars ('{num_bars}') is invalid. Provide a value >= 1.")
+            raise ValueError(f"Cannot call `GeneratedBarsEventFeed.__init__` because $num_bars ('{num_bars}') is invalid. Provide a value >= 1.")
 
         # Initialize feed as not closed yet
         self._closed: bool = False

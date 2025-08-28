@@ -1,7 +1,7 @@
 import logging
 from datetime import timedelta
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
-from suite_trading.platform.event_feed.demo_bar_event_feed import DemoBarEventFeed
+from suite_trading.platform.event_feed.generated_bars_event_feed import GeneratedBarsEventFeed
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.platform.event_feed.periodic_time_event_feed import PeriodicTimeEventFeed
 from suite_trading.strategy.strategy import Strategy
@@ -16,7 +16,7 @@ class DemoStrategy(Strategy):
         logger.debug("Strategy starting...")
 
         # Add data to strategy: 1-minute bars (demo data)
-        bars_feed: EventFeed = DemoBarEventFeed(num_bars=20)
+        bars_feed: EventFeed = GeneratedBarsEventFeed(num_bars=20)
         self.add_event_feed("bars_feed", bars_feed)
 
         # Add data to strategy: Time notifications each 10 seconds
