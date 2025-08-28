@@ -507,9 +507,7 @@ class TradingEngine:
                         strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
                         strategy.on_error(e)
                         # Terminate all feeds for this strategy in case of error (per-feed errors are already logged)
-                        error_count = self._cleanup_all_feeds_for_strategy(strategy)
-                        if error_count > 0:
-                            logger.debug(f"Closed feeds after on_error callback for Strategy named '{strategy_name}'; errors={error_count}")
+                        self._cleanup_all_feeds_for_strategy(strategy)
 
                     # Notify EventFeed listeners after strategy callback
                     try:
@@ -710,10 +708,10 @@ class TradingEngine:
             except Exception as e:
                 count_feeds_closed_with_exc += 1
                 strategy_name = self._get_strategy_name(strategy)
-                logger.error(f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}': {e}")
+                logger.error(f"Error during closing EventFeed named '{name}' for Strategy named '{strategy_name}': {e}")
         name_feeds_dict.clear()
         strategy_name = self._get_strategy_name(strategy)
-        logger.info(f"Cleaned up {count_feeds_closed_ok} EventFeed(s) for Strategy named '{strategy_name}'; errors={count_feeds_closed_with_exc}")
+        logger.info(f"Cleaned up {count_feeds_closed_ok} all EventFeed(s) for Strategy named '{strategy_name}'; errors={count_feeds_closed_with_exc}")
         return count_feeds_closed_with_exc
 
     # endregion
