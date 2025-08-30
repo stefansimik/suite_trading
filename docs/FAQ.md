@@ -105,9 +105,9 @@ added `EventFeed`(s) per `Strategy`:
   - Can auto‑sort by `end_dt` (`auto_sort=True` by default)
   - Emits events with `is_historical=True`
 
-2) `GeneratedBarsEventFeed`
-- Purpose: generate a synthetic bar series in memory (great for demos and tests).
-- Uses a `deque`; `peek()` returns the left element, `pop()` consumes it.
+2) `FixedSequenceEventFeed` (with create_bar_series)
+- Purpose: feed synthetic demo bars by wrapping create_bar_series output into `NewBarEvent`(s).
+- Uses a deque internally; `peek()` returns the next event, `pop()` consumes it.
 
 3) `MinuteBarAggregationEventFeed`
 - Purpose: aggregate minute bars (e.g., 1‑min) to N‑minute bars (e.g., 5‑min).
@@ -197,13 +197,13 @@ self.add_event_feed("historical_data", feed)
 2) Generating demo data
 
 ```python
-from suite_trading.utils.data_generation.bar_generation import DEFAULT_FIRST_BAR
+from suite_trading.utils.data_generation.bar_generation import DEFAULT_FIRST_BAR, create_bar_series
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 
-
-demo_feed = GeneratedBarsEventFeed(
-    first_bar=DEFAULT_FIRST_BAR,
-    num_bars=100,  # Generate 100 bars
-)
+bars = create_bar_series(first_bar=DEFAULT_FIRST_BAR, num_bars=100)
+events = [NewBarEvent(bar=b, dt_received=b.end_dt, is_historical=True) for b in bars]
+demo_feed = FixedSequenceEventFeed(events)
 self.add_event_feed("demo_data", demo_feed)
 ```
 
@@ -248,12 +248,12 @@ from datetime import datetime, timezone
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.platform.engine.trading_engine import TradingEngine
-from suite_trading.platform.event_feed.generated_bars_event_feed import GeneratedBarsEventFeed
+from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import (
     MinuteBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
-from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar
+from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar, create_bar_series
 
 
 class AggregationStrategy(Strategy):
@@ -267,7 +267,9 @@ class AggregationStrategy(Strategy):
         first_end = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc)
         first_bar = create_bar(bar_type=bt_1m, end_dt=first_end)
 
-        src = GeneratedBarsEventFeed(first_bar=first_bar, num_bars=20)
+        bars = create_bar_series(first_bar=first_bar, num_bars=20)
+        events = [NewBarEvent(bar=b, dt_received=b.end_dt, is_historical=True) for b in bars]
+        src = FixedSequenceEventFeed(events)
         self.add_event_feed("1m", src)
 
         agg = MinuteBarAggregationEventFeed(

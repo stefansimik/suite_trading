@@ -38,7 +38,8 @@ from datetime import timedelta
 
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.platform.engine.trading_engine import TradingEngine
-from suite_trading.platform.event_feed.generated_bars_event_feed import GeneratedBarsEventFeed
+from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
+from suite_trading.utils.data_generation.bar_generation import create_bar_series
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.platform.event_feed.periodic_time_event_feed import FixedIntervalEventFeed
 from suite_trading.strategy.strategy import Strategy
@@ -54,7 +55,9 @@ class DemoStrategy(Strategy):
         logger.debug("Strategy starting...")
 
         # Add data to strategy: 1-minute bars (demo data)
-        bars_feed: EventFeed = GeneratedBarsEventFeed(num_bars=20)
+        bars = create_bar_series(num_bars=20)
+        events = [NewBarEvent(bar=b, dt_received=b.end_dt, is_historical=True) for b in bars]
+        bars_feed: EventFeed = FixedSequenceEventFeed(events)
         self.add_event_feed("bars_feed", bars_feed)
 
         # Add data to strategy: Time notifications each 10 seconds
@@ -206,7 +209,7 @@ This project is in **active development** with approximately **60-70% of core fu
 
 Current status (as of 2025-08-18):
 - Ready to try: TradingEngine, Strategy lifecycle, Event model (Bar/TradeTick/QuoteTick),
-  EventFeed(s), MessageBus, and demo data feeds (e.g., GeneratedBarsEventFeed).
+  EventFeed(s), MessageBus, and demo data utilities (create_bar_series + FixedSequenceEventFeed).
 - Not yet available: EventFeedProvider(s) for live/historical integrations, Broker(s),
   advanced order types, indicators, performance analytics.
 
