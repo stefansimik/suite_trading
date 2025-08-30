@@ -11,6 +11,9 @@ class EventFeed(Protocol):
     - Call pop() to get the next ready event.
     - If pop()/peek() returns None and is_finished() is False, try later.
     - If is_finished() is True, the feed has no more events.
+
+    Listeners:
+    - TradingEngine invokes listeners after it pops an event  from EventFeed and processes the callback. That means, EventFeed implementations must not notify listeners themselves (it is done in TradingEngine automatically)
     """
 
     def peek(self) -> Optional[Event]:

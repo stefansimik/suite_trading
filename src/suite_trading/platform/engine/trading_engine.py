@@ -505,7 +505,8 @@ class TradingEngine:
                         # Cleanup all feeds for this strategy
                         self._close_and_remove_all_feeds_for_strategy(strategy)
 
-                    # Notify EventFeed listeners after strategy callback
+                    # Notify EventFeed listeners after strategy callback.
+                    # This is the single place listeners are invoked for EventFeed(s); feeds must not self-notify.
                     try:
                         for listener in feed.get_listeners():
                             try:

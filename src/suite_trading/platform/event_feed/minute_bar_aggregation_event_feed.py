@@ -151,7 +151,10 @@ class MinuteBarAggregationEventFeed:
                 self._aggregated_bars_queue.popleft()
 
     def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key. Called after each successful `pop`.
+        """Register $listener under $key.
+
+        Notes:
+            Listeners are invoked by TradingEngine after each successful pop() from this feed.
 
         Raises:
             ValueError: If $key is empty or already registered.
