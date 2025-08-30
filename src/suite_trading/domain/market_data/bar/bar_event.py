@@ -1,7 +1,12 @@
 from datetime import datetime
+from collections.abc import Iterable, Iterator
+from typing import Callable
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
+
+
+# region Class
 
 
 class NewBarEvent(Event):
@@ -88,3 +93,39 @@ class NewBarEvent(Event):
         if not isinstance(other, NewBarEvent):
             return False
         return self.bar == other.bar and self.dt_received == other.dt_received and self.is_historical == other.is_historical
+
+
+# endregion
+
+# region Utilities
+
+
+def wrap_bars_to_events(
+    bars: Iterable[Bar],
+    *,
+    is_historical: bool = True,
+    dt_received_getter: Callable[[Bar], datetime] | None = None,
+) -> Iterator["NewBarEvent"]:
+    """Wrap $bars into $NewBarEvent(s) with predictable $dt_received defaults.
+
+    Args:
+        bars: Iterable of $Bar instances to wrap.
+        is_historical: Whether produced $NewBarEvent(s) represent historical data.
+        dt_received_getter: Function mapping a $Bar to its $dt_received timestamp.
+            Defaults to bar.end_dt for deterministic historical usage.
+
+    Returns:
+        Iterator[NewBarEvent]: A lazy iterator of wrapped events.
+
+    Example:
+        feed = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(num_bars=20)))
+    """
+    if dt_received_getter is None:
+        dt_received_getter = lambda b: b.end_dt  # noqa: E731
+
+    for b in bars:
+        # Check: ensure dt_received is provided via getter per bar for clarity
+        yield NewBarEvent(bar=b, dt_received=dt_received_getter(b), is_historical=is_historical)
+
+
+# endregion

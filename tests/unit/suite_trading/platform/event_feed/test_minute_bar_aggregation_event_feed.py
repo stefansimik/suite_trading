@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 import pytest
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import (
@@ -106,9 +106,7 @@ def test_minute_bar_aggregation_first_minute_is_1(count_1min_bars, expected_coun
     bt_1m = create_bar_type(value=1, unit=BarUnit.MINUTE)
     first_end_dt = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc)
     first_bar = create_bar(bar_type=bt_1m, end_dt=first_end_dt)
-    bars = create_bar_series(first_bar=first_bar, num_bars=count_1min_bars)
-    events = [NewBarEvent(bar=b, dt_received=b.end_dt, is_historical=True) for b in bars]
-    src_feed = FixedSequenceEventFeed(events)
+    src_feed = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(first_bar=first_bar, num_bars=count_1min_bars)))
     strategy = ConfigurableStrategy(source_feed_1_min=src_feed)
     engine.add_strategy("agg_strategy", strategy)
 
@@ -131,9 +129,7 @@ def test_minute_bar_aggregation_first_minute_is_3_emit_first_partial_cases(emit_
     bt_1m = create_bar_type(value=1, unit=BarUnit.MINUTE)
     first_end_dt = datetime(2025, 1, 2, 0, 3, 0, tzinfo=timezone.utc)
     first_bar = create_bar(bar_type=bt_1m, end_dt=first_end_dt)
-    bars = create_bar_series(first_bar=first_bar, num_bars=count_1min_bars)
-    events = [NewBarEvent(bar=b, dt_received=b.end_dt, is_historical=True) for b in bars]
-    src_feed = FixedSequenceEventFeed(events)
+    src_feed = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(first_bar=first_bar, num_bars=count_1min_bars)))
     strategy = ConfigurableStrategy(source_feed_1_min=src_feed, emit_first_partial=emit_first_partial)
     engine.add_strategy("agg_strategy", strategy)
 
@@ -166,8 +162,7 @@ def test_minute_bar_aggregation_skips_missing_minute_05(
     # to 5-minute windows aligned to UTC day boundaries.
     engine = TradingEngine()
     # Wrap bars into NewBarEvent(s) and feed via FixedSequenceEventFeed
-    events = [NewBarEvent(bar=b, dt_received=b.end_dt, is_historical=True) for b in bars]
-    src_feed = FixedSequenceEventFeed(events)
+    src_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
     strategy = ConfigurableStrategy(source_feed_1_min=src_feed, emit_first_partial=emit_first_partial)
     engine.add_strategy("agg_strategy", strategy)
 

@@ -198,12 +198,12 @@ self.add_event_feed("historical_data", feed)
 
 ```python
 from suite_trading.utils.data_generation.bar_generation import DEFAULT_FIRST_BAR, create_bar_series
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 
+
 bars = create_bar_series(first_bar=DEFAULT_FIRST_BAR, num_bars=100)
-events = [NewBarEvent(bar=b, dt_received=b.end_dt, is_historical=True) for b in bars]
-demo_feed = FixedSequenceEventFeed(events)
+demo_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
 self.add_event_feed("demo_data", demo_feed)
 ```
 
@@ -246,7 +246,7 @@ Inspired by `tests/unit/.../test_minute_bar_aggregation_event_feed.py`
 ```python
 from datetime import datetime, timezone
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import (
@@ -267,9 +267,7 @@ class AggregationStrategy(Strategy):
         first_end = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc)
         first_bar = create_bar(bar_type=bt_1m, end_dt=first_end)
 
-        bars = create_bar_series(first_bar=first_bar, num_bars=20)
-        events = [NewBarEvent(bar=b, dt_received=b.end_dt, is_historical=True) for b in bars]
-        src = FixedSequenceEventFeed(events)
+        src = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(first_bar=first_bar, num_bars=20)))
         self.add_event_feed("1m", src)
 
         agg = MinuteBarAggregationEventFeed(
