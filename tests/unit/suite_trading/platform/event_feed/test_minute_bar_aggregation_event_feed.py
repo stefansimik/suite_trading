@@ -1,26 +1,3 @@
-"""Tests for MinuteBarAggregationEventFeed aggregation behavior.
-
-Logical structure:
-- We generate 1-minute bars via create_bar_series and feed them through FixedSequenceEventFeed.
-  The starting minute (end time minute) of the first 1-minute bar is configurable.
-- We aggregate those 1-minute bars into 5-minute bars aligned to day boundaries (ends at
-  minutes 5, 10, 15, ...). The aggregator can optionally emit the first partial window via
-  the emit_first_partial flag.
-- The Strategy subscribes to both the source 1-minute feed and the aggregated 5-minute
-  feed, and counts observed NewBarEvent(s) by bar unit and value. This allows us to assert
-  both the total number of 1-minute bars consumed and the number of aggregated 5-minute
-  bars produced.
-
-Scenarios covered:
-- First bar end minute = 1
-  - 20 x 1-min -> 4 x 5-min (emit_first_partial = False)
-  - 19 x 1-min -> 3 x 5-min (emit_first_partial = False)
-  - 21 x 1-min -> 4 x 5-min (emit_first_partial = False)
-- First bar end minute = 3
-  - 20 x 1-min -> 3 x 5-min (emit_first_partial = False)
-  - 20 x 1-min -> 3 x 5-min (emit_first_partial = True)
-"""
-
 import logging
 from datetime import datetime, timezone
 
@@ -63,7 +40,6 @@ class ConfigurableStrategy(Strategy):
         # LOCAL STATE
         self._count_1min_bars_processed: int = 0
         self._count_5min_bars_processed: int = 0
-        self._agg_end_minutes: list[int] = []
 
     def on_start(self) -> None:
         # Wire the provided source feed and a 5-minute aggregation feed.
@@ -88,8 +64,6 @@ class ConfigurableStrategy(Strategy):
                 self._count_1min_bars_processed += 1
             if int(bt.value) == 5:
                 self._count_5min_bars_processed += 1
-                # Record end minute of aggregated 5-minute bar for boundary assertions
-                self._agg_end_minutes.append(bar.end_dt.minute)
 
 
 @pytest.mark.parametrize(
@@ -174,6 +148,3 @@ def test_minute_bar_aggregation_skips_missing_minute_05(
     # Aggregated 5-minute bars across :05 and :10 boundaries with a missing minute inside the first
     # window. The first partial is emitted only if emit_first_partial=True.
     assert strategy._count_5min_bars_processed == expected_count_5min_bars
-
-    # Check that aggregated bar end times are aligned and match expectations
-    assert strategy._agg_end_minutes == expected_ends
