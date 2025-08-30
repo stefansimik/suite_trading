@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
@@ -17,16 +17,16 @@ class OhlcvAccumulator:
 
     def __init__(self) -> None:
         # First BarType
-        self.first_bar_type: Optional[BarType] = None
+        self.bars: List[Bar] = []
 
-        # OHLCV values
+        # Accumulated OHLCV values
         self.open: Optional[Decimal] = None
         self.high: Optional[Decimal] = None
         self.low: Optional[Decimal] = None
         self.close: Optional[Decimal] = None
         self.volume: Decimal = Decimal("0")
 
-        # Window
+        # Accumulated aggregated time window
         self.window_start_dt: Optional[datetime] = None
         self.window_end_dt: Optional[datetime] = None
 
@@ -36,17 +36,14 @@ class OhlcvAccumulator:
 
     def reset(self) -> None:
         """Clear accumulated state for a new window."""
-        # Clean first BarType
-        self.first_bar_type = None
+        self.bars = []
 
-        # Clean OHLCV values
         self.open = None
         self.high = None
         self.low = None
         self.close = None
         self.volume = Decimal("0")
 
-        # Window
         self.window_start_dt: Optional[datetime] = None
         self.window_end_dt: Optional[datetime] = None
 
@@ -59,11 +56,10 @@ class OhlcvAccumulator:
         Raises:
             ValueError: If $bar.bar_type is different from the first BarType in this window.
         """
-        adding_first_bar = self.open is None
-        if adding_first_bar:
-            # Set first BarType
-            self.first_bar_type = bar.bar_type
+        self.bars.append(bar)
 
+        adding_first_bar = len(self.bars) == 1
+        if adding_first_bar:
             # Set initial OHLCV value
             self.open = bar.open
             self.high = bar.high
@@ -137,7 +133,8 @@ class OhlcvAccumulator:
         Raises:
             ValueError: If $bar_type is different from $self.first_bar_type.
         """
-        if self.first_bar_type != bar_type:
-            raise ValueError(f"{self.__class__.__name__} cannot accept mixed bar-types in one window. | First bar-type: {self.first_bar_type} | Later bar-type: {bar_type}")
+        first_bar_type = self.bars[0].bar_type
+        if first_bar_type != bar_type:
+            raise ValueError(f"{self.__class__.__name__} cannot accept mixed bar-types in one window. | First bar-type: {first_bar_type} | Later bar-type: {bar_type}")
 
     # endregion
