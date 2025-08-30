@@ -86,7 +86,7 @@ class Currency:
             ValueError: If currency already exists and overwrite is False.
             TypeError: If currency is not Currency instance.
         """
-        if not isinstance(currency, Currency):
+        if not isinstance(currency, "Currency"):
             raise TypeError(f"$currency must be a Currency instance, but provided value is: {currency}")
 
         if currency.code in cls._registry and not overwrite:

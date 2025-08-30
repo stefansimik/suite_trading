@@ -1,4 +1,3 @@
-from __future__ import annotations
 from datetime import datetime, timezone, timedelta, tzinfo
 
 # One place to change the visible UTC indicator
@@ -139,7 +138,6 @@ def to_utc(dt: datetime, *, naive_tz: tzinfo | None = None) -> datetime:
 
 
 # endregion
-
 
 # region Formatting
 

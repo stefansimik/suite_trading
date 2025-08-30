@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections import deque
 from datetime import datetime
 from typing import Deque, Iterable, Callable

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 # BarsFromDataFrameEventFeed: Stream historical bars from an in-memory pandas DataFrame.
 # Keeps an index pointer and a cached next event for efficient peek/pop.
 

@@ -1,4 +1,3 @@
-from __future__ import annotations  # Enables forward references in type hints
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Union, Optional
@@ -39,7 +38,7 @@ class Execution:
 
     def __init__(
         self,
-        order: Order,
+        order: "Order",
         quantity: Union[Decimal, str, float],
         price: Union[Decimal, str, float],
         timestamp: datetime,
@@ -89,7 +88,7 @@ class Execution:
         return Decimal(str(value))
 
     @property
-    def order(self) -> Order:
+    def order(self) -> "Order":
         """Get the parent order."""
         return self._order
 
@@ -202,12 +201,7 @@ class Execution:
         Returns:
             str: String representation of the execution.
         """
-        return (
-            f"{self.__class__.__name__}(id={self.id}, "
-            f"order_id={self.order.id}, instrument={self.instrument}, "
-            f"side={self.side}, quantity={self.quantity}, price={self.price}, "
-            f"timestamp={self.timestamp})"
-        )
+        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={self.timestamp})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another execution.

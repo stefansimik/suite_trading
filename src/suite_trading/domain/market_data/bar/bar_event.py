@@ -105,7 +105,7 @@ def wrap_bars_to_events(
     *,
     is_historical: bool = True,
     dt_received_getter: Callable[[Bar], datetime] | None = None,
-) -> Iterator["NewBarEvent"]:
+) -> Iterator[NewBarEvent]:
     """Wrap $bars into $NewBarEvent(s) with predictable $dt_received defaults.
 
     Args:

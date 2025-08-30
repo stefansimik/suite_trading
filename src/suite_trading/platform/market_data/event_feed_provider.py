@@ -1,9 +1,7 @@
 """Event feed provider protocol definition."""
 
-from typing import Protocol, Callable, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from suite_trading.platform.event_feed.event_feed import EventFeed
+from typing import Protocol, Callable
+from suite_trading.platform.event_feed.event_feed import EventFeed
 
 
 class EventFeedProvider(Protocol):
@@ -48,7 +46,7 @@ class EventFeedProvider(Protocol):
         event_type: type,
         parameters: dict,
         callback: Callable,
-    ) -> "EventFeed":
+    ) -> EventFeed:
         """Create or return an event feed instance for the given request.
 
         This factory method creates an EventFeed that implements the full EventFeed protocol.

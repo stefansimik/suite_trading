@@ -1,4 +1,3 @@
-from __future__ import annotations  # Enables forward references in type hints
 from decimal import Decimal
 from typing import List
 
@@ -199,9 +198,7 @@ class Order:
         Returns:
             str: String representation of the order.
         """
-        return (
-            f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
-        )
+        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another order.

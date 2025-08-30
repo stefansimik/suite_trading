@@ -191,11 +191,7 @@ class Position:
         Returns:
             str: A detailed string representation.
         """
-        return (
-            f"{self.__class__.__name__}(instrument={self.instrument!r}, quantity={self.quantity}, "
-            f"average_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, "
-            f"realized_pnl={self.realized_pnl}, last_update={self.last_update!r})"
-        )
+        return f"{self.__class__.__name__}(instrument={self.instrument!r}, quantity={self.quantity}, average_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={self.last_update!r})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another position.
@@ -208,11 +204,4 @@ class Position:
         """
         if not isinstance(other, Position):
             return False
-        return (
-            self.instrument == other.instrument
-            and self.quantity == other.quantity
-            and self.average_price == other.average_price
-            and self.unrealized_pnl == other.unrealized_pnl
-            and self.realized_pnl == other.realized_pnl
-            and self.last_update == other.last_update
-        )
+        return self.instrument == other.instrument and self.quantity == other.quantity and self.average_price == other.average_price and self.unrealized_pnl == other.unrealized_pnl and self.realized_pnl == other.realized_pnl and self.last_update == other.last_update

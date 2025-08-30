@@ -1,5 +1,3 @@
-from __future__ import annotations  # enables lazy evaluation of annotations
-
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
