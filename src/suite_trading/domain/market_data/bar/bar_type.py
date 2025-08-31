@@ -21,6 +21,8 @@ class BarType:
 
     SEPARATOR: str = "::"
 
+    # region Init
+
     def __init__(self, instrument: Instrument, value: int, unit: BarUnit, price_type: PriceType):
         """Initialize a new bar type.
 
@@ -34,6 +36,49 @@ class BarType:
         self._value = value
         self._unit = unit
         self._price_type = price_type
+
+    # endregion
+
+    # region Convenience
+
+    def copy(
+        self,
+        *,
+        instrument: Instrument | None = None,
+        value: int | None = None,
+        unit: BarUnit | None = None,
+        price_type: PriceType | None = None,
+    ) -> "BarType":
+        """Return a new BarType copied from this instance with optional overrides.
+
+        Args:
+            instrument: Optional override for $instrument. If None, reuse current.
+            value: Optional override for $value. If None, reuse current.
+            unit: Optional override for $unit. If None, reuse current.
+            price_type: Optional override for $price_type. If None, reuse current.
+
+        Returns:
+            BarType: A new BarType with provided overrides applied.
+
+        Example:
+            >>> bt1 = BarType(instrument, 5, BarUnit.MINUTE, PriceType.LAST)
+            >>> bt2 = bt1.copy(value=15)
+            >>> str(bt1)
+            'EURUSD@FOREX::5-MINUTE::LAST'
+            >>> str(bt2)
+            'EURUSD@FOREX::15-MINUTE::LAST'
+        """
+        # Create a new instance, reusing current values when overrides are not provided.
+        return BarType(
+            instrument=instrument if instrument is not None else self.instrument,
+            value=value if value is not None else self.value,
+            unit=unit if unit is not None else self.unit,
+            price_type=price_type if price_type is not None else self.price_type,
+        )
+
+    # endregion
+
+    # region Properties
 
     @property
     def instrument(self) -> Instrument:
@@ -54,6 +99,10 @@ class BarType:
     def price_type(self) -> PriceType:
         """Get the price type."""
         return self._price_type
+
+    # endregion
+
+    # region Magic
 
     def __str__(self) -> str:
         """Return a string representation of the bar type."""
@@ -89,3 +138,5 @@ class BarType:
             int: Hash value based on all attributes.
         """
         return hash((self.instrument, self.value, self.unit, self.price_type))
+
+    # endregion
