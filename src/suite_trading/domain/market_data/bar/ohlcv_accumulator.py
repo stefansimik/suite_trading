@@ -86,13 +86,15 @@ class OhlcvAccumulator:
             if bar.end_dt > self.window_end_dt:
                 self.window_end_dt = bar.end_dt
 
-    def get_aggregated_bar(self, bar_type: BarType, start_dt: datetime, end_dt: datetime) -> Bar:
+    def get_aggregated_bar(self, bar_type: BarType, start_dt: datetime, end_dt: datetime, *, is_partial: bool = False) -> Bar:
         """Build one Bar for [$start_dt, $end_dt] using the accumulated OHLCV.
 
         Args:
             bar_type (BarType): BarType of the result.
             start_dt (datetime): Start of the window.
             end_dt (datetime): End of the window.
+            is_partial (bool): Whether the aggregated bar is partial (incomplete input window).
+                This flag is metadata only and does not affect equality of Bar instances.
 
         Returns:
             Bar: A Bar with open/high/low/close and volume from the current window.
@@ -106,6 +108,7 @@ class OhlcvAccumulator:
             low=self.low,
             close=self.close,
             volume=self.volume,
+            is_partial=is_partial,
         )
 
     # endregion

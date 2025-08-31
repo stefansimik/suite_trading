@@ -46,6 +46,8 @@ def create_bar(
     bar_body_in_ticks: int = 20,
     bar_wicks_ratio: Decimal | str = Decimal("0.4"),
     volume: Decimal = Decimal("100_000_000"),
+    *,
+    is_partial: bool = False,
 ) -> Bar:
     """
     Create a single demo bar with the given parameters.
@@ -58,6 +60,7 @@ def create_bar(
         bar_body_in_ticks: Size of the bar body in ticks
         bar_wicks_ratio: Ratio of wick size to body size (0.4 = 40% of body size)
         volume: The trading volume during the bar period
+        is_partial: Whether the bar is partial (metadata only; does not affect equality)
 
     Returns:
         A Bar instance with the specified properties
@@ -116,7 +119,7 @@ def create_bar(
         high_price = open_price + wick_size
         low_price = close_price - wick_size
 
-    return Bar(bar_type=bar_type, start_dt=start_dt, end_dt=end_dt, open=open_price, high=high_price, low=low_price, close=close_price, volume=volume)
+    return Bar(bar_type=bar_type, start_dt=start_dt, end_dt=end_dt, open=open_price, high=high_price, low=low_price, close=close_price, volume=volume, is_partial=is_partial)
 
 
 # Create the default first bar using constants

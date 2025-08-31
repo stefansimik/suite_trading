@@ -32,6 +32,8 @@ class Bar:
         value (int): The numeric value of the period (delegated from bar_type).
         unit (BarUnit): The unit of the period (delegated from bar_type).
         price_type (PriceType): The type of price data (delegated from bar_type).
+        is_partial (bool): Whether the bar was aggregated from incomplete input data.
+            This is metadata only and does not affect equality of Bar instances.
     """
 
     def __init__(
@@ -44,6 +46,8 @@ class Bar:
         low: Union[Decimal, str, float],
         close: Union[Decimal, str, float],
         volume: Optional[Union[Decimal, str, float]] = None,
+        *,
+        is_partial: bool = False,
     ):
         """Initialize a new bar.
 
@@ -56,6 +60,8 @@ class Bar:
             low: The lowest price reached during the period.
             close: The closing price for the period.
             volume: The trading volume during the period (optional).
+            is_partial: Whether this bar was aggregated from incomplete input data. Defaults to False.
+                Note: `is_partial` is an informational hint and does not participate in `Bar` equality.
 
         Raises:
             ValueError: If datetime values are not timezone-aware, end_dt is not after start_dt,
@@ -72,6 +78,7 @@ class Bar:
         self._low = Decimal(str(low))
         self._close = Decimal(str(close))
         self._volume = Decimal(str(volume)) if volume is not None else None
+        self._is_partial = bool(is_partial)
 
         # Ensure end_dt is after start_dt
         if self._end_dt <= self._start_dt:
@@ -130,6 +137,11 @@ class Bar:
         return self._volume
 
     @property
+    def is_partial(self) -> bool:
+        """Return whether this bar was aggregated from incomplete input data."""
+        return self._is_partial
+
+    @property
     def instrument(self) -> Instrument:
         """Get the instrument from bar_type."""
         return self.bar_type.instrument
@@ -156,8 +168,9 @@ class Bar:
             str: A human-readable string representation.
         """
         volume_str = f", volume={self.volume}" if self.volume is not None else ""
+        partial_str = ", partial" if self.is_partial else ""
         dt_str = format_range(self.start_dt, self.end_dt)
-        return f"{self.__class__.__name__}({self.bar_type}, {dt_str}, OHLC={self.open}/{self.high}/{self.low}/{self.close}{volume_str})"
+        return f"{self.__class__.__name__}({self.bar_type}, {dt_str}, OHLC={self.open}/{self.high}/{self.low}/{self.close}{volume_str}{partial_str})"
 
     def __repr__(self) -> str:
         """Return a developer-friendly representation of the bar.
@@ -167,7 +180,7 @@ class Bar:
         """
         # Use consistent datetime formatting in developer representation
         _dt = format_range(self.start_dt, self.end_dt)
-        return f"{self.__class__.__name__}(bar_type={self.bar_type!r}, dt={_dt}, open={self.open}, high={self.high}, low={self.low}, close={self.close}, volume={self.volume})"
+        return f"{self.__class__.__name__}(bar_type={self.bar_type!r}, dt={_dt}, open={self.open}, high={self.high}, low={self.low}, close={self.close}, volume={self.volume}, is_partial={self.is_partial})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another bar.
