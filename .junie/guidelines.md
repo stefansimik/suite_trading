@@ -39,6 +39,12 @@ def calculate_portfolio_value(positions: list) -> Decimal: ...
 def calc_pv(pos: list) -> Decimal: ...
 ```
 
+### Improving attribute and variable names
+- Prefer clear, intuitive, and descriptive names for attributes and variables.
+- Keep names concise when possible, but never at the cost of clarity.
+- Use domain terms consistently; pick nouns for values and properties, verbs for functions.
+- Rename confusing names proactively to reduce reading and maintenance effort.
+
 ## 2.2 Classes, dataclasses, and named tuples
 Rule: Use standard classes for fundamental domain models. Dataclasses and named tuples are
 allowed for simple config or helper/value objects only.
@@ -247,8 +253,23 @@ return f"{self.__class__.__name__}({self.kind}, {dt_str})"
 # 3. Code organization (supporting)
 
 ## 3.1 Regions
-Use regions to structure large files/classes. Name regions with verbs (e.g., "Manage
-strategies"). Always mark with "# region ..." / "# endregion".
+Improve code regions to present structure clearly and simply.
+
+Guidelines:
+- Add short, meaningful regions adapted to each file/class.
+- Suggested generic regions (use when relevant):
+  - Init — constructors/initialization
+  - Main — main functionality/public API
+  - Utilities (or Convenience) — helper functions for comfort operations
+  - Internal — internal/private methods not part of public API
+  - Properties — public properties
+  - Magic — magic methods like __str__, __repr__, etc.
+- You may introduce new, appropriate region names when they create cohesive units of functionality.
+- Not all regions must be used; include only those that make sense for the file.
+- Always mark regions with "# region NAME" and "# endregion".
+- Spacing: keep one empty line after "# region NAME" and one empty line before "# endregion".
+- Remove all empty regions.
+- Order functions within a region in a meaningful way: more important first, less important later.
 
 ## 3.2 Imports and package structure
 
