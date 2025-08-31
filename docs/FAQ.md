@@ -115,15 +115,15 @@ added `EventFeed`(s) per `Strategy`:
   - Registers as a listener on the source feed via the implementation's `add_listener(...)` (concrete feeds may expose registration helpers even though the EventFeed Protocol only requires `get_listeners()`)
   - Accumulates OHLCV and emits on N‑minute boundaries
   - Emits `NewBarEvent` with source `dt_received` and `is_historical`
-  - `emit_first_partial` decides whether the very first partial bar is emitted
+  - `emit_first_partial_bar` decides whether the very first partial bar is emitted; `emit_later_partial_bars` controls subsequent partials
 
-4) `PeriodicTimeEventFeed`
+4) `FixedIntervalEventFeed`
 - Purpose: emit `TimeTickEvent` at a fixed interval (every second/minute, etc.).
 - Great as a heartbeat/clock for scheduling logic.
 - Can auto‑finish together with another feed via `finish_with_feed`.
 
 Tip: You can set parameter `finish_with_feed` to another feed to automatically stop
-generating `TimeTickEvent`(s) from this `PeriodicTimeEventFeed`.
+generating `TimeTickEvent`(s) from this `FixedIntervalEventFeed`.
 
 ---
 
@@ -217,7 +217,7 @@ minute_feed = BarsFromDataFrameEventFeed(df=minute_data, bar_type=minute_bar_typ
 five_minute_feed = MinuteBarAggregationEventFeed(
     source_feed=minute_feed,
     window_minutes=5,
-    emit_first_partial=False,  # Skip incomplete first bar
+    emit_first_partial_bar=False,  # Skip incomplete first bar
 )
 
 # Strategy receives BOTH 1-minute and 5-minute bars
@@ -230,7 +230,7 @@ self.add_event_feed("five_minute_data", five_minute_feed)
 ```python
 from datetime import datetime, timedelta, timezone
 
-time_feed = PeriodicTimeEventFeed(
+time_feed = FixedIntervalEventFeed(
     start_dt=datetime.now(timezone.utc),
     interval=timedelta(seconds=30),
 )
@@ -273,7 +273,7 @@ class AggregationStrategy(Strategy):
         agg = MinuteBarAggregationEventFeed(
             source_feed=src,
             window_minutes=5,
-            emit_first_partial=False,
+            emit_first_partial_bar=False,
         )
         self.add_event_feed("5m", agg)
 
@@ -295,7 +295,7 @@ engine.start()
 What to notice:
 - The aggregation feed registers as a listener on the source via the implementation's `add_listener(...)` (engine invokes listeners after strategy callback)
 - The strategy receives both 1‑min and 5‑min `NewBarEvent`(s), interleaved in time order
-- `emit_first_partial` lets you emit the initial partial window when desired
+- `emit_first_partial_bar` controls the initial partial window; `emit_later_partial_bars` controls later partials
 
 ---
 
@@ -318,7 +318,7 @@ class FlexibleStrategy(Strategy):
 feeds = {
     "minute_bars": BarsFromDataFrameEventFeed(df=df, bar_type=minute_type),
     "daily_bars": BarsFromDataFrameEventFeed(df=daily_df, bar_type=daily_type),
-    "timer": PeriodicTimeEventFeed(start_dt=start, interval=timedelta(minutes=1)),
+    "timer": FixedIntervalEventFeed(start_dt=start, interval=timedelta(minutes=1)),
 }
 strategy = FlexibleStrategy(data_feeds=feeds)
 ```
@@ -374,7 +374,7 @@ def on_event(self, event):
     print(f"System received it at {self.wall_clock_time}")
 ```
 
-If you need frequent “ticks,” add `PeriodicTimeEventFeed` to nudge your logic.
+If you need frequent “ticks,” add `FixedIntervalEventFeed` to nudge your logic.
 
 ---
 
@@ -401,7 +401,7 @@ self.add_event_feed("15min", fifteen_min_feed)
 Aggregation rules (5‑min windows), straight from `MinuteBarAggregationEventFeed`:
 - Windows align to UTC days; end at minute multiples of N (e.g., 00:05, 00:10, 00:15)
 - A bar ending exactly at a window boundary triggers bar emission
-- First partial window emission is controlled by parameter `emit_first_partial`
+- First partial window emission is controlled by `emit_first_partial_bar`; later partials by `emit_later_partial_bars`
 
 
 ### Key benefits
