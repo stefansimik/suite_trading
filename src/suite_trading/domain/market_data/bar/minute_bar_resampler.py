@@ -38,10 +38,10 @@ class MinuteBarResampler:
     def __init__(self, *, window_minutes: int, on_emit_callback: Callable[[NewBarEvent], None]) -> None:
         # Store input parameters
         self._window_minutes = self._expect_window_minutes(window_minutes)
-        self._emit_event_callback = on_emit_callback
+        self._on_emit = on_emit_callback
 
         # Windowing / ordering / source sizing
-        self._current_window_bounds: Tuple[Optional[datetime], Optional[datetime]] = (None, None)
+        self._window_bounds: Tuple[Optional[datetime], Optional[datetime]] = (None, None)
         self._last_bar_end_dt: Optional[datetime] = None
         self._input_bar_minutes: Optional[int] = None
 
@@ -80,16 +80,16 @@ class MinuteBarResampler:
 
         bar = event.bar
         window_start, window_end = self._compute_window_bounds(bar.end_dt)
-        if self._current_window_bounds == (None, None):
-            self._current_window_bounds = (window_start, window_end)
+        if self._window_bounds == (None, None):
+            self._window_bounds = (window_start, window_end)
 
-        window_changed = self._current_window_bounds != (window_start, window_end)
+        window_changed = self._window_bounds != (window_start, window_end)
         has_data = self._event_accumulator.has_data()
 
         # Emit previous window on jump (exclude current event)
         should_emit_bar_because_window_changed = window_changed and has_data
         if should_emit_bar_because_window_changed:
-            self._emit_window(self._current_window_bounds[0], self._current_window_bounds[1])
+            self._emit_window(self._window_bounds[0], self._window_bounds[1])
 
         # Acccumulate event
         self._event_accumulator.add(event)
@@ -100,7 +100,7 @@ class MinuteBarResampler:
             self._emit_window(window_start, window_end)
 
         # Update window/order tracking
-        self._current_window_bounds = (window_start, window_end)
+        self._window_bounds = (window_start, window_end)
         self._last_bar_end_dt = bar.end_dt
 
     def reset(self) -> None:
@@ -113,7 +113,7 @@ class MinuteBarResampler:
             None: This function mutates internal state only.
         """
         self._event_accumulator.reset()
-        self._current_window_bounds = (None, None)
+        self._window_bounds = (None, None)
         self._last_bar_end_dt = None
         self._input_bar_minutes = None
         self.emitted_bar_count = 0
@@ -190,7 +190,7 @@ class MinuteBarResampler:
         )
 
         # Emit, update counters, and reset accumulator
-        self._emit_event_callback(evt)
+        self._on_emit(evt)
         self.emitted_bar_count += 1
         self._event_accumulator.reset()
 

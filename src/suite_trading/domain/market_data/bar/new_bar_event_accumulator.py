@@ -14,7 +14,7 @@ class NewBarEventAccumulator:
     # region Init
 
     def __init__(self) -> None:
-        self._core = BarAccumulator()
+        self._bar_accumulator = BarAccumulator()
         self._last_dt_received: Optional[datetime] = None
         self._last_is_historical: Optional[bool] = None
 
@@ -24,13 +24,13 @@ class NewBarEventAccumulator:
 
     def reset(self) -> None:
         """Clear accumulated state for a new window."""
-        self._core.reset()
+        self._bar_accumulator.reset()
         self._last_dt_received = None
         self._last_is_historical = None
 
     def has_data(self) -> bool:
         """Return True if at least one event has been added."""
-        return self._core.has_data()
+        return self._bar_accumulator.has_data()
 
     def add(self, event: NewBarEvent) -> None:
         """Add a NewBarEvent and update OHLCV and metadata.
@@ -42,7 +42,7 @@ class NewBarEventAccumulator:
         if not isinstance(event, NewBarEvent):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.add` because $event (class '{type(event).__name__}') is not a NewBarEvent")
 
-        self._core.add(event.bar)
+        self._bar_accumulator.add(event.bar)
         self._last_dt_received = event.dt_received
         self._last_is_historical = event.is_historical
 
@@ -65,7 +65,7 @@ class NewBarEventAccumulator:
         Returns:
             NewBarEvent: Aggregated event with propagated metadata.
         """
-        bar = self._core.build_bar(out_bar_type, start_dt, end_dt, is_partial=is_partial)
+        bar = self._bar_accumulator.build_bar(out_bar_type, start_dt, end_dt, is_partial=is_partial)
 
         # Check: require $last_dt_received and $last_is_historical to be present to build an event
         if self._last_dt_received is None or self._last_is_historical is None:
@@ -78,10 +78,10 @@ class NewBarEventAccumulator:
     # region Magic methods
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(count={self._core.count})"
+        return f"{self.__class__.__name__}(count={self._bar_accumulator.count})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(count={self._core.count!r})"
+        return f"{self.__class__.__name__}(count={self._bar_accumulator.count!r})"
 
     # endregion
 
@@ -89,11 +89,11 @@ class NewBarEventAccumulator:
 
     @property
     def first_bar_type(self) -> Optional[BarType]:
-        return self._core.first_bar_type
+        return self._bar_accumulator.first_bar_type
 
     @property
     def count(self) -> int:
-        return self._core.count
+        return self._bar_accumulator.count
 
     @property
     def last_dt_received(self) -> Optional[datetime]:
