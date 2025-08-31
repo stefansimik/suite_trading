@@ -86,15 +86,11 @@ class Bar:
 
         # Validate high price
         if self._high < self._open or self._high < self._low or self._high < self._close:
-            raise ValueError(
-                f"$high price ({self._high}) must be greater than or equal to all other prices: open={self._open}, low={self._low}, close={self._close}",
-            )
+            raise ValueError(f"$high price ({self._high}) must be greater than or equal to all other prices: open={self._open}, low={self._low}, close={self._close}")
 
         # Validate low price
         if self._low > self._open or self._low > self._high or self._low > self._close:
-            raise ValueError(
-                f"$low price ({self._low}) must be less than or equal to all other prices: open={self._open}, high={self._high}, close={self._close}",
-            )
+            raise ValueError(f"$low price ({self._low}) must be less than or equal to all other prices: open={self._open}, high={self._high}, close={self._close}")
 
     @property
     def bar_type(self) -> BarType:
