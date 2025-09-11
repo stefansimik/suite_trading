@@ -60,7 +60,7 @@ class TestStrategy(Strategy):
                 self.ends_5m.append(bar.end_dt)
 
 
-def build_feed_from_end_minutes(
+def build_feed_from_minute_ends(
     *,
     base_day: datetime,
     end_minutes: Iterable[int],
@@ -114,7 +114,7 @@ def build_feed_from_end_minutes(
         ([0], [0]),
     ],
 )
-def test_minute_to_five_minute_aggregation_parametrized(
+def test_1m_to_5m_emits_end_minutes(
     input_1min_bars,
     expected_ends_5m,
 ):
@@ -125,7 +125,7 @@ def test_minute_to_five_minute_aggregation_parametrized(
     """
     engine = TradingEngine()
     base_day = datetime(2025, 1, 2, tzinfo=timezone.utc)
-    event_feed_1min_bars = build_feed_from_end_minutes(base_day=base_day, end_minutes=input_1min_bars)
+    event_feed_1min_bars = build_feed_from_minute_ends(base_day=base_day, end_minutes=input_1min_bars)
 
     strategy = TestStrategy(source_feed_1_min=event_feed_1min_bars)
     engine.add_strategy("test_strategy", strategy)
