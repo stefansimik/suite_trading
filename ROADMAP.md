@@ -1,7 +1,7 @@
 # Roadmap
 
 A concise, high‑level plan for initial development. Phases are intentionally small and
-focused. Last updated: 2025‑08‑31.
+focused. Last updated: 2025‑09‑12.
 
 ## Phase 0 — Bars from CSV/DataFrame — DONE ✅
 
@@ -9,20 +9,16 @@ Implemented via BarsFromDataFrameEventFeed.
 
 ## Phase 1 — Minute bar aggregation (core implemented) ✅
 
-1. Ak je agregovany bar nasobkom 60-minut, nastav vystupny bar ako hodinovy
-2. Urob test pre dalsie resamplingy:
-    - 1min bary -> 5-min, 15-min, 20-min, 30-min, 1-hour, 2-hour, 4-hour, 6-hour, 12-hour
-    - 5-min bary -> 15-min, 30-min, 1-hour, 2-hour, 4-hour, 6-hour, 12-hour
-    - 15-min bary -> 30-min, 1-hour, 2-hour, 4-hour, 6-hour, 12-hour
-    - 30-min bary -> 1-hour, 2-hour, 4-hour, 6-hour, 12-hour
-    - 1-hour bary -> 2-hour, 4-hour, 6-hour, 12-hour
-3. Zanalyzuj, ako by sme mohli agregovat SECONDS bars
-    * zrejme by sme nastavili opat X-nasobok do agregacie
-    * a pri vystupe by stacilo agregovany bar zaokruhlit na sekundy/minuty/hod, podla toho akoby to vyslo
-4. Dorobit aggregator pre Daily bars
-5. Dorobit aggregator pre Weekly bars
-6. Dorobit aggregator pre Monthly b
-7. Dorobit aggregator pre VolumeBars
+1. Emit hour-typed bars when target size is a multiple of 60 minutes — DONE ✅
+2. Parametrized tests for resampling matrix across seconds/minutes/hours — DONE ✅
+    - Single-boundary and five-interval tests validate behavior and types
+    - Matrix covers bases: 1s, 5s, 1m, 5m, 15m, 30m, 1h
+    - Matrix covers targets: 5s, 15s, 30s, 1m, 5m, 15m, 20m, 30m, 1h, 2h, 4h, 6h, 12h
+3. Support seconds-based aggregation and boundary rounding — DONE ✅
+4. Add Daily bar aggregation — TODO
+5. Add Weekly bar aggregation — TODO
+6. Add Monthly bar aggregation — TODO
+7. Add VolumeBar aggregation — TODO
 
 ## Phase 2 — Indicators
 
