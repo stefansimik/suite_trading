@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Iterable, NamedTuple
 
 import pytest
@@ -158,11 +158,6 @@ T_4H = Period(BarUnit.HOUR, 4)
 T_6H = Period(BarUnit.HOUR, 6)
 T_12H = Period(BarUnit.HOUR, 12)
 
-XFAIL_FOR_SECONDS_BASE_PERIODS = pytest.mark.xfail(
-    reason="Seconds aggregation not implemented yet",
-    strict=False,
-)
-
 MATRIX: dict[Period, list[Period]] = {
     BASE_1S: [T_5S, T_30S, T_1MIN, T_5MIN, T_15MIN, T_30MIN, T_1H, T_2H, T_4H, T_6H, T_12H],
     BASE_5S: [T_15S, T_30S, T_1MIN, T_5MIN, T_15MIN, T_30MIN, T_1H, T_2H, T_4H, T_6H, T_12H],
@@ -176,10 +171,11 @@ MATRIX: dict[Period, list[Period]] = {
 PARAMS = []
 for base_period, target_periods in MATRIX.items():
     for target_period in target_periods:
-        xfail_mark = XFAIL_FOR_SECONDS_BASE_PERIODS if base_period.unit == BarUnit.SECOND else ()
-        PARAMS.append(pytest.param(base_period, target_period, marks=xfail_mark))
+        PARAMS.append(pytest.param(base_period, target_period))
 
-IDS = [f"{p.values[0].size}{p.values[0].unit.name[0]}→{p.values[1].size}{p.values[1].unit.name[0]}" for p in PARAMS]
+IDS = [f"{p.values[0].size}{p.values[0].unit.name[0]} -> {p.values[1].size}{p.values[1].unit.name[0]}" for p in PARAMS]
+
+pass
 
 # endregion
 
@@ -226,3 +222,73 @@ def test_time_bar_aggregation_single_boundary_emits_and_type_is_correct(
     assert strategy.count_agg == 1
     assert strategy.ends_agg == [boundary]
     assert strategy.types_agg == [target]
+
+
+@pytest.mark.parametrize("base_period, target", PARAMS, ids=IDS)
+def test_time_bar_aggregation_spans_five_intervals_with_many_inputs(
+    base_period: Period,
+    target: Period,
+) -> None:
+    """Emit many source bars spanning five full aggregated intervals.
+
+    We generate two source bars per target interval: one early bar within the
+    interval and one exactly at the boundary. This keeps the test fast (10 input
+    bars total) while still verifying aggregation across a longer time range.
+
+    Asserts:
+    - Input source event count equals 10 (2 per interval over 5 intervals)
+    - Aggregated output count equals 5 (one per target boundary)
+    - Aggregated end datetimes equal the five successive boundaries
+    - Aggregated BarType (unit, size) matches $target for every emitted bar
+    """
+    engine = TradingEngine()
+    base_day = datetime(2025, 1, 2, tzinfo=timezone.utc)
+
+    # Compute the first target boundary inside the day and time deltas for math
+    first_boundary = boundary_dt_for_target(
+        base_day=base_day,
+        unit=target.unit,
+        size=target.size,
+    )
+
+    def to_timedelta(p: Period) -> timedelta:
+        if p.unit == BarUnit.SECOND:
+            return timedelta(seconds=p.size)
+        if p.unit == BarUnit.MINUTE:
+            return timedelta(minutes=p.size)
+        if p.unit == BarUnit.HOUR:
+            return timedelta(hours=p.size)
+        raise ValueError(f"Unsupported $unit '{p.unit}' in `to_timedelta`")
+
+    target_dt = to_timedelta(target)
+    base_dt = to_timedelta(base_period)
+
+    # Build end-times covering 5 target intervals with two source bars per interval
+    # Order per interval: an early bar strictly inside the interval, then the boundary bar
+    end_times: list[datetime] = []
+    boundaries: list[datetime] = []
+    for i in range(1, 6):
+        boundary_i = first_boundary + (i - 1) * target_dt
+        start_i = boundary_i - target_dt
+        mid_i = start_i + base_dt  # first base bar end strictly within the interval
+        end_times.extend([mid_i, boundary_i])
+        boundaries.append(boundary_i)
+
+    feed = build_feed_from_end_times(
+        unit=base_period.unit,
+        size=base_period.size,
+        end_times=end_times,
+    )
+
+    strategy = TestStrategy(source_feed=feed, target=target)
+    engine.add_strategy("test_strategy", strategy)
+
+    engine.start()
+
+    # Input count: all source bars (none of them match the target type)
+    assert strategy.count_input == len(end_times)
+
+    # Aggregated output: exactly one bar per interval at each boundary with correct type
+    assert strategy.count_agg == len(boundaries)
+    assert strategy.ends_agg == boundaries
+    assert strategy.types_agg == [target] * len(boundaries)
