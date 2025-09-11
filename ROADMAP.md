@@ -9,27 +9,20 @@ Implemented via BarsFromDataFrameEventFeed.
 
 ## Phase 1 — Minute bar aggregation (core implemented) ✅
 
-Status: Core resampling and aggregation are working end‑to‑end.
-
-Implemented:
-- MinuteBarResampler: N‑minute, day‑aligned (UTC), right‑closed windows; emits on window
-  change/close; robust validations; partial vs full detection.
-- MinuteBarAggregationEventFeed: EventFeed wrapper with peek/pop/is_finished/close/
-  remove_events_before and listener API (add/remove/get_listeners). Integrates with
-  TradingEngine via listeners after successful pop.
-- Basic tests for 1‑>5 min aggregation, non‑zero start minute, missing minute inside a window,
-  and first‑partial policy.
-- FAQ updated to document EventFeed protocol including get_listeners().
-
-Next tasks:
-- Expand test matrix across windows: 5, 15, 20, 30, 60, 120, 240, 360, 720 (any divisor of 1440).
-- Listener implementation: extract common listener registry (Mixin or helper) and reuse in
-  EventFeed(s) (e.g., BarsFromDataFrameEventFeed, FixedSequenceEventFeed, PeriodicTimeEventFeed).
-- Output bar type promotion: when window is a whole hour (60, 120, ...), optionally produce
-  hourly bar units if supported by the domain model (keep minute unit as default for now).
-- Naming: keep MinuteBarAggregationEventFeed; consider a generic TimeAggregationEventFeed only
-  if/when seconds or non‑minute inputs are added.
-- Document timezone alignment and window semantics in docs with short examples.
+1. Ak je agregovany bar nasobkom 60-minut, nastav vystupny bar ako hodinovy
+2. Urob test pre dalsie resamplingy:
+    - 1min bary -> 5-min, 15-min, 20-min, 30-min, 1-hour, 2-hour, 4-hour, 6-hour, 12-hour
+    - 5-min bary -> 15-min, 30-min, 1-hour, 2-hour, 4-hour, 6-hour, 12-hour
+    - 15-min bary -> 30-min, 1-hour, 2-hour, 4-hour, 6-hour, 12-hour
+    - 30-min bary -> 1-hour, 2-hour, 4-hour, 6-hour, 12-hour
+    - 1-hour bary -> 2-hour, 4-hour, 6-hour, 12-hour
+3. Zanalyzuj, ako by sme mohli agregovat SECONDS bars
+    * zrejme by sme nastavili opat X-nasobok do agregacie
+    * a pri vystupe by stacilo agregovany bar zaokruhlit na sekundy/minuty/hod, podla toho akoby to vyslo
+4. Dorobit aggregator pre Daily bars
+5. Dorobit aggregator pre Weekly bars
+6. Dorobit aggregator pre Monthly b
+7. Dorobit aggregator pre VolumeBars
 
 ## Phase 2 — Indicators
 

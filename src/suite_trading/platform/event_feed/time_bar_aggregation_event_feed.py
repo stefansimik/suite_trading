@@ -5,22 +5,23 @@ import logging
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.utils.datetime_utils import require_utc
-from suite_trading.domain.market_data.bar.minute_bar_resampler import MinuteBarResampler
+from suite_trading.domain.market_data.bar.time_bar_resampler import TimeBarResampler
 
 
 logger = logging.getLogger(__name__)
 
 
-class MinuteBarAggregationEventFeed:
-    """Aggregate minute bars from a source EventFeed using `MinuteBarResampler`.
+class TimeBarAggregationEventFeed:
+    """Aggregate time-based bars from a source EventFeed using `TimeBarResampler`.
 
     Receive source bars path:
       - `on_source_event`: receives NewBarEvent(s) from $source_feed and forwards to the
         resampler.
 
     Aggregation path:
-      - `on_aggregated_event`: invoked by `MinuteBarResampler` when a window closes or updates;
+      - `on_aggregated_event`: invoked by `TimeBarResampler` when a window closes or updates;
         applies partial-bar policy and enqueues resulting events.
 
     Consumers pull aggregated events via `peek`/`pop`. External listeners registered with
@@ -29,12 +30,21 @@ class MinuteBarAggregationEventFeed:
 
     # region Init
 
-    def __init__(self, source_feed, window_minutes: int, emit_first_partial_bar: bool = True, emit_later_partial_bars: bool = True):
+    def __init__(self, source_feed, unit: BarUnit, size: int, emit_first_partial_bar: bool = True, emit_later_partial_bars: bool = True):
         # SET INPUT PARAMETERS
         self._source_feed = source_feed
-        self._window_minutes = window_minutes
+        self._unit = unit
+        self._size = size
         self._emit_first_partial_bar = emit_first_partial_bar
         self._emit_later_partial_bars = emit_later_partial_bars
+
+        # Check: ensure size > 0
+        if not isinstance(self._size, int) or self._size <= 0:
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $size ('{self._size}') must be > 0")
+
+        # Check: unit must be SECOND/MINUTE/HOUR only in v1
+        if self._unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR}:
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $unit ('{self._unit}') is not supported; use SECOND, MINUTE, or HOUR")
 
         # LISTENERS OF THIS FEED (who want to be notified about aggregated bars)
         self._listeners: dict[str, Callable[[Event], None]] = {}
@@ -43,11 +53,11 @@ class MinuteBarAggregationEventFeed:
         self._closed: bool = False
 
         # LISTEN TO SOURCE FEED: This way we listen to receive input events from source-feed
-        self._listener_key: str = f"minute-agg-{window_minutes}m-{id(self):x}"
+        self._listener_key: str = f"time-agg-{self._unit.name.lower()}-{self._size}-{id(self):x}"
         self._source_feed.add_listener(self._listener_key, self.on_source_event)
 
         # RESAMPLER: This object generates aggregated events
-        self._resampler = MinuteBarResampler(window_minutes=self._window_minutes, on_emit_callback=self.on_aggregated_event)
+        self._resampler = TimeBarResampler(unit=self._unit, size=self._size, on_emit_callback=self.on_aggregated_event)
 
         # AGGREGATED EVENTS
         self._aggregated_event_queue: Deque[NewBarEvent] = deque()  # Aggregated bar events are stored in this queue
@@ -58,7 +68,7 @@ class MinuteBarAggregationEventFeed:
     # region Listener
 
     def on_source_event(self, event: Event) -> None:
-        """Ingest a NewBarEvent from $source_feed and forward to `MinuteBarResampler`.
+        """Ingest a NewBarEvent from $source_feed and forward to `TimeBarResampler`.
 
         Args:
             event (Event): Must be a NewBarEvent; otherwise a ValueError is raised.
@@ -79,11 +89,11 @@ class MinuteBarAggregationEventFeed:
     # region Resampler callback
 
     def on_aggregated_event(self, evt: NewBarEvent) -> None:
-        """Handle aggregated bar from `MinuteBarResampler` and apply partial-bar policy.
+        """Handle aggregated bar from `TimeBarResampler` and apply partial-bar policy.
 
         Purpose:
             - Aggregation path: the resampler emits a NewBarEvent for the configured
-              $window_minutes window, and this feed decides whether to enqueue it.
+              (unit,size) window, and this feed decides whether to enqueue it.
 
         Args:
             evt (NewBarEvent): Aggregated bar event (may be partial).
@@ -185,9 +195,9 @@ class MinuteBarAggregationEventFeed:
     # region String representations
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(window_minutes={self._window_minutes}, queued={len(self._aggregated_event_queue)}, closed={self._closed}, emitted_event_count={self.emitted_event_count})"
+        return f"{self.__class__.__name__}(unit={self._unit.name}, size={self._size}, queued={len(self._aggregated_event_queue)}, closed={self._closed}, emitted_event_count={self.emitted_event_count})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(window_minutes={self._window_minutes!r}, queued={len(self._aggregated_event_queue)!r}, closed={self._closed!r}, emitted_event_count={self.emitted_event_count!r})"
+        return f"{self.__class__.__name__}(unit={self._unit!r}, size={self._size!r}, queued={len(self._aggregated_event_queue)!r}, closed={self._closed!r}, emitted_event_count={self.emitted_event_count!r})"
 
     # endregion

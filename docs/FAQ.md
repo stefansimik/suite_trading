@@ -109,7 +109,7 @@ added `EventFeed`(s) per `Strategy`:
 - Purpose: feed synthetic demo bars by wrapping create_bar_series output into `NewBarEvent`(s).
 - Uses a deque internally; `peek()` returns the next event, `pop()` consumes it.
 
-3) `MinuteBarAggregationEventFeed`
+3) `TimeBarAggregationEventFeed`
 - Purpose: aggregate minute bars (e.g., 1‑min) to N‑minute bars (e.g., 5‑min).
 - How it works:
   - Registers as a listener on the source feed via the implementation's `add_listener(...)` (concrete feeds may expose registration helpers even though the EventFeed Protocol only requires `get_listeners()`)
@@ -214,9 +214,10 @@ self.add_event_feed("demo_data", demo_feed)
 minute_feed = BarsFromDataFrameEventFeed(df=minute_data, bar_type=minute_bar_type)
 
 # Aggregate to 5-minute bars
-five_minute_feed = MinuteBarAggregationEventFeed(
+five_minute_feed = TimeBarAggregationEventFeed(
     source_feed=minute_feed,
-    window_minutes=5,
+    unit=BarUnit.MINUTE,
+    size=5,
     emit_first_partial_bar=False,  # Skip incomplete first bar
 )
 
@@ -241,7 +242,7 @@ self.add_event_feed("timer", time_feed)
 
 ### Two feeds: 1‑minute bars and aggregated 5‑minute bars
 
-Inspired by `tests/unit/.../test_minute_bar_aggregation_event_feed.py`
+Inspired by `tests/unit/.../test_time_bar_aggregation_event_feed.py`
 
 ```python
 from datetime import datetime, timezone
@@ -249,8 +250,8 @@ from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
-from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import (
-    MinuteBarAggregationEventFeed,
+from suite_trading.platform.event_feed.time_bar_aggregation_event_feed import (
+    TimeBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar, create_bar_series
@@ -270,9 +271,10 @@ class AggregationStrategy(Strategy):
         src = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(first_bar=first_bar, num_bars=20)))
         self.add_event_feed("1m", src)
 
-        agg = MinuteBarAggregationEventFeed(
+        agg = TimeBarAggregationEventFeed(
             source_feed=src,
-            window_minutes=5,
+            unit=BarUnit.MINUTE,
+            size=5,
             emit_first_partial_bar=False,
         )
         self.add_event_feed("5m", agg)
@@ -387,10 +389,10 @@ Data aggregation chain (multiple timeframes from a single minute source):
 minute_feed = BarsFromDataFrameEventFeed(df=df, bar_type=minute_type)
 
 # Aggregate to 5-minute
-five_min_feed = MinuteBarAggregationEventFeed(source_feed=minute_feed, window_minutes=5)
+five_min_feed = TimeBarAggregationEventFeed(source_feed=minute_feed, unit=BarUnit.MINUTE, size=5)
 
 # Aggregate to 15-minute
-fifteen_min_feed = MinuteBarAggregationEventFeed(source_feed=minute_feed, window_minutes=15)
+fifteen_min_feed = TimeBarAggregationEventFeed(source_feed=minute_feed, unit=BarUnit.MINUTE, size=15)
 
 # Strategy receives all timeframes
 self.add_event_feed("1min", minute_feed)
@@ -398,7 +400,7 @@ self.add_event_feed("5min", five_min_feed)
 self.add_event_feed("15min", fifteen_min_feed)
 ```
 
-Aggregation rules (5‑min windows), straight from `MinuteBarAggregationEventFeed`:
+Aggregation rules (5‑min windows), straight from `TimeBarAggregationEventFeed`:
 - Windows align to UTC days; end at minute multiples of N (e.g., 00:05, 00:10, 00:15)
 - A bar ending exactly at a window boundary triggers bar emission
 - First partial window emission is controlled by `emit_first_partial_bar`; later partials by `emit_later_partial_bars`

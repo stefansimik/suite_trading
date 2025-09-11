@@ -10,8 +10,8 @@ from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import (
     FixedSequenceEventFeed,
 )
-from suite_trading.platform.event_feed.minute_bar_aggregation_event_feed import (
-    MinuteBarAggregationEventFeed,
+from suite_trading.platform.event_feed.time_bar_aggregation_event_feed import (
+    TimeBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.utils.data_generation.bar_generation import (
@@ -42,7 +42,7 @@ class TestStrategy(Strategy):
         # 1-min feed
         self.add_event_feed("source_1m", self._source_feed_1_min)
         # 5-min feed
-        agg = MinuteBarAggregationEventFeed(source_feed=self._source_feed_1_min, window_minutes=5)
+        agg = TimeBarAggregationEventFeed(source_feed=self._source_feed_1_min, unit=BarUnit.MINUTE, size=5)
         self.add_event_feed("agg_5m", agg)
 
     def on_event(self, event) -> None:
