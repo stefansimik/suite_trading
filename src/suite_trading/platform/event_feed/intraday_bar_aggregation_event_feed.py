@@ -42,9 +42,9 @@ class IntradayBarAggregationEventFeed:
         if not isinstance(self._size, int) or self._size <= 0:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $size ('{self._size}') must be > 0")
 
-        # Check: unit must be SECOND/MINUTE/HOUR only in v1
-        if self._unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR}:
-            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $unit ('{self._unit}') is not supported; use SECOND, MINUTE, or HOUR")
+        # Check: unit must be SECOND/MINUTE/HOUR/DAY
+        if self._unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY}:
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $unit ('{self._unit}') is not supported; use SECOND, MINUTE, HOUR, or DAY")
 
         # LISTENERS OF THIS FEED (who want to be notified about aggregated bars)
         self._listeners: dict[str, Callable[[Event], None]] = {}
