@@ -21,13 +21,14 @@ class TimeBarResampler:
         last included input event.
 
     Constraints (v1):
-        - Supported output units: SECOND, MINUTE, HOUR.
-        - Input bars must also be time-based with units in {SECOND, MINUTE, HOUR}.
+        - Supported output units: SECOND, MINUTE, HOUR, DAY (daily = 00:00–24:00 UTC, right-closed).
+        - If $unit is DAY, only $size == 1 is supported.
+        - Input bars must also be time-based with units in {SECOND, MINUTE, HOUR, DAY}.
         - Output window duration must be >= input bar duration and an exact multiple of it.
         - Alignment is anchored to midnight UTC using total seconds since day start.
 
     Args:
-        $unit (BarUnit): Target time unit (SECOND, MINUTE, HOUR).
+        $unit (BarUnit): Target time unit (SECOND, MINUTE, HOUR, DAY).
         $size (int): Positive integer window size in $unit.
         $on_emit_callback (Callable[[NewBarEvent], None]): Callback invoked with aggregated
             bar events.
@@ -41,8 +42,12 @@ class TimeBarResampler:
             raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $size ('{size}') is not > 0")
 
         # Check: unit supported
-        if unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR}:
-            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, or HOUR")
+        if unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY}:
+            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, HOUR, or DAY")
+
+        # Check: only size==1 allowed for DAY
+        if unit == BarUnit.DAY and size != 1:
+            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit is DAY but $size ('{size}') is not 1; only daily size=1 is supported")
 
         self._unit = unit
         self._size = size
@@ -130,8 +135,8 @@ class TimeBarResampler:
     def _validate_first_source_and_compatibility(self, event: NewBarEvent) -> None:
         # Require time-based bars
         bar = event.bar
-        if bar.unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR}:
-            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $bar.unit ('{bar.unit}') is not a supported time unit; only SECOND, MINUTE, HOUR are supported")
+        if bar.unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY}:
+            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $bar.unit ('{bar.unit}') is not a supported time unit; only SECOND, MINUTE, HOUR, DAY are supported")
 
         # Infer input bar size in seconds
         self._input_bar_seconds = int((bar.end_dt - bar.start_dt).total_seconds())
@@ -159,6 +164,8 @@ class TimeBarResampler:
             return 60
         if self._unit == BarUnit.HOUR:
             return 3600
+        if self._unit == BarUnit.DAY:
+            return 86400
         # Defensive default (should not happen due to ctor validation)
         return 1
 
