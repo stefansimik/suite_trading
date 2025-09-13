@@ -10,7 +10,7 @@ from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import (
     FixedSequenceEventFeed,
 )
-from suite_trading.platform.event_feed.time_bar_aggregation_event_feed import (
+from suite_trading.platform.event_feed.intraday_bar_aggregation_event_feed import (
     IntradayBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
