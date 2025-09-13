@@ -11,7 +11,7 @@ from suite_trading.platform.event_feed.fixed_sequence_event_feed import (
     FixedSequenceEventFeed,
 )
 from suite_trading.platform.event_feed.time_bar_aggregation_event_feed import (
-    TimeBarAggregationEventFeed,
+    IntradayBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.utils.data_generation.bar_generation import (
@@ -80,7 +80,7 @@ def boundary_dt_for_target(
 
 
 class TestStrategy(Strategy):
-    """Strategy wiring a source feed to a TimeBarAggregationEventFeed.
+    """Strategy wiring a source feed to a IntradayBarAggregationEventFeed.
 
     Records only aggregated NewBarEvent(s) matching the target period.
     """
@@ -106,7 +106,7 @@ class TestStrategy(Strategy):
         self.add_event_feed("source", self._source_feed)
 
         # Aggregation event-feed: resamples bars from the source feed into the target period
-        agg = TimeBarAggregationEventFeed(
+        agg = IntradayBarAggregationEventFeed(
             source_feed=self._source_feed,
             unit=self._target.unit,
             size=self._target.size,

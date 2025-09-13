@@ -13,7 +13,7 @@ from suite_trading.domain.market_data.bar.time_bar_resampler import TimeBarResam
 logger = logging.getLogger(__name__)
 
 
-class TimeBarAggregationEventFeed:
+class IntradayBarAggregationEventFeed:
     """Aggregate time-based bars from a source EventFeed using `TimeBarResampler`.
 
     Receive source bars path:
