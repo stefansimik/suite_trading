@@ -42,11 +42,11 @@ class TimeBarResampler:
             raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $size ('{size}') is not > 0")
 
         # Check: unit supported
-        if unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY, BarUnit.WEEK}:
-            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, or WEEK")
+        if unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH}:
+            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, WEEK, or MONTH")
 
-        # Check: only size==1 allowed for DAY and WEEK
-        if unit in {BarUnit.DAY, BarUnit.WEEK} and size != 1:
+        # Check: only size==1 allowed for DAY, WEEK, and MONTH
+        if unit in {BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH} and size != 1:
             raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit is {unit.name} but $size ('{size}') is not 1; only {unit.name.lower()} size=1 is supported")
 
         self._unit = unit
@@ -143,15 +143,23 @@ class TimeBarResampler:
         if self._input_bar_seconds <= 0:
             raise ValueError(f"Cannot call `TimeBarResampler.add_event` because inferred $input_bar_seconds ('{self._input_bar_seconds}') must be > 0")
 
-        window_seconds = self._window_seconds()
-
-        # Check: output window not finer than input
-        if window_seconds < self._input_bar_seconds:
-            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $output_window_seconds ('{window_seconds}') is < $input_bar_seconds ('{self._input_bar_seconds}')")
-
-        # Check: multiple rule
-        if (window_seconds % self._input_bar_seconds) != 0:
-            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $output_window_seconds ('{window_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
+        if self._unit == BarUnit.MONTH:
+            # For monthly aggregation: input must evenly divide a day (86400 seconds)
+            if 86400 % self._input_bar_seconds != 0:
+                raise ValueError(f"Cannot call `TimeBarResampler.add_event` because monthly aggregation requires $input_bar_seconds to divide 86400; got '{self._input_bar_seconds}'")
+            # Validate current month window is multiple of input size
+            w_start, w_end = self._compute_window_bounds(bar.end_dt)
+            month_seconds = int((w_end - w_start).total_seconds())
+            if (month_seconds % self._input_bar_seconds) != 0:
+                raise ValueError(f"Cannot call `TimeBarResampler.add_event` because current month length in seconds ('{month_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
+        else:
+            window_seconds = self._window_seconds()
+            # Check: output window not finer than input
+            if window_seconds < self._input_bar_seconds:
+                raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $output_window_seconds ('{window_seconds}') is < $input_bar_seconds ('{self._input_bar_seconds}')")
+            # Check: multiple rule
+            if (window_seconds % self._input_bar_seconds) != 0:
+                raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $output_window_seconds ('{window_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
 
     # endregion
 
@@ -186,12 +194,20 @@ class TimeBarResampler:
             return
         output_bar_type = first_bt.copy(value=self._size, unit=self._unit)
 
+        # Compute partial flag; for MONTH use actual window duration due to variable length
+        if self._unit == BarUnit.MONTH:
+            full_seconds = int((window_end - window_start).total_seconds())
+            full_window_bar_count = full_seconds // int(self._input_bar_seconds or 1)
+            is_partial = self._event_accumulator.count < full_window_bar_count
+        else:
+            is_partial = self._is_partial()
+
         # Build aggregated event from the accumulator's current state
         evt = self._event_accumulator.build_event(
             output_bar_type,
             window_start,
             window_end,
-            is_partial=self._is_partial(),
+            is_partial=is_partial,
         )
 
         # Emit, update counters, and reset accumulator
@@ -208,8 +224,23 @@ class TimeBarResampler:
         - For WEEK (size=1), align to calendar week boundaries: Monday 00:00 UTC to next Monday
           00:00 UTC. The end boundary is the smallest Monday >= $dt (i.e., dt exactly at Monday
           00:00 is considered the end of the previous week).
+        - For MONTH (size=1), align to calendar months: first day 00:00 UTC to first day 00:00
+          next month. An event exactly at month start closes the previous month.
         """
         require_utc(dt)
+
+        if self._unit == BarUnit.MONTH:
+            # Compute month window where end is the smallest 1st-of-month 00:00 >= $dt.
+            # Subtract 1 microsecond so dt at exact month start maps to previous month.
+            dt_adj = dt - timedelta(microseconds=1)
+            day_start = dt_adj.replace(hour=0, minute=0, second=0, microsecond=0)
+            month_start = day_start.replace(day=1)
+            # Compute next month start (handles Dec -> Jan)
+            if month_start.month == 12:
+                next_month_start = month_start.replace(year=month_start.year + 1, month=1)
+            else:
+                next_month_start = month_start.replace(month=month_start.month + 1)
+            return month_start, next_month_start
 
         if self._unit == BarUnit.WEEK:
             # Compute week window where end is the smallest Monday 00:00 >= $dt.

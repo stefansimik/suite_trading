@@ -42,12 +42,12 @@ class TimeBarAggregationEventFeed:
         if not isinstance(self._size, int) or self._size <= 0:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $size ('{self._size}') must be > 0")
 
-        # Check: unit must be SECOND/MINUTE/HOUR/DAY/WEEK
-        if self._unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY, BarUnit.WEEK}:
-            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $unit ('{self._unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, or WEEK")
+        # Check: unit must be SECOND/MINUTE/HOUR/DAY/WEEK/MONTH
+        if self._unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH}:
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $unit ('{self._unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, WEEK, or MONTH")
 
-        # Check: enforce size == 1 for DAY and WEEK
-        if self._unit in {BarUnit.DAY, BarUnit.WEEK} and self._size != 1:
+        # Check: enforce size == 1 for DAY, WEEK, MONTH
+        if self._unit in {BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH} and self._size != 1:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $size ('{self._size}') must be 1 when $unit is {self._unit.name}")
 
         # LISTENERS OF THIS FEED (who want to be notified about aggregated bars)
