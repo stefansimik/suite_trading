@@ -223,16 +223,12 @@ class Strategy(ABC):
         """
         # Check: TradingEngine must be attached in this Strategy
         if self._trading_engine is None:
-            raise RuntimeError(
-                "Cannot call `add_event_feed` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
+            raise RuntimeError("Cannot call `add_event_feed` because $_trading_engine is None. Add the strategy to a TradingEngine first.")
 
         # Check: Strategy must be in $state, where adding feeds make sense (only in states ADDED or RUNNING)
         if not (self._state_machine.can_execute_action(StrategyAction.START_STRATEGY) or self.state == StrategyState.RUNNING):
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
-            raise RuntimeError(
-                f"Cannot call `add_event_feed` because $state ({self.state.name}) does not allow adding feeds. Valid actions: {valid_actions}. Call it from `on_start` or when the strategy is RUNNING.",
-            )
+            raise RuntimeError(f"Cannot call `add_event_feed` because $state ({self.state.name}) does not allow adding feeds. Valid actions: {valid_actions}. Call it from `on_start` or when the strategy is RUNNING.")
 
         # If callback function was not provided, let's use the default `on_event` callback
         if callback is None:
@@ -260,16 +256,12 @@ class Strategy(ABC):
         """
         # Check: engine must be attached
         if self._trading_engine is None:
-            raise RuntimeError(
-                "Cannot call `remove_event_feed` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
+            raise RuntimeError("Cannot call `remove_event_feed` because $_trading_engine is None. Add the strategy to a TradingEngine first.")
 
         # Check: state must be RUNNING to remove feeds
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
-            raise RuntimeError(
-                f"Cannot call `remove_event_feed` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
-            )
+            raise RuntimeError(f"Cannot call `remove_event_feed` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         # Delegate to TradingEngine
         self._trading_engine.remove_event_feed_from_strategy(self, feed_name)
@@ -292,18 +284,17 @@ class Strategy(ABC):
         """
         # Check: trading engine must be attached before submitting orders
         if self._trading_engine is None:
-            raise RuntimeError(
-                "Cannot call `submit_order` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
+            raise RuntimeError("Cannot call `submit_order` because $_trading_engine is None. Add the strategy to a TradingEngine first.")
+
         # Check: state must be RUNNING to submit orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
-            raise RuntimeError(
-                f"Cannot call `submit_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
-            )
+            raise RuntimeError(f"Cannot call `submit_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         self._trading_engine.submit_order(order, broker)
 
+    # FIXME: Order is already created and should already know to which Broker it is attached.
+    #   So we should not need to pass it as an argument here.
     def cancel_order(self, order: Order, broker: Broker) -> None:
         """Cancel an existing order.
 
@@ -321,6 +312,7 @@ class Strategy(ABC):
             raise RuntimeError(
                 "Cannot call `cancel_order` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
             )
+
         # Check: state must be RUNNING to cancel orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
@@ -330,6 +322,8 @@ class Strategy(ABC):
 
         self._trading_engine.cancel_order(order, broker)
 
+    # FIXME: Order is already created and should already know to which Broker it is attached.
+    #   So we should not need to pass it as an argument here.
     def modify_order(self, order: Order, broker: Broker) -> None:
         """Modify an existing order.
 
@@ -344,18 +338,16 @@ class Strategy(ABC):
         """
         # Check: trading engine must be attached before modifying orders
         if self._trading_engine is None:
-            raise RuntimeError(
-                "Cannot call `modify_order` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
+            raise RuntimeError("Cannot call `modify_order` because $_trading_engine is None. Add the strategy to a TradingEngine first.")
+
         # Check: state must be RUNNING to modify orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
-            raise RuntimeError(
-                f"Cannot call `modify_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
-            )
+            raise RuntimeError(f"Cannot call `modify_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         self._trading_engine.modify_order(order, broker)
 
+    # TODO: Allow filtering only orders created by this Strategy
     def get_active_orders(self, broker: Broker) -> List[Order]:
         """Get all currently active orders.
 
@@ -372,15 +364,12 @@ class Strategy(ABC):
         """
         # Check: trading engine must be attached before retrieving active orders
         if self._trading_engine is None:
-            raise RuntimeError(
-                "Cannot call `get_active_orders` because $_trading_engine is None. Add the strategy to a TradingEngine first.",
-            )
+            raise RuntimeError("Cannot call `get_active_orders` because $_trading_engine is None. Add the strategy to a TradingEngine first.")
+
         # Check: state must be RUNNING to retrieve active orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
-            raise RuntimeError(
-                f"Cannot call `get_active_orders` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
-            )
+            raise RuntimeError(f"Cannot call `get_active_orders` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         return self._trading_engine.get_active_orders(broker)
 

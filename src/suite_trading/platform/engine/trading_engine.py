@@ -173,9 +173,7 @@ class TradingEngine:
         key = type(broker)
         # Check: only one broker per concrete class
         if key in self._brokers_dict:
-            raise ValueError(
-                f"Cannot call `add_broker` because a broker of class {key.__name__} is already added to this TradingEngine",
-            )
+            raise ValueError(f"Cannot call `add_broker` because a broker of class {key.__name__} is already added to this TradingEngine")
 
         self._brokers_dict[key] = broker
         logger.debug(f"Added broker of class {key.__name__}")
@@ -191,9 +189,7 @@ class TradingEngine:
         """
         # Check: broker type must be added before removing
         if broker_type not in self._brokers_dict:
-            raise KeyError(
-                f"Cannot call `remove_broker` because $broker_type ('{broker_type.__name__}') is not added to this TradingEngine. Add the broker using `add_broker` first.",
-            )
+            raise KeyError(f"Cannot call `remove_broker` because $broker_type ('{broker_type.__name__}') is not added to this TradingEngine. Add the broker using `add_broker` first.")
 
         del self._brokers_dict[broker_type]
         logger.debug(f"Removed broker of class {broker_type.__name__}")
@@ -255,9 +251,7 @@ class TradingEngine:
         """
         # Check: strategy name must be added before starting
         if name not in self._name_strategies_bidict:
-            raise KeyError(
-                f"Cannot call `start_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
-            )
+            raise KeyError(f"Cannot call `start_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.")
 
         strategy = self._name_strategies_bidict[name]
 
