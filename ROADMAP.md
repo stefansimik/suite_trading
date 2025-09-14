@@ -16,9 +16,10 @@ Implemented via BarsFromDataFrameEventFeed.
     - Matrix covers targets: 5s, 15s, 30s, 1m, 5m, 15m, 20m, 30m, 1h, 2h, 4h, 6h, 12h
 3. Support seconds-based aggregation and boundary rounding — DONE ✅
 4. Add Daily bar aggregation — DONE ✅
-5. Add Weekly bar aggregation — TODO
-6. Add Monthly bar aggregation — TODO
+5. Add Weekly bar aggregation — DONE ✅
+6. Add Monthly bar aggregation — DONE ✅
 7. Add VolumeBar aggregation — TODO
+8. Bar aggregation should also accept TimeEvents, that would close and emit the bars, if no last finishing source bar comes.
 
 ## Phase 2 — Indicators
 
