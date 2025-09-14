@@ -1,7 +1,7 @@
 # Roadmap
 
 A concise, high‑level plan for initial development. Phases are intentionally small and
-focused. Last updated: 2025‑09‑12.
+focused. Last updated: 2025‑09‑14.
 
 ## Phase 0 — Bars from CSV/DataFrame — DONE ✅
 
@@ -15,7 +15,7 @@ Implemented via BarsFromDataFrameEventFeed.
     - Matrix covers bases: 1s, 5s, 1m, 5m, 15m, 30m, 1h
     - Matrix covers targets: 5s, 15s, 30s, 1m, 5m, 15m, 20m, 30m, 1h, 2h, 4h, 6h, 12h
 3. Support seconds-based aggregation and boundary rounding — DONE ✅
-4. Add Daily bar aggregation — TODO
+4. Add Daily bar aggregation — DONE ✅
 5. Add Weekly bar aggregation — TODO
 6. Add Monthly bar aggregation — TODO
 7. Add VolumeBar aggregation — TODO

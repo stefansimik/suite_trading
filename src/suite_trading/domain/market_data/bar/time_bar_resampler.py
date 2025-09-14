@@ -42,12 +42,12 @@ class TimeBarResampler:
             raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $size ('{size}') is not > 0")
 
         # Check: unit supported
-        if unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY}:
-            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, HOUR, or DAY")
+        if unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY, BarUnit.WEEK}:
+            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, or WEEK")
 
-        # Check: only size==1 allowed for DAY
-        if unit == BarUnit.DAY and size != 1:
-            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit is DAY but $size ('{size}') is not 1; only daily size=1 is supported")
+        # Check: only size==1 allowed for DAY and WEEK
+        if unit in {BarUnit.DAY, BarUnit.WEEK} and size != 1:
+            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit is {unit.name} but $size ('{size}') is not 1; only {unit.name.lower()} size=1 is supported")
 
         self._unit = unit
         self._size = size
@@ -166,6 +166,8 @@ class TimeBarResampler:
             return 3600
         if self._unit == BarUnit.DAY:
             return 86400
+        if self._unit == BarUnit.WEEK:
+            return 604800
         # Defensive default (should not happen due to ctor validation)
         return 1
 
@@ -198,12 +200,30 @@ class TimeBarResampler:
         self._event_accumulator.reset()
 
     def _compute_window_bounds(self, dt: datetime) -> tuple[datetime, datetime]:
-        """Compute right-closed window aligned to midnight UTC for $dt.
+        """Compute right-closed UTC window for $dt.
 
-        We compute alignment using seconds since day start and rounding up to the nearest
-        multiple of $window_seconds. This works uniformly for SECOND/MINUTE/HOUR windows.
+        Logic:
+        - For SECOND/MINUTE/HOUR (and DAY with size=1), align using seconds since midnight and
+          round up to the nearest multiple of $window_seconds within the UTC day.
+        - For WEEK (size=1), align to calendar week boundaries: Monday 00:00 UTC to next Monday
+          00:00 UTC. The end boundary is the smallest Monday >= $dt (i.e., dt exactly at Monday
+          00:00 is considered the end of the previous week).
         """
         require_utc(dt)
+
+        if self._unit == BarUnit.WEEK:
+            # Compute week window where end is the smallest Monday 00:00 >= $dt.
+            # We subtract 1 microsecond so that dt exactly at Monday 00:00 maps to the previous
+            # week's start when we floor to Monday, making the end equal to the current Monday.
+            dt_adj = dt - timedelta(microseconds=1)
+            day_start = dt_adj.replace(hour=0, minute=0, second=0, microsecond=0)
+            weekday = day_start.weekday()  # Monday=0 .. Sunday=6
+            week_start = day_start - timedelta(days=weekday)
+            window_start = week_start
+            window_end = week_start + timedelta(days=7)
+            return window_start, window_end
+
+        # Default path for SECOND/MINUTE/HOUR and DAY (size=1)
         day_start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
         seconds_since_day_start = int((dt - day_start).total_seconds())
         window_seconds = self._window_seconds()
