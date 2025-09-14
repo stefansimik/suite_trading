@@ -250,8 +250,8 @@ from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
-from suite_trading.platform.event_feed.intraday_bar_aggregation_event_feed import (
-    IntradayBarAggregationEventFeed,
+from suite_trading.platform.event_feed.time_bar_aggregation_event_feed import (
+    TimeBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar, create_bar_series
@@ -271,7 +271,7 @@ class AggregationStrategy(Strategy):
         src = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(first_bar=first_bar, num_bars=20)))
         self.add_event_feed("1m", src)
 
-        agg = IntradayBarAggregationEventFeed(
+        agg = TimeBarAggregationEventFeed(
             source_feed=src,
             unit=BarUnit.MINUTE,
             size=5,
