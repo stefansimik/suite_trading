@@ -10,6 +10,7 @@ from suite_trading.utils.math import ceil_to_multiple
 from suite_trading.domain.market_data.bar.new_bar_event_accumulator import NewBarEventAccumulator
 
 
+#
 class TimeBarResampler:
     """Resample time-based Bars into right-closed windows of (unit,size).
 
@@ -66,7 +67,7 @@ class TimeBarResampler:
 
     # endregion
 
-    # region Main
+    # region Main logic
 
     def add_event(self, event: NewBarEvent) -> None:
         """Consume a `NewBarEvent` and resample it into aggregated time bars.
@@ -104,8 +105,8 @@ class TimeBarResampler:
         self._event_accumulator.add(event)
 
         # If we are exactly at the end of the window, emit including current event
-        should_emit_bar_because_bar_end_reached = bar.end_dt == window_end
-        if should_emit_bar_because_bar_end_reached:
+        should_emit_bar_because_window_end_reached = bar.end_dt == window_end
+        if should_emit_bar_because_window_end_reached:
             self._emit_window(window_start, window_end)
 
         # Update window/order tracking
@@ -148,11 +149,12 @@ class TimeBarResampler:
             if 86400 % self._input_bar_seconds != 0:
                 raise ValueError(f"Cannot call `TimeBarResampler.add_event` because monthly aggregation requires $input_bar_seconds to divide 86400; got '{self._input_bar_seconds}'")
             # Validate current month window is multiple of input size
-            w_start, w_end = self._compute_window_bounds(bar.end_dt)
-            month_seconds = int((w_end - w_start).total_seconds())
+            window_start, window_end = self._compute_window_bounds(bar.end_dt)
+            month_seconds = int((window_end - window_start).total_seconds())
             if (month_seconds % self._input_bar_seconds) != 0:
                 raise ValueError(f"Cannot call `TimeBarResampler.add_event` because current month length in seconds ('{month_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
         else:
+            # For SECOND/MINUTE/HOUR/DAY/WEEK the window seconds are fixed; MONTH varies and is handled above
             window_seconds = self._window_seconds()
             # Check: output window not finer than input
             if window_seconds < self._input_bar_seconds:
@@ -166,18 +168,19 @@ class TimeBarResampler:
     # region Internal
 
     def _unit_seconds(self) -> int:
-        if self._unit == BarUnit.SECOND:
-            return 1
-        if self._unit == BarUnit.MINUTE:
-            return 60
-        if self._unit == BarUnit.HOUR:
-            return 3600
-        if self._unit == BarUnit.DAY:
-            return 86400
-        if self._unit == BarUnit.WEEK:
-            return 604800
-        # Defensive default (should not happen due to ctor validation)
-        return 1
+        match self._unit:
+            case BarUnit.SECOND:
+                return 1
+            case BarUnit.MINUTE:
+                return 60
+            case BarUnit.HOUR:
+                return 3600
+            case BarUnit.DAY:
+                return 86400
+            case BarUnit.WEEK:
+                return 604800
+            case _:
+                raise ValueError(f"Cannot call `TimeBarResampler._unit_seconds` because $unit ('{self._unit}') is not a fixed-length time unit")
 
     def _window_seconds(self) -> int:
         return self._size * self._unit_seconds()
@@ -189,10 +192,10 @@ class TimeBarResampler:
     def _emit_window(self, window_start: datetime, window_end: datetime) -> None:
         """Build and emit an aggregated NewBarEvent for the given window bounds."""
         # Derive output bar type aligned to target window size
-        first_bt = self._event_accumulator.first_bar_type
-        if first_bt is None:
+        first_bar_type = self._event_accumulator.first_bar_type
+        if first_bar_type is None:
             return
-        output_bar_type = first_bt.copy(value=self._size, unit=self._unit)
+        output_bar_type = first_bar_type.copy(value=self._size, unit=self._unit)
 
         # Compute partial flag; for MONTH use actual window duration due to variable length
         if self._unit == BarUnit.MONTH:
@@ -203,7 +206,7 @@ class TimeBarResampler:
             is_partial = self._is_partial()
 
         # Build aggregated event from the accumulator's current state
-        evt = self._event_accumulator.build_event(
+        aggregated_event = self._event_accumulator.build_event(
             output_bar_type,
             window_start,
             window_end,
@@ -211,7 +214,7 @@ class TimeBarResampler:
         )
 
         # Emit, update counters, and reset accumulator
-        self._on_emit(evt)
+        self._on_emit(aggregated_event)
         self.emitted_bar_count += 1
         self._event_accumulator.reset()
 
@@ -232,8 +235,8 @@ class TimeBarResampler:
         if self._unit == BarUnit.MONTH:
             # Compute month window where end is the smallest 1st-of-month 00:00 >= $dt.
             # Subtract 1 microsecond so dt at exact month start maps to previous month.
-            dt_adj = dt - timedelta(microseconds=1)
-            day_start = dt_adj.replace(hour=0, minute=0, second=0, microsecond=0)
+            dt_adjusted = dt - timedelta(microseconds=1)
+            day_start = dt_adjusted.replace(hour=0, minute=0, second=0, microsecond=0)
             month_start = day_start.replace(day=1)
             # Compute next month start (handles Dec -> Jan)
             if month_start.month == 12:
@@ -246,8 +249,8 @@ class TimeBarResampler:
             # Compute week window where end is the smallest Monday 00:00 >= $dt.
             # We subtract 1 microsecond so that dt exactly at Monday 00:00 maps to the previous
             # week's start when we floor to Monday, making the end equal to the current Monday.
-            dt_adj = dt - timedelta(microseconds=1)
-            day_start = dt_adj.replace(hour=0, minute=0, second=0, microsecond=0)
+            dt_adjusted = dt - timedelta(microseconds=1)
+            day_start = dt_adjusted.replace(hour=0, minute=0, second=0, microsecond=0)
             weekday = day_start.weekday()  # Monday=0 .. Sunday=6
             week_start = day_start - timedelta(days=weekday)
             window_start = week_start
