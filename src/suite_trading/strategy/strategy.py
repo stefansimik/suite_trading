@@ -91,14 +91,17 @@ class Strategy(ABC):
     # region Internal
 
     def _require_trading_engine(self) -> "TradingEngine":
-        """Return the attached TradingEngine or raise if it is not set.
+        """Return the attached TradingEngine or raise if missing.
 
-        Returns:
-            TradingEngine: The attached TradingEngine instance.
+        Notes:
+         - TradingEngine manages Strategies - not vice versa. We should prefer Strategy APIs over direct engine calls if possible.
+         - TradingEngine should be used for advanced use-cases only, when you know, what you're doing.
 
-        Raises:
-            RuntimeError: If $_trading_engine is None. Add the Strategy to a TradingEngine using
-                `add_strategy` first.
+         Returns:
+             TradingEngine: The attached TradingEngine.
+
+         Raises:
+             RuntimeError: If $_trading_engine is None
         """
         # Check: TradingEngine must be attached to this Strategy
         if self._trading_engine is None:

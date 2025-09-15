@@ -418,3 +418,52 @@ Aggregation rules (5‑min windows), straight from `TimeBarAggregationEventFeed`
    - Independent timelines per `Strategy` (no global clock)
    - No start/end dates to manage — strategies stop naturally when their EventFeed(s) finish
    - Strategy can add or remove feeds anytime
+
+
+---
+
+### Choosing brokers: default, fixed, or dynamic
+
+This way all 3 scenarios are easy to implement:
+
+1) Default broker for Strategy
+- Pass a `Broker` instance as part of your Strategy's input configuration and store it as
+  your default (e.g., `$default_broker`). Use it whenever you call `submit_order`.
+
+```python
+class MyStrategy(Strategy):
+    def __init__(self, default_broker: Broker) -> None:
+        super().__init__()
+        self.default_broker = default_broker  # default Broker for this Strategy
+
+    def on_event(self, event: Event):
+        if should_trade(event):
+            self.submit_order(create_order(event), self.default_broker)
+```
+
+2) Fixed Broker for Strategy
+- Choose a specific Broker directly inside the Strategy using `get_broker` with its concrete
+  class, for example `self.get_broker(SimulatedBroker)`.
+
+```python
+# Retrieve a concrete Broker instance by its class
+sim_broker = self.get_broker(SimulatedBroker)
+self.submit_order(create_order(event), sim_broker)
+```
+
+3) Strategy chooses Broker dynamically
+- A Strategy can implement its own logic and select from all available brokers exposed via the
+  $brokers mapping.
+
+```python
+# Inspect all available brokers and choose one based on your own rules
+for broker_type, broker in self.brokers.items():
+    if supports_instrument(broker, event):  # example of some logic
+        self.submit_order(create_order(event), broker)
+        break
+```
+
+Notes:
+- The $brokers property returns a mapping: dict[type[Broker], Broker].
+- `get_broker(broker_type)` raises an error if the requested broker type was not added to the
+  TradingEngine.
