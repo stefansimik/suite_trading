@@ -56,16 +56,16 @@ class Broker(Protocol):
             bool: True if connected to broker, False otherwise.
         """
         ...
-
     # endregion
 
     # region Orders
 
-    def submit_order(self, order: Order) -> None:
+    def submit_order(self, order: Order, *trigger_orders: Order) -> None:
         """Submit order for execution.
 
         Args:
             order (Order): The order to submit for execution.
+            trigger_orders (Order): The order that are triggered by the main order
 
         Raises:
             ConnectionError: If not connected to broker.

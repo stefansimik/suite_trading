@@ -7,24 +7,18 @@ from typing import List
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.order.execution import Execution
-from suite_trading.domain.order.order_enums import OrderSide
+from suite_trading.domain.order.order_enums import OrderSide, OrderTriggerType
 from suite_trading.domain.order.order_state import OrderAction, OrderState
 from suite_trading.domain.order.orders import Order, LimitOrder, MarketOrder, StopOrder, StopLimitOrder
 
 logger = logging.getLogger(__name__)
 
 def lmt_order_active(order: LimitOrder, bar: Bar):
-    if order.side == OrderSide.BUY:
-        return order.limit_price <= bar.high
-    else:
-        return order.limit_price >= bar.low
+    return bar.high >= order.limit_price
 
 
 def stp_order_active(order: StopOrder, bar):
-    if order.side == OrderSide.BUY:
-        return order.stop_price <= bar.high
-    else:
-        return order.stop_price >= bar.low
+    return bar.low <= order.stop_price
 
 
 class SimulatedBroker:
@@ -43,25 +37,29 @@ class SimulatedBroker:
     def is_connected(self) -> bool:
         return self.connected
 
-    def submit_order(self, order: Order) -> None:
+    def submit_order(self, order: Order, *trigger_orders: Order) -> None:
         """Submit order for execution.
 
         Args:
             order (Order): The order to submit for execution.
+            trigger_orders (Order): The order that are triggered by the main order
 
         Raises:
             ConnectionError: If not connected to broker.
             ValueError: If order is invalid or cannot be submitted.
         """
         # pre-check needed (all parameters good?)
-        if self.is_order_valid(order):
-            order.change_state(OrderAction.SUBMIT) # order is now PENDING
-            if isinstance(order, MarketOrder):
-                order.change_state(OrderAction.SUBMIT) # mkt order are directly ACCEPTED
-        else:
-            order.change_state(OrderAction.DENY)
+        for o in trigger_orders:
+            self.is_order_valid(o) # raises an ValueError on false
+        self.is_order_valid(order)
+        # process orders
+        order.change_state(OrderAction.SUBMIT) # order is now PENDING
+        if isinstance(order, MarketOrder):
+            order.change_state(OrderAction.SUBMIT) # mkt order are directly ACCEPTED
 
         self.orders.__setitem__(order.id, order)
+        for o in trigger_orders:
+            self.orders.__setitem__(o.id, o)
 
     def cancel_order(self, order: Order) -> None:
         """Cancel an existing order.
@@ -97,7 +95,7 @@ class SimulatedBroker:
             ConnectionError: If not connected to broker.
         """
         return  list( {k: v for k, v in self.orders.items()
-                        if v.state in (OrderState.INITIALIZED, OrderState.PENDING, OrderState.SUBMITTED,
+                        if v.state in (OrderState.PENDING, OrderState.SUBMITTED,
                                        OrderState.ACCEPTED, OrderState.PENDING_UPDATE, OrderState.PENDING_CANCEL,
                                        OrderState.PARTIALLY_FILLED, OrderState.TRIGGERED) }.values() )
 
@@ -120,6 +118,7 @@ class SimulatedBroker:
         i = 0
         while i < len(submitted_lmt_order):
             if lmt_order_active(submitted_lmt_order[i], bar):
+                logger.debug(f"SUBMIT order {submitted_lmt_order[i].id}")
                 submitted_lmt_order[i].change_state(OrderAction.SUBMIT)
                 self.fill_order(submitted_lmt_order[i].limit_price, bar.end_dt, submitted_lmt_order[i])
             i += 1
@@ -129,6 +128,7 @@ class SimulatedBroker:
         i = 0
         while i < len(submitted_stp_order):
             if stp_order_active(submitted_stp_order[i], bar):
+                logger.debug(f"SUBMIT order {submitted_stp_order[i].id}")
                 submitted_stp_order[i].change_state(OrderAction.SUBMIT)
                 price = submitted_stp_order[i].stop_price
                 if isinstance(submitted_stp_order[i], StopLimitOrder):
@@ -142,8 +142,43 @@ class SimulatedBroker:
         order.filled_quantity = order.quantity
         order.average_fill_price = fill_price
         order.change_state(OrderAction.FILL)
+        logger.debug(f"FILL order {order.id}")
+        # check for trigger orders
+        for action in [OrderTriggerType.CANCEL, OrderTriggerType.ACTIVATE]:
+            order_ids = order.get_trigger_orders(action)
+            for o_id in order_ids:
+                self.trigger_order(action, o_id)
 
-    def is_order_valid(self, order: Order) -> bool:
+    def trigger_order(self, action: OrderTriggerType, order_id: str):
+        """
+
+        :param action:
+        :param order_id:
+        :return:
+        Raises:
+            ValueError on order is not found
+            ValueError on order is in wrong state
+        """
+        order = self.orders.get(order_id, None)
+        if order is not None:
+            logger.debug(f"{action.name} order {order_id}: current state: {order.state}")
+            if action == OrderTriggerType.ACTIVATE:
+                if order.state == OrderState.INITIALIZED:
+                    order.change_state(OrderAction.SUBMIT)
+                else:
+                    raise ValueError(f"Order {order_id} should be in state INITIALIZED, but was {order.state}")
+            else: # CANCEL
+                if order.state == OrderState.PENDING:
+                    order.change_state(OrderAction.SUBMIT)
+                    order.change_state(OrderAction.CANCEL)
+                else:
+                    raise ValueError(f"Order {order_id} should be in state PENDING, but was {order.state}")
+        else:
+            raise ValueError(f"Order_id {order_id} not found")
+
+
+
+    def is_order_valid(self, order: Order) -> None:
         # warning for stp limit orders (one time warning)
         if isinstance(order, StopLimitOrder):
             o: StopLimitOrder = order
@@ -151,4 +186,3 @@ class SimulatedBroker:
                 logger.warning("Warning: stop limit orders with different stop and limit price cannot be simulated and will be filled with the lmt price")
                 self.warning_stp_lmt_order_shown = True
         # TODO more ch
-        return True
