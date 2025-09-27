@@ -1,13 +1,14 @@
 from __future__ import annotations
+
 from decimal import Decimal
 from typing import List, Optional, TYPE_CHECKING
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.execution import Execution
-from suite_trading.domain.order.order_enums import OrderSide, TimeInForce
+from suite_trading.domain.order.order_enums import OrderSide, TimeInForce, OrderTriggerType
 from suite_trading.domain.order.order_state import OrderState, OrderAction, create_order_state_machine
 from suite_trading.utils.id_generator import get_next_id
-from suite_trading.utils.state_machine import StateMachine
+from suite_trading.utils.state_machine import StateMachine, State
 
 if TYPE_CHECKING:
     from suite_trading.strategy.strategy import Strategy
@@ -68,6 +69,7 @@ class Order:
         self.filled_quantity = Decimal("0")  # Always initialize to 0 for new orders
         self.average_fill_price = None  # Always initialize to None for new orders
         self.executions: List[Execution] = []  # List of executions in chronological order
+        self.trigger_order_ids: List[(OrderTriggerType, str)] = []
 
         # Internal state
         self._state_machine: StateMachine = create_order_state_machine()
@@ -172,6 +174,32 @@ class Order:
 
         self.executions.append(execution)
 
+    def add_trigger_order(self, trigger_type: OrderTriggerType, order_id: str) -> None:
+        """ Add an order_id to be activated or canceled on filling the order.
+        Args:
+        :param trigger_type: if the order shall be activated or canceled.
+        :param order_id: the unique identifier for the order.
+        Raises:
+            ValueError: If the order_id already exists.
+        """
+        for (k, v) in self.trigger_order_ids:
+            if k == trigger_type and v == order_id:
+                raise ValueError(f"Cannot add order_id {order_id} twice")
+        self.trigger_order_ids.append( (trigger_type,order_id) )
+
+    def get_trigger_orders(self, trigger_type: OrderTriggerType) -> List[str]:
+        order_ids: List[str] = []
+        for (k,v) in self.trigger_order_ids:
+            if k == trigger_type:
+                order_ids.append(v)
+        return order_ids
+
+    def remove_trigger_order(self, order_id: str):
+        order_ids = []
+        for (k, v) in self.trigger_order_ids:
+            if v == order_id:
+                self.trigger_order_ids.remove((k, v))
+
     @property
     def state(self) -> OrderState:
         """Get the current state of the order from the state machine.
@@ -228,7 +256,6 @@ class Order:
         if not isinstance(other, Order):
             return False
         return self.id == other.id
-
 
 class MarketOrder(Order):
     """Market order that executes immediately at the current market price.
