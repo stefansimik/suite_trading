@@ -23,10 +23,11 @@ def stp_order_active(order: StopOrder, bar):
 
 class SimulatedBroker:
 
-    def __init__(self):
+    def __init__(self, custom_logger: logging.Logger = None) -> None:
         self.connected = False
         self.orders = dict[str, Order]()
         self.warning_stp_lmt_order_shown = False
+        self.custom_logger = custom_logger
 
     def connect(self) -> None:
         self.connected = True
@@ -71,7 +72,7 @@ class SimulatedBroker:
             ConnectionError: If not connected to broker.
             ValueError: If order cannot be cancelled (e.g., already filled).
         """
-        logger.warning(f"Canceling {order}")
+        self.logger().warning(f"Canceling {order}")
 
     def modify_order(self, order: Order) -> None:
         """Modify an existing order.
@@ -83,7 +84,7 @@ class SimulatedBroker:
             ConnectionError: If not connected to broker.
             ValueError: If order cannot be modified (e.g., already filled).
         """
-        logger.info(f"Modifying {order}")
+        self.logger().info(f"Modifying {order}")
 
     def get_active_orders(self) -> List[Order]:
         """Get all currently active orders.
@@ -118,7 +119,7 @@ class SimulatedBroker:
         i = 0
         while i < len(submitted_lmt_order):
             if lmt_order_active(submitted_lmt_order[i], bar):
-                logger.debug(f"SUBMIT order {submitted_lmt_order[i].id}")
+                self.logger().debug(f"SUBMIT order {submitted_lmt_order[i].id}")
                 submitted_lmt_order[i].change_state(OrderAction.SUBMIT)
                 self.fill_order(submitted_lmt_order[i].limit_price, bar.end_dt, submitted_lmt_order[i])
             i += 1
@@ -128,7 +129,7 @@ class SimulatedBroker:
         i = 0
         while i < len(submitted_stp_order):
             if stp_order_active(submitted_stp_order[i], bar):
-                logger.debug(f"SUBMIT order {submitted_stp_order[i].id}")
+                self.logger().debug(f"SUBMIT order {submitted_stp_order[i].id}")
                 submitted_stp_order[i].change_state(OrderAction.SUBMIT)
                 price = submitted_stp_order[i].stop_price
                 if isinstance(submitted_stp_order[i], StopLimitOrder):
@@ -142,7 +143,7 @@ class SimulatedBroker:
         order.filled_quantity = order.quantity
         order.average_fill_price = fill_price
         order.change_state(OrderAction.FILL)
-        logger.debug(f"FILL order {order.id}")
+        self.logger().debug(f"%.16s FILL order {order.id}", execution_time)
         # check for trigger orders
         for action in [OrderTriggerType.CANCEL, OrderTriggerType.ACTIVATE]:
             order_ids = order.get_trigger_orders(action)
@@ -161,7 +162,7 @@ class SimulatedBroker:
         """
         order = self.orders.get(order_id, None)
         if order is not None:
-            logger.debug(f"{action.name} order {order_id}: current state: {order.state}")
+            self.logger().debug(f"{action.name} order {order_id}: current state: {order.state}")
             if action == OrderTriggerType.ACTIVATE:
                 if order.state == OrderState.INITIALIZED:
                     order.change_state(OrderAction.SUBMIT)
@@ -183,6 +184,12 @@ class SimulatedBroker:
         if isinstance(order, StopLimitOrder):
             o: StopLimitOrder = order
             if not self.warning_stp_lmt_order_shown and o.stop_price != o.limit_price:
-                logger.warning("Warning: stop limit orders with different stop and limit price cannot be simulated and will be filled with the lmt price")
+                self.logger().warning("Warning: stop limit orders with different stop and limit price cannot be simulated and will be filled with the lmt price")
                 self.warning_stp_lmt_order_shown = True
         # TODO more ch
+
+    def logger(self) -> logging.Logger:
+        if self.custom_logger is None:
+            return logger
+        else:
+            return self.custom_logger
