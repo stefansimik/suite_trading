@@ -342,7 +342,7 @@ class Strategy(ABC):
 
     # region Orders
 
-    def submit_order(self, order: Order, broker: Broker) -> None:
+    def submit_order(self, order: Order, broker: Broker, *trigger_orders: Order) -> None:
         """Submit an order for execution.
 
         Allowed only when the strategy is RUNNING.
@@ -350,6 +350,7 @@ class Strategy(ABC):
         Args:
             order (Order): The order to submit for execution.
             broker (Broker): The broker to submit the order to.
+            *trigger_orders (list of Order): The orders to trigger (SL, TP)
 
         Raises:
             RuntimeError: If $trading_engine is None or $state is not RUNNING.
@@ -361,7 +362,7 @@ class Strategy(ABC):
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `submit_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
-        engine.submit_order(order, broker)
+        engine.submit_order(order, broker, *trigger_orders)
 
     # FIXME: Order is already created and should already know to which Broker it is attached.
     #   So we should not need to pass it as an argument here.

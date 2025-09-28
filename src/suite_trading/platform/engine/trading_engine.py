@@ -677,7 +677,7 @@ class TradingEngine:
 
     # region Orders
 
-    def submit_order(self, order: Order, broker: Broker) -> None:
+    def submit_order(self, order: Order, broker: Broker,  *trigger_orders: Order) -> None:
         """Send an order to your broker.
 
         Args:
@@ -688,7 +688,7 @@ class TradingEngine:
             ConnectionError: If the broker is not connected.
             ValueError: If the order is invalid or cannot be submitted.
         """
-        broker.submit_order(order)
+        broker.submit_order(order, *trigger_orders)
 
     def cancel_order(self, order: Order, broker: Broker) -> None:
         """Cancel an order with your broker.
