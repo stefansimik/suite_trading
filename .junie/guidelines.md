@@ -286,6 +286,8 @@ executable code (e.g., __version__).
 - Keep only the root `tests/__init__.py` file
 
 # 5. Git commit guidelines
+- Never auto-commit: Junie must not create commits, tags, or pushes unless explicitly requested
+  by the User in the current message.
 - Write commits in imperative mood (command form)
   - ✅ "Add user authentication"; ❌ "Added user authentication"
 - Subject line: <= 50 chars; start with a capital letter; no period at end
