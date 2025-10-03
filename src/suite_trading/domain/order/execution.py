@@ -65,9 +65,9 @@ class Execution:
         # Generate ID if not provided
         self._id = id if id is not None else get_next_id()
 
-        # Explicit type conversion for precise financial calculations
-        self._quantity = self._convert_to_decimal(quantity)
-        self._price = self._convert_to_decimal(price)
+        # Normalize to instrument grid for precise financial calculations
+        self._quantity = self.instrument.snap_quantity(quantity)
+        self._price = self.instrument.snap_price(price)
         self._commission = self._convert_to_decimal(commission)
 
         # Explicit validation

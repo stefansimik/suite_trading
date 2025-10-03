@@ -50,7 +50,7 @@ class Order:
         # Trading details (private attributes with public properties)
         self._instrument = instrument
         self._side = side
-        self._quantity = quantity
+        self._quantity = instrument.snap_quantity(quantity)
 
         # Execution details (private attributes with public properties)
         self._time_in_force = time_in_force
@@ -271,7 +271,7 @@ class LimitOrder(Order):
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set limit price (private attribute with public property)
-        self._limit_price = limit_price
+        self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
         super().__init__(instrument, side, quantity, id, time_in_force)
@@ -329,7 +329,7 @@ class StopOrder(Order):
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set stop price (private attribute with public property)
-        self._stop_price = stop_price
+        self._stop_price = instrument.snap_price(stop_price)
 
         # Call parent constructor
         super().__init__(instrument, side, quantity, id, time_in_force)
@@ -390,8 +390,8 @@ class StopLimitOrder(Order):
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set prices (private attributes with public properties)
-        self._stop_price = stop_price
-        self._limit_price = limit_price
+        self._stop_price = instrument.snap_price(stop_price)
+        self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
         super().__init__(instrument, side, quantity, id, time_in_force)
