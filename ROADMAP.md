@@ -19,7 +19,29 @@ Implemented via BarsFromDataFrameEventFeed.
 5. Add Weekly bar aggregation — DONE ✅
 6. Add Monthly bar aggregation — DONE ✅
 7. Add VolumeBar aggregation — TODO
+
+   Volume bars are a special type of candlestick where each candle represents a constant traded
+   volume instead of a constant time period. When aggregating from higher‑resolution data (for
+   example tick‑by‑tick data) into volume bars, a problem can occur when source trades do not
+   divide exactly into the requested fixed volume.
+
+   Main approaches to address this problem:
+   A) Exact Volume Matching:
+    When the target volume (e.g., 1000 contracts) is reached exactly, the candle is closed.
+    If the last trade exceeds the limit, split the trade — part goes to the current candle,
+    the remainder starts a new one.
+    Advantage: Every candle has exactly the same volume.
+    Disadvantage: May split individual trades, which is not always realistic
+
+   B) Overflow Method — RECOMMENDED WAY
+    Add the entire trade that exceeds the limit to the current candle.
+    The resulting volume bars have slightly different volumes (always ≥ the target).
+    Advantage: Preserves the integrity of individual trades.
+    Disadvantage: Inconsistent candle volumes
+
 8. Bar aggregation should also accept TimeEvents, that would close and emit the bars, if no last finishing source bar comes.
+
+9. Maybe part of Event interface should be `is_historical` or `is_live` flag.
 
 ## Phase 2 — Indicators
 
