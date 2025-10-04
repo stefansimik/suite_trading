@@ -37,3 +37,9 @@ class OrderTriggerType(Enum):
 
     ACTIVATE = "ACTIVATE"
     CANCEL = "CANCEL"
+
+class TradeDirection(Enum):
+    """Represents the direction of an order."""
+    ENTRY = "ENTRY"
+    EXIT = "EXIT"
+
