@@ -10,8 +10,8 @@ from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.order.order_enums import OrderSide, TimeInForce, OrderTriggerType
-from suite_trading.domain.order.order_state import OrderAction, OrderState
+from suite_trading.domain.order.order_enums import OrderSide, TimeInForce, OrderTriggerType, TradeDirection
+from suite_trading.domain.order.order_state import OrderState
 from suite_trading.domain.order.orders import MarketOrder, LimitOrder, StopOrder, StopLimitOrder
 from suite_trading.platform.broker.simulation_broker import SimulatedBroker
 
@@ -53,7 +53,7 @@ def test_connection_state():
 def test_two_isolated_market_orders_state(order_side1: OrderSide, order_side2: OrderSide):
     testee: SimulatedBroker = SimulatedBroker()
     ####### buy order_buy
-    order_buy: MarketOrder = MarketOrder(INSTRUMENT, order_side1, Decimal(1), 1, TimeInForce.GTC)
+    order_buy: MarketOrder = MarketOrder(INSTRUMENT, order_side1, Decimal(1), id = 1, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(order_buy)
     #
     assert testee.get_active_orders().__len__() == 1
@@ -67,7 +67,7 @@ def test_two_isolated_market_orders_state(order_side1: OrderSide, order_side2: O
     assert order_buy.executions[0].side == order_side1
 
     ####### the opposite trade (sell order_buy)
-    order_sell: MarketOrder = MarketOrder(INSTRUMENT, order_side2, Decimal(1), 2, TimeInForce.GTC)
+    order_sell: MarketOrder = MarketOrder(INSTRUMENT, order_side2, Decimal(1), id = 2, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(order_sell)
     ao = testee.get_active_orders()
     assert ao.__len__() == 1
@@ -96,11 +96,11 @@ def test_limit_order_state(order_side: OrderSide):
     lmt_price2 = Decimal(1.007)
     bar_open_price = Decimal(1.003)
     # buy lmt
-    lmt_order1: LimitOrder = LimitOrder(INSTRUMENT, order_side, Decimal(1), lmt_price1, 3, TimeInForce.GTC)
+    lmt_order1: LimitOrder = LimitOrder(INSTRUMENT, order_side, Decimal(1), lmt_price1, id=3, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(lmt_order1)
     assert testee.get_active_orders().__len__() == 1
     assert lmt_order1.state == OrderState.PENDING
-    lmt_order2: LimitOrder = LimitOrder(INSTRUMENT, order_side, Decimal(1), lmt_price2, 4, TimeInForce.GTC)
+    lmt_order2: LimitOrder = LimitOrder(INSTRUMENT, order_side, Decimal(1), lmt_price2, id=4, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(lmt_order2)
     assert testee.get_active_orders().__len__() == 2
     assert lmt_order2.state == OrderState.PENDING
@@ -124,11 +124,11 @@ def test_stp_order_state(order_side: OrderSide):
     stp_price1 = Decimal(1.008)
     stp_price2 = Decimal(1.000)
     bar_open_price = Decimal(1.005)
-    stp_order1: StopOrder = StopOrder(INSTRUMENT, order_side, Decimal(1), stp_price1,  5, TimeInForce.GTC)
+    stp_order1: StopOrder = StopOrder(INSTRUMENT, order_side, Decimal(1), stp_price1, id=5, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(stp_order1)
     assert testee.get_active_orders().__len__() == 1
     assert stp_order1.state == OrderState.PENDING
-    stp_order2: StopOrder = StopOrder(INSTRUMENT, order_side, Decimal(1), stp_price2, 6, TimeInForce.GTC)
+    stp_order2: StopOrder = StopOrder(INSTRUMENT, order_side, Decimal(1), stp_price2, id=6, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(stp_order2)
     assert testee.get_active_orders().__len__() == 2
     assert stp_order2.state == OrderState.PENDING
@@ -154,11 +154,11 @@ def test_stp_lmt_order_state(order_side: OrderSide):
     stp_price1 = Decimal(1.008)
     stp_price2 = Decimal(1.000)
     bar_open_price = Decimal(1.005)
-    stp_lmt_order_buy: StopLimitOrder = StopLimitOrder(INSTRUMENT, order_side, Decimal(1), stp_price1, lmt_price, 7, TimeInForce.GTC)
+    stp_lmt_order_buy: StopLimitOrder = StopLimitOrder(INSTRUMENT, order_side, Decimal(1), stp_price1, lmt_price, id=7, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(stp_lmt_order_buy)
     assert testee.get_active_orders().__len__() == 1
     assert stp_lmt_order_buy.state == OrderState.PENDING
-    stp_order_buy2: StopLimitOrder = StopLimitOrder(INSTRUMENT, order_side, Decimal(1), stp_price2, lmt_price, 6, TimeInForce.GTC)
+    stp_order_buy2: StopLimitOrder = StopLimitOrder(INSTRUMENT, order_side, Decimal(1), stp_price2, lmt_price, id=6, trade_direction=TradeDirection.EXIT)
     testee.submit_order(stp_order_buy2)
     assert testee.get_active_orders().__len__() == 2
     assert stp_order_buy2.state == OrderState.PENDING
@@ -181,13 +181,13 @@ def test_stp_lmt_order_state(order_side: OrderSide):
 )
 def test_bracket_oco_order(order_side: OrderSide, entry_price: Decimal, sl_price: Decimal, tp_price: Decimal):
     testee: SimulatedBroker = SimulatedBroker()
-    entry_order: LimitOrder = LimitOrder(INSTRUMENT, order_side, Decimal(1), entry_price, 3, TimeInForce.GTC)
+    entry_order: LimitOrder = LimitOrder(INSTRUMENT, order_side, Decimal(1), entry_price, id=3, trade_direction=TradeDirection.ENTRY)
     if order_side == OrderSide.BUY:
-        sl_order = StopOrder(INSTRUMENT, order_side.__other_side__(), Decimal(1), sl_price, 4, TimeInForce.GTC)
-        tp_order = LimitOrder(INSTRUMENT, order_side.__other_side__(), Decimal(1), tp_price, 5, TimeInForce.GTC)
+        sl_order = StopOrder(INSTRUMENT, order_side.__other_side__(), Decimal(1), sl_price, id=4, trade_direction=TradeDirection.EXIT)
+        tp_order = LimitOrder(INSTRUMENT, order_side.__other_side__(), Decimal(1), tp_price, id=5, trade_direction=TradeDirection.EXIT)
     else:
-        sl_order = LimitOrder(INSTRUMENT, order_side.__other_side__(), Decimal(1), sl_price, 6, TimeInForce.GTC)
-        tp_order = StopOrder(INSTRUMENT, order_side.__other_side__(), Decimal(1), tp_price, 7, TimeInForce.GTC)
+        sl_order = LimitOrder(INSTRUMENT, order_side.__other_side__(), Decimal(1), sl_price, id=6, trade_direction=TradeDirection.EXIT)
+        tp_order = StopOrder(INSTRUMENT, order_side.__other_side__(), Decimal(1), tp_price, id=7, trade_direction=TradeDirection.EXIT)
     entry_order.add_trigger_order(OrderTriggerType.ACTIVATE, sl_order.id) # activate on fill TP
     entry_order.add_trigger_order(OrderTriggerType.ACTIVATE, tp_order.id) # activate on fill SL
     sl_order.add_trigger_order(OrderTriggerType.CANCEL, tp_order.id) # OCO the TP
