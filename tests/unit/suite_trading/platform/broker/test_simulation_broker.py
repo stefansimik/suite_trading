@@ -92,9 +92,9 @@ def test_two_isolated_market_orders_state(order_side1: OrderSide, order_side2: O
 )
 def test_limit_order_state(order_side: OrderSide):
     testee: SimulatedBroker = SimulatedBroker()
-    lmt_price1 = Decimal(1.002)
-    lmt_price2 = Decimal(1.007)
-    bar_open_price = Decimal(1.003)
+    lmt_price1 = Decimal('1.002')
+    lmt_price2 = Decimal('1.007')
+    bar_open_price = Decimal('1.003')
     # buy lmt
     lmt_order1: LimitOrder = LimitOrder(INSTRUMENT, order_side, Decimal(1), lmt_price1, id=3, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(lmt_order1)
@@ -121,9 +121,9 @@ def test_limit_order_state(order_side: OrderSide):
 )
 def test_stp_order_state(order_side: OrderSide):
     testee: SimulatedBroker = SimulatedBroker()
-    stp_price1 = Decimal(1.008)
-    stp_price2 = Decimal(1.000)
-    bar_open_price = Decimal(1.005)
+    stp_price1 = Decimal('1.008')
+    stp_price2 = Decimal('1.000')
+    bar_open_price = Decimal('1.005')
     stp_order1: StopOrder = StopOrder(INSTRUMENT, order_side, Decimal(1), stp_price1, id=5, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(stp_order1)
     assert testee.get_active_orders().__len__() == 1
@@ -150,10 +150,10 @@ def test_stp_order_state(order_side: OrderSide):
 )
 def test_stp_lmt_order_state(order_side: OrderSide):
     testee: SimulatedBroker = SimulatedBroker()
-    lmt_price = Decimal(1.007)
-    stp_price1 = Decimal(1.008)
-    stp_price2 = Decimal(1.000)
-    bar_open_price = Decimal(1.005)
+    lmt_price = Decimal('1.007')
+    stp_price1 = Decimal('1.008')
+    stp_price2 = Decimal('1.000')
+    bar_open_price = Decimal('1.005')
     stp_lmt_order_buy: StopLimitOrder = StopLimitOrder(INSTRUMENT, order_side, Decimal(1), stp_price1, lmt_price, id=7, trade_direction=TradeDirection.ENTRY)
     testee.submit_order(stp_lmt_order_buy)
     assert testee.get_active_orders().__len__() == 1
