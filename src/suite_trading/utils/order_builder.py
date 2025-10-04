@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.domain.order.order_enums import OrderSide, TimeInForce, OrderTriggerType
+from suite_trading.domain.order.order_enums import OrderSide, TimeInForce, OrderTriggerType, TradeDirection
 from suite_trading.domain.order.orders import Order, LimitOrder, StopOrder
 
 
@@ -88,28 +88,22 @@ class OrderBuilder:
 
     # internal build methods
     def _build_main_order(self) -> Order | None:
-        return LimitOrder(
-                instrument=self.instrument,
-                side=self.main_order_side,
-                quantity=self.main_order_quantity,
-                limit_price=self.main_lmt_price,
-                time_in_force=self.main_time_in_force,
-            )
+        return LimitOrder(self.instrument, self.main_order_side, self.main_order_quantity, self.main_lmt_price, TradeDirection.ENTRY, time_in_force=self.main_time_in_force)
 
     def _build_sl_order(self) -> Order | None:
         if self.sl_price is not None:
             if self.main_order_side == OrderSide.BUY:
-                sl_order = StopOrder(self.instrument, self.main_order_side.__other_side__(), self.main_order_quantity, self.sl_price, None, TimeInForce.GTC)
+                sl_order = StopOrder(self.instrument, self.main_order_side.__other_side__(), self.main_order_quantity, self.sl_price, TradeDirection.EXIT, id = None, trade_id = None, time_in_force=TimeInForce.GTC)
             else:
-                sl_order = LimitOrder(self.instrument, self.main_order_side.__other_side__(), self.main_order_quantity, self.sl_price, None, TimeInForce.GTC)
+                sl_order = LimitOrder(self.instrument, self.main_order_side.__other_side__(), self.main_order_quantity, self.sl_price, TradeDirection.EXIT, id = None, trade_id = None, time_in_force=TimeInForce.GTC)
             return sl_order
         return None
 
     def _build_tp_order(self) -> Order | None:
         if self.tp_price is not None:
             if self.main_order_side == OrderSide.BUY:
-                tp_order = LimitOrder(self.instrument, self.main_order_side.__other_side__(), self.main_order_quantity, self.tp_price, None, TimeInForce.GTC)
+                tp_order = LimitOrder(self.instrument, self.main_order_side.__other_side__(), self.main_order_quantity, self.tp_price, TradeDirection.EXIT, id = None, trade_id = None, time_in_force=TimeInForce.GTC)
             else:
-                tp_order = StopOrder(self.instrument, self.main_order_side.__other_side__(), self.main_order_quantity, self.tp_price, None, TimeInForce.GTC)
+                tp_order = StopOrder(self.instrument, self.main_order_side.__other_side__(), self.main_order_quantity, self.tp_price, TradeDirection.EXIT, id = None, trade_id = None, time_in_force=TimeInForce.GTC)
             return tp_order
         return None
