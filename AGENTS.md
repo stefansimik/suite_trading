@@ -45,6 +45,15 @@ def calc_pv(pos: list) -> Decimal: ...
 - Use domain terms consistently; pick nouns for values and properties, verbs for functions.
 - Rename confusing names proactively to reduce reading and maintenance effort.
 
+### Method naming for resource access
+
+- Use `list_*` for methods that return collections (lists, iterables, generators).
+  - Examples: `list_active_orders()`, `list_open_positions()`.
+- Use `get_*` for methods that return a single resource or value object.
+  - Examples: `get_account_info()`, `get_order(order_id)`.
+- Use `find_*` or `query_*` only when search/filter semantics are the primary purpose and
+  results may be partial or empty from a larger domain. (Optional, future scope.)
+
 ## 2.2 Classes, dataclasses, and named tuples
 Rule: Use standard classes for fundamental domain models. Dataclasses and named tuples are
 allowed for simple config or helper/value objects only.
