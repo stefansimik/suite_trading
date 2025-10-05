@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import List
+from typing import List, Optional
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.execution import Execution
@@ -32,7 +32,7 @@ class Order:
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        id: int = None,
+        id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new Order.
@@ -41,11 +41,11 @@ class Order:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
-            id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Order identification (private attributes with public properties)
-        self._id = id if id is not None else get_next_id()
+        self._id = str(id) if id is not None else str(get_next_id())
 
         # Trading details (private attributes with public properties)
         self._instrument = instrument
@@ -226,7 +226,7 @@ class MarketOrder(Order):
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        id: int = None,
+        id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new MarketOrder.
@@ -235,7 +235,7 @@ class MarketOrder(Order):
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
-            id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         super().__init__(instrument, side, quantity, id, time_in_force)
@@ -257,7 +257,7 @@ class LimitOrder(Order):
         side: OrderSide,
         quantity: Decimal,
         limit_price: Decimal,
-        id: int = None,
+        id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new LimitOrder.
@@ -267,7 +267,7 @@ class LimitOrder(Order):
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             limit_price (Decimal): The limit price for the order.
-            id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set limit price (private attribute with public property)
@@ -315,7 +315,7 @@ class StopOrder(Order):
         side: OrderSide,
         quantity: Decimal,
         stop_price: Decimal,
-        id: int = None,
+        id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new StopOrder.
@@ -325,7 +325,7 @@ class StopOrder(Order):
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             stop_price (Decimal): The stop price for the order.
-            id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set stop price (private attribute with public property)
@@ -375,7 +375,7 @@ class StopLimitOrder(Order):
         quantity: Decimal,
         stop_price: Decimal,
         limit_price: Decimal,
-        id: int = None,
+        id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """Initialize a new StopLimitOrder.
@@ -386,7 +386,7 @@ class StopLimitOrder(Order):
             quantity (Decimal): The quantity to trade.
             stop_price (Decimal): The stop price that triggers the order.
             limit_price (Decimal): The limit price for the order once triggered.
-            id (int, optional): Unique identifier for the order. If None, generates a new ID.
+            id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
         """
         # Set prices (private attributes with public properties)
