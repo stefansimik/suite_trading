@@ -1,8 +1,13 @@
 """Broker protocol definition."""
 
-from typing import List, Protocol, runtime_checkable
+from __future__ import annotations
 
+from typing import Callable, List, Protocol, runtime_checkable
+
+from suite_trading.domain.account_info import AccountInfo
+from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.order.orders import Order
+from suite_trading.domain.position import Position
 
 
 @runtime_checkable
@@ -68,32 +73,36 @@ class Broker(Protocol):
         """
         ...
 
-    def cancel_order(self, order: Order) -> None:
-        """Cancel an existing order.
+    def cancel_order(self, order_id: str | int) -> None:
+        """Cancel an existing order by its broker-assigned identifier.
 
         Args:
-            order (Order): The order to cancel.
+            order_id (str | int): Identifier of the order to cancel.
 
         Raises:
             ConnectionError: If not connected to broker.
-            ValueError: If order cannot be cancelled (e.g., already filled).
+            ValueError: If order cannot be cancelled (e.g., already filled or not found).
         """
         ...
 
     def modify_order(self, order: Order) -> None:
-        """Get all currently active orders.
+        """Modify an existing order in place.
 
-        Active orders include all orders that are not in a terminal state
-        (i.e., not Filled, Cancelled, or Rejected).
+        Args:
+            order (Order): The order carrying updated fields (e.g., limit price, quantity).
 
         Raises:
             ConnectionError: If not connected to broker.
-            ValueError: If order cannot be modified (e.g., already filled).
+            ValueError: If the order cannot be modified (e.g., already filled or not found).
+            NotSupportedError: If the broker does not support order modification.
         """
         ...
 
     def list_active_orders(self) -> List[Order]:
         """Get all currently active orders.
+
+        Active orders include all orders that are not in a terminal state
+        (i.e., not Filled, Cancelled, or Rejected).
 
         Returns:
             List[Order]: List of all active orders for this broker.
@@ -105,4 +114,99 @@ class Broker(Protocol):
 
     # endregion
 
-    # region
+    # region Positions
+
+    def list_open_positions(self) -> List[Position]:
+        """Return currently open positions.
+
+        Returns:
+            List[Position]: All open positions known to this Broker.
+
+        Raises:
+            ConnectionError: If not connected (for live brokers).
+            NotSupportedError: If positions are not supported.
+        """
+        ...
+
+    # endregion
+
+    # region Listeners
+
+    def add_order_updated_listener(self, listener: Callable[[Order], None]) -> None:
+        """Subscribe a callback to order updates.
+
+        Args:
+            listener: Callback with signature `listener(order)` where
+                - $order: Order instance that was updated.
+
+        Returns:
+            None
+
+        Notes:
+            - Duplicate subscriptions are ignored.
+            - Listener is invoked for every update event for tracked orders.
+        """
+        ...
+
+    def remove_order_updated_listener(self, listener: Callable[[Order], None]) -> None:
+        """Unsubscribe a previously registered order-updated listener.
+
+        Args:
+            listener: The same callback object that was passed to
+                `add_order_updated_listener`.
+
+        Returns:
+            None
+
+        Notes:
+            - No-op if the listener is not registered.
+        """
+        ...
+
+    def add_execution_listener(self, listener: Callable[[Execution], None]) -> None:
+        """Subscribe a callback to execution events (fills).
+
+        Args:
+            listener: Callback with signature `listener(execution)` where
+                - $execution: Execution details (price, quantity, fees, at).
+
+        Returns:
+            None
+
+        Notes:
+            - Duplicate subscriptions are ignored.
+            - Listener is invoked for each execution event (including partial fills).
+        """
+        ...
+
+    def remove_execution_listener(self, listener: Callable[[Execution], None]) -> None:
+        """Unsubscribe a previously registered execution listener.
+
+        Args:
+            listener: The same callback object that was passed to `add_execution_listener`.
+
+        Returns:
+            None
+
+        Notes:
+            - No-op if the listener is not registered.
+        """
+        ...
+
+    # endregion
+
+    # region Account
+
+    def get_account_info(self) -> AccountInfo:
+        """Return current account information (balances, margins, etc.).
+
+        Returns:
+            AccountInfo: Snapshot of account state.
+
+        Raises:
+            ConnectionError: If not connected (for live brokers).
+            NotSupportedError: If accounts are not supported.
+        """
+        ...
+
+    # endregion
