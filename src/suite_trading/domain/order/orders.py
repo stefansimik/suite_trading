@@ -267,7 +267,12 @@ class Order:
         return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
+        """Return a string representation of the order.
+
+        Returns:
+            str: String representation of the order.
+        """
+        return f"{self.__class__.__name__}(id={self.id}({self.trade_id}), instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state}, direction={self.trade_direction})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another order.
