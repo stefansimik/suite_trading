@@ -243,7 +243,7 @@ class Strategy(ABC):
 
         # Check: Strategy must be in $state, where adding feeds make sense (only in states ADDED or RUNNING)
         if not (self._state_machine.can_execute_action(StrategyAction.START_STRATEGY) or self.state == StrategyState.RUNNING):
-            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `add_event_feed` because $state ({self.state.name}) does not allow adding feeds. Valid actions: {valid_actions}. Call it from `on_start` or when the strategy is RUNNING.")
 
         # If callback function was not provided, let's use the default `on_event` callback
@@ -274,7 +274,7 @@ class Strategy(ABC):
 
         # Check: state must be RUNNING to remove feeds
         if self.state != StrategyState.RUNNING:
-            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `remove_event_feed` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         # Delegate to TradingEngine
@@ -335,7 +335,7 @@ class Strategy(ABC):
 
         # Check: state must be RUNNING to submit orders
         if self.state != StrategyState.RUNNING:
-            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `submit_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         engine.submit_order(order, broker)
@@ -358,7 +358,7 @@ class Strategy(ABC):
 
         # Check: state must be RUNNING to cancel orders
         if self.state != StrategyState.RUNNING:
-            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(
                 f"Cannot call `cancel_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
             )
@@ -383,13 +383,13 @@ class Strategy(ABC):
 
         # Check: state must be RUNNING to modify orders
         if self.state != StrategyState.RUNNING:
-            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `modify_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         engine.modify_order(order, broker)
 
     # TODO: Allow filtering only orders created by this Strategy
-    def get_active_orders(self, broker: Broker) -> List[Order]:
+    def list_active_orders(self, broker: Broker) -> List[Order]:
         """Get all currently active orders.
 
         Allowed only when the strategy is RUNNING.
@@ -407,9 +407,9 @@ class Strategy(ABC):
 
         # Check: state must be RUNNING to retrieve active orders
         if self.state != StrategyState.RUNNING:
-            valid_actions = [a.value for a in self._state_machine.get_valid_actions()]
-            raise RuntimeError(f"Cannot call `get_active_orders` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
+            valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
+            raise RuntimeError(f"Cannot call `list_active_orders` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
-        return engine.get_active_orders(broker)
+        return engine.list_active_orders(broker)
 
     # endregion

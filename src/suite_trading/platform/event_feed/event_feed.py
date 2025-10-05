@@ -59,6 +59,6 @@ class EventFeed(Protocol):
         """
         ...
 
-    def get_listeners(self) -> list[Callable[[Event], None]]:
+    def list_listeners(self) -> list[Callable[[Event], None]]:
         """Return all registered listeners for this EventFeed in registration order."""
         ...

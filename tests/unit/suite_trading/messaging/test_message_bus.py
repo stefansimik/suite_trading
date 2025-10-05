@@ -72,7 +72,7 @@ def test_unsubscribe():
     msg_bus.subscribe("topic", on_topic)
 
     # Verify that callback is in the listeners
-    listeners = msg_bus.get_listeners("topic")
+    listeners = msg_bus.list_listeners("topic")
     assert len(listeners) == 1
     assert listeners[0] == on_topic
 
@@ -80,7 +80,7 @@ def test_unsubscribe():
     msg_bus.unsubscribe("topic", on_topic)
 
     # Verify that callback is no longer in the listeners
-    listeners = msg_bus.get_listeners("topic")
+    listeners = msg_bus.list_listeners("topic")
     assert len(listeners) == 0
 
     # Publish to topic
@@ -149,7 +149,7 @@ def test_validate_topic_format():
         # These should not raise exceptions
         msg_bus.subscribe(topic, lambda x: None)
         msg_bus.unsubscribe(topic, lambda x: None)
-        msg_bus.get_listeners(topic)
+        msg_bus.list_listeners(topic)
         msg_bus.publish(topic, "data")
 
     # Test invalid topics
@@ -176,7 +176,7 @@ def test_validate_topic_format():
             msg_bus.unsubscribe(topic, lambda x: None)
 
         with pytest.raises(ValueError):
-            msg_bus.get_listeners(topic)
+            msg_bus.list_listeners(topic)
 
 
 def test_subscriber_count_validation_point_to_point():

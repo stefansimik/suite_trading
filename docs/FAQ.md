@@ -52,7 +52,7 @@ An `EventFeed` is a simple, non‑blocking stream of events with these methods:
 - `close() -> None` — Free resources. Idempotent and non‑blocking.
 - `remove_events_before(cutoff_time: datetime) -> None`
   - Drop events earlier than a cutoff (used when adding feeds late).
-- `get_listeners() -> list[Callable[[Event], None]]`
+- `list_listeners() -> list[Callable[[Event], None]]`
   - Return all registered listeners for this EventFeed in registration order (read‑only view).
 
 Implement this protocol and your data source can feed a strategy with any data (historical bars, live
@@ -74,8 +74,8 @@ complete control. You can:
 
 Note on listeners and invocation order
 - Implementations may still offer `add_listener`/`remove_listener` for registration convenience, but listener invocation is no longer done inside `EventFeed.pop()`.
-- The `TradingEngine` is responsible for invoking EventFeed listeners. It calls `feed.get_listeners()` and invokes each listener right after the strategy callback processes the popped event.
-- Ordering: listeners are invoked in the order returned by `get_listeners()` (registration order).
+- The `TradingEngine` is responsible for invoking EventFeed listeners. It calls `feed.list_listeners()` and invokes each listener right after the strategy callback processes the popped event.
+- Ordering: listeners are invoked in the order returned by `list_listeners()` (registration order).
 - Error handling: listener exceptions are caught and logged; the engine keeps running.
 
 Here’s where the magic happens — the `TradingEngine` automatically synchronizes ALL your
@@ -112,7 +112,7 @@ added `EventFeed`(s) per `Strategy`:
 3) `TimeBarAggregationEventFeed`
 - Purpose: aggregate minute bars (e.g., 1‑min) to N‑minute bars (e.g., 5‑min).
 - How it works:
-  - Registers as a listener on the source feed via the implementation's `add_listener(...)` (concrete feeds may expose registration helpers even though the EventFeed Protocol only requires `get_listeners()`)
+  - Registers as a listener on the source feed via the implementation's `add_listener(...)` (concrete feeds may expose registration helpers even though the EventFeed Protocol only requires `list_listeners()`)
   - Accumulates OHLCV and emits on N‑minute boundaries
   - Emits `NewBarEvent` with source `dt_received` and `is_historical`
   - `emit_first_partial_bar` decides whether the very first partial bar is emitted; `emit_later_partial_bars` controls subsequent partials

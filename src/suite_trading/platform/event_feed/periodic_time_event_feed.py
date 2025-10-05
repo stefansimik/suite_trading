@@ -268,7 +268,7 @@ class FixedIntervalEventFeed:
 
         del self._listeners[key]
 
-    def get_listeners(self) -> list[Callable[[Event], None]]:
+    def list_listeners(self) -> list[Callable[[Event], None]]:
         return list(self._listeners.values())
 
     # endregion

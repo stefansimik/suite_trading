@@ -92,7 +92,7 @@ class Broker(Protocol):
         """
         ...
 
-    def get_active_orders(self) -> List[Order]:
+    def list_active_orders(self) -> List[Order]:
         """Get all currently active orders.
 
         Returns:

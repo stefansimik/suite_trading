@@ -94,7 +94,7 @@ class StateMachine:
         """
         return (self._current_state, action) in self._transitions
 
-    def get_valid_actions(self) -> list[Action]:
+    def list_valid_actions(self) -> list[Action]:
         """Get all valid actions from the current state.
 
         Returns:
@@ -117,7 +117,7 @@ class StateMachine:
         key = (self._current_state, action)
 
         if key not in self._transitions:
-            valid_actions = [a.value for a in self.get_valid_actions()]
+            valid_actions = [a.value for a in self.list_valid_actions()]
             raise ValueError(
                 f"Invalid $action '{action.value}' from $_current_state '{self._current_state.value}'. Valid actions are: {valid_actions}",
             )
@@ -134,7 +134,7 @@ class StateMachine:
         Returns:
             bool: True if the current state is terminal, False otherwise.
         """
-        return len(self.get_valid_actions()) == 0
+        return len(self.list_valid_actions()) == 0
 
     def reset(self, new_state: State):
         """Reset the state machine to a specific state.

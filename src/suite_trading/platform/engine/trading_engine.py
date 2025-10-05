@@ -257,7 +257,7 @@ class TradingEngine:
 
         # Check: strategy must be able to start
         if not strategy._state_machine.can_execute_action(StrategyAction.START_STRATEGY):
-            valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot start strategy in state {strategy.state.name}. Valid actions: {valid_actions}")
 
         logger.info(f"Starting Strategy named '{name}' (class {strategy.__class__.__name__})")
@@ -288,7 +288,7 @@ class TradingEngine:
 
         # Check: strategy must be able to stop
         if not strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
-            valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot stop strategy in state {strategy.state.name}. Valid actions: {valid_actions}")
 
         logger.info(f"Stopping Strategy named '{name}'")
@@ -323,7 +323,7 @@ class TradingEngine:
 
         # Check: strategy must be in terminal state before removing
         if not strategy._state_machine.is_in_terminal_state():
-            valid_actions = [a.value for a in strategy._state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}")
 
         # Remove clocks tracking for this strategy
@@ -360,7 +360,7 @@ class TradingEngine:
         """
         # Check: engine must be in NEW state before starting
         if not self._engine_state_machine.can_execute_action(EngineAction.START_ENGINE):
-            valid_actions = [a.value for a in self._engine_state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in self._engine_state_machine.list_valid_actions()]
             raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
 
         logger.info(f"Starting TradingEngine: {len(self._event_feed_providers_dict)} event-feed-provider(s), {len(self._brokers_dict)} broker(s), {len(self._name_strategies_bidict)} strategy(ies)")
@@ -410,7 +410,7 @@ class TradingEngine:
 
         # Check: engine must be in RUNNING state, when we want to stop it
         if not self._engine_state_machine.can_execute_action(EngineAction.STOP_ENGINE):
-            valid_actions = [a.value for a in self._engine_state_machine.get_valid_actions()]
+            valid_actions = [a.value for a in self._engine_state_machine.list_valid_actions()]
             raise ValueError(f"Cannot stop engine in state {self.state.name}. Valid actions: {valid_actions}")
 
         try:
@@ -502,7 +502,7 @@ class TradingEngine:
                     # Notify EventFeed listeners after strategy callback.
                     # This is the single place listeners are invoked for EventFeed(s); feeds must not self-notify.
                     try:
-                        for listener in feed.get_listeners():
+                        for listener in feed.list_listeners():
                             try:
                                 listener(next_event)
                             except Exception as le:
@@ -712,7 +712,7 @@ class TradingEngine:
         """
         broker.modify_order(order)
 
-    def get_active_orders(self, broker: Broker) -> List[Order]:
+    def list_active_orders(self, broker: Broker) -> List[Order]:
         """Get all your active orders from a broker.
 
         Args:
@@ -724,6 +724,6 @@ class TradingEngine:
         Raises:
             ConnectionError: If the broker is not connected.
         """
-        return broker.get_active_orders()
+        return broker.list_active_orders()
 
     # endregion

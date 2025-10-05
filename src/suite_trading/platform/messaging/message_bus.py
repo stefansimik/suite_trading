@@ -127,7 +127,7 @@ class MessageBus:
                 if topic in self._wildcard_patterns:
                     del self._wildcard_patterns[topic]
 
-    def get_listeners(self, topic: str) -> List[Callable]:
+    def list_listeners(self, topic: str) -> List[Callable]:
         """
         Get all callbacks registered for a specific topic.
 
