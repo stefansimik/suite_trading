@@ -22,11 +22,18 @@ class Broker(Protocol):
     actual broker/exchange systems, handling essential trading operations.
     """
 
+    # region Connection
+
     def connect(self) -> None:
-        """Establish broker connection.
+        """Establish connection to the broker.
+
+        This method initializes the connection to the broker's API or trading system.
+        For live brokers, this typically involves authentication and session setup.
+        For `SimulatedBroker`, this is a no-op that always succeeds.
 
         Raises:
-            ConnectionError: If connection cannot be established.
+            ConnectionError: If connection cannot be established due to network issues,
+                authentication failure, or broker system unavailability.
         """
         ...
 
@@ -44,6 +51,10 @@ class Broker(Protocol):
             bool: True if connected to broker, False otherwise.
         """
         ...
+
+    # endregion
+
+    # region Orders
 
     def submit_order(self, order: Order) -> None:
         """Submit order for execution.
@@ -70,10 +81,10 @@ class Broker(Protocol):
         ...
 
     def modify_order(self, order: Order) -> None:
-        """Modify an existing order.
+        """Get all currently active orders.
 
-        Args:
-            order (Order): The order to modify with updated parameters.
+        Active orders include all orders that are not in a terminal state
+        (i.e., not Filled, Cancelled, or Rejected).
 
         Raises:
             ConnectionError: If not connected to broker.
@@ -91,3 +102,7 @@ class Broker(Protocol):
             ConnectionError: If not connected to broker.
         """
         ...
+
+    # endregion
+
+    # region
