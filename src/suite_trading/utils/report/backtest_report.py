@@ -1,7 +1,8 @@
 import logging
+from decimal import Decimal
 from typing import List
 
-from suite_trading.domain.order.order_enums import OrderTriggerType, TradeDirection
+from suite_trading.domain.order.order_enums import OrderTriggerType, TradeDirection, OrderSide
 from suite_trading.domain.order.order_state import OrderState
 from suite_trading.domain.order.orders import Order
 
@@ -24,6 +25,22 @@ class Trade:
     @property
     def trade_id(self):
         return self._order_entry[0].trade_id
+
+    def get_pnl(self) -> Decimal:
+        pnl: Decimal = Decimal('0')
+        for o in self._order_entry:
+            for e in o.executions:
+                if e.side == OrderSide.BUY:
+                    pnl -= e.net_value
+                else:
+                    pnl += e.net_value
+        for o in self._order_exit:
+            for e in o.executions:
+                if e.side == OrderSide.BUY:
+                    pnl -= e.net_value
+                else:
+                    pnl += e.net_value
+        return pnl
 
 class BacktestReport:
     def __init__(self, orders: dict[str, Order], custom_logger: logging.Logger = None):
