@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from decimal import Decimal, getcontext, InvalidOperation
 
 from suite_trading.domain.monetary.currency import Currency
@@ -63,7 +65,7 @@ class Money:
         """Get the currency."""
         return self._currency
 
-    def _check_same_currency(self, other: "Money") -> None:
+    def _check_same_currency(self, other: Money) -> None:
         """Check if two Money objects have the same currency.
 
         Args:
@@ -207,7 +209,7 @@ class Money:
         return hash((self.value, self.currency.code))
 
     @classmethod
-    def from_str(cls, value_str: str) -> "Money":
+    def from_str(cls, value_str: str) -> Money:
         """Parse Money from string like '1000.50 USD'.
 
         Args:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -54,7 +56,7 @@ class Strategy(ABC):
 
     # region Attach engine
 
-    def set_trading_engine(self, trading_engine: "TradingEngine") -> None:
+    def set_trading_engine(self, trading_engine: TradingEngine) -> None:
         """
         Attaches the TradingEngine so this Strategy can interact with platform features.
 
@@ -90,7 +92,7 @@ class Strategy(ABC):
 
     # region Internal
 
-    def _require_trading_engine(self) -> "TradingEngine":
+    def _require_trading_engine(self) -> TradingEngine:
         """Return the attached TradingEngine or raise if missing.
 
         Notes:

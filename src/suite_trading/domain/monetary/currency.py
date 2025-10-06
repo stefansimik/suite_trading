@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from enum import Enum
 from typing import Dict
 
@@ -21,7 +23,7 @@ class Currency:
     """
 
     # Class-level registry for predefined currencies
-    _registry: Dict[str, "Currency"] = {}
+    _registry: Dict[str, Currency] = {}
 
     def __init__(self, code: str, precision: int, name: str, currency_type: CurrencyType):
         """Initialize a Currency instance.
@@ -75,7 +77,7 @@ class Currency:
         return self._currency_type
 
     @classmethod
-    def register(cls, currency: "Currency", overwrite: bool = False) -> None:
+    def register(cls, currency: Currency, overwrite: bool = False) -> None:
         """Register a currency in the global registry.
 
         Args:
@@ -86,7 +88,7 @@ class Currency:
             ValueError: If currency already exists and overwrite is False.
             TypeError: If currency is not Currency instance.
         """
-        if not isinstance(currency, "Currency"):
+        if not isinstance(currency, Currency):
             raise TypeError(f"$currency must be a Currency instance, but provided value is: {currency}")
 
         if currency.code in cls._registry and not overwrite:
@@ -95,7 +97,7 @@ class Currency:
         cls._registry[currency.code] = currency
 
     @classmethod
-    def from_str(cls, code: str) -> "Currency":
+    def from_str(cls, code: str) -> Currency:
         """Get currency from registry by code.
 
         Args:

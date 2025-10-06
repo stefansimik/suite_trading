@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC
 from datetime import datetime
 
@@ -29,7 +31,7 @@ class Event(ABC):
         """Official event time (UTC)."""
         return self._dt_event
 
-    def __lt__(self, other: "Event") -> bool:
+    def __lt__(self, other: Event) -> bool:
         """Sort by $dt_event, then $dt_received for deterministic ordering."""
         if self.dt_event != other.dt_event:
             return self.dt_event < other.dt_event

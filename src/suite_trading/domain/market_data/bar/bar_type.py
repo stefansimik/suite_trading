@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.price_type import PriceType
@@ -48,7 +50,7 @@ class BarType:
         value: int | None = None,
         unit: BarUnit | None = None,
         price_type: PriceType | None = None,
-    ) -> "BarType":
+    ) -> BarType:
         """Return a new BarType copied from this instance with optional overrides.
 
         Args:

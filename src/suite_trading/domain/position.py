@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, Union
@@ -149,7 +151,7 @@ class Position:
 
         return self.quantity * current_price * self.instrument.contract_value_multiplier
 
-    def update_unrealized_pnl(self, current_price: Decimal) -> "Position":
+    def update_unrealized_pnl(self, current_price: Decimal) -> Position:
         """Create a new Position with updated unrealized P&L based on current market price.
 
         Args:
