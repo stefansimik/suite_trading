@@ -259,6 +259,38 @@ dt_str = format_range(self.start_dt, self.end_dt)
 return f"{self.__class__.__name__}({self.kind}, {dt_str})"
 ```
 
+## 2.11 Typing: always enable postponed annotations
+
+Rule: Start every first‑party module with `from __future__ import annotations`.
+
+Requirements:
+- Do not quote type names (use Strategy, not "Strategy").
+- Use `if TYPE_CHECKING:` for heavy/mutual imports only.
+- For runtime type info, use `typing.get_type_hints(obj, include_extras=True)`.
+
+Example:
+```python
+# Before
+from typing import Optional, TYPE_CHECKING
+if TYPE_CHECKING:
+    from suite_trading.strategy.strategy import Strategy
+class Order:
+    def __init__(self, strategy: Optional["Strategy"] = None) -> None: ...
+# After
+from __future__ import annotations
+from typing import Optional, TYPE_CHECKING
+if TYPE_CHECKING:
+    from suite_trading.strategy.strategy import Strategy
+class Order:
+    def __init__(self, strategy: Optional[Strategy] = None) -> None: ...
+```
+
+Acceptance checks:
+- [ ] Modules start with `from __future__ import annotations`.
+- [ ] No quoted forward refs remain.
+- [ ] Cross‑module types resolved via `if TYPE_CHECKING:` without runtime cycles.
+- [ ] No raw `__annotations__`; use `typing.get_type_hints(..., include_extras=True)`.
+
 # 3. Code organization (supporting)
 
 ## 3.1 Regions
