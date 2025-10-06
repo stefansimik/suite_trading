@@ -73,7 +73,7 @@ def test_two_isolated_market_orders_state(order_side1: OrderSide, order_side2: O
     assert ao.__len__() == 1
     assert isinstance(ao[0], MarketOrder)
     assert order_sell.state == OrderState.SUBMITTED
-    assert ao[0].id == 2
+    assert ao[0].id == '2'
     # send some price data
     event = create_bar_event("2025-01-03T10:30:00Z", Decimal(1.001))
     testee.on_event(event)
