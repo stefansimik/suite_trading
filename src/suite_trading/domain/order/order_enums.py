@@ -7,6 +7,12 @@ class OrderSide(Enum):
     BUY = "BUY"
     SELL = "SELL"
 
+    def __other_side__(self):
+        if self.value == OrderSide.SELL.value:
+            return OrderSide.BUY
+        else:
+            return OrderSide.SELL
+
 
 class OrderType(Enum):
     """Represents the type of order execution."""
@@ -25,3 +31,15 @@ class TimeInForce(Enum):
     IOC = "IOC"  # Immediate Or Cancel
     FOK = "FOK"  # Fill Or Kill
     DAY = "DAY"  # Good for the trading day
+
+class OrderTriggerType(Enum):
+    """Represents the action for the triggered order"""
+
+    ACTIVATE = "ACTIVATE"
+    CANCEL = "CANCEL"
+
+class TradeDirection(Enum):
+    """Represents the direction of an order."""
+    ENTRY = "ENTRY"
+    EXIT = "EXIT"
+

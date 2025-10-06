@@ -1,0 +1,195 @@
+"""Simulation Broker"""
+import logging
+from datetime import datetime
+from decimal import Decimal
+from typing import List
+
+from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.order.execution import Execution
+from suite_trading.domain.order.order_enums import OrderSide, OrderTriggerType
+from suite_trading.domain.order.order_state import OrderAction, OrderState
+from suite_trading.domain.order.orders import Order, LimitOrder, MarketOrder, StopOrder, StopLimitOrder
+
+logger = logging.getLogger(__name__)
+
+def lmt_order_active(order: LimitOrder, bar: Bar):
+    return bar.high >= order.limit_price
+
+
+def stp_order_active(order: StopOrder, bar):
+    return bar.low <= order.stop_price
+
+
+class SimulatedBroker:
+
+    def __init__(self, custom_logger: logging.Logger = None) -> None:
+        self.connected = False
+        self.orders = dict[str, Order]()
+        self.warning_stp_lmt_order_shown = False
+        self.custom_logger = custom_logger
+
+    def connect(self) -> None:
+        self.connected = True
+
+    def disconnect(self) -> None:
+        self.connected = False
+
+    def is_connected(self) -> bool:
+        return self.connected
+
+    def submit_order(self, order: Order, *trigger_orders: Order) -> None:
+        """Submit order for execution.
+
+        Args:
+            order (Order): The order to submit for execution.
+            trigger_orders (Order): The order that are triggered by the main order
+
+        Raises:
+            ConnectionError: If not connected to broker.
+            ValueError: If order is invalid or cannot be submitted.
+        """
+        # pre-check needed (all parameters good?)
+        for o in trigger_orders:
+            self.is_order_valid(o) # raises an ValueError on false
+        self.is_order_valid(order)
+        # process orders
+        order.change_state(OrderAction.SUBMIT) # order is now PENDING
+        if isinstance(order, MarketOrder):
+            order.change_state(OrderAction.SUBMIT) # mkt order are directly ACCEPTED
+
+        self.orders.__setitem__(order.id, order)
+        for o in trigger_orders:
+            self.orders.__setitem__(o.id, o)
+
+    def cancel_order(self, order: Order) -> None:
+        """Cancel an existing order.
+
+        Args:
+            order (Order): The order to cancel.
+
+        Raises:
+            ConnectionError: If not connected to broker.
+            ValueError: If order cannot be cancelled (e.g., already filled).
+        """
+        self.logger().warning(f"Canceling {order}")
+
+    def modify_order(self, order: Order) -> None:
+        """Modify an existing order.
+
+        Args:
+            order (Order): The order to modify with updated parameters.
+
+        Raises:
+            ConnectionError: If not connected to broker.
+            ValueError: If order cannot be modified (e.g., already filled).
+        """
+        self.logger().info(f"Modifying {order}")
+
+    def get_active_orders(self) -> List[Order]:
+        """Get all currently active orders.
+
+        Returns:
+            List[Order]: List of all active orders for this broker.
+
+        Raises:
+            ConnectionError: If not connected to broker.
+        """
+        return  list( {k: v for k, v in self.orders.items()
+                        if v.state in (OrderState.PENDING, OrderState.SUBMITTED,
+                                       OrderState.ACCEPTED, OrderState.PENDING_UPDATE, OrderState.PENDING_CANCEL,
+                                       OrderState.PARTIALLY_FILLED, OrderState.TRIGGERED) }.values() )
+
+    # receives price events
+    def on_event(self, event):
+        if isinstance(event, NewBarEvent):
+            bar: Bar = event.bar
+            self.handle_new_price(bar)
+
+    def handle_new_price(self, bar: Bar):
+        # market order --> direct accept+fill
+        submitted_market_order = list( {k: v for k, v in self.orders.items() if v.state == OrderState.SUBMITTED and isinstance(v, MarketOrder)}.values() )
+        i = 0
+        while i < len(submitted_market_order):
+            self.fill_order(bar.open, bar.start_dt, submitted_market_order[i])
+            i += 1
+        # lmt orders
+        submitted_lmt_order = list({k: v for k, v in self.orders.items() if
+                                       v.state == OrderState.PENDING and isinstance(v, LimitOrder)}.values())
+        i = 0
+        while i < len(submitted_lmt_order):
+            if lmt_order_active(submitted_lmt_order[i], bar):
+                self.logger().debug(f"SUBMIT order {submitted_lmt_order[i].id}")
+                submitted_lmt_order[i].change_state(OrderAction.SUBMIT)
+                self.fill_order(submitted_lmt_order[i].limit_price, bar.end_dt, submitted_lmt_order[i])
+            i += 1
+        # stop orders + stp lmt orders
+        submitted_stp_order = list({k: v for k, v in self.orders.items() if
+                                    v.state == OrderState.PENDING and isinstance(v, StopOrder | StopLimitOrder)}.values())
+        i = 0
+        while i < len(submitted_stp_order):
+            if stp_order_active(submitted_stp_order[i], bar):
+                self.logger().debug(f"SUBMIT order {submitted_stp_order[i].id}")
+                submitted_stp_order[i].change_state(OrderAction.SUBMIT)
+                price = submitted_stp_order[i].stop_price
+                if isinstance(submitted_stp_order[i], StopLimitOrder):
+                    price = submitted_stp_order[i].limit_price
+                self.fill_order(price, bar.end_dt, submitted_stp_order[i])
+            i += 1
+
+    def fill_order(self, fill_price: Decimal, execution_time: datetime, order: Order):
+        execution = Execution(order, order.quantity, fill_price, execution_time)
+        order.add_execution(execution)
+        order.filled_quantity = order.quantity
+        order.average_fill_price = fill_price
+        order.change_state(OrderAction.FILL)
+        self.logger().debug(f"%.16s FILL order {order.id}", execution_time)
+        # check for trigger orders
+        for action in [OrderTriggerType.CANCEL, OrderTriggerType.ACTIVATE]:
+            order_ids = order.get_trigger_orders(action)
+            for o_id in order_ids:
+                self.trigger_order(action, o_id)
+
+    def trigger_order(self, action: OrderTriggerType, order_id: str):
+        """
+
+        :param action:
+        :param order_id:
+        :return:
+        Raises:
+            ValueError on order is not found
+            ValueError on order is in wrong state
+        """
+        order = self.orders.get(order_id, None)
+        if order is not None:
+            self.logger().debug(f"{action.name} order {order_id}: current state: {order.state}")
+            if action == OrderTriggerType.ACTIVATE:
+                if order.state == OrderState.INITIALIZED:
+                    order.change_state(OrderAction.SUBMIT)
+                else:
+                    raise ValueError(f"Order {order_id} should be in state INITIALIZED, but was {order.state}")
+            else: # CANCEL
+                if order.state == OrderState.PENDING:
+                    order.change_state(OrderAction.SUBMIT)
+                    order.change_state(OrderAction.CANCEL)
+                else:
+                    raise ValueError(f"Order {order_id} should be in state PENDING, but was {order.state}")
+        else:
+            raise ValueError(f"Order_id {order_id} not found")
+
+
+
+    def is_order_valid(self, order: Order) -> None:
+        # warning for stp limit orders (one time warning)
+        if isinstance(order, StopLimitOrder):
+            o: StopLimitOrder = order
+            if not self.warning_stp_lmt_order_shown and o.stop_price != o.limit_price:
+                self.logger().warning("Warning: stop limit orders with different stop and limit price cannot be simulated and will be filled with the lmt price")
+                self.warning_stp_lmt_order_shown = True
+        # TODO more ch
+
+    def logger(self) -> logging.Logger:
+        if self.custom_logger is None:
+            return logger
+        else:
+            return self.custom_logger
