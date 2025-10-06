@@ -50,8 +50,8 @@ def test_basic_flow():
     engine: TradingEngine = TradingEngine()
 
     # Add strategy
-    strategy: Strategy = DemoStrategy()
-    engine.add_strategy("demo_strategy", strategy)
+    strategy: Strategy = DemoStrategy(name="demo_strategy")
+    engine.add_strategy(strategy)
 
     # Start trading engine
     engine.start()

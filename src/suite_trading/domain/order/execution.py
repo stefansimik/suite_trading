@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.utils.id_generator import get_next_id
+from suite_trading.utils.datetime_utils import format_dt
 
 
 class Execution:
@@ -197,13 +198,16 @@ class Execution:
         if self._quantity > self._order.unfilled_quantity:
             raise ValueError(f"Execution $quantity ({self._quantity}) cannot exceed order unfilled quantity ({self._order.unfilled_quantity})")
 
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(id={self.id})"
+
     def __repr__(self) -> str:
         """Return a string representation of the execution.
 
         Returns:
             str: String representation of the execution.
         """
-        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={self.timestamp})"
+        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another execution.

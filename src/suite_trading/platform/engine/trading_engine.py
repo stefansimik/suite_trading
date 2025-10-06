@@ -207,23 +207,27 @@ class TradingEngine:
 
     # region Strategies
 
-    def add_strategy(self, name: str, strategy: Strategy) -> None:
-        """Add a strategy with a unique name.
+    def add_strategy(self, strategy: Strategy) -> None:
+        """Add a Strategy to this TradingEngine using its required name.
+
+        Strategy names must be unique within this TradingEngine. The engine enforces this: if another
+        Strategy with the same name is already registered, this method raises ValueError.
 
         Args:
-            name: Unique name to identify this strategy.
-            strategy: The strategy instance to add.
+            strategy: The Strategy instance to add. Uses `strategy.name` as the key.
 
         Raises:
-            ValueError: If a strategy with the same name already exists or strategy is not NEW.
+            ValueError: If a Strategy with the same name is already added, or if $strategy is not NEW.
         """
+        name = strategy.name
+
         # Check: strategy name must be unique and not already added
         if name in self._name_strategies_bidict:
             raise ValueError(f"Cannot call `add_strategy` because Strategy named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
         # Check: strategy must be NEW before attaching
         if strategy.state != StrategyState.NEW:
-            raise ValueError("Cannot call `add_strategy` because $strategy is not NEW. Current $state is {strategy.state.name}. Provide a fresh instance of {strategy.__class__.__name__}.")
+            raise ValueError(f"Cannot call `add_strategy` because $strategy is not NEW. Current $state is {strategy.state.name}. Provide a fresh instance of {strategy.__class__.__name__}.")
 
         # Connect strategy to this engine
         strategy.set_trading_engine(self)

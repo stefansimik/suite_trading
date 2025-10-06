@@ -28,8 +28,8 @@ class TestStrategy(Strategy):
     Records counts and end timestamps of emitted 5‑minute bars for assertions.
     """
 
-    def __init__(self, *, source_feed_1_min) -> None:
-        super().__init__()
+    def __init__(self, *, name: str, source_feed_1_min) -> None:
+        super().__init__(name)
         # Input params
         self._source_feed_1_min = source_feed_1_min
 
@@ -127,8 +127,8 @@ def test_1m_to_5m_emits_end_minutes(
     base_day = datetime(2025, 1, 2, tzinfo=timezone.utc)
     event_feed_1min_bars = build_feed_from_minute_ends(base_day=base_day, end_minutes=input_1min_bars)
 
-    strategy = TestStrategy(source_feed_1_min=event_feed_1min_bars)
-    engine.add_strategy("test_strategy", strategy)
+    strategy = TestStrategy(name="test_strategy", source_feed_1_min=event_feed_1min_bars)
+    engine.add_strategy(strategy)
 
     engine.start()
 

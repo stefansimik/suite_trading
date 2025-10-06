@@ -25,8 +25,8 @@ BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST)
 
 
 class DemoStrategy(Strategy):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
         self._bars_processed: int = 0
 
     # Standard callback, when strategy starts.
@@ -67,8 +67,8 @@ def test_dataframe_feed_demo():
     engine: TradingEngine = TradingEngine()
 
     # Add strategy that uses only BarsFromDataFrameEventFeed
-    strategy: Strategy = DemoStrategy()
-    engine.add_strategy("bars_from_csv_strategy", strategy)
+    strategy: Strategy = DemoStrategy(name="bars_from_csv_strategy")
+    engine.add_strategy(strategy)
 
     # Start trading engine (should process exactly 10 bars from CSV)
     engine.start()

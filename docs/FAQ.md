@@ -154,8 +154,8 @@ INSTRUMENT = Instrument("EURUSD", "FOREX", 0.00001, 1)
 BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST)
 
 class CsvStrategy(Strategy):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
         self._count = 0
 
     def on_start(self):
@@ -169,9 +169,12 @@ class CsvStrategy(Strategy):
             logger.debug(f"Processed bar #{self._count}: {event.bar}")
 
 engine = TradingEngine()
-engine.add_strategy("csv_demo", CsvStrategy())
+engine.add_strategy(CsvStrategy(name="csv_demo"))
 engine.start()
 ```
+
+Note: Strategy $name must be unique within a single TradingEngine. `TradingEngine.add_strategy`
+will raise ValueError when a duplicate name is provided.
 
 ---
 
@@ -258,8 +261,8 @@ from suite_trading.utils.data_generation.bar_generation import create_bar_type, 
 
 
 class AggregationStrategy(Strategy):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
         self.n_1m = 0
         self.n_5m = 0
 
@@ -290,7 +293,7 @@ class AggregationStrategy(Strategy):
 
 
 engine = TradingEngine()
-engine.add_strategy("agg", AggregationStrategy())
+engine.add_strategy(AggregationStrategy(name="agg"))
 engine.start()
 ```
 
@@ -307,8 +310,8 @@ Configure your strategy’s data sources from outside the strategy itself:
 
 ```python
 class FlexibleStrategy(Strategy):
-    def __init__(self, data_feeds: dict):
-        super().__init__()
+    def __init__(self, name: str, data_feeds: dict):
+        super().__init__(name)
         self.data_feeds = data_feeds
 
     def on_start(self):
@@ -432,8 +435,8 @@ This way all 3 scenarios are easy to implement:
 
 ```python
 class MyStrategy(Strategy):
-    def __init__(self, default_broker: Broker) -> None:
-        super().__init__()
+    def __init__(self, name: str, default_broker: Broker) -> None:
+        super().__init__(name)
         self.default_broker = default_broker  # default Broker for this Strategy
 
     def on_event(self, event: Event):

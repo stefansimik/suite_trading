@@ -43,12 +43,28 @@ class Strategy(ABC):
 
     # region Init
 
-    def __init__(self):
-        """Initialize a new strategy.
+    def __init__(self, name: str) -> None:
+        """Initialize a new Strategy with a required user-facing name.
 
-        Sets initial lifecycle state to NEW. Engine reference is None until added by
-        TradingEngine.
+        Note:
+            The $name must be unique among all Strategy(ies) added to the same TradingEngine.
+            The engine enforces this constraint in `TradingEngine.add_strategy` and raises
+            ValueError on duplicates.
+
+        Args:
+            name (str): Required name for this Strategy. Must be non-empty.
+
+        Raises:
+            TypeError: If $name is not a str.
+            ValueError: If $name is empty or whitespace only.
         """
+        # Check: validate $name is a non-empty str
+        if not isinstance(name, str):
+            raise TypeError(f"Strategy could not be instantiated because $name must be a str (got type '{type(name).__name__}') in `Strategy.__init__`.")
+        if name.strip() == "":
+            raise ValueError("Strategy could not be instantiated because $name cannot be empty or whitespace in `Strategy.__init__`.")
+
+        self._name = name
         self._trading_engine = None
         self._state_machine = create_strategy_state_machine()
 
@@ -112,7 +128,12 @@ class Strategy(ABC):
 
     # endregion
 
-    # region State
+    # region Name & State
+
+    @property
+    def name(self) -> str:
+        """Get the required name of this Strategy."""
+        return self._name
 
     @property
     def state(self) -> StrategyState:
@@ -413,5 +434,15 @@ class Strategy(ABC):
             raise RuntimeError(f"Cannot call `list_active_orders` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         return engine.list_active_orders(broker)
+
+    # endregion
+
+    # region Magic
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(name={self.name})"
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(name={self.name}, state={self.state.name})"
 
     # endregion

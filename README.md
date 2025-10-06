@@ -85,9 +85,12 @@ class DemoStrategy(Strategy):
 
 # Create and run the trading engine
 engine: TradingEngine = TradingEngine()
-engine.add_strategy("demo_strategy", DemoStrategy())
+engine.add_strategy(DemoStrategy(name="demo_strategy"))
 engine.start()
 ```
+
+Note: Strategy $name must be unique within a single TradingEngine. The engine enforces
+this and raises ValueError on duplicates when you call `add_strategy`.
 
 ## Key Features
 

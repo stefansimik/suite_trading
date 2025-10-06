@@ -88,10 +88,11 @@ class TestStrategy(Strategy):
     def __init__(
         self,
         *,
+        name: str,
         source_feed,
         target: Period,
     ) -> None:
-        super().__init__()
+        super().__init__(name)
         self._source_feed = source_feed
         self._target = target
 
@@ -210,8 +211,8 @@ def test_time_bar_aggregation_single_boundary_emits_and_type_is_correct(
         end_times=[boundary],
     )
 
-    strategy = TestStrategy(source_feed=feed, target=target)
-    engine.add_strategy("probe", strategy)
+    strategy = TestStrategy(name="probe", source_feed=feed, target=target)
+    engine.add_strategy(strategy)
 
     engine.start()
 
@@ -280,8 +281,8 @@ def test_time_bar_aggregation_spans_five_intervals_with_many_inputs(
         end_times=end_times,
     )
 
-    strategy = TestStrategy(source_feed=feed, target=target)
-    engine.add_strategy("test_strategy", strategy)
+    strategy = TestStrategy(name="test_strategy", source_feed=feed, target=target)
+    engine.add_strategy(strategy)
 
     engine.start()
 

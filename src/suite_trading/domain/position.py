@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Optional, Union
 
 from suite_trading.domain.instrument import Instrument
+from suite_trading.utils.datetime_utils import format_dt
 
 
 class Position:
@@ -193,7 +194,8 @@ class Position:
         Returns:
             str: A detailed string representation.
         """
-        return f"{self.__class__.__name__}(instrument={self.instrument!r}, quantity={self.quantity}, average_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={self.last_update!r})"
+        last_update_str = format_dt(self.last_update) if self.last_update is not None else None
+        return f"{self.__class__.__name__}(instrument={self.instrument!r}, quantity={self.quantity}, average_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={last_update_str})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another position.
