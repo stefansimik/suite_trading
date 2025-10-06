@@ -233,8 +233,7 @@ raise ValueError(f"Cannot call `start_strategy` because $state ('{self.state}') 
 Keep all Markdown lines (including code) <= 100 chars. Break lines at natural points.
 
 ## 2.10 Datetime formatting in `__str__` and `__repr__`
-Rule: If an object includes datetimes in its string representations, they must be formatted
-with utilities from `src/suite_trading/utils/datetime_format.py`.
+Rule: If an object includes datetimes in its string representations, they must be formatted with utilities from `suite_trading.utils.datetime_utils`.
 
 Why:
 - Consistency across the codebase
