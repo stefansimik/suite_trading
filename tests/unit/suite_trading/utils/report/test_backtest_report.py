@@ -7,7 +7,7 @@ from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.order.order_enums import OrderSide, TradeDirection
 from suite_trading.domain.order.order_state import OrderAction
-from suite_trading.domain.order.orders import Order, LimitOrder
+from suite_trading.domain.order.orders import Order, LimitOrder, StopOrder
 from suite_trading.utils.order_builder import OrderBuilder
 from suite_trading.utils.report.backtest_report import BacktestReport
 
@@ -22,6 +22,8 @@ def fill_order(order: Order) -> Order:
     price = Decimal(1)
     if isinstance(order, LimitOrder):
         price = order.limit_price
+    if isinstance(order, StopOrder):
+        price = order.stop_price
     ex = Execution(order, order.quantity, price, datetime.datetime.now())
     order.add_execution(ex)
     order.average_fill_price = price
@@ -73,3 +75,39 @@ def test_build_trades_multiple_orders():
     assert len(testee.trades) == 1
     assert order_list[2].average_fill_price == Decimal('1.11')
     assert order_list[3].quantity == Decimal('0.2')
+
+def test_trade_pnl():
+    orders: dict[str, Order] = {}
+    # 1 lmt order + 1 sl + 3 tp
+    ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.BUY, Decimal('1.0'), Decimal('1.0'))
+          .sl(Decimal('0.99'))
+          .tp(Decimal('1.1'), Decimal('0.6')).tp(Decimal('1.12'), Decimal('0.4')).build())
+    #
+    report = BacktestReport(orders)
+    orders.__setitem__(ob.main_order.id, fill_order(ob.main_order))
+    order_list = ob.trigger_orders
+    orders.__setitem__(order_list[0].id, order_list[0])
+    orders.__setitem__(order_list[1].id, fill_order(order_list[1]))
+    orders.__setitem__(order_list[2].id, fill_order(order_list[2]))
+    report._build_trades()
+    #
+    assert len(report.trades) == 1
+    assert report.trades[ob.main_order.trade_id].get_pnl() == Decimal('0.108')
+
+def test_trade_pnl_short():
+    orders: dict[str, Order] = {}
+    # 1 lmt order + 1 sl + 3 tp
+    ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.SELL, Decimal('1.0'), Decimal('1.0'))
+          .sl(Decimal('1.05'))
+          .tp(Decimal('0.9'), Decimal('0.6')).tp(Decimal('0.8'), Decimal('0.4')).build())
+    #
+    report = BacktestReport(orders)
+    orders.__setitem__(ob.main_order.id, fill_order(ob.main_order))
+    order_list = ob.trigger_orders
+    orders.__setitem__(order_list[0].id, order_list[0])
+    orders.__setitem__(order_list[1].id, fill_order(order_list[1]))
+    orders.__setitem__(order_list[2].id, fill_order(order_list[2]))
+    report._build_trades()
+    #
+    assert len(report.trades) == 1
+    assert report.trades[ob.main_order.trade_id].get_pnl() == Decimal('0.14')
