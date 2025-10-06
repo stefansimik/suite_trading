@@ -2,6 +2,7 @@ from datetime import datetime
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
+from suite_trading.utils.datetime_utils import format_dt
 
 
 class NewQuoteTickEvent(Event):
@@ -47,20 +48,10 @@ class NewQuoteTickEvent(Event):
         return self.quote_tick.timestamp
 
     def __str__(self) -> str:
-        """Return a string representation of the quote tick event.
-
-        Returns:
-            str: A human-readable string representation.
-        """
-        return f"{self.__class__.__name__}(quote_tick={self.quote_tick}, dt_received={self.dt_received})"
+        return f"{self.__class__.__name__}(quote_tick={self.quote_tick}, dt_received={format_dt(self.dt_received)})"
 
     def __repr__(self) -> str:
-        """Return a developer-friendly representation of the quote tick event.
-
-        Returns:
-            str: A detailed string representation.
-        """
-        return f"{self.__class__.__name__}(quote_tick={self.quote_tick!r}, dt_received={self.dt_received!r})"
+        return f"{self.__class__.__name__}(quote_tick={self.quote_tick!r}, dt_received={format_dt(self.dt_received)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another quote tick event.

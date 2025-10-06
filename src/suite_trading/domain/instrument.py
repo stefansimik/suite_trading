@@ -187,27 +187,14 @@ class Instrument:
         """Return a string representation of the instrument.
 
         Returns:
-            str: The instrument in format "name@exchange".
+            str: The instrument in format "Instrument(name@exchange)".
         """
-        return f"{self.name}@{self.exchange}"
+        return f"{self.__class__.__name__}(name={self.name}, exchange={self.exchange})"
 
     def __repr__(self) -> str:
-        """Return a developer-friendly representation of the instrument.
-
-        Returns:
-            str: A detailed string representation.
-        """
-        return f"{self.__class__.__name__}(name={self.name!r}, exchange={self.exchange!r}, price_increment={self.price_increment}, quantity_increment={self.quantity_increment}, contract_value_multiplier={self.contract_value_multiplier})"
+        return f"{self.__class__.__name__}(name={self.name}, exchange={self.exchange}, price_increment={self.price_increment}, quantity_increment={self.quantity_increment}, contract_value_multiplier={self.contract_value_multiplier})"
 
     def __eq__(self, other) -> bool:
-        """Check equality with another instrument.
-
-        Args:
-            other: The other object to compare with.
-
-        Returns:
-            bool: True if instruments are equal, False otherwise.
-        """
         if not isinstance(other, Instrument):
             return False
         return self.name == other.name and self.exchange == other.exchange and self.price_increment == other.price_increment and self.quantity_increment == other.quantity_increment and self.contract_value_multiplier == other.contract_value_multiplier

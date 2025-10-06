@@ -210,12 +210,10 @@ class Order:
         if self.filled_quantity > self.quantity:
             raise ValueError(f"$filled_quantity ({self.filled_quantity}) cannot exceed $quantity ({self.quantity})")
 
-    def __repr__(self) -> str:
-        """Return a string representation of the order.
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
-        Returns:
-            str: String representation of the order.
-        """
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
     def __eq__(self, other) -> bool:

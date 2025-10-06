@@ -107,16 +107,10 @@ class BarType:
     # region Magic
 
     def __str__(self) -> str:
-        """Return a string representation of the bar type."""
-        return f"{str(self.instrument)}{self.SEPARATOR}{self.value}-{self.unit.name}{self.SEPARATOR}{self.price_type.name}"
+        return f"{self.__class__.__name__}(instrument={self.instrument}, value={self.value}, unit={self.unit}, price_type={self.price_type})"
 
     def __repr__(self) -> str:
-        """Return a developer-friendly representation of the bar type.
-
-        Returns:
-            str: A detailed string representation.
-        """
-        return f"{self.__class__.__name__}(instrument={self.instrument!r}, value={self.value}, unit={self.unit}, price_type={self.price_type})"
+        return f"{self.__class__.__name__}(instrument={self.instrument}, value={self.value}, unit={self.unit}, price_type={self.price_type})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another bar type.

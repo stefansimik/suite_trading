@@ -2,6 +2,7 @@ from datetime import datetime
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.tick.trade_tick import TradeTick
+from suite_trading.utils.datetime_utils import format_dt
 
 
 class NewTradeTickEvent(Event):
@@ -47,20 +48,10 @@ class NewTradeTickEvent(Event):
         return self.trade_tick.timestamp
 
     def __str__(self) -> str:
-        """Return a string representation of the trade tick event.
-
-        Returns:
-            str: A human-readable string representation.
-        """
-        return f"{self.__class__.__name__}(trade_tick={self.trade_tick}, dt_received={self.dt_received})"
+        return f"{self.__class__.__name__}(trade_tick={self.trade_tick}, dt_received={format_dt(self.dt_received)})"
 
     def __repr__(self) -> str:
-        """Return a developer-friendly representation of the trade tick event.
-
-        Returns:
-            str: A detailed string representation.
-        """
-        return f"{self.__class__.__name__}(trade_tick={self.trade_tick!r}, dt_received={self.dt_received!r})"
+        return f"{self.__class__.__name__}(trade_tick={self.trade_tick!r}, dt_received={format_dt(self.dt_received)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another trade tick event.

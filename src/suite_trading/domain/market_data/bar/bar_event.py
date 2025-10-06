@@ -4,6 +4,7 @@ from typing import Callable
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.utils.datetime_utils import format_dt
 
 
 # region Class
@@ -66,20 +67,10 @@ class NewBarEvent(Event):
         return self.bar.end_dt
 
     def __str__(self) -> str:
-        """Return a string representation of the bar event.
-
-        Returns:
-            str: A human-readable string representation.
-        """
-        return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received}, is_historical={self.is_historical})"
+        return f"{self.__class__.__name__}(bar={self.bar}, dt_received={format_dt(self.dt_received)}, is_historical={self.is_historical})"
 
     def __repr__(self) -> str:
-        """Return a developer-friendly representation of the bar event.
-
-        Returns:
-            str: A detailed string representation.
-        """
-        return f"{self.__class__.__name__}(bar={self.bar!r}, dt_received={self.dt_received!r}, is_historical={self.is_historical!r})"
+        return f"{self.__class__.__name__}(bar={self.bar!r}, dt_received={format_dt(self.dt_received)}, is_historical={self.is_historical})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another bar event.

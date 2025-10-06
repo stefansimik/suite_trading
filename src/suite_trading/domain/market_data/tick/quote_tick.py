@@ -98,21 +98,10 @@ class QuoteTick:
         return self._timestamp
 
     def __str__(self) -> str:
-        """Return a string representation of the quote tick.
-
-        Returns:
-            str: A human-readable string representation.
-        """
-        ts = format_dt(self.timestamp)
-        return f"{self.__class__.__name__}({self.instrument}, {self.bid_price}x{self.bid_volume} / {self.ask_price}x{self.ask_volume}, {ts})"
+        return f"{self.__class__.__name__}(instrument={self.instrument}, bid={self.bid_price}, bid_volume={self.bid_volume}, ask={self.ask_price}, ask_volume={self.ask_volume}, timestamp={format_dt(self.timestamp)})"
 
     def __repr__(self) -> str:
-        """Return a developer-friendly representation of the quote tick.
-
-        Returns:
-            str: A detailed string representation.
-        """
-        return f"{self.__class__.__name__}(instrument={self.instrument!r}, bid_price={self.bid_price}, ask_price={self.ask_price}, bid_volume={self.bid_volume}, ask_volume={self.ask_volume}, timestamp={self.timestamp!r})"
+        return f"{self.__class__.__name__}(instrument={self.instrument}, bid={self.bid_price}, ask={self.ask_price}, bid_volume={self.bid_volume}, ask_volume={self.ask_volume}, timestamp={format_dt(self.timestamp)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another quote tick.

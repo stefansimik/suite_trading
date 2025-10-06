@@ -67,21 +67,10 @@ class TradeTick:
         return self._timestamp
 
     def __str__(self) -> str:
-        """Return a string representation of the trade tick.
-
-        Returns:
-            str: A human-readable string representation.
-        """
-        ts = format_dt(self.timestamp)
-        return f"{self.__class__.__name__}({self.instrument}, {self.price} x {self.volume}, {ts})"
+        return f"{self.__class__.__name__}({self.instrument}, {self.price} x {self.volume}, {format_dt(self.timestamp)})"
 
     def __repr__(self) -> str:
-        """Return a developer-friendly representation of the trade tick.
-
-        Returns:
-            str: A detailed string representation.
-        """
-        return f"{self.__class__.__name__}(instrument={self.instrument!r}, price={self.price}, volume={self.volume}, timestamp={self.timestamp!r})"
+        return f"{self.__class__.__name__}(instrument={self.instrument}, price={self.price}, volume={self.volume}, timestamp={format_dt(self.timestamp)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another trade tick.

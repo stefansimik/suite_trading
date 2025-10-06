@@ -180,22 +180,13 @@ class Position:
         )
 
     def __str__(self) -> str:
-        """Return a string representation of the position.
-
-        Returns:
-            str: The position in a readable format.
-        """
         side = "LONG" if self.is_long else "SHORT" if self.is_short else "FLAT"
-        return f"{side} {abs(self.quantity)} {self.instrument} @ {self.average_price}"
+        return f"{self.__class__.__name__}(side={side}, quantity={abs(self.quantity)}, instrument= {self.instrument}, avg_price={self.average_price})"
 
     def __repr__(self) -> str:
-        """Return a developer-friendly representation of the position.
-
-        Returns:
-            str: A detailed string representation.
-        """
+        side = "LONG" if self.is_long else "SHORT" if self.is_short else "FLAT"
         last_update_str = format_dt(self.last_update) if self.last_update is not None else None
-        return f"{self.__class__.__name__}(instrument={self.instrument!r}, quantity={self.quantity}, average_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={last_update_str})"
+        return f"{self.__class__.__name__}(side={side}, quantity={abs(self.quantity)}, instrument= {self.instrument}, avg_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={last_update_str})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another position.
