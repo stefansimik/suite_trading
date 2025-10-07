@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from abc import ABC
 from datetime import datetime
 
 from suite_trading.utils.datetime_utils import expect_utc
 
 
-class Event(ABC):
-    """Abstract base for all events entering the TradingEngine.
+class Event:
+    """Base class for all events entering the TradingEngine.
 
     Policy:
     - All events carry two timestamps and both must be timezone-aware UTC:
