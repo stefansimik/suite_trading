@@ -12,9 +12,9 @@ from suite_trading.utils.order_builder import OrderBuilder
 from suite_trading.utils.report.backtest_report import BacktestReport
 
 # Constants
-INSTRUMENT = Instrument(name="EURUSD", exchange="FOREX", price_increment=Decimal("0.00001"), quantity_increment=Decimal("0.1"))
+INSTRUMENT = Instrument(name="EURUSD", exchange="FOREX", price_increment=Decimal("0.00001"), quantity_increment=Decimal("0.1"), contract_value_multiplier='100')
 
-def fill_order(order: Order) -> Order:
+def fill_order(order: Order, commmission: Decimal = Decimal('0.1')) -> Order:
     order.change_state(OrderAction.SUBMIT)
     order.change_state(OrderAction.SUBMIT)
     order.change_state(OrderAction.ACCEPT)
@@ -24,7 +24,7 @@ def fill_order(order: Order) -> Order:
         price = order.limit_price
     if isinstance(order, StopOrder):
         price = order.stop_price
-    ex = Execution(order, order.quantity, price, datetime.datetime.now())
+    ex = Execution(order, order.quantity, price, datetime.datetime.now(), commission=commmission)
     order.add_execution(ex)
     order.average_fill_price = price
     return order
@@ -76,7 +76,7 @@ def test_build_trades_multiple_orders():
     assert order_list[2].average_fill_price == Decimal('1.11')
     assert order_list[3].quantity == Decimal('0.2')
 
-def test_trade_pnl():
+def test_trade_pnl_long_commission():
     orders: dict[str, Order] = {}
     # 1 lmt order + 1 sl + 3 tp
     ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.BUY, Decimal('1.0'), Decimal('1.0'))
@@ -92,9 +92,9 @@ def test_trade_pnl():
     report._build_trades()
     #
     assert len(report.trades) == 1
-    assert report.trades[ob.main_order.trade_id].get_pnl() == Decimal('0.108')
+    assert report.trades[ob.main_order.trade_id].get_pnl() == Decimal('10.5')
 
-def test_trade_pnl_short():
+def test_trade_pnl_short_commission():
     orders: dict[str, Order] = {}
     # 1 lmt order + 1 sl + 3 tp
     ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.SELL, Decimal('1.0'), Decimal('1.0'))
@@ -110,4 +110,4 @@ def test_trade_pnl_short():
     report._build_trades()
     #
     assert len(report.trades) == 1
-    assert report.trades[ob.main_order.trade_id].get_pnl() == Decimal('0.14')
+    assert report.trades[ob.main_order.trade_id].get_pnl() == Decimal('13.7')

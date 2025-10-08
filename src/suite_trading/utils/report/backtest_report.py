@@ -2,11 +2,17 @@ import logging
 from decimal import Decimal
 from typing import List
 
+from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.order.order_enums import OrderTriggerType, TradeDirection, OrderSide
 from suite_trading.domain.order.order_state import OrderState
 from suite_trading.domain.order.orders import Order
 
 logger = logging.getLogger(__name__)
+
+
+def _gross_value(e: Execution) -> Decimal:
+    return e.gross_value * e.instrument.contract_value_multiplier
+
 
 class Trade:
     def __init__(self, order: Order):
@@ -31,15 +37,15 @@ class Trade:
         for o in self._order_entry:
             for e in o.executions:
                 if e.side == OrderSide.BUY:
-                    pnl -= e.net_value
+                    pnl = pnl - _gross_value(e) - e.commission
                 else:
-                    pnl += e.net_value
+                    pnl = pnl + _gross_value(e) - e.commission
         for o in self._order_exit:
             for e in o.executions:
                 if e.side == OrderSide.BUY:
-                    pnl -= e.net_value
+                    pnl = pnl - _gross_value(e) - e.commission
                 else:
-                    pnl += e.net_value
+                    pnl = pnl + _gross_value(e) - e.commission
         return pnl
 
 class BacktestReport:
