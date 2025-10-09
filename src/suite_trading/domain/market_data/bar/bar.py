@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, Union
@@ -36,6 +38,18 @@ class Bar:
         is_partial (bool): Whether the bar was aggregated from incomplete input data.
             This is metadata only and does not affect equality of Bar instances.
     """
+
+    __slots__ = (
+        "_bar_type",
+        "_start_dt",
+        "_end_dt",
+        "_open",
+        "_high",
+        "_low",
+        "_close",
+        "_volume",
+        "_is_partial",
+    )
 
     def __init__(
         self,

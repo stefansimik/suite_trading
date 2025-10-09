@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Callable
 import logging
@@ -21,6 +23,8 @@ class TimeTickEvent(Event):
         dt_event (datetime): Scheduled tick time (UTC).
         dt_received (datetime): When the event entered the system (UTC).
     """
+
+    __slots__ = ()
 
     def __init__(
         self,

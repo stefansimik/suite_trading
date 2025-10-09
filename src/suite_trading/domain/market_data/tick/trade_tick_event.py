@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 from suite_trading.domain.event import Event
@@ -15,6 +17,8 @@ class NewTradeTickEvent(Event):
         trade_tick (TradeTick): The pure trade tick data object containing trade information.
         dt_received (datetime): When the event entered our system (timezone-aware UTC).
     """
+
+    __slots__ = ("_trade_tick",)
 
     def __init__(self, trade_tick: TradeTick, dt_received: datetime):
         """Initialize a new trade tick event.

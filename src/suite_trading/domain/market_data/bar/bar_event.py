@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from collections.abc import Iterable, Iterator
 from typing import Callable
@@ -21,6 +23,8 @@ class NewBarEvent(Event):
         dt_received (datetime): When the event entered our system (timezone-aware UTC).
         is_historical (bool): Whether this bar data is historical or live.
     """
+
+    __slots__ = ("_bar", "_is_historical")
 
     def __init__(
         self,

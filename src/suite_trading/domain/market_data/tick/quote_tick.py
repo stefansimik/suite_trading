@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Union
@@ -20,6 +22,15 @@ class QuoteTick:
         ask_volume (Decimal): The volume available at the best ask price.
         timestamp (datetime): The datetime when the quote was recorded (timezone-aware).
     """
+
+    __slots__ = (
+        "_instrument",
+        "_bid_price",
+        "_ask_price",
+        "_bid_volume",
+        "_ask_volume",
+        "_timestamp",
+    )
 
     def __init__(
         self,

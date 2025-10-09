@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from decimal import Decimal, ROUND_HALF_EVEN
 from typing import Union
 
@@ -12,6 +14,14 @@ class Instrument:
         quantity_increment (Decimal): The minimum quantity change increment.
         contract_value_multiplier (Decimal): The value of one contract (e.g., 125000 for 6E on CME).
     """
+
+    __slots__ = (
+        "_name",
+        "_exchange",
+        "_price_increment",
+        "_quantity_increment",
+        "_contract_value_multiplier",
+    )
 
     def __init__(
         self,

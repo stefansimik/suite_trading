@@ -15,6 +15,8 @@ class Event:
     - UTC enforcement happens here (fail fast); subclasses must pass both to `__init__`.
     """
 
+    __slots__ = ("_dt_event", "_dt_received")
+
     def __init__(self, dt_event: datetime, dt_received: datetime) -> None:
         # Check: enforce UTC invariants at the boundary for all events
         self._dt_event: datetime = expect_utc(dt_event)

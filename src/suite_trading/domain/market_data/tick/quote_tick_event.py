@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 from suite_trading.domain.event import Event
@@ -15,6 +17,8 @@ class NewQuoteTickEvent(Event):
         quote_tick (QuoteTick): The pure quote tick data object containing bid/ask information.
         dt_received (datetime): When the event entered our system (timezone-aware UTC).
     """
+
+    __slots__ = ("_quote_tick",)
 
     def __init__(self, quote_tick: QuoteTick, dt_received: datetime):
         """Initialize a new quote tick event.

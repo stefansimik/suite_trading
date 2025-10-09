@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Union
@@ -18,6 +20,8 @@ class TradeTick:
         volume (Decimal): The volume of the trade.
         timestamp (datetime): The datetime when the trade occurred (timezone-aware).
     """
+
+    __slots__ = ("_instrument", "_price", "_volume", "_timestamp")
 
     def __init__(self, instrument: Instrument, price: Union[Decimal, str, float], volume: Union[Decimal, str, float], timestamp: datetime):
         """Initialize a new trade tick.
