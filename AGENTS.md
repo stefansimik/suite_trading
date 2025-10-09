@@ -290,6 +290,45 @@ Acceptance checks:
 - [ ] Cross‑module types resolved via `if TYPE_CHECKING:` without runtime cycles.
 - [ ] No raw `__annotations__`; use `typing.get_type_hints(..., include_extras=True)`.
 
+## 2.12 __slots__ for high-volume, fixed-shape classes
+
+Rule: For classes with many instances (e.g., market data, events), define `__slots__` to reduce
+memory use, improve attribute access speed, and prevent accidental attributes.
+
+When to use:
+- High instance counts at runtime (Bars, TradeTicks, QuoteTicks, PriceSample, Event subclasses).
+- Fixed attribute schema; no dynamic attributes required.
+- No reliance on an instance `__dict__`.
+
+Inheritance requirement:
+- If a parent class defines `__slots__`, every subclass must also define `__slots__`.
+  - Use `__slots__ = ()` when the subclass adds no new instance fields.
+  - Otherwise list the private attribute names actually assigned (e.g., `"_price"`).
+
+Implementation tips:
+- Slot the private underscored names used in `__init__`.
+- Do not add `"__weakref__"` unless instances are weak-referenced.
+- If a subclass truly needs dynamic attributes, include `"__dict__"` in its `__slots__`.
+
+Examples:
+```python
+class Event:
+    __slots__ = ("_dt_event", "_dt_received")
+
+class BarEvent(Event):
+    __slots__ = ()  # no new instance fields
+
+class QuoteTick(Event):
+    __slots__ = (
+        "_instrument",
+        "_bid_price",
+        "_ask_price",
+        "_bid_volume",
+        "_ask_volume",
+        "_timestamp",
+    )
+```
+
 # 3. Code organization (supporting)
 
 ## 3.1 Regions
