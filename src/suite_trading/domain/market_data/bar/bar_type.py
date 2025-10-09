@@ -18,7 +18,9 @@ class BarType:
         instrument: The financial instrument.
         value: The numeric value of the period (e.g., 1, 5, 15).
         unit: The unit of the period (e.g., MINUTE, HOUR) from BarUnit.
-        price_type: The type of price data (BID/ASK/LAST/MID).
+        price_type: The type of original higher-resolution price data used to build bars
+            of this BarType (BID/ASK/MID/LAST_TRADE). LAST_TRADE denotes the last traded
+            price (often called LAST by data vendors).
     """
 
     SEPARATOR: str = "::"
@@ -32,7 +34,9 @@ class BarType:
             instrument: The financial instrument.
             value: The numeric value of the period (e.g., 1, 5, 15).
             unit: The unit of the period (e.g., MINUTE, HOUR) from BarUnit.
-            price_type: The type of price data (BID/ASK/LAST/MID).
+            price_type: The type of original higher-resolution price data
+                (BID/ASK/MID/LAST_TRADE). LAST_TRADE means the last traded price
+                (often called LAST).
         """
         self._instrument = instrument
         self._value = value
@@ -99,7 +103,11 @@ class BarType:
 
     @property
     def price_type(self) -> PriceType:
-        """Get the price type."""
+        """Return the $price_type indicating which input price series bars use.
+
+        Values: BID, ASK, MID, LAST_TRADE. LAST_TRADE denotes the last traded price
+        (often called LAST by data vendors).
+        """
         return self._price_type
 
     # endregion
@@ -107,7 +115,7 @@ class BarType:
     # region Magic
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(instrument={self.instrument}, value={self.value}, unit={self.unit}, price_type={self.price_type})"
+        return f"{self.instrument.name}@{self.instrument.exchange}{self.SEPARATOR}{self.value}-{self.unit.name}{self.SEPARATOR}{self.price_type.name}"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(instrument={self.instrument}, value={self.value}, unit={self.unit}, price_type={self.price_type})"

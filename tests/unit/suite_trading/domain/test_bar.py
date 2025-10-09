@@ -41,13 +41,13 @@ def test_bar_construction_and_values():
     assert bar.instrument == bar_type.instrument
     assert bar.value == bar_type.value
     assert bar.unit == bar_type.unit
-    assert bar.price_type == bar_type.price_type
+    assert bar.bar_type.price_type == bar_type.price_type
 
     # Test that the properties return the expected values
     assert bar.instrument == INSTRUMENT
     assert bar.value == BAR_VALUE
     assert bar.unit == BarUnit.MINUTE
-    assert bar.price_type == PriceType.LAST_TRADE
+    assert bar.bar_type.price_type == PriceType.LAST_TRADE
 
     # Test that the close price and volume match what we provided
     assert bar.close == CLOSE_PRICE_DECIMAL

@@ -28,10 +28,11 @@ class Bar:
         low (Decimal): The lowest price reached during the period.
         close (Decimal): The closing price for the period.
         volume (Optional[Decimal]): The trading volume during the period (optional).
-        instrument (Instrument): The financial instrument identifier (delegated from bar_type).
-        value (int): The numeric value of the period (delegated from bar_type).
-        unit (BarUnit): The unit of the period (delegated from bar_type).
-        price_type (PriceType): The type of price data (delegated from bar_type).
+        instrument (Instrument): The financial instrument identifier (delegated from $bar_type).
+        value (int): The numeric value of the period (delegated from $bar_type).
+        unit (BarUnit): The unit of the period (delegated from $bar_type).
+        price_type (PriceType): Delegated from $bar_type. See `BarType.price_type` for
+            the semantics of the underlying series used to construct this bar.
         is_partial (bool): Whether the bar was aggregated from incomplete input data.
             This is metadata only and does not affect equality of Bar instances.
     """
@@ -154,7 +155,10 @@ class Bar:
 
     @property
     def price_type(self) -> PriceType:
-        """Get the price_type from bar_type."""
+        """Return the delegated $price_type from $bar_type.
+
+        See `BarType.price_type` for the meaning of this field.
+        """
         return self.bar_type.price_type
 
     def __str__(self) -> str:
