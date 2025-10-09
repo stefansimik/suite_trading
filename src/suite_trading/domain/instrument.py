@@ -184,12 +184,12 @@ class Instrument:
     # region Special methods
 
     def __str__(self) -> str:
-        """Return a string representation of the instrument.
+        """Return a concise string representation of the instrument.
 
         Returns:
-            str: The instrument in format "Instrument(name@exchange)".
+            str: The instrument in format "<name>@<exchange>" (e.g., "EURUSD@FOREX").
         """
-        return f"{self.__class__.__name__}(name={self.name}, exchange={self.exchange})"
+        return f"{self.name}@{self.exchange}"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name}, exchange={self.exchange}, price_increment={self.price_increment}, quantity_increment={self.quantity_increment}, contract_value_multiplier={self.contract_value_multiplier})"
