@@ -26,10 +26,10 @@ READ_TIMEOUT = 30
 """
 # INPUT
 SYMBOL: str = "EURUSD"
-FROM_DT: str = "2025-01-01"
+FROM_DT: str = "2015-01-01"
 TO_DT: str = "2025-07-31"
 # 1week, 1day, 4hour, 1hour, 30min, 15min, 5min, 1min
-PERIOD: str = "30min"
+PERIOD: str = "5min"
 # OUTPUT
 CSV_OUTPUT_PATH: str = "../../../../../res/data"
 CACHE_PATH: str = "../../../../../res/cache"
@@ -289,6 +289,7 @@ def bulk_load(_period: str, _symbol: str,
         raise ValueError(f"from_date ({f}) must be before to_date ({t})")
     res = []
     oldest = None
+    gap_tries = 0
     while f <= t:
         bars = get_historical_chart(_period=_period, _symbol=_symbol, from_date=far, to_date=t)
         if (oldest is not None) and bars:
@@ -301,8 +302,9 @@ def bulk_load(_period: str, _symbol: str,
         oldest = bars[-1]
         new_oldest = _parse_dt_utc(oldest["date"][:10])
         if new_oldest == t:
-            print("ERROR: no new data received. Abort")
-            break
+            gap_tries = gap_tries + 1
+            new_oldest = new_oldest - timedelta(days=1)
+            print(f"!!!!!!!!!!! WARNING #{gap_tries} !!!!!!!!!!!!: no new data received. Try to skip one day: {new_oldest}")
         t = new_oldest
         #print("new oldest: ", t)
     return res
