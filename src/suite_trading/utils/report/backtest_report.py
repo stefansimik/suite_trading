@@ -95,13 +95,13 @@ class BacktestReport:
         winner = len ( {k: v for k, v in self.trades.items() if v.get_pnl() >= Decimal('0')} )
         loser = len({k: v for k, v in self.trades.items() if v.get_pnl() < Decimal('0')})
         report.append(f"Winner  : {winner}     Loser: {loser}")
-        winrate = 0 if winner <= 0 else (len(self.trades) / winner) * 100
-        report.append(f"Win rate: {winrate}%")
+        winrate = 0 if winner <= 0 else (winner / len(self.trades)) * 100
+        report.append(f"Win rate: {winrate:.1f}%")
         l = list()
         win_sum = sum({v.get_pnl() for v in self.trades.values() if v.get_pnl() >= Decimal('0')})
         lose_sum = sum({v.get_pnl() for v in self.trades.values() if v.get_pnl() < Decimal('0')})
-        pf = "n/a" if lose_sum == 0 else win_sum / lose_sum
-        report.append(f"PF      : {pf}   W/L PnL : {win_sum} / {lose_sum}")
+        pf = "n/a" if lose_sum == 0 else win_sum / lose_sum * -1
+        report.append(f"PF      : {pf:.2f}   W/L PnL : {win_sum:.2f} / {lose_sum:.2f}")
 
         self.log().debug("end calculating report")
         return report
