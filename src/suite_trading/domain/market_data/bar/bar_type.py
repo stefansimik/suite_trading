@@ -10,9 +10,9 @@ class BarType:
 
     Example:
         >>> instrument = Instrument("EURUSD", "FOREX", Decimal("0.00001"), Decimal("1"))
-        >>> bar_type = BarType(instrument, 5, BarUnit.MINUTE, PriceType.LAST)
+        >>> bar_type = BarType(instrument, 5, BarUnit.MINUTE, PriceType.LAST_TRADE)
         >>> print(bar_type)
-        EURUSD@FOREX::5-MINUTE::LAST
+        EURUSD@FOREX::5-MINUTE::LAST_TRADE
 
     Attributes:
         instrument: The financial instrument.
@@ -63,12 +63,12 @@ class BarType:
             BarType: A new BarType with provided overrides applied.
 
         Example:
-            >>> bt1 = BarType(instrument, 5, BarUnit.MINUTE, PriceType.LAST)
+            >>> bt1 = BarType(instrument, 5, BarUnit.MINUTE, PriceType.LAST_TRADE)
             >>> bt2 = bt1.copy(value=15)
             >>> str(bt1)
-            'EURUSD@FOREX::5-MINUTE::LAST'
+            'EURUSD@FOREX::5-MINUTE::LAST_TRADE'
             >>> str(bt2)
-            'EURUSD@FOREX::15-MINUTE::LAST'
+            'EURUSD@FOREX::15-MINUTE::LAST_TRADE'
         """
         # Create a new instance, reusing current values when overrides are not provided.
         return BarType(

@@ -151,7 +151,7 @@ logger = logging.getLogger(__name__)
 
 CSV_PATH = Path(__file__).with_name("demo_bars.csv")
 INSTRUMENT = Instrument("EURUSD", "FOREX", 0.00001, 1)
-BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST)
+BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
 
 class CsvStrategy(Strategy):
     def __init__(self, name: str) -> None:
@@ -188,7 +188,7 @@ df = pd.read_csv("eurusd_data.csv", parse_dates=["start_dt", "end_dt"])
 
 # Define what kind of bars these are
 instrument = Instrument("EURUSD", "FOREX", 0.00001, 1)
-bar_type = BarType(instrument, 1, BarUnit.MINUTE, PriceType.LAST)
+bar_type = BarType(instrument, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
 
 # Create the feed
 feed = BarsFromDataFrameEventFeed(df=df, bar_type=bar_type)

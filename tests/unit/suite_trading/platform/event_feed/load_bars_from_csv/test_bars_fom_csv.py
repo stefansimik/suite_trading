@@ -21,7 +21,7 @@ CSV_PATH = Path(__file__).with_name(CSV_FILE_NAME)
 
 # Describe BarType for bars constructed in the CSV file
 INSTRUMENT = Instrument("EURUSD", "FOREX", 0.00001, 1)
-BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST)
+BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
 
 
 class DemoStrategy(Strategy):

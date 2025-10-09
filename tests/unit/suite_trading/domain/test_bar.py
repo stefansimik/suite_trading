@@ -26,7 +26,7 @@ VOLUME_DECIMAL = Decimal(str(VOLUME))
 def test_bar_construction_and_values():
     """Test that Bar can be constructed properly and its values are correctly set."""
     # Create a bar type using the utility function
-    bar_type = create_bar_type(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST)
+    bar_type = create_bar_type(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
 
     # Create a bar using the utility function with a fixed datetime
     fixed_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -47,7 +47,7 @@ def test_bar_construction_and_values():
     assert bar.instrument == INSTRUMENT
     assert bar.value == BAR_VALUE
     assert bar.unit == BarUnit.MINUTE
-    assert bar.price_type == PriceType.LAST
+    assert bar.price_type == PriceType.LAST_TRADE
 
     # Test that the close price and volume match what we provided
     assert bar.close == CLOSE_PRICE_DECIMAL

@@ -27,7 +27,7 @@ def create_bar_type(
     instrument: Instrument = DEFAULT_INSTRUMENT,
     value: int = 1,
     unit: BarUnit = BarUnit.MINUTE,
-    price_type: PriceType = PriceType.LAST,
+    price_type: PriceType = PriceType.LAST_TRADE,
 ) -> BarType:
     """
     Create a BarType instance with the given parameters.
