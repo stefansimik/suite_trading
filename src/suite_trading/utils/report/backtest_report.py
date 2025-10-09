@@ -16,39 +16,71 @@ def _gross_value(e: Execution) -> Decimal:
 
 class Trade:
     def __init__(self, order: Order):
-        self._order_entry: List[Order] = [order]
-        self._order_exit: List[Order] = []
-
+        self.__order_entry: List[Order] = [order]
+        self.__order_exit: List[Order] = []
+        self.pnl: Decimal | None = None
 
     @property
     def order_entry(self) -> List[Order]:
-        return self._order_entry
+        return self.__order_entry
 
     @property
     def order_exit(self) -> List[Order]:
-        return self._order_exit
+        return self.__order_exit
 
     @property
     def trade_id(self):
-        return self._order_entry[0].trade_id
+        return self.__order_entry[0].trade_id
+
+    def add_order_entry(self, order: Order):
+        self.__order_entry.append(order)
+        self.__reset()
+
+    def add_order_exit(self, order: Order):
+        self.order_exit.append(order)
+        self.__reset()
+
+    def __reset(self):
+        self.pnl = None
 
     def get_pnl(self) -> Decimal:
-        pnl: Decimal = Decimal('0')
-        for o in self._order_entry:
+        _pnl: Decimal = self.pnl
+        if _pnl is not None:
+            return _pnl
+        _pnl = Decimal('0')
+        for o in self.__order_entry:
             for e in o.executions:
                 if e.side == OrderSide.BUY:
-                    pnl = pnl - _gross_value(e) - e.commission
+                    _pnl = _pnl - _gross_value(e) - e.commission
                 else:
-                    pnl = pnl + _gross_value(e) - e.commission
-        for o in self._order_exit:
+                    _pnl = _pnl + _gross_value(e) - e.commission
+        for o in self.__order_exit:
             for e in o.executions:
                 if e.side == OrderSide.BUY:
-                    pnl = pnl - _gross_value(e) - e.commission
+                    _pnl = _pnl - _gross_value(e) - e.commission
                 else:
-                    pnl = pnl + _gross_value(e) - e.commission
-        return pnl
+                    _pnl = _pnl + _gross_value(e) - e.commission
+        self.pnl = _pnl
+        return _pnl
 
 class BacktestReport:
+    """
+    Usage:
+        After engine.start() was performed and simulation is ready, call:
+
+        BacktestReport(broker.orders).print_report()
+
+        or
+
+        report = BacktestReport(broker.orders).create_report()
+        # do what you need with the string lines
+
+    Parameters:
+        orders: dict[str, Order]
+            the dict of orders from simulation broker
+        custom_logger: logging.Logger
+            custom logger for printing the report
+    """
     def __init__(self, orders: dict[str, Order], custom_logger: logging.Logger = None):
         self.custom_logger = custom_logger
         if not isinstance(orders, dict):
@@ -58,23 +90,28 @@ class BacktestReport:
 
     def create_report(self) -> List[str]:
         self.log().debug("start calculating report")
-        report = []
-        #
-        report.append(f"Orders: #{len(self.orders)}")
         self._build_trades()
-
-        report.append(f"Trades: {len(self.trades)}")
-
+        report =     [f"Orders  : {len(self.orders)}     Trades : {len(self.trades)}"]
+        winner = len ( {k: v for k, v in self.trades.items() if v.get_pnl() >= Decimal('0')} )
+        loser = len({k: v for k, v in self.trades.items() if v.get_pnl() < Decimal('0')})
+        report.append(f"Winner  : {winner}     Loser: {loser}")
+        winrate = 0 if winner <= 0 else (len(self.trades) / winner) * 100
+        report.append(f"Win rate: {winrate}%")
+        l = list()
+        win_sum = sum({v.get_pnl() for v in self.trades.values() if v.get_pnl() >= Decimal('0')})
+        lose_sum = sum({v.get_pnl() for v in self.trades.values() if v.get_pnl() < Decimal('0')})
+        pf = "n/a" if lose_sum == 0 else win_sum / lose_sum
+        report.append(f"PF      : {pf}   W/L PnL : {win_sum} / {lose_sum}")
 
         self.log().debug("end calculating report")
         return report
 
     def print_report(self):
         r = self.create_report()
-        self.log().debug("+----------- Report start ------------")
+        self.log().debug("+-------------- Report start ---------------")
         for l in r:
             self.log().debug(f"| {l}")
-        self.log().debug("+----------- Report end ------------")
+        self.log().debug("+-------------- Report end -----------------")
 
     def log(self) -> logging.Logger:
         if self.custom_logger is not None:
