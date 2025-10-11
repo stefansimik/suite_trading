@@ -17,7 +17,7 @@ from suite_trading.platform.broker.simulation_broker import SimulatedBroker
 
 # Constants
 INSTRUMENT = Instrument(name="EURUSD", exchange="FOREX", price_increment=Decimal("0.00001"))
-BAR_TYPE = BarType(INSTRUMENT, 30, BarUnit.MINUTE, PriceType.LAST)
+BAR_TYPE = BarType(INSTRUMENT, 30, BarUnit.MINUTE, PriceType.LAST_TRADE)
 
 # helper
 def create_bar(dt: datetime, price: Decimal, high_mod: Decimal = 0.001, low_mod: Decimal = 0.001, close_mod: Decimal = 0) -> Bar:
