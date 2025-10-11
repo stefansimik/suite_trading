@@ -100,7 +100,7 @@ class BacktestReport:
         l = list()
         win_sum = sum({v.get_pnl() for v in self.trades.values() if v.get_pnl() >= Decimal('0')})
         lose_sum = sum({v.get_pnl() for v in self.trades.values() if v.get_pnl() < Decimal('0')})
-        pf = "n/a" if lose_sum == 0 else win_sum / lose_sum * -1
+        pf = 0 if lose_sum == 0 else  (win_sum / lose_sum * -1)
         report.append(f"PF      : {pf:.2f}   W/L PnL : {win_sum:.2f} / {lose_sum:.2f}")
 
         self.log().debug("end calculating report")
