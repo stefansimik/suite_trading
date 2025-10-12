@@ -50,6 +50,17 @@ class OrderBuilder:
         ob = (OrderBuilder(self.cfg.instrument).lmt(OrderSide.SELL, limit_price, quantity)
                     .sl(sl_price, 70).sl(sl_price, 30).tp(tp_price)
                     .build())
+
+    Example with convenient tp setter with risk reward factor
+        ob = (OrderBuilder(self.cfg.instrument).lmt(OrderSide.SELL, limit_price, quantity)
+                    .sl(sl_price).tp_rr(2)
+                    .build())
+        Creates an order with RR 1:2
+
+        ob = (OrderBuilder(self.cfg.instrument).lmt(OrderSide.SELL, limit_price, quantity)
+                    .sl(sl_price).tp_rr(1).tp_rr(2)
+                    .build())
+        Creates 2 TP order with first TP 1RR, second TP 2RR
     """
     def __init__(self, instrument: Instrument):
         self.__created = False
@@ -69,6 +80,7 @@ class OrderBuilder:
         self.__tp_price = []
         self.__tp_quantity_rel_amount = []
         self.__tp_quantity = []
+        self.__tp_rr = []
         self.__trade_id = None
 
     @property
@@ -120,6 +132,16 @@ class OrderBuilder:
         v = partial_quantity if isinstance(partial_quantity, Decimal) else Decimal(str(partial_quantity))
         self.__tp_quantity_rel_amount.append(v)
         self.__tp_quantity.append(Decimal('0')) # will be calculated on build()
+        self.__tp_rr.append(None)
+        return self
+
+    def tp_rr(self, risk_reward: Decimal | float, partial_quantity: Decimal | float = 1) -> OrderBuilder:
+        self.__tp_price.append(None)
+        v = partial_quantity if isinstance(partial_quantity, Decimal) else Decimal(str(partial_quantity))
+        self.__tp_quantity_rel_amount.append(v)
+        self.__tp_quantity.append(Decimal('0'))  # will be calculated on build()
+        v_risk_reward = risk_reward if isinstance(risk_reward, Decimal) else Decimal(str(risk_reward))
+        self.__tp_rr.append(v_risk_reward)
         return self
 
     def risk(self, absolute_risk: Decimal) -> OrderBuilder:
@@ -193,8 +215,9 @@ class OrderBuilder:
                 rel_amount = self.__sl_quantity_rel_amount[i] / sum_sl_quantity_rel_amount
                 # risk / (sl_diff * multiplier)
                 sl_quantity = (self.__risk_absolute / (diff * self.__instrument.contract_value_multiplier)) * rel_amount
-                self.__sl_quantity[i] = sl_quantity
+                self.__sl_quantity[i] = self.__instrument.snap_quantity( sl_quantity )
                 i += 1
+            # sum of sl quantity is the entry quantity
             sum_qu = sum( {v for v in self.__sl_quantity} )
             self.__main_order_quantity = self.__instrument.snap_quantity( sum_qu )
             # calculate the tp quantity
@@ -202,7 +225,7 @@ class OrderBuilder:
             i = 0
             while i < len(self.__tp_price):
                 rel_amount = self.__tp_quantity_rel_amount[i] / sum_tp_quantity_rel_amount
-                tp_quantity = sum_qu * rel_amount
+                tp_quantity = self.__instrument.snap_quantity( self.__main_order_quantity * rel_amount )
                 self.__tp_quantity[i] = tp_quantity
                 i += 1
         else:
@@ -228,6 +251,7 @@ class OrderBuilder:
         return order_list
 
     def _build_tp_order(self) -> List[Order]:
+        self.__calculate_tp_price()
         i = 0
         order_list = []
         while i < len(self.__tp_price):
@@ -239,3 +263,36 @@ class OrderBuilder:
                 order_list.append(tp_order)
             i += 1
         return order_list
+
+    def __calculate_tp_price(self):
+        i = 0
+        price_has_to_be_calculated = False
+        while i < len(self.__tp_price):
+            if self.__tp_price[i] is None:
+                price_has_to_be_calculated = True
+            i += 1
+        if price_has_to_be_calculated:
+            # calculate the risk of all stop losses
+            i = 0
+            total_sl_risk = Decimal('0')
+            while i < len(self.__sl_price):
+                diff = abs(self.__main_lmt_price - self.__sl_price[i])
+                total_sl_risk += Decimal(diff * self.__sl_quantity[i] * self.__instrument.contract_value_multiplier)
+                i += 1
+            # distribute risk on take profit trades
+            sum_quantity = sum( {v for v in self.__tp_quantity} )
+            i = 0
+            while i < len(self.__tp_price):
+                if self.__tp_price[i] is None:
+                    # we need to calculate the price depending on RR (quantity is already given)
+                    # risk / (tp_diff * multiplier) = quantity
+                    # -> risk / (quantity * multiplier) = tp_diff
+                    rel_quant = self.__tp_quantity[i] / sum_quantity
+                    tp_risk = total_sl_risk *  rel_quant * self.__tp_rr[i]
+                    tp_diff = tp_risk / (self.__tp_quantity[i] * self.__instrument.contract_value_multiplier)
+                    if self.__main_order_side == OrderSide.BUY:
+                        price = self.__main_lmt_price + tp_diff
+                    else:
+                        price = self.__main_lmt_price - tp_diff
+                    self.__tp_price[i] = self.__instrument.snap_price(price)
+                i += 1

@@ -4,6 +4,7 @@ import pytest
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderSide
+from suite_trading.domain.order.orders import StopOrder, LimitOrder
 from suite_trading.utils.order_builder import OrderBuilder
 
 # Constants
@@ -75,6 +76,14 @@ def test_main_quantity_given_2_weighted_sl():
     assert ob.trigger_orders[1].quantity == Decimal('0.4')
     assert ob.trigger_orders[2].quantity == Decimal('1.0')
 
+def test_main_quantity_given_2_weighted_sl_uneven_round():
+    ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.BUY, Decimal('1.173'), Decimal(0.33))
+          .sl(Decimal('1.17000'), 80).sl(Decimal('1.17000'), 20).tp(Decimal('1.18')).build())
+    assert ob.main_order.quantity == Decimal('0.33')
+    assert ob.trigger_orders[0].quantity == Decimal('0.26')
+    assert ob.trigger_orders[1].quantity == Decimal('0.07')
+    assert ob.trigger_orders[2].quantity == Decimal('0.33')
+
 def test_main_quantity_given_3_weighted_tp():
     ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.BUY, Decimal('1.173'), Decimal(1.0))
           .sl(Decimal('1.17000')).tp(Decimal('1.181'), 50).tp(Decimal('1.182'), 40).tp(Decimal('1.183'), 10).build())
@@ -84,3 +93,50 @@ def test_main_quantity_given_3_weighted_tp():
     assert ob.trigger_orders[2].quantity == Decimal('0.4')
     assert ob.trigger_orders[3].quantity == Decimal('0.1')
 
+def test_main_quantity_given_2_weighted_tp_rounding():
+    ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.BUY, Decimal('1.173'), Decimal(0.33))
+          .sl(Decimal('1.17000')).tp(Decimal('1.181'), 80).tp(Decimal('1.182'), 20).build())
+    assert ob.main_order.quantity == Decimal('0.33')
+    assert ob.trigger_orders[0].quantity == Decimal('0.33')
+    assert ob.trigger_orders[1].quantity == Decimal('0.26')
+    assert ob.trigger_orders[2].quantity == Decimal('0.07')
+
+def test_risk_1_tp_rr():
+    ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.BUY, Decimal('1.173'))
+          .risk(Decimal('100'))
+          .sl(Decimal('1.17000')).tp_rr(2).build())
+    assert ob.main_order.quantity == Decimal('0.33')
+    assert ob.trigger_orders[0].quantity == Decimal('0.33')
+    assert ob.trigger_orders[1].quantity == Decimal('0.33')
+    assert isinstance(ob.trigger_orders[1], LimitOrder)
+    if isinstance( ob.trigger_orders[1], LimitOrder):
+        assert ob.trigger_orders[1].limit_price == Decimal('1.17900')
+
+def test_risk_2_tp_rr():
+    ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.BUY, Decimal('1.173'))
+          .risk(Decimal('100'))
+          .sl(Decimal('1.17000')).tp_rr(1).tp_rr(2).build())
+    assert ob.main_order.quantity == Decimal('0.33')
+    assert ob.trigger_orders[0].quantity == Decimal('0.33')
+    assert ob.trigger_orders[1].quantity == Decimal('0.33')
+    assert isinstance(ob.trigger_orders[1], LimitOrder)
+    if isinstance( ob.trigger_orders[1], LimitOrder):
+        assert ob.trigger_orders[1].limit_price == Decimal('1.17600')
+    assert isinstance(ob.trigger_orders[2], LimitOrder)
+    if isinstance(ob.trigger_orders[2], LimitOrder):
+        assert ob.trigger_orders[2].limit_price == Decimal('1.17900')
+
+def test_risk_2_tp_rr_weight():
+    ob = (OrderBuilder(INSTRUMENT).lmt(OrderSide.BUY, Decimal('1.173'))
+          .risk(Decimal('100'))
+          .sl(Decimal('1.17000')).tp_rr(1, 80).tp_rr(2, 20).build())
+    assert ob.main_order.quantity == Decimal('0.33')
+    assert ob.trigger_orders[0].quantity == Decimal('0.33')
+    assert ob.trigger_orders[1].quantity == Decimal('0.26')
+    assert ob.trigger_orders[2].quantity == Decimal('0.07')
+    assert isinstance(ob.trigger_orders[1], LimitOrder)
+    if isinstance( ob.trigger_orders[1], LimitOrder):
+        assert ob.trigger_orders[1].limit_price == Decimal('1.17600')
+    assert isinstance(ob.trigger_orders[2], LimitOrder)
+    if isinstance(ob.trigger_orders[2], LimitOrder):
+        assert ob.trigger_orders[2].limit_price == Decimal('1.17900')
