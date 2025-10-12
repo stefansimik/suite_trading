@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from suite_trading.domain.market_data.bar.bar_type import BarType
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.domain.market_data.bar.bar_accumulator import BarAccumulator
 
 
@@ -32,14 +32,14 @@ class NewBarEventAccumulator:
         """Return True if at least one event has been added."""
         return self._bar_accumulator.has_data()
 
-    def add(self, event: NewBarEvent) -> None:
+    def add(self, event: BarEvent) -> None:
         """Add a NewBarEvent and update OHLCV and metadata.
 
         Args:
-            event (NewBarEvent): Input event to accumulate.
+            event (BarEvent): Input event to accumulate.
         """
         # Check: ensure $event is a NewBarEvent instance to maintain type safety
-        if not isinstance(event, NewBarEvent):
+        if not isinstance(event, BarEvent):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.add` because $event (class '{type(event).__name__}') is not a NewBarEvent")
 
         self._bar_accumulator.add(event.bar)
@@ -53,7 +53,7 @@ class NewBarEventAccumulator:
         end_dt: datetime | None,
         *,
         is_partial: bool,
-    ) -> NewBarEvent:
+    ) -> BarEvent:
         """Create a NewBarEvent using last included event metadata and aggregated Bar.
 
         Args:
@@ -63,7 +63,7 @@ class NewBarEventAccumulator:
             is_partial (bool): Whether the aggregated window is partial.
 
         Returns:
-            NewBarEvent: Aggregated event with propagated metadata.
+            BarEvent: Aggregated event with propagated metadata.
         """
         bar = self._bar_accumulator.build_bar(out_bar_type, start_dt, end_dt, is_partial=is_partial)
 
@@ -71,7 +71,7 @@ class NewBarEventAccumulator:
         if self._last_dt_received is None or self._last_is_historical is None:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.build_event` because missing metadata: $last_dt_received ('{self._last_dt_received}'), $last_is_historical ('{self._last_is_historical}')")
 
-        return NewBarEvent(bar=bar, dt_received=self._last_dt_received, is_historical=self._last_is_historical)
+        return BarEvent(bar=bar, dt_received=self._last_dt_received, is_historical=self._last_is_historical)
 
     # endregion
 

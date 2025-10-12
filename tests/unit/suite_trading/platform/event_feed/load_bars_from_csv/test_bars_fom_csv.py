@@ -7,7 +7,7 @@ from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.platform.event_feed.bars_from_dataframe_event_feed import BarsFromDataFrameEventFeed
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -46,7 +46,7 @@ class DemoStrategy(Strategy):
 
     # Standard callback for all events
     def on_event(self, event):
-        if isinstance(event, NewBarEvent):
+        if isinstance(event, BarEvent):
             self._bars_processed += 1
             logger.debug(f"Processed bar #{self._bars_processed}: {event.bar}")
         else:

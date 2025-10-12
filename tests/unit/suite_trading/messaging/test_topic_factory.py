@@ -1,7 +1,7 @@
 from suite_trading.platform.messaging.topic_factory import TopicFactory
 from suite_trading.platform.messaging.message_bus import MessageBus
 from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import BarEvent
 
 
 def test_topic_protocol_create_topic_for_bar():
@@ -17,7 +17,7 @@ def test_topic_protocol_create_topic_for_bar():
 
 
 def test_message_bus_publish_bar_event():
-    """Test publishing a NewBarEvent to MessageBus using TopicFactory topic."""
+    """Test publishing a BarEvent to MessageBus using TopicFactory topic."""
     # Create a message bus
     msg_bus = MessageBus()
 
@@ -48,14 +48,14 @@ def test_message_bus_publish_bar_event():
     msg_bus.subscribe(topic, on_bar_event)
 
     # Publish the bar event
-    event = NewBarEvent(
+    event = BarEvent(
         bar=bar,
         dt_received=datetime.now(tz=timezone.utc),
         is_historical=True,
     )
     msg_bus.publish(topic, event)
 
-    # Verify that the callback was called with the correct NewBarEvent
+    # Verify that the callback was called with the correct BarEvent
     assert callback_called, "Callback was not called"
-    assert isinstance(received_event, NewBarEvent), "Received event is not a NewBarEvent"
+    assert isinstance(received_event, BarEvent), "Received event is not a BarEvent"
     assert received_event.bar == bar, "Received bar does not match published bar"

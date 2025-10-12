@@ -1,12 +1,7 @@
 from __future__ import annotations
-
 from collections.abc import Iterator
 from typing import Protocol, runtime_checkable
-
 from suite_trading.domain.market_data.price_sample import PriceSample
-
-
-# region PriceEvent API
 
 
 @runtime_checkable
@@ -26,6 +21,3 @@ class PriceEvent(Protocol):
     def iter_price_samples(self) -> Iterator[PriceSample]:
         """Yield `PriceSample` items in deterministic order."""
         ...
-
-
-# endregion

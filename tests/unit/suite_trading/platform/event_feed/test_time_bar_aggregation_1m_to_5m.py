@@ -5,7 +5,7 @@ from typing import Iterable
 import pytest
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
+from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import (
     FixedSequenceEventFeed,
@@ -46,7 +46,7 @@ class TestStrategy(Strategy):
         self.add_event_feed("agg_5m", agg)
 
     def on_event(self, event) -> None:
-        if not isinstance(event, NewBarEvent):
+        if not isinstance(event, BarEvent):
             logger.debug(f"Received non-bar event (ignored): {event}")
             return
 
@@ -74,7 +74,7 @@ def build_feed_from_minute_ends(
         unit_minutes: Bar unit size in minutes (1 for input series).
 
     Returns:
-        FixedSequenceEventFeed of NewBarEvent(s) in the exact provided order.
+        FixedSequenceEventFeed of BarEvent(s) in the exact provided order.
     """
     bt = create_bar_type(value=unit_minutes, unit=BarUnit.MINUTE)
     bars = [

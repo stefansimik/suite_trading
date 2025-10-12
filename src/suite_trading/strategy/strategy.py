@@ -234,7 +234,7 @@ class Strategy(ABC):
         by all strategy subclasses to handle all types of events.
 
         Args:
-            event (Event): The complete event wrapper (NewBarEvent, NewTradeTickEvent, etc.)
+            event (Event): The complete event wrapper (BarEvent, TradeTickEvent, etc.)
         """
         pass
 

@@ -122,7 +122,7 @@ class TopicFactory:
         Generate standardized topics for any event type and parameters.
 
         Args:
-            event_type: The event class (e.g., NewBarEvent, NewCalendarEvent)
+            event_type: The event class (e.g., BarEvent, NewCalendarEvent)
             parameters: Dict containing event-specific parameters
 
         Returns:
@@ -150,12 +150,12 @@ class TopicFactory:
 
     @staticmethod
     def create_topic_for_newbarevent(request_details: dict) -> str:
-        """Create topic for NewBarEvent using request_details dict."""
+        """Create topic for BarEvent using request_details dict."""
         bar_type = request_details.get("bar_type")
         if bar_type:
             return TopicFactory.create_topic_from_parts(
                 ["bar", str(bar_type.instrument).lower(), f"{bar_type.value}-{bar_type.unit.name.lower()}", bar_type.price_type.name.lower()],
             )
-        raise ValueError("$bar_type is required in $request_details for NewBarEvent")
+        raise ValueError("$bar_type is required in $request_details for BarEvent")
 
     # endregion

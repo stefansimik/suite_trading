@@ -140,18 +140,20 @@ from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.platform.event_feed.bars_from_dataframe_event_feed import (
     BarsFromDataFrameEventFeed,
 )
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.strategy.strategy import Strategy
 
+
 logger = logging.getLogger(__name__)
 
 CSV_PATH = Path(__file__).with_name("demo_bars.csv")
 INSTRUMENT = Instrument("EURUSD", "FOREX", 0.00001, 1)
 BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
+
 
 class CsvStrategy(Strategy):
     def __init__(self, name: str) -> None:
@@ -164,9 +166,10 @@ class CsvStrategy(Strategy):
         self.add_event_feed("bars_from_csv", feed)
 
     def on_event(self, event):
-        if isinstance(event, NewBarEvent):
+        if isinstance(event, BarEvent):
             self._count += 1
             logger.debug(f"Processed bar #{self._count}: {event.bar}")
+
 
 engine = TradingEngine()
 engine.add_strategy(CsvStrategy(name="csv_demo"))
@@ -201,7 +204,7 @@ self.add_event_feed("historical_data", feed)
 
 ```python
 from suite_trading.utils.data_generation.bar_generation import DEFAULT_FIRST_BAR, create_bar_series
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
+from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 
 
@@ -250,7 +253,7 @@ Inspired by `tests/unit/.../test_time_bar_aggregation_event_feed.py`
 ```python
 from datetime import datetime, timezone
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
+from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.platform.event_feed.time_bar_aggregation_event_feed import (
@@ -283,7 +286,7 @@ class AggregationStrategy(Strategy):
         self.add_event_feed("5m", agg)
 
     def on_event(self, event):
-        if isinstance(event, NewBarEvent):
+        if isinstance(event, BarEvent):
             unit = event.bar.bar_type.unit
             if unit == BarUnit.MINUTE:
                 if int(event.bar.bar_type.value) == 1:

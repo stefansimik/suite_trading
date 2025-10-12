@@ -7,7 +7,7 @@ from suite_trading.domain.market_data.tick.trade_tick import TradeTick
 from suite_trading.utils.datetime_utils import format_dt
 
 
-class NewTradeTickEvent(Event):
+class TradeTickEvent(Event):
     """Event wrapper carrying trade tick data with system metadata.
 
     This event represents the arrival of new trade tick data in the trading system.
@@ -66,6 +66,6 @@ class NewTradeTickEvent(Event):
         Returns:
             bool: True if trade tick events are equal, False otherwise.
         """
-        if not isinstance(other, NewTradeTickEvent):
+        if not isinstance(other, TradeTickEvent):
             return False
         return self.trade_tick == other.trade_tick and self.dt_received == other.dt_received

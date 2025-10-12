@@ -54,7 +54,7 @@ class EventFeedProvider(Protocol):
         EventFeedManager, not by the feed object itself.
 
         Args:
-            event_type: The type of events requested (e.g., NewBarEvent).
+            event_type: The type of events requested (e.g., BarEvent).
             parameters: Provider-specific configuration for the feed.
             callback: Function to be called when new events are delivered.
 

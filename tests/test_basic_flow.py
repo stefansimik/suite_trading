@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
+from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.utils.data_generation.bar_generation import create_bar_series
@@ -30,7 +30,7 @@ class DemoStrategy(Strategy):
 
     # Standard callback for all events
     def on_event(self, event):
-        if isinstance(event, NewBarEvent):
+        if isinstance(event, BarEvent):
             self.on_bar(event.bar)  # Dispatch to custom callback
         else:
             # Handle all other events here

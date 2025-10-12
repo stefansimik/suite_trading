@@ -5,7 +5,7 @@ from typing import Iterable, NamedTuple
 import pytest
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent, wrap_bars_to_events
+from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import (
     FixedSequenceEventFeed,
@@ -115,7 +115,7 @@ class TestStrategy(Strategy):
         self.add_event_feed("agg", agg)
 
     def on_event(self, event) -> None:
-        if not isinstance(event, NewBarEvent):
+        if not isinstance(event, BarEvent):
             logger.debug(f"Received non-bar event (ignored): {event}")
             return
 

@@ -4,7 +4,7 @@ from typing import Callable, Deque, Optional
 import logging
 
 from suite_trading.domain.event import Event
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.utils.datetime_utils import require_utc
 from suite_trading.domain.market_data.bar.time_bar_resampler import TimeBarResampler
@@ -64,7 +64,7 @@ class TimeBarAggregationEventFeed:
         self._resampler = TimeBarResampler(unit=self._unit, size=self._size, on_emit_callback=self.on_aggregated_event)
 
         # AGGREGATED EVENTS
-        self._aggregated_event_queue: Deque[NewBarEvent] = deque()  # Aggregated bar events are stored in this queue
+        self._aggregated_event_queue: Deque[BarEvent] = deque()  # Aggregated bar events are stored in this queue
         self.emitted_event_count: int = 0
 
     # endregion
@@ -72,18 +72,18 @@ class TimeBarAggregationEventFeed:
     # region Listener
 
     def on_source_event(self, event: Event) -> None:
-        """Ingest a NewBarEvent from $source_feed and forward to `TimeBarResampler`.
+        """Ingest a BarEvent from $source_feed and forward to `TimeBarResampler`.
 
         Args:
-            event (Event): Must be a NewBarEvent; otherwise a ValueError is raised.
+            event (Event): Must be a BarEvent; otherwise a ValueError is raised.
         """
         # If closed, ignore events
         if self._closed:
             return
 
-        # Check: We are processing NewBarEvent(s). Other events are not expected
-        if not isinstance(event, NewBarEvent):
-            raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $event (class '{type(event).__name__}') is not a NewBarEvent. Register this feed on an EventFeed that produces NewBarEvent(s).")
+        # Check: We are processing BarEvent(s). Other events are not expected
+        if not isinstance(event, BarEvent):
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $event (class '{type(event).__name__}') is not a BarEvent. Register this feed on an EventFeed that produces BarEvent(s).")
 
         # Delegate to resampler which will invoke `on_aggregated_event` on window emissions
         self._resampler.add_event(event)
@@ -92,15 +92,15 @@ class TimeBarAggregationEventFeed:
 
     # region Resampler callback
 
-    def on_aggregated_event(self, evt: NewBarEvent) -> None:
+    def on_aggregated_event(self, evt: BarEvent) -> None:
         """Handle aggregated bar from `TimeBarResampler` and apply partial-bar policy.
 
         Purpose:
-            - Aggregation path: the resampler emits a NewBarEvent for the configured
+            - Aggregation path: the resampler emits a BarEvent for the configured
               (unit,size) window, and this feed decides whether to enqueue it.
 
         Args:
-            evt (NewBarEvent): Aggregated bar event (may be partial).
+            evt (BarEvent): Aggregated bar event (may be partial).
         """
         is_partial = evt.bar.is_partial
         is_first = self.emitted_event_count == 0

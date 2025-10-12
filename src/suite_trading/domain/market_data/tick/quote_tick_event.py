@@ -10,7 +10,7 @@ from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.utils.datetime_utils import format_dt
 
 
-class NewQuoteTickEvent(Event):
+class QuoteTickEvent(Event):
     """Event wrapper carrying quote tick data with system metadata.
 
     This event represents the arrival of new quote tick data in the trading system.
@@ -85,7 +85,7 @@ class NewQuoteTickEvent(Event):
         Returns:
             bool: True if quote tick events are equal, False otherwise.
         """
-        if not isinstance(other, NewQuoteTickEvent):
+        if not isinstance(other, QuoteTickEvent):
             return False
         return self.quote_tick == other.quote_tick and self.dt_received == other.dt_received
 

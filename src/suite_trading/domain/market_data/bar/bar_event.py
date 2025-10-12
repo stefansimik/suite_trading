@@ -14,7 +14,7 @@ from suite_trading.utils.datetime_utils import format_dt
 # region Class
 
 
-class NewBarEvent(Event):
+class BarEvent(Event):
     """Event wrapper carrying bar data with system metadata.
 
     This event represents the arrival of new bar data in the trading system.
@@ -153,7 +153,7 @@ class NewBarEvent(Event):
         Returns:
             bool: True if bar events are equal, False otherwise.
         """
-        if not isinstance(other, NewBarEvent):
+        if not isinstance(other, BarEvent):
             return False
         return self.bar == other.bar and self.dt_received == other.dt_received and self.is_historical == other.is_historical
 
@@ -168,17 +168,17 @@ def wrap_bars_to_events(
     *,
     is_historical: bool = True,
     dt_received_getter: Callable[[Bar], datetime] | None = None,
-) -> Iterator[NewBarEvent]:
-    """Wrap $bars into $NewBarEvent(s) with predictable $dt_received defaults.
+) -> Iterator[BarEvent]:
+    """Wrap $bars into $BarEvent(s) with predictable $dt_received defaults.
 
     Args:
         bars: Iterable of $Bar instances to wrap.
-        is_historical: Whether produced $NewBarEvent(s) represent historical data.
+        is_historical: Whether produced $BarEvent(s) represent historical data.
         dt_received_getter: Function mapping a $Bar to its $dt_received timestamp.
             Defaults to bar.end_dt for deterministic historical usage.
 
     Returns:
-        Iterator[NewBarEvent]: A lazy iterator of wrapped events.
+        Iterator[BarEvent]: A lazy iterator of wrapped events.
 
     Example:
         feed = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(num_bars=20)))
@@ -188,7 +188,7 @@ def wrap_bars_to_events(
 
     for b in bars:
         # Check: ensure dt_received is provided via getter per bar for clarity
-        yield NewBarEvent(bar=b, dt_received=dt_received_getter(b), is_historical=is_historical)
+        yield BarEvent(bar=b, dt_received=dt_received_getter(b), is_historical=is_historical)
 
 
 # endregion

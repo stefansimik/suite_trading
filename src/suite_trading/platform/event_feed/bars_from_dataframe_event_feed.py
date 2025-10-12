@@ -9,7 +9,7 @@ import pandas as pd
 
 from suite_trading.utils.datetime_utils import require_utc
 from suite_trading.domain.event import Event
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 
@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 class BarsFromDataFrameEventFeed:
-    """Stream historical `NewBarEvent`(s) from a pandas DataFrame.
+    """Stream historical `BarEvent`(s) from a pandas DataFrame.
 
-    - This EventFeed reads one row per bar and emits `NewBarEvent` with $is_historical=True.
+    - This EventFeed reads one row per bar and emits `BarEvent` with $is_historical=True.
 
     Input DataFrame has to meet these requirements:
     - Columns: start_dt, end_dt, open, high, low, close. Optional: volume.
@@ -44,7 +44,7 @@ class BarsFromDataFrameEventFeed:
         Args:
         - $df (pd.DataFrame): Source data with one row per bar. See class docstring for DataFrame requirements.
         - $bar_type (BarType): Identifies instrument, timeframe, and price type for all bars.
-        - $metadata (dict | None): Optional metadata attached to each emitted `NewBarEvent`.
+        - $metadata (dict | None): Optional metadata attached to each emitted `BarEvent`.
         - $auto_sort (bool): When True (default), automatically sort $df by 'end_dt' ascending if
           it is not already monotonic non-decreasing. The input DataFrame is not mutated; a sorted
           copy is used internally.
@@ -199,7 +199,7 @@ class BarsFromDataFrameEventFeed:
     # region Internal helpers
 
     def _build_event_from_row(self, row: pd.Series) -> Event:
-        """Build a NewBarEvent from a DataFrame row.
+        """Build a BarEvent from a DataFrame row.
 
         The Bar constructor will validate domain constraints; we pass values through as-is.
         """
@@ -214,7 +214,7 @@ class BarsFromDataFrameEventFeed:
             volume=row["volume"] if "volume" in row.index else None,
         )
         # For historical data, set dt_received equal to dt_event (bar end)
-        event = NewBarEvent(bar=bar, dt_received=row["end_dt"], is_historical=True)
+        event = BarEvent(bar=bar, dt_received=row["end_dt"], is_historical=True)
         return event
 
     # endregion

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Callable, Optional, Tuple
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
-from suite_trading.domain.market_data.bar.bar_event import NewBarEvent
+from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.utils.datetime_utils import require_utc
 from suite_trading.utils.math import ceil_to_multiple
 from suite_trading.domain.market_data.bar.new_bar_event_accumulator import NewBarEventAccumulator
@@ -15,8 +15,8 @@ class TimeBarResampler:
     """Resample time-based Bars into right-closed windows of (unit,size).
 
     Purpose:
-        Aggregate incoming `NewBarEvent` objects carrying time-based Bars into fixed
-        windows aligned to UTC day boundaries. Emit a `NewBarEvent` for each window when it
+        Aggregate incoming `BarEvent` objects carrying time-based Bars into fixed
+        windows aligned to UTC day boundaries. Emit a `BarEvent` for each window when it
         closes on its boundary or when input jumps to a new window. The aggregated Bar
         includes `is_partial` metadata and the emitted event propagates latency from the
         last included input event.
@@ -31,13 +31,13 @@ class TimeBarResampler:
     Args:
         $unit (BarUnit): Target time unit (SECOND, MINUTE, HOUR, DAY).
         $size (int): Positive integer window size in $unit.
-        $on_emit_callback (Callable[[NewBarEvent], None]): Callback invoked with aggregated
+        $on_emit_callback (Callable[[BarEvent], None]): Callback invoked with aggregated
             bar events.
     """
 
     # region Init
 
-    def __init__(self, *, unit: BarUnit, size: int, on_emit_callback: Callable[[NewBarEvent], None]) -> None:
+    def __init__(self, *, unit: BarUnit, size: int, on_emit_callback: Callable[[BarEvent], None]) -> None:
         # Check: size must be > 0
         if not isinstance(size, int) or size <= 0:
             raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $size ('{size}') is not > 0")
@@ -69,8 +69,8 @@ class TimeBarResampler:
 
     # region Main logic
 
-    def add_event(self, event: NewBarEvent) -> None:
-        """Consume a `NewBarEvent` and resample it into aggregated time bars.
+    def add_event(self, event: BarEvent) -> None:
+        """Consume a `BarEvent` and resample it into aggregated time bars.
 
         Behavior:
         - Enforce ordering.
@@ -82,7 +82,7 @@ class TimeBarResampler:
         - If the current Bar ends exactly at $window_end, emit aggregated window (including current).
 
         Args:
-            $event (NewBarEvent): Input event carrying a time-based Bar.
+            $event (BarEvent): Input event carrying a time-based Bar.
         """
         self._validate_event_and_ordering(event)
         if self._input_bar_seconds is None:
@@ -125,15 +125,15 @@ class TimeBarResampler:
 
     # region Validations
 
-    def _validate_event_and_ordering(self, event: NewBarEvent) -> None:
-        if not isinstance(event, NewBarEvent):
-            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $event (class '{type(event).__name__}') is not a NewBarEvent")
+    def _validate_event_and_ordering(self, event: BarEvent) -> None:
+        if not isinstance(event, BarEvent):
+            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $event (class '{type(event).__name__}') is not a BarEvent")
 
         bar = event.bar
         if self._last_bar_end_dt is not None and bar.end_dt < self._last_bar_end_dt:
             raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $bar.end_dt ('{bar.end_dt}') is older than previous input ('{self._last_bar_end_dt}')")
 
-    def _validate_first_source_and_compatibility(self, event: NewBarEvent) -> None:
+    def _validate_first_source_and_compatibility(self, event: BarEvent) -> None:
         # Require time-based bars
         bar = event.bar
         if bar.unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY}:
@@ -190,7 +190,7 @@ class TimeBarResampler:
         return self._event_accumulator.count < full_window_bar_count
 
     def _emit_window(self, window_start: datetime, window_end: datetime) -> None:
-        """Build and emit an aggregated NewBarEvent for the given window bounds."""
+        """Build and emit an aggregated BarEvent for the given window bounds."""
         # Derive output bar type aligned to target window size
         first_bar_type = self._event_accumulator.first_bar_type
         if first_bar_type is None:
