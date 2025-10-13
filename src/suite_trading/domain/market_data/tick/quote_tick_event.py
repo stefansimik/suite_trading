@@ -54,7 +54,7 @@ class QuoteTickEvent(Event):
         """
         return self.quote_tick.timestamp
 
-    # region PriceEvent implementation
+    # region PriceSampleSource implementation
 
     def iter_price_samples(self) -> Iterator[PriceSample]:
         """Yield BID then ASK `PriceSample` from $quote_tick in deterministic order."""

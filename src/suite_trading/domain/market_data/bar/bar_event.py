@@ -72,13 +72,13 @@ class BarEvent(Event):
         """
         return self.bar.end_dt
 
-    # region PriceEvent implementation
+    # region PriceSampleSource implementation
 
-    # TODO: We should remove the PriceEvent protocol from all Event(s) and move the responsibility into some sort configurable PriceDecompositionModel
+    # TODO: We should remove the PriceSampleSource protocol from all Event(s) and move the responsibility into some sort configurable PriceDecompositionModel
     #  that will be part of Order-Price matching engine
     #  Main point is, that it is not responsibility of Event to decompose the order of prices for order-fills simulation.
     #  Event just has to carry the informations, nothing more.
-    #  Then, we probably don't need this implementation of PriceEvent at all, as Order-Price matching engine
+    #  Then, we probably don't need this implementation of PriceSampleSource at all, as Order-Price matching engine
     #  can automatically do this:
     #       1. it checks the type of structure (Bar / Trade+Quote ticks)
     #       2. it decomposes them into PriceSamples (or ideally some OrderBook type of structure, which is most precise structure for simulating order-fills)
