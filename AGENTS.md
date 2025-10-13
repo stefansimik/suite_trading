@@ -329,6 +329,59 @@ class QuoteTick(Event):
     )
 ```
 
+## 2.13 Comparison and sorting (total ordering)
+
+Rule: For any custom comparable type, implement full ordering with `@total_ordering`.
+
+Requirements:
+- Implement `__lt__` and ensure `__eq__` is defined. For Enum types, `Enum.__eq__` is enough.
+- If $other is a different type, return `NotImplemented` from the comparison methods.
+- Put ordering in one place (a precedence map or a key function); do not duplicate logic.
+- Annotate returns as `bool | NotImplementedType`.
+- Keep methods short and readable. Follow 2.1 naming and 2.11 typing.
+
+Example (current `PriceType` implementation):
+```python
+from __future__ import annotations
+from enum import Enum
+from functools import total_ordering
+from types import NotImplementedType
+
+@total_ordering
+class PriceType(Enum):
+    BID = "BID"
+    ASK = "ASK"
+    MID = "MID"
+    LAST_TRADE = "LAST_TRADE"
+
+    def __lt__(self, other: object) -> bool | NotImplementedType:
+        if not isinstance(other, PriceType):
+            return NotImplemented
+        return _PRICE_TYPE_ORDER[self] < _PRICE_TYPE_ORDER[other]
+
+# Single source of truth for ordering: defined once and reused
+_PRICE_TYPE_ORDER = {
+    PriceType.BID: 0,
+    PriceType.ASK: 1,
+    PriceType.MID: 2,
+    PriceType.LAST_TRADE: 3,
+}
+```
+
+Notes:
+- `__eq__` is provided by `Enum` (identity comparison), which satisfies `@total_ordering`.
+
+Why `NotImplemented`?
+- It enables Python's reflected operations and correct type dispatch during comparisons.
+
+Acceptance checks:
+- [ ] Class is decorated with `@total_ordering`.
+- [ ] `__lt__` returns `NotImplemented` when $other is not the same type.
+- [ ] Ordering uses a single precedence map/key defined once (not recreated per call).
+- [ ] Return type hints include `NotImplementedType`.
+- [ ] Module starts with `from __future__ import annotations`.
+- [ ] If using `Enum`, relying on its `__eq__` is acceptable; otherwise implement `__eq__`.
+
 # 3. Code organization (supporting)
 
 ## 3.1 Regions

@@ -3,12 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
+from functools import total_ordering
+from types import NotImplementedType
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.utils.datetime_utils import format_dt
 
 
+@total_ordering
 class PriceSample:
     """A single observed price for an Instrument at a moment in time.
 
@@ -56,21 +59,30 @@ class PriceSample:
 
     # region Magic
 
-    def __eq__(self, other: Any) -> bool:  # type: ignore[override]
+    def __eq__(self, other: Any) -> bool:
         if other is self:
             return True
         if not isinstance(other, PriceSample):
             return False
         return self.instrument == other.instrument and self.dt_event == other.dt_event and self.price_type == other.price_type
 
-    def __hash__(self) -> int:  # type: ignore[override]
+    def __hash__(self) -> int:
         return hash((self.instrument, self.dt_event, self.price_type))
 
-    def __str__(self) -> str:  # type: ignore[override]
+    def __lt__(self, other: Any) -> bool | NotImplementedType:
+        if not isinstance(other, PriceSample):
+            return NotImplemented
+        return (self.dt_event, str(self.instrument), self.price_type) < (
+            other.dt_event,
+            str(other.instrument),
+            other.price_type,
+        )
+
+    def __str__(self) -> str:
         at = format_dt(self.dt_event)
         return f"{self.__class__.__name__}(instrument={self.instrument}, at={at}, type={self.price_type}, price={self.price})"
 
-    def __repr__(self) -> str:  # type: ignore[override]
+    def __repr__(self) -> str:
         at = format_dt(self.dt_event)
         return f"{self.__class__.__name__}(instrument={self.instrument!r}, dt_event={at!s}, price_type={self.price_type!r}, price={self.price!r})"
 
