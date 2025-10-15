@@ -27,7 +27,7 @@ class Execution:
         quantity (Decimal): The quantity that was executed in this fill.
         price (Decimal): The price at which this execution occurred.
         timestamp (datetime): When this execution occurred.
-        id (str): Unique identifier for this execution.
+        order_id (str): Unique identifier for this execution.
         commission (Decimal): Commission/fees charged for this execution.
 
     Properties:
@@ -199,7 +199,7 @@ class Execution:
             raise ValueError(f"Execution $quantity ({self._quantity}) cannot exceed order unfilled quantity ({self._order.unfilled_quantity})")
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id})"
+        return f"{self.__class__.__name__}(order_id={self.id})"
 
     def __repr__(self) -> str:
         """Return a string representation of the execution.
@@ -207,7 +207,7 @@ class Execution:
         Returns:
             str: String representation of the execution.
         """
-        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
+        return f"{self.__class__.__name__}(order_id={self.id}, order_id={self.order.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another execution.

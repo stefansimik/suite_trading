@@ -23,7 +23,7 @@ class Order:
         executions (List[Execution]): List of executions for this order, in chronological order.
 
     Properties:
-        id (str): Unique identifier for the order (read-only).
+        order_id (str): Unique identifier for the order (read-only).
         instrument (Instrument): The financial instrument to trade (read-only).
         side (OrderSide): Whether this is a BUY or SELL order (read-only).
         quantity (Decimal): The quantity to trade (read-only).
@@ -36,7 +36,7 @@ class Order:
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        id: Optional[str] = None,
+        order_id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         strategy: Optional[Strategy] = None,
     ):
@@ -46,12 +46,12 @@ class Order:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
-            id (str, optional): Unique identifier for the order. If None, generates a new ID.
+            order_id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
         # Order identification (private attributes with public properties)
-        self._id = str(id) if id is not None else str(get_next_id())
+        self._order_id = str(order_id) if order_id is not None else str(get_next_id())
 
         # Trading details (private attributes with public properties)
         self._instrument = instrument
@@ -76,13 +76,13 @@ class Order:
         self._validate()
 
     @property
-    def id(self) -> str:
+    def order_id(self) -> str:
         """Get the unique identifier for the order.
 
         Returns:
             str: The order ID.
         """
-        return self._id
+        return self._order_id
 
     @property
     def instrument(self) -> Instrument:
@@ -168,7 +168,7 @@ class Order:
             ValueError: If the execution is not for this order.
         """
         if execution.order != self:
-            raise ValueError(f"Execution order with $order_id = '{execution.order.id}' does not match this order with $id = '{self.id}'")
+            raise ValueError(f"Execution order with $order_id = '{execution.order.order_id}' does not match this order with $order_id = '{self.order_id}'")
 
         self.executions.append(execution)
 
@@ -211,10 +211,10 @@ class Order:
             raise ValueError(f"$filled_quantity ({self.filled_quantity}) cannot exceed $quantity ({self.quantity})")
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
+        return f"{self.__class__.__name__}(order_id={self.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
+        return f"{self.__class__.__name__}(order_id={self.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another order.
@@ -227,7 +227,7 @@ class Order:
         """
         if not isinstance(other, Order):
             return False
-        return self.id == other.id
+        return self.order_id == other.order_id
 
 
 class MarketOrder(Order):
@@ -242,7 +242,7 @@ class MarketOrder(Order):
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        id: Optional[str] = None,
+        order_id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         strategy: Optional[Strategy] = None,
     ):
@@ -252,11 +252,11 @@ class MarketOrder(Order):
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
-            id (str, optional): Unique identifier for the order. If None, generates a new ID.
+            order_id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
-        super().__init__(instrument, side, quantity, id, time_in_force, strategy)
+        super().__init__(instrument, side, quantity, order_id, time_in_force, strategy)
 
 
 class LimitOrder(Order):
@@ -275,7 +275,7 @@ class LimitOrder(Order):
         side: OrderSide,
         quantity: Decimal,
         limit_price: Decimal,
-        id: Optional[str] = None,
+        order_id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         strategy: Optional[Strategy] = None,
     ):
@@ -286,7 +286,7 @@ class LimitOrder(Order):
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             limit_price (Decimal): The limit price for the order.
-            id (str, optional): Unique identifier for the order. If None, generates a new ID.
+            order_id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
@@ -294,7 +294,7 @@ class LimitOrder(Order):
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, strategy)
+        super().__init__(instrument, side, quantity, order_id, time_in_force, strategy)
 
     @property
     def limit_price(self) -> Decimal:
@@ -335,7 +335,7 @@ class StopOrder(Order):
         side: OrderSide,
         quantity: Decimal,
         stop_price: Decimal,
-        id: Optional[str] = None,
+        order_id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         strategy: Optional[Strategy] = None,
     ):
@@ -346,7 +346,7 @@ class StopOrder(Order):
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
             stop_price (Decimal): The stop price for the order.
-            id (str, optional): Unique identifier for the order. If None, generates a new ID.
+            order_id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
@@ -354,7 +354,7 @@ class StopOrder(Order):
         self._stop_price = instrument.snap_price(stop_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, strategy)
+        super().__init__(instrument, side, quantity, order_id, time_in_force, strategy)
 
     @property
     def stop_price(self) -> Decimal:
@@ -397,7 +397,7 @@ class StopLimitOrder(Order):
         quantity: Decimal,
         stop_price: Decimal,
         limit_price: Decimal,
-        id: Optional[str] = None,
+        order_id: Optional[str] = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         strategy: Optional[Strategy] = None,
     ):
@@ -409,7 +409,7 @@ class StopLimitOrder(Order):
             quantity (Decimal): The quantity to trade.
             stop_price (Decimal): The stop price that triggers the order.
             limit_price (Decimal): The limit price for the order once triggered.
-            id (str, optional): Unique identifier for the order. If None, generates a new ID.
+            order_id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
@@ -418,7 +418,7 @@ class StopLimitOrder(Order):
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, strategy)
+        super().__init__(instrument, side, quantity, order_id, time_in_force, strategy)
 
     @property
     def stop_price(self) -> Decimal:
