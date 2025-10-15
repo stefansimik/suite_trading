@@ -677,18 +677,19 @@ class TradingEngine:
 
     # region Orders
 
-    def submit_order(self, order: Order, broker: Broker) -> None:
-        """Send an order to your broker.
+    def submit_order(self, order: Order, broker: Broker, strategy: Strategy) -> None:
+        """Send an order to your broker on behalf of $strategy.
 
         Args:
             order: The order to submit.
             broker: The broker to use.
+            strategy: The Strategy submitting the order.
 
         Raises:
             ConnectionError: If the broker is not connected.
             ValueError: If the order is invalid or cannot be submitted.
         """
-        broker.submit_order(order)
+        broker.submit_order(order, strategy)
 
     def cancel_order(self, order: Order, broker: Broker) -> None:
         """Cancel an order with your broker.

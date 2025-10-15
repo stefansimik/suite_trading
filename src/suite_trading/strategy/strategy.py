@@ -361,7 +361,7 @@ class Strategy(ABC):
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `submit_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
-        engine.submit_order(order, broker)
+        engine.submit_order(order, broker, self)
 
     # FIXME: Order is already created and should already know to which Broker it is attached.
     #   So we should not need to pass it as an argument here.

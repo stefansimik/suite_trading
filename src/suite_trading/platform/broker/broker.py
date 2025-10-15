@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Callable, List, Protocol, runtime_checkable
+from typing import Callable, List, Protocol, runtime_checkable, TYPE_CHECKING
 
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.position import Position
+
+if TYPE_CHECKING:
+    from suite_trading.strategy.strategy import Strategy
 
 
 @runtime_checkable
@@ -61,11 +64,12 @@ class Broker(Protocol):
 
     # region Orders
 
-    def submit_order(self, order: Order) -> None:
-        """Submit order for execution.
+    def submit_order(self, order: Order, strategy: Strategy) -> None:
+        """Submit $order on behalf of $strategy for execution.
 
         Args:
             order (Order): The order to submit for execution.
+            strategy (Strategy): Strategy that is submitting the order.
 
         Raises:
             ConnectionError: If not connected to broker.
