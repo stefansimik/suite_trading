@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Callable, List, Protocol, runtime_checkable, TYPE_CHECKING
+from typing import List, Protocol, runtime_checkable, TYPE_CHECKING
 
 from suite_trading.domain.account_info import AccountInfo
-from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.position import Position
 
@@ -16,9 +15,6 @@ if TYPE_CHECKING:
 @runtime_checkable
 class Broker(Protocol):
     """Protocol for brokers.
-
-    The @runtime_checkable decorator from Python's typing module allows you to use
-    isinstance() and issubclass() checks with Protocol classes at runtime.
 
     This protocol defines the interface that brokers must implement
     to handle core brokerage operations including:
@@ -77,15 +73,15 @@ class Broker(Protocol):
         """
         ...
 
-    def cancel_order(self, order_id: str | int) -> None:
-        """Cancel an existing order by its broker-assigned identifier.
+    def cancel_order(self, order: Order) -> None:
+        """Cancel an existing $order.
 
         Args:
-            order_id (str | int): Identifier of the order to cancel.
+            order (Order): The Order to cancel.
 
         Raises:
             ConnectionError: If not connected to broker.
-            ValueError: If order cannot be cancelled (e.g., already filled or not found).
+            ValueError: If $order cannot be cancelled (e.g., already filled or not found).
         """
         ...
 
@@ -129,71 +125,6 @@ class Broker(Protocol):
         Raises:
             ConnectionError: If not connected (for live brokers).
             NotSupportedError: If positions are not supported.
-        """
-        ...
-
-    # endregion
-
-    # region Listeners
-
-    def add_order_updated_listener(self, listener: Callable[[Order], None]) -> None:
-        """Subscribe a callback to order updates.
-
-        Args:
-            listener: Callback with signature `listener(order)` where
-                - $order: Order instance that was updated.
-
-        Returns:
-            None
-
-        Notes:
-            - Duplicate subscriptions are ignored.
-            - Listener is invoked for every update event for tracked orders.
-        """
-        ...
-
-    def remove_order_updated_listener(self, listener: Callable[[Order], None]) -> None:
-        """Unsubscribe a previously registered order-updated listener.
-
-        Args:
-            listener: The same callback object that was passed to
-                `add_order_updated_listener`.
-
-        Returns:
-            None
-
-        Notes:
-            - No-op if the listener is not registered.
-        """
-        ...
-
-    def add_execution_listener(self, listener: Callable[[Execution], None]) -> None:
-        """Subscribe a callback to execution events (fills).
-
-        Args:
-            listener: Callback with signature `listener(execution)` where
-                - $execution: Execution details (price, quantity, fees, at).
-
-        Returns:
-            None
-
-        Notes:
-            - Duplicate subscriptions are ignored.
-            - Listener is invoked for each execution event (including partial fills).
-        """
-        ...
-
-    def remove_execution_listener(self, listener: Callable[[Execution], None]) -> None:
-        """Unsubscribe a previously registered execution listener.
-
-        Args:
-            listener: The same callback object that was passed to `add_execution_listener`.
-
-        Returns:
-            None
-
-        Notes:
-            - No-op if the listener is not registered.
         """
         ...
 
