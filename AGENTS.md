@@ -260,35 +260,46 @@ return f"{self.__class__.__name__}({self.kind}, {dt_str})"
 
 ## 2.11 Typing: always enable postponed annotations
 
-Rule: Start every first‑party module with `from __future__ import annotations`.
+Rule: Start every first‑party module with `from __future__ import annotations`. Use direct type
+names everywhere (no quotes) — including self‑references in the same module/class/Protocol.
+Never use string module paths (e.g., "a.b.Type"); import the type.
 
-Requirements:
-- Do not quote type names (use Strategy, not "Strategy").
-- Use `if TYPE_CHECKING:` for heavy/mutual imports only.
-- For runtime type info, use `typing.get_type_hints(obj, include_extras=True)`.
+Imports for types:
+- Prefer unconditional imports unless they cause cycles or are heavy.
+- Otherwise import under `if TYPE_CHECKING:` and still use direct names (unquoted).
+- If using `typing.get_type_hints` at runtime, ensure symbols exist at runtime or pass
+  `globalns`/`localns`.
+
+Annotation style:
+- Builtin generics: `list[T]`, `dict[K, V]`, `set[T]`, `tuple[...]`.
+- Use `|` (and `| None`) instead of `Union`/`Optional`.
+- Use `type[T]` for class objects.
+- `Callable[[...], R]` with explicit return type.
 
 Example:
 ```python
-# Before
-from typing import Optional, TYPE_CHECKING
+class Broker(Protocol):
+    def set_callbacks(
+        self,
+        on_execution: Callable[[Broker, Order, Execution], None],
+        on_order_updated: Callable[[Broker, Order], None],
+    ) -> None: ...
+
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from suite_trading.strategy.strategy import Strategy
-class Order:
-    def __init__(self, strategy: Optional["Strategy"] = None) -> None: ...
-# After
-from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
-if TYPE_CHECKING:
-    from suite_trading.strategy.strategy import Strategy
-class Order:
-    def __init__(self, strategy: Optional[Strategy] = None) -> None: ...
+    from suite_trading.domain.order.execution import Execution
+
+self._on_execution: Callable[[Broker, Order, Execution], None] | None = None
 ```
 
 Acceptance checks:
-- [ ] Modules start with `from __future__ import annotations`.
-- [ ] No quoted forward refs remain.
-- [ ] Cross‑module types resolved via `if TYPE_CHECKING:` without runtime cycles.
-- [ ] No raw `__annotations__`; use `typing.get_type_hints(..., include_extras=True)`.
+- [ ] Module starts with `from __future__ import annotations`.
+- [ ] No quoted forward references (methods, attributes, Protocols, Callables).
+- [ ] Builtin generics only (no `typing.List`/`typing.Dict`).
+- [ ] `|` unions and `| None` (no `Union`/`Optional`).
+- [ ] `Callable[[...], R]` list form with explicit return type.
+- [ ] Cross‑module types imported unconditionally or under `TYPE_CHECKING`.
+- [ ] If `get_type_hints` is used at runtime, symbols resolvable or namespaces provided.
 
 ## 2.12 __slots__ for high-volume, fixed-shape classes
 
