@@ -12,6 +12,7 @@ from suite_trading.strategy.strategy_state_machine import StrategyState, Strateg
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
+    from suite_trading.domain.order.execution import Execution
 
 logger = logging.getLogger(__name__)
 
@@ -434,6 +435,26 @@ class Strategy(ABC):
             raise RuntimeError(f"Cannot call `list_active_orders` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         return engine.list_active_orders(broker)
+
+    # endregion
+
+    # region Broker callbacks
+
+    def on_execution(self, order: Order, execution: Execution, broker: Broker) -> None:
+        """Called when an execution (fill/partial-fill) happens for $order.
+
+        Default implementation is a no-op. Override in your strategy to update positions, PnL,
+        or to submit follow-up orders.
+        """
+        logger.debug(f"Strategy named '{self.name}' received execution for order on broker {broker.__class__.__name__}")
+
+    def on_order_updated(self, order: Order, broker: Broker) -> None:
+        """Called when $order changes state (Accepted, Cancelled, Rejected, etc.).
+
+        Default implementation is a no-op. Override in your strategy to react to order lifecycle
+        changes.
+        """
+        logger.debug(f"Strategy named '{self.name}' received order update from broker {broker.__class__.__name__}")
 
     # endregion
 

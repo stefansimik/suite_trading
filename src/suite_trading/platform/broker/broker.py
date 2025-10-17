@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import List, Protocol, runtime_checkable, TYPE_CHECKING
+from typing import List, Protocol, runtime_checkable, TYPE_CHECKING, Callable
 
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.position import Position
 
 if TYPE_CHECKING:
-    from suite_trading.strategy.strategy import Strategy
+    from suite_trading.domain.order.execution import Execution
 
 
 @runtime_checkable
@@ -58,14 +58,30 @@ class Broker(Protocol):
 
     # endregion
 
+    # region Callbacks
+
+    def set_callbacks(
+        self,
+        on_execution: Callable[[Broker, Order, Execution], None],
+        on_order_updated: Callable[[Broker, Order], None],
+    ) -> None:
+        """Register Engine callbacks to report broker events.
+
+        The Broker must invoke `on_execution` when a fill/partial-fill occurs and
+        `on_order_updated` when an order changes state. When both happen for the same
+        broker event, call `on_execution` first, then `on_order_updated`.
+        """
+        ...
+
+    # endregion
+
     # region Orders
 
-    def submit_order(self, order: Order, strategy: Strategy) -> None:
-        """Submit $order on behalf of $strategy for execution.
+    def submit_order(self, order: Order) -> None:
+        """Submit $order for execution.
 
         Args:
             order (Order): The order to submit for execution.
-            strategy (Strategy): Strategy that is submitting the order.
 
         Raises:
             ConnectionError: If not connected to broker.

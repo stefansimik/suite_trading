@@ -1,7 +1,8 @@
+from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Callable, Optional, NamedTuple
+from typing import Dict, List, Callable, Optional, NamedTuple, TYPE_CHECKING
 
 from suite_trading.domain.event import Event
 from suite_trading.platform.event_feed.event_feed import EventFeed
@@ -14,6 +15,9 @@ from suite_trading.platform.engine.engine_state_machine import EngineState, Engi
 from bidict import bidict
 
 from suite_trading.utils.state_machine import StateMachine
+
+if TYPE_CHECKING:
+    from suite_trading.domain.order.execution import Execution
 
 
 logger = logging.getLogger(__name__)
@@ -29,15 +33,20 @@ logger = logging.getLogger(__name__)
 # region Helper classes
 
 
-class FeedCallbackTuple(NamedTuple):
+class EventFeedCallbackPair(NamedTuple):
     feed: EventFeed
     callback: Callable
 
 
+class StrategyBrokerPair(NamedTuple):
+    strategy: Strategy
+    broker: Broker
+
+
 @dataclass
 class StrategyClocks:
-    last_event_time: Optional[datetime] = None
-    wall_clock_time: Optional[datetime] = None
+    last_event_time: datetime | None = None
+    wall_clock_time: datetime | None = None
 
     def update_on_event(self, dt_event: datetime, dt_received: datetime) -> None:
         # Advance timeline to official event time
@@ -89,10 +98,15 @@ class TradingEngine:
 
         # Strategies registry (bi-directional dictionary)
         self._name_strategies_bidict: bidict[str, Strategy] = bidict()
+
         # EventFeeds per Strategy: strategy -> { feed_name: FeedAndCallbackTuple }
-        self._strategy_feeds_dict: Dict[Strategy, Dict[str, FeedCallbackTuple]] = {}
+        self._strategy_feeds_dict: Dict[Strategy, Dict[str, EventFeedCallbackPair]] = {}
+
         # Tracks per-strategy clocks (last_event and wall-clock)
         self._strategy_clocks_dict: Dict[Strategy, StrategyClocks] = {}
+
+        # Keep relation of Order to: Strategy + Broker
+        self._order_routes: Dict[Order, StrategyBrokerPair] = {}
 
     # endregion
 
@@ -176,7 +190,8 @@ class TradingEngine:
             raise ValueError(f"Cannot call `add_broker` because a broker of class {key.__name__} is already added to this TradingEngine")
 
         self._brokers_dict[key] = broker
-        logger.debug(f"Added broker of class {key.__name__}")
+        broker.set_callbacks(self._on_broker_execution, self._on_broker_order_update)
+        logger.debug(f"Added Broker (class {key.__name__}) and registered callbacks")
 
     def remove_broker(self, broker_type: type[Broker]) -> None:
         """Remove a broker by type.
@@ -554,23 +569,19 @@ class TradingEngine:
         """
         # Check: strategy must be added to this engine
         if strategy not in self._name_strategies_bidict.values():
-            raise ValueError(
-                "Cannot call `add_event_feed_for_strategy` because $strategy ({strategy.__class__.__name__}) is not added to this TradingEngine. Add the strategy using `add_strategy` first.",
-            )
+            raise ValueError("Cannot call `add_event_feed_for_strategy` because $strategy ({strategy.__class__.__name__}) is not added to this TradingEngine. Add the strategy using `add_strategy` first.")
 
         # Check: feed_name must be unique per strategy
         feeds_dict = self._strategy_feeds_dict[strategy]
         if feed_name in feeds_dict:
-            raise ValueError(
-                "Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name ('{feed_name}') is already used for this strategy. Choose a different name.",
-            )
+            raise ValueError("Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name ('{feed_name}') is already used for this strategy. Choose a different name.")
 
         # Timeline filtering if the strategy already processed events
         if strategy.last_event_time is not None:
             event_feed.remove_events_before(strategy.last_event_time)
 
         # Register locally
-        feeds_dict[feed_name] = FeedCallbackTuple(event_feed, callback)
+        feeds_dict[feed_name] = EventFeedCallbackPair(event_feed, callback)
         strategy_name = self._get_strategy_name(strategy)
         logger.info(f"Added EventFeed named '{feed_name}' to Strategy named '{strategy_name}'")
 
@@ -687,9 +698,17 @@ class TradingEngine:
 
         Raises:
             ConnectionError: If the broker is not connected.
-            ValueError: If the order is invalid or cannot be submitted.
+            ValueError: If the order is invalid or cannot be submitted, or if $order is re-owned.
         """
-        broker.submit_order(order, strategy)
+        # Check: do not remap an already submitted order to a different owner
+        route = self._order_routes.get(order)
+        if route is not None and route.strategy is not strategy:
+            owner_name = self._get_strategy_name(route.strategy)
+            raise ValueError(f"Cannot call `submit_order` because $order is already owned by Strategy named '{owner_name}'")
+        # Record ownership + routing atomically
+        self._order_routes[order] = StrategyBrokerPair(strategy=strategy, broker=broker)
+        # Delegate to broker
+        broker.submit_order(order)
 
     def cancel_order(self, order: Order, broker: Broker) -> None:
         """Cancel an order with your broker.
@@ -730,5 +749,56 @@ class TradingEngine:
             ConnectionError: If the broker is not connected.
         """
         return broker.list_active_orders()
+
+    # Broker → Engine callbacks (deterministic ordering ensured by Broker)
+    def _on_broker_execution(self, broker: Broker, order: Order, execution: Execution) -> None:
+        route = self._order_routes.get(order)
+        if route is None:
+            raise ValueError("Cannot call `_on_broker_execution` because $order is unknown to this TradingEngine")
+        # Check: broker emitting the event must match the recorded broker
+        if route.broker is not broker:
+            raise ValueError("Cannot call `_on_broker_execution` because $broker does not match recorded broker for $order")
+        try:
+            route.strategy.on_execution(order, execution, broker)
+        except Exception as e:
+            logger.error(f"Error in `Strategy.on_execution` for Strategy named '{route.strategy.name}': {e}")
+            self._transition_strategy_to_error(route.strategy, e)
+
+    def _on_broker_order_update(self, broker: Broker, order: Order) -> None:
+        route = self._order_routes.get(order)
+        if route is None:
+            raise ValueError("Cannot call `_on_broker_order_update` because $order is unknown to this TradingEngine")
+        # Check: broker emitting the event must match the recorded broker
+        if route.broker is not broker:
+            raise ValueError("Cannot call `_on_broker_order_update` because $broker does not match recorded broker for $order")
+        try:
+            route.strategy.on_order_updated(order, broker)
+        except Exception as e:
+            logger.error(f"Error in `Strategy.on_order_updated` for Strategy named '{route.strategy.name}': {e}")
+            self._transition_strategy_to_error(route.strategy, e)
+        finally:
+            self._cleanup_if_terminal(order)
+
+    def _transition_strategy_to_error(self, strategy: Strategy, exc: Exception) -> None:
+        """Transition Strategy to ERROR and notify via `on_error`."""
+        try:
+            # Move strategy to ERROR state via state machine, if not already
+            if strategy.state != StrategyState.ERROR:
+                strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
+        finally:
+            try:
+                strategy.on_error(exc)
+            except Exception as inner:
+                logger.error(f"Error in `Strategy.on_error` for Strategy named '{strategy.name}': {inner}")
+
+    def _cleanup_if_terminal(self, order: Order) -> None:
+        """Remove $order mappings if it is in a terminal state.
+
+        This placeholder will be implemented once `Order` exposes a state field.
+        """
+        # Example once states are available:
+        # if getattr(order, "state", None) in {OrderState.FILLED, OrderState.CANCELLED, OrderState.REJECTED}:
+        #     self._order_routes.pop(order, None)
+        return
 
     # endregion
