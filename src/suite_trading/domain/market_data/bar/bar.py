@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Union
 
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
@@ -56,11 +55,11 @@ class Bar:
         bar_type: BarType,
         start_dt: datetime,
         end_dt: datetime,
-        open: Union[Decimal, str, float],
-        high: Union[Decimal, str, float],
-        low: Union[Decimal, str, float],
-        close: Union[Decimal, str, float],
-        volume: Optional[Union[Decimal, str, float]] = None,
+        open: Decimal | str | float,
+        high: Decimal | str | float,
+        low: Decimal | str | float,
+        close: Decimal | str | float,
+        volume: Decimal | str | float | None = None,
         *,
         is_partial: bool = False,
     ):
@@ -143,7 +142,7 @@ class Bar:
         return self._close
 
     @property
-    def volume(self) -> Optional[Decimal]:
+    def volume(self) -> Decimal | None:
         """Get the volume."""
         return self._volume
 

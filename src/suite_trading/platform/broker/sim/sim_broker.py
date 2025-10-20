@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING
 
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.market_data.price_sample import PriceSample
@@ -29,8 +29,8 @@ class SimBroker(Broker):
         self._orders_by_id: dict[str, Order] = {}
 
         # Engine callbacks (set via `set_callbacks`)
-        self._on_execution: Optional[Callable[[Broker, Order, Execution], None]] = None
-        self._on_order_updated: Optional[Callable[[Broker, Order], None]] = None
+        self._on_execution: Callable[[Broker, Order, Execution], None] | None = None
+        self._on_order_updated: Callable[[Broker, Order], None] | None = None
 
         # POSITIONS API
         self._positions: list[Position] = []  # TODO: manage via executions

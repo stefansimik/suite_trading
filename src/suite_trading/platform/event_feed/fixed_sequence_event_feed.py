@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from collections import deque
 from datetime import datetime
-from typing import Deque, Iterable, Callable
+from collections.abc import Iterable, Callable
 import logging
 
 from suite_trading.domain.event import Event
@@ -51,7 +53,7 @@ class FixedSequenceEventFeed:
 
         # Materialize provided iterable into a deque
         if isinstance(events, deque):
-            self._event_deque: Deque[Event] = events
+            self._event_deque: deque[Event] = events
         else:
             self._event_deque = deque(events)
 

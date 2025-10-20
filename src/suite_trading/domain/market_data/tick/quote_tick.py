@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Union
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_utils import format_dt, expect_utc
@@ -35,10 +34,10 @@ class QuoteTick:
     def __init__(
         self,
         instrument: Instrument,
-        bid_price: Union[Decimal, str, float],
-        ask_price: Union[Decimal, str, float],
-        bid_volume: Union[Decimal, str, float],
-        ask_volume: Union[Decimal, str, float],
+        bid_price: Decimal | str | float,
+        ask_price: Decimal | str | float,
+        bid_volume: Decimal | str | float,
+        ask_volume: Decimal | str | float,
         timestamp: datetime,
     ):
         """Initialize a new quote tick.

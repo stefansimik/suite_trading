@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Protocol, runtime_checkable, TYPE_CHECKING, Callable
+from typing import Protocol, runtime_checkable, TYPE_CHECKING, Callable
 
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.order.orders import Order
@@ -114,7 +114,7 @@ class Broker(Protocol):
         """
         ...
 
-    def list_active_orders(self) -> List[Order]:
+    def list_active_orders(self) -> list[Order]:
         """Get all currently active orders.
 
         Active orders include all orders that are not in a terminal state
@@ -132,7 +132,7 @@ class Broker(Protocol):
 
     # region Positions
 
-    def list_open_positions(self) -> List[Position]:
+    def list_open_positions(self) -> list[Position]:
         """Return currently open positions.
 
         Returns:

@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 from decimal import Decimal
-from typing import Union
 
 
-def round_to_increment(price: Union[float, Decimal], increment: Decimal) -> Decimal:
+def round_to_increment(price: float | Decimal, increment: Decimal) -> Decimal:
     """
     Round a price to the nearest valid price increment.
 

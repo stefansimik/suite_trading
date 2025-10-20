@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict
 
 
 class CurrencyType(Enum):
@@ -23,7 +22,7 @@ class Currency:
     """
 
     # Class-level registry for predefined currencies
-    _registry: Dict[str, Currency] = {}
+    _registry: dict[str, Currency] = {}
 
     def __init__(self, code: str, precision: int, name: str, currency_type: CurrencyType):
         """Initialize a Currency instance.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_event import BarEvent
@@ -15,8 +14,8 @@ class NewBarEventAccumulator:
 
     def __init__(self) -> None:
         self._bar_accumulator = BarAccumulator()
-        self._last_dt_received: Optional[datetime] = None
-        self._last_is_historical: Optional[bool] = None
+        self._last_dt_received: datetime | None = None
+        self._last_is_historical: bool | None = None
 
     # endregion
 
@@ -88,7 +87,7 @@ class NewBarEventAccumulator:
     # region Properties
 
     @property
-    def first_bar_type(self) -> Optional[BarType]:
+    def first_bar_type(self) -> BarType | None:
         return self._bar_accumulator.first_bar_type
 
     @property
@@ -96,11 +95,11 @@ class NewBarEventAccumulator:
         return self._bar_accumulator.count
 
     @property
-    def last_dt_received(self) -> Optional[datetime]:
+    def last_dt_received(self) -> datetime | None:
         return self._last_dt_received
 
     @property
-    def last_is_historical(self) -> Optional[bool]:
+    def last_is_historical(self) -> bool | None:
         return self._last_is_historical
 
     # endregion

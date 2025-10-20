@@ -1,4 +1,6 @@
-from typing import Protocol, Optional, Callable
+from __future__ import annotations
+
+from typing import Protocol, Callable
 from datetime import datetime
 from suite_trading.domain.event import Event
 
@@ -16,11 +18,11 @@ class EventFeed(Protocol):
     - TradingEngine invokes listeners after it pops an event  from EventFeed and processes the callback. That means, EventFeed implementations must not notify listeners themselves (it is done in TradingEngine automatically)
     """
 
-    def peek(self) -> Optional[Event]:
+    def peek(self) -> Event | None:
         """Return the next event without consuming it, or None if none is ready."""
         ...
 
-    def pop(self) -> Optional[Event]:
+    def pop(self) -> Event | None:
         """Return the next event and advance the feed, or None if none is ready."""
         ...
 

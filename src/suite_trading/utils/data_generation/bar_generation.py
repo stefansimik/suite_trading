@@ -1,8 +1,10 @@
 """Functions for generating demo bar data."""
 
+from __future__ import annotations
+
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from typing import List, Callable
+from collections.abc import Callable
 
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
@@ -129,8 +131,8 @@ DEFAULT_FIRST_BAR = create_bar(is_bullish=True)
 def create_bar_series(
     first_bar: Bar = DEFAULT_FIRST_BAR,
     num_bars: int = 20,
-    price_pattern_func: Callable = zig_zag_function,
-) -> List[Bar]:
+    price_pattern_func: Callable[[int], float] = zig_zag_function,
+) -> list[Bar]:
     """
     Generate a series of bars with a specified price pattern.
 

@@ -1,4 +1,6 @@
-from typing import Sequence
+from __future__ import annotations
+
+from collections.abc import Sequence
 import re
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.instrument import Instrument

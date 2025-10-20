@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from suite_trading.domain.monetary.currency import Currency, CurrencyType
 
 

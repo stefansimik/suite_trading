@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Callable
+from typing import Callable
 import logging
 
 from suite_trading.domain.event import Event
@@ -92,8 +92,8 @@ class FixedIntervalEventFeed:
         self,
         start_dt: datetime,
         interval: timedelta,
-        end_dt: Optional[datetime] = None,
-        finish_with_feed: Optional[EventFeed] = None,
+        end_dt: datetime | None = None,
+        finish_with_feed: EventFeed | None = None,
     ) -> None:
         # Check: $start_datetime must be timezone-aware UTC to avoid ambiguous scheduling
         require_utc(start_dt)
@@ -115,12 +115,12 @@ class FixedIntervalEventFeed:
         # Copy input params
         self._start_dt: datetime = start_dt
         self._interval: timedelta = interval
-        self._end_dt: Optional[datetime] = end_dt
-        self._finish_with_feed: Optional[EventFeed] = finish_with_feed
+        self._end_dt: datetime | None = end_dt
+        self._finish_with_feed: EventFeed | None = finish_with_feed
 
         # Internal state
         self._next_tick_dt: datetime = start_dt
-        self._next_event: Optional[TimeTickEvent] = None
+        self._next_event: TimeTickEvent | None = None
         self._closed: bool = False
         self._finished: bool = False
 
@@ -131,14 +131,14 @@ class FixedIntervalEventFeed:
 
     # region EventFeed protocol
 
-    def peek(self) -> Optional[Event]:
+    def peek(self) -> Event | None:
         """Return the next event if ready, else None.
 
         Non-blocking readiness check. When `datetime.now(UTC) >= $next_tick`, a TimeTickEvent is
         created and cached until consumed with `pop()`.
 
         Returns:
-            Optional[Event]: The next TimeTickEvent when ready; otherwise None.
+            Event | None: The next TimeTickEvent when ready; otherwise None.
         """
         if self._check_finished_guard():
             return None
@@ -156,14 +156,14 @@ class FixedIntervalEventFeed:
 
         return self._next_event
 
-    def pop(self) -> Optional[Event]:
+    def pop(self) -> Event | None:
         """Return the next event and advance the schedule, or None if not ready.
 
         Advancing increments $next_tick by $interval. If an inclusive $end_datetime is set and
         the next scheduled tick moves beyond it, the feed is marked finished.
 
         Returns:
-            Optional[Event]: The ready event, or None when not ready.
+            Event | None: The ready event, or None when not ready.
         """
         if self._check_finished_guard():
             return None

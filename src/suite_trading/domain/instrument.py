@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_EVEN
-from typing import Union
 
 
 class Instrument:
@@ -27,9 +26,9 @@ class Instrument:
         self,
         name: str,
         exchange: str,
-        price_increment: Union[Decimal, str],
-        quantity_increment: Union[Decimal, str] = Decimal("1"),
-        contract_value_multiplier: Union[Decimal, str] = Decimal("1"),
+        price_increment: Decimal | str,
+        quantity_increment: Decimal | str = Decimal("1"),
+        contract_value_multiplier: Decimal | str = Decimal("1"),
     ):
         """Initialize a new instrument.
 
@@ -139,7 +138,7 @@ class Instrument:
 
     # region Normalization
 
-    def snap_price(self, value: Union[Decimal, str, float, int]) -> Decimal:
+    def snap_price(self, value: Decimal | str | float | int) -> Decimal:
         """Return $value snapped to $price_increment as an exact Decimal.
 
         Accepts float safely by converting via str(...) before Decimal construction, then
@@ -164,7 +163,7 @@ class Instrument:
         # Snap to the instrument's price increment (banker's rounding)
         return v.quantize(self.price_increment, rounding=ROUND_HALF_EVEN)
 
-    def snap_quantity(self, value: Union[Decimal, str, float, int]) -> Decimal:
+    def snap_quantity(self, value: Decimal | str | float | int) -> Decimal:
         """Return $value snapped to $quantity_increment as an exact Decimal.
 
         Accepts float safely by converting via str(...) before Decimal construction, then

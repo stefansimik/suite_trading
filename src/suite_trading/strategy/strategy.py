@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Callable, Optional
+from typing import TYPE_CHECKING, Callable
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
@@ -150,7 +150,7 @@ class Strategy(ABC):
     # region Times
 
     @property
-    def last_event_time(self) -> Optional[datetime]:
+    def last_event_time(self) -> datetime | None:
         """Get time (`dt_event`) of the last event for this strategy.
 
         Returns the dt_event of the last processed event for this strategy. Advances only when this
@@ -162,7 +162,7 @@ class Strategy(ABC):
         return self._trading_engine._strategy_clocks_dict[self].last_event_time
 
     @property
-    def wall_clock_time(self) -> Optional[datetime]:
+    def wall_clock_time(self) -> datetime | None:
         """Get the latest known wall clock time (max `dt_received` from all events) for this strategy.
 
         Returns the maximum dt_received seen across all events processed by this strategy. Use this
@@ -243,7 +243,7 @@ class Strategy(ABC):
         self,
         feed_name: str,
         event_feed: EventFeed,
-        callback: Optional[Callable] = None,
+        callback: Callable | None = None,
     ) -> None:
         """Attach an EventFeed to this Strategy.
 
@@ -413,7 +413,7 @@ class Strategy(ABC):
         engine.modify_order(order, broker)
 
     # TODO: Allow filtering only orders created by this Strategy
-    def list_active_orders(self, broker: Broker) -> List[Order]:
+    def list_active_orders(self, broker: Broker) -> list[Order]:
         """Get all currently active orders.
 
         Allowed only when the strategy is RUNNING.

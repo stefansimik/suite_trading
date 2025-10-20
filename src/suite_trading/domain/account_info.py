@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Mapping, NamedTuple
+from collections.abc import Mapping
+from typing import NamedTuple
 
 from suite_trading.domain.monetary.currency import Currency
 from suite_trading.utils.datetime_utils import format_dt, expect_utc
@@ -58,7 +59,7 @@ class AccountInfo:
         self.account_id = account_id
 
         # Normalize and validate the funds map into a plain dict with Decimal values
-        validated_funds_by_currency: Dict[Currency, Funds] = {}
+        validated_funds_by_currency: dict[Currency, Funds] = {}
         for currency, funds in funds_by_currency.items():
             # Check: currency keys must be Currency
             if not isinstance(currency, Currency):
@@ -73,7 +74,7 @@ class AccountInfo:
             if locked_amount < 0:
                 raise ValueError(f"`AccountInfo.__init__` received negative $locked amount for '{currency}': {locked_amount}")
             validated_funds_by_currency[currency] = Funds(available=available_amount, locked=locked_amount)
-        self.funds_by_currency: Dict[Currency, Funds] = validated_funds_by_currency
+        self.funds_by_currency: dict[Currency, Funds] = validated_funds_by_currency
 
         # Check: leverage must be positive
         self.leverage = Decimal(leverage)

@@ -1,4 +1,6 @@
-from typing import Any, Callable, Dict, List, Pattern, Tuple
+from __future__ import annotations
+
+from typing import Any, Callable
 import re
 from suite_trading.platform.messaging.message_priority import SubscriberPriority
 from suite_trading.platform.messaging.topic_factory import TopicFactory
@@ -20,11 +22,11 @@ class MessageBus:
         Initializes empty dictionaries for storing callbacks with priorities and wildcard patterns.
         """
         # Dictionary to store callbacks with their priorities for each topic
-        self._callbacks: Dict[str, List[Tuple[Callable, SubscriberPriority]]] = {}
+        self._callbacks: dict[str, list[tuple[Callable[[Any], None], SubscriberPriority]]] = {}
         # Dictionary to store compiled regex patterns for wildcard topics
-        self._wildcard_patterns: Dict[str, Pattern] = {}
+        self._wildcard_patterns: dict[str, re.Pattern[str]] = {}
 
-    def publish(self, topic: str, data: Any, min_subscribers: int = 0, max_subscribers: int = None):
+    def publish(self, topic: str, data: Any, min_subscribers: int = 0, max_subscribers: int | None = None):
         """
         Publish data to a specific topic with subscriber validation.
 
@@ -74,7 +76,7 @@ class MessageBus:
         for callback, _ in callbacks_to_invoke:
             callback(data)
 
-    def subscribe(self, topic: str, callback: Callable, priority: SubscriberPriority = SubscriberPriority.MEDIUM):
+    def subscribe(self, topic: str, callback: Callable[[Any], None], priority: SubscriberPriority = SubscriberPriority.MEDIUM):
         """
         Subscribe a callback to a specific topic with priority.
 
@@ -103,7 +105,7 @@ class MessageBus:
             pattern_str = topic.replace(TopicFactory.TOPIC_SEPARATOR, "\\:\\:").replace(TopicFactory.WILDCARD_CHAR, ".*")
             self._wildcard_patterns[topic] = re.compile(f"^{pattern_str}$")
 
-    def unsubscribe(self, topic: str, callback: Callable):
+    def unsubscribe(self, topic: str, callback: Callable[[Any], None]):
         """
         Unsubscribe a callback from a specific topic.
 
@@ -127,7 +129,7 @@ class MessageBus:
                 if topic in self._wildcard_patterns:
                     del self._wildcard_patterns[topic]
 
-    def list_listeners(self, topic: str) -> List[Callable]:
+    def list_listeners(self, topic: str) -> list[Callable[[Any], None]]:
         """
         Get all callbacks registered for a specific topic.
 

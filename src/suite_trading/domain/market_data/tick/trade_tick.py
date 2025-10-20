@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Union
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_utils import format_dt, expect_utc
@@ -23,7 +22,7 @@ class TradeTick:
 
     __slots__ = ("_instrument", "_price", "_volume", "_timestamp")
 
-    def __init__(self, instrument: Instrument, price: Union[Decimal, str, float], volume: Union[Decimal, str, float], timestamp: datetime):
+    def __init__(self, instrument: Instrument, price: Decimal | str | float, volume: Decimal | str | float, timestamp: datetime):
         """Initialize a new trade tick.
 
         Args:

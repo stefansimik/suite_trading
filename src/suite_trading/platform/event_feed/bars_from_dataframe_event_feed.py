@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 # BarsFromDataFrameEventFeed: Stream historical bars from an in-memory pandas DataFrame.
 # Keeps an index pointer and a cached next event for efficient peek/pop.
 
 from datetime import datetime, tzinfo
-from typing import Optional, Callable
+from typing import Callable
 import logging
 
 import pandas as pd
@@ -37,7 +39,7 @@ class BarsFromDataFrameEventFeed:
         df: pd.DataFrame,
         bar_type: BarType,
         auto_sort: bool = True,
-        source_tz: Optional[str | tzinfo] = None,
+        source_tz: str | tzinfo | None = None,
     ) -> None:
         """Initialize the feed.
 
@@ -96,7 +98,7 @@ class BarsFromDataFrameEventFeed:
 
         # Internal state
         self._row_index_of_next_event: int = 0
-        self._next_bar_event: Optional[Event] = None
+        self._next_bar_event: Event | None = None
 
         # Listeners of this event-feed (in case some other objects needs to be notified about consumed/popped events)
         self._listeners: dict[str, Callable[[Event], None]] = {}
@@ -105,7 +107,7 @@ class BarsFromDataFrameEventFeed:
 
     # region EventFeed protocol
 
-    def peek(self) -> Optional[Event]:
+    def peek(self) -> Event | None:
         """Return the next event without consuming it, or None if none is ready."""
         if self._df is None:
             return None
@@ -118,7 +120,7 @@ class BarsFromDataFrameEventFeed:
         self._next_bar_event = self._build_event_from_row(row)
         return self._next_bar_event
 
-    def pop(self) -> Optional[Event]:
+    def pop(self) -> Event | None:
         """Return the next event and advance the feed, or None if none is ready."""
         event = self.peek()
         if event is None:

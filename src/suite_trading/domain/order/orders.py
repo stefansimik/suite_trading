@@ -1,6 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.execution import Execution
@@ -36,9 +36,9 @@ class Order:
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        order_id: Optional[str] = None,
+        order_id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Optional[Strategy] = None,
+        strategy: Strategy | None = None,
     ):
         """Initialize a new Order.
 
@@ -67,7 +67,7 @@ class Order:
         # Mutable execution tracking attributes
         self.filled_quantity = Decimal("0")  # Always initialize to 0 for new orders
         self.average_fill_price = None  # Always initialize to None for new orders
-        self.executions: List[Execution] = []  # List of executions in chronological order
+        self.executions: list[Execution] = []  # List of executions in chronological order
 
         # Internal state
         self._state_machine: StateMachine = create_order_state_machine()
@@ -121,7 +121,7 @@ class Order:
         return self._time_in_force
 
     @property
-    def strategy(self) -> Optional[Strategy]:
+    def strategy(self) -> Strategy | None:
         """Get the Strategy that created this order, if available.
 
         Returns:
@@ -242,9 +242,9 @@ class MarketOrder(Order):
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        order_id: Optional[str] = None,
+        order_id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Optional[Strategy] = None,
+        strategy: Strategy | None = None,
     ):
         """Initialize a new MarketOrder.
 
@@ -275,9 +275,9 @@ class LimitOrder(Order):
         side: OrderSide,
         quantity: Decimal,
         limit_price: Decimal,
-        order_id: Optional[str] = None,
+        order_id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Optional[Strategy] = None,
+        strategy: Strategy | None = None,
     ):
         """Initialize a new LimitOrder.
 
@@ -335,9 +335,9 @@ class StopOrder(Order):
         side: OrderSide,
         quantity: Decimal,
         stop_price: Decimal,
-        order_id: Optional[str] = None,
+        order_id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Optional[Strategy] = None,
+        strategy: Strategy | None = None,
     ):
         """Initialize a new StopOrder.
 
@@ -397,9 +397,9 @@ class StopLimitOrder(Order):
         quantity: Decimal,
         stop_price: Decimal,
         limit_price: Decimal,
-        order_id: Optional[str] = None,
+        order_id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Optional[Strategy] = None,
+        strategy: Strategy | None = None,
     ):
         """Initialize a new StopLimitOrder.
 

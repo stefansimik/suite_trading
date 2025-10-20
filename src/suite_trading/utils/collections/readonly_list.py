@@ -1,5 +1,7 @@
-from typing import TypeVar, Generic, Iterator, Union, Optional, List
-from collections.abc import Sequence
+from __future__ import annotations
+
+from typing import TypeVar, Generic
+from collections.abc import Sequence, Iterator
 
 T = TypeVar("T")
 
@@ -27,7 +29,7 @@ class ReadOnlyList(Generic[T], Sequence[T]):
         ...     process(order)
     """
 
-    def __init__(self, data: List[T], count: Optional[int] = None):
+    def __init__(self, data: list[T], count: int | None = None):
         """Initialize a read-only view of the provided list.
 
         Args:
@@ -38,7 +40,7 @@ class ReadOnlyList(Generic[T], Sequence[T]):
         self._data = data
         self._count = len(data) if count is None else min(count, len(data))
 
-    def __getitem__(self, index: Union[int, slice]) -> Union[T, List[T]]:
+    def __getitem__(self, index: int | slice) -> T | list[T]:
         """Get item(s) by index or slice.
 
         Args:
@@ -95,7 +97,7 @@ class ReadOnlyList(Generic[T], Sequence[T]):
         """
         return self._count > 0
 
-    def index(self, value: T, start: int = 0, stop: Optional[int] = None) -> int:
+    def index(self, value: T, start: int = 0, stop: int | None = None) -> int:
         """Find the index of the first occurrence of value.
 
         Args:
@@ -130,7 +132,7 @@ class ReadOnlyList(Generic[T], Sequence[T]):
         """
         return sum(1 for i in range(self._count) if self._data[i] == value)
 
-    def to_list(self) -> List[T]:
+    def to_list(self) -> list[T]:
         """Create a copy of the data as a regular list.
 
         This method explicitly creates a copy when needed, making the

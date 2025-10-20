@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Callable, Optional, Tuple
+from typing import Callable
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import BarEvent
@@ -55,9 +55,9 @@ class TimeBarResampler:
         self._on_emit = on_emit_callback
 
         # Windowing / ordering / source sizing
-        self._window_bounds: Tuple[Optional[datetime], Optional[datetime]] = (None, None)
-        self._last_bar_end_dt: Optional[datetime] = None
-        self._input_bar_seconds: Optional[int] = None
+        self._window_bounds: tuple[datetime | None, datetime | None] = (None, None)
+        self._last_bar_end_dt: datetime | None = None
+        self._input_bar_seconds: int | None = None
 
         # Per-window accumulator
         self._event_accumulator = NewBarEventAccumulator()

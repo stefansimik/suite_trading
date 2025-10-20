@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Callable, Optional, NamedTuple, TYPE_CHECKING
+from typing import Callable, NamedTuple, TYPE_CHECKING
 
 from suite_trading.domain.event import Event
 from suite_trading.platform.event_feed.event_feed import EventFeed
@@ -100,13 +100,13 @@ class TradingEngine:
         self._name_strategies_bidict: bidict[str, Strategy] = bidict()
 
         # EventFeeds per Strategy: strategy -> { feed_name: FeedAndCallbackTuple }
-        self._strategy_feeds_dict: Dict[Strategy, Dict[str, EventFeedCallbackPair]] = {}
+        self._strategy_feeds_dict: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
 
         # Tracks per-strategy clocks (last_event and wall-clock)
-        self._strategy_clocks_dict: Dict[Strategy, StrategyClocks] = {}
+        self._strategy_clocks_dict: dict[Strategy, StrategyClocks] = {}
 
         # Keep relation of Order to: Strategy + Broker
-        self._order_routes: Dict[Order, StrategyBrokerPair] = {}
+        self._order_routes: dict[Order, StrategyBrokerPair] = {}
 
     # endregion
 
@@ -644,7 +644,7 @@ class TradingEngine:
                     return True
         return False
 
-    def _find_feed_with_oldest_event(self, strategy: Strategy) -> Optional[tuple[str, EventFeed, Callable]]:
+    def _find_feed_with_oldest_event(self, strategy: Strategy) -> tuple[str, EventFeed, Callable] | None:
         """
         Next returned event is always the oldest event from all this strategy's event-feeds.
         If more events have the same time `dt_event`, then event coming from first event-feed wins.
@@ -655,8 +655,8 @@ class TradingEngine:
             feed = EventFeed containing the next event
             callback = callback function to process event
         """
-        oldest_event: Optional[Event] = None
-        winner_tuple: Optional[tuple[str, EventFeed, Callable]] = None
+        oldest_event: Event | None = None
+        winner_tuple: tuple[str, EventFeed, Callable] | None = None
 
         # Find the next feed (name, feed, callback) with the oldest available event.
         for name, (feed, callback) in self._strategy_feeds_dict[strategy].items():
@@ -736,7 +736,7 @@ class TradingEngine:
         """
         broker.modify_order(order)
 
-    def list_active_orders(self, broker: Broker) -> List[Order]:
+    def list_active_orders(self, broker: Broker) -> list[Order]:
         """Get all your active orders from a broker.
 
         Args:

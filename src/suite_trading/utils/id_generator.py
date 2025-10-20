@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from threading import Lock
 
 # Module-level variables for thread-safe ID generation

@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 from enum import Enum
-from typing import Dict, Tuple
 
 
 class State(Enum):
@@ -57,7 +58,7 @@ class StateMachine:
         ```
     """
 
-    def __init__(self, initial_state: State, transitions: Dict[Tuple[State, Action], State]):
+    def __init__(self, initial_state: State, transitions: dict[tuple[State, Action], State]):
         """Initialize the state machine.
 
         Args:

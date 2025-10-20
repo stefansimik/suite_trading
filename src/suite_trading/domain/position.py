@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Union
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_utils import format_dt
@@ -34,11 +33,11 @@ class Position:
     def __init__(
         self,
         instrument: Instrument,
-        quantity: Union[Decimal, str, float],
-        average_price: Union[Decimal, str, float],
-        unrealized_pnl: Union[Decimal, str, float] = Decimal("0"),
-        realized_pnl: Union[Decimal, str, float] = Decimal("0"),
-        last_update: Optional[datetime] = None,
+        quantity: Decimal | str | float,
+        average_price: Decimal | str | float,
+        unrealized_pnl: Decimal | str | float = Decimal("0"),
+        realized_pnl: Decimal | str | float = Decimal("0"),
+        last_update: datetime | None = None,
     ):
         """Initialize a new position.
 
@@ -98,7 +97,7 @@ class Position:
         return self._realized_pnl
 
     @property
-    def last_update(self) -> Optional[datetime]:
+    def last_update(self) -> datetime | None:
         """Get the last update timestamp."""
         return self._last_update
 

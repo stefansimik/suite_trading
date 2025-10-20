@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
@@ -22,12 +21,12 @@ class BarAccumulator:
     # region Init
 
     def __init__(self) -> None:
-        self._open: Optional[Decimal] = None
-        self._high: Optional[Decimal] = None
-        self._low: Optional[Decimal] = None
-        self._close: Optional[Decimal] = None
+        self._open: Decimal | None = None
+        self._high: Decimal | None = None
+        self._low: Decimal | None = None
+        self._close: Decimal | None = None
         self._volume: Decimal = Decimal("0")
-        self._first_bar_type: Optional[BarType] = None
+        self._first_bar_type: BarType | None = None
         self._count: int = 0
 
     # endregion
@@ -141,7 +140,7 @@ class BarAccumulator:
     # region Access properties
 
     @property
-    def first_bar_type(self) -> Optional[BarType]:
+    def first_bar_type(self) -> BarType | None:
         return self._first_bar_type
 
     @property

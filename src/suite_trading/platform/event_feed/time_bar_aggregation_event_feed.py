@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from collections import deque
 from datetime import datetime
-from typing import Callable, Deque, Optional
+from typing import Callable
 import logging
 
 from suite_trading.domain.event import Event
@@ -64,7 +66,7 @@ class TimeBarAggregationEventFeed:
         self._resampler = TimeBarResampler(unit=self._unit, size=self._size, on_emit_callback=self.on_aggregated_event)
 
         # AGGREGATED EVENTS
-        self._aggregated_event_queue: Deque[BarEvent] = deque()  # Aggregated bar events are stored in this queue
+        self._aggregated_event_queue: deque[BarEvent] = deque()  # Aggregated bar events are stored in this queue
         self.emitted_event_count: int = 0
 
     # endregion
@@ -116,7 +118,7 @@ class TimeBarAggregationEventFeed:
 
     # region EventFeed protocol
 
-    def peek(self) -> Optional[Event]:
+    def peek(self) -> Event | None:
         """Return the next aggregated event without consuming it, or None if none is ready."""
         # If queue is empty, return None
         if not self._aggregated_event_queue:
@@ -125,7 +127,7 @@ class TimeBarAggregationEventFeed:
         # Return leftmost value without consuming it
         return self._aggregated_event_queue[0]
 
-    def pop(self) -> Optional[Event]:
+    def pop(self) -> Event | None:
         """Return the next aggregated event, or None if none is ready."""
         # If queue is empty, return None
         if not self._aggregated_event_queue:
