@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Callable, TYPE_CHECKING
+from dataclasses import dataclass
+from collections.abc import Iterable
 
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.market_data.price_sample import PriceSample
@@ -155,18 +157,53 @@ class SimBroker(Broker):
 
     # region Price processing
 
-    def process_price_sample(self, sample: PriceSample) -> None:
-        """Handle a new `PriceSample`.
+    @dataclass(frozen=True)
+    class MatchResult:
+        """Result of matching a single `PriceSample` against orders."""
 
-        This is a placeholder during early design. TradingEngine will call
-        `process_price_sample` for each incoming `PriceSample`. Matching and state
-        transitions will be implemented later.
+        executions: list[Execution]
+        updated_orders: list[Order]
+
+    def _match_orders_for_sample(
+        self,
+        sample: PriceSample,
+        orders: Iterable[Order],
+    ) -> MatchResult:
+        """Evaluate $sample against $orders and propose effects.
+
+        Args:
+            sample: Single `PriceSample` to evaluate.
+            orders: Active `Order`(s) targeting `sample.instrument`.
+
+        Returns:
+            MatchResult: Proposed executions and order-state transitions.
+
+        Note:
+            Real matching (market/limit/stop, TIF, partials) will be implemented later.
         """
+        return self.MatchResult(executions=[], updated_orders=[])
+
+    def process_price_sample(self, sample: PriceSample) -> None:
+        """Handle a new `PriceSample`."""
         # Retrieve candidate orders by scanning (simpler but less efficient)
         orders = [o for o in self._orders_by_id.values() if o.instrument == sample.instrument]
-        # Matching logic will iterate only over relevant orders (no full scan)
-        for order in orders:
-            ...  # TODO: match and update state
+
+        result = self._match_orders_for_sample(sample, orders)
+
+        # Emit executions first, then order updates
+        if self._on_execution is not None:
+            for exe in result.executions:
+                # NOTE: assume `exe.order_id` maps to a tracked order
+                order = self._orders_by_id.get(exe.order_id)
+                if order is not None:
+                    self._on_execution(self, order, exe)
+
+        if self._on_order_updated is not None:
+            for updated in result.updated_orders:
+                # Replace tracked order with updated state
+                self._orders_by_id[updated.order_id] = updated
+                self._on_order_updated(self, updated)
+
         return
 
     # endregion
