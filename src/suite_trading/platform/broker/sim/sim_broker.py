@@ -10,12 +10,13 @@ from suite_trading.domain.market_data.price_sample import PriceSample
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
+from suite_trading.platform.broker.capabilities import PriceSampleConsumer
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
 
 
-class SimBroker(Broker):
+class SimBroker(Broker, PriceSampleConsumer):
     """Simulated broker for backtesting/paper trading.
 
     Regions with '(from Broker)' implement the Broker protocol. Other regions are unique to SimBroker implementation.

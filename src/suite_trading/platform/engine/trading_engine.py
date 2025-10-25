@@ -9,6 +9,8 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
+from suite_trading.domain.market_data.price_sample_source import PriceSampleSource
+from suite_trading.platform.broker.capabilities import PriceSampleConsumer
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
@@ -95,6 +97,8 @@ class TradingEngine:
 
         # Brokers registry (type-keyed, one instance per class)
         self._brokers_by_type_dict: dict[type[Broker], Broker] = {}
+        # Brokers that consume price samples (capability-based)
+        self._price_sample_consuming_brokers: list[PriceSampleConsumer] = []
 
         # Strategies registry (bi-directional dictionary)
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
@@ -192,7 +196,12 @@ class TradingEngine:
 
         self._brokers_by_type_dict[broker_type] = broker
         broker.set_callbacks(self._on_broker_execution, self._on_broker_order_update)
-        logger.debug(f"Added Broker (class {broker_type.__name__}) and registered callbacks")
+        logger.debug(f"Broker (class {broker_type.__name__}) was added to {TradingEngine.__name__}.")
+
+        # Register brokers that can consume PriceSample-s
+        if isinstance(broker, PriceSampleConsumer):
+            self._price_sample_consuming_brokers.append(broker)
+            logger.debug(f"Broker (class {broker_type.__name__}) was added among brokers, that consume Event-s of type {PriceSampleSource.__name__}.")
 
     def remove_broker(self, broker_type: type[Broker]) -> None:
         """Remove a broker by type.
@@ -519,6 +528,14 @@ class TradingEngine:
                         # Cleanup all feeds for this strategy
                         self._close_and_remove_all_feeds_for_strategy(strategy)
 
+                    # Route Events of type PriceSampleSource to capable brokers (when they have active orders)
+                    if isinstance(next_event, PriceSampleSource):
+                        for sample in next_event.iter_price_samples():
+                            for broker in self._price_sample_consuming_brokers:
+                                if not broker.list_active_orders():
+                                    continue
+                                broker.process_price_sample(sample)
+
                     # Notify EventFeed listeners after strategy callback.
                     # This is the single place listeners are invoked for EventFeed(s); feeds must not self-notify.
                     try:
@@ -792,6 +809,7 @@ class TradingEngine:
             except Exception as inner:
                 logger.error(f"Error in `Strategy.on_error` for Strategy named '{strategy.name}': {inner}")
 
+    # TODO: this is unfinished, needs some thinking, how to do it well
     def _cleanup_if_terminal(self, order: Order) -> None:
         """Remove $order mappings if it is in a terminal state.
 
