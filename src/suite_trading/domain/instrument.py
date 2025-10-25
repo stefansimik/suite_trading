@@ -84,29 +84,53 @@ class Instrument:
 
     # region Convenience
 
-    def price_from_ticks(self, n: int) -> Decimal:
-        """Return a price delta equal to $n price_from_ticks (n * $price_increment).
+    def ticks_to_price(self, tick_count: int) -> Decimal:
+        """Return price delta for $tick_count ticks as an exact Decimal.
 
         Args:
-            n (int): Number of price price_from_ticks. Must be a positive integer.
+            tick_count: Tick count; can be negative, zero, or positive.
 
         Returns:
-            Decimal: Exact price change as `n * price_increment`.
+            Decimal: Exact price change computed as `tick_count * price_increment`.
 
         Raises:
-            TypeError: If $n is not an int.
-            ValueError: If $n <= 0.
+            TypeError: If $tick_count is not an int.
         """
-        # Check: enforce integer count of price_from_ticks for predictable arithmetic
-        if not isinstance(n, int):
-            raise TypeError("Cannot call `price_from_ticks` because $n is not int. Pass a positive int for tick count.")
+        # Check: enforce integer tick count for predictable arithmetic
+        if not isinstance(tick_count, int):
+            raise TypeError("Cannot call `ticks_to_price` because $tick_count is not int. Pass an int for tick count.")
+        # Return the price delta; negative and zero are allowed
+        return self.price_increment * tick_count
 
-        # Check: price_from_ticks must be positive to express a non-zero price delta
-        if n <= 0:
-            raise ValueError(f"Cannot call `price_from_ticks` because $n ('{n}') must be > 0.")
+    def price_to_ticks(self, price_delta: Decimal) -> int:
+        """Return the number of whole ticks represented by $price_delta.
 
-        # Return the price delta
-        return self.price_increment * n
+        The result is signed and computed as `price_delta / price_increment`.
+
+        Args:
+            price_delta (Decimal): Price delta to convert to ticks.
+
+        Returns:
+            int: Signed tick count.
+
+        Raises:
+            TypeError: If $price_delta is not Decimal.
+            ValueError: If $price_delta is not finite or not a multiple of $price_increment.
+        """
+        # Check: enforce Decimal input to avoid silent float issues
+        if not isinstance(price_delta, Decimal):
+            raise TypeError("Cannot call `price_to_ticks` because $price_delta must be Decimal")
+
+        # Check: input must be finite
+        if not price_delta.is_finite():
+            raise ValueError(f"Cannot call `price_to_ticks` because $price_delta ('{price_delta}') is not finite")
+
+        # Check: price_delta must align to the instrument's tick size
+        if price_delta % self.price_increment != 0:
+            raise ValueError(f"Cannot call `price_to_ticks` because $price_delta ('{price_delta}') is not a multiple of $price_increment ('{self.price_increment}')")
+
+        ticks = price_delta / self.price_increment
+        return int(ticks)
 
     def quantity_from_lots(self, n: int) -> Decimal:
         """Return a quantity equal to $n quantity_from_lots (n * $quantity_increment).
