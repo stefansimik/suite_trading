@@ -393,6 +393,63 @@ Acceptance checks:
 - [ ] Module starts with `from __future__ import annotations`.
 - [ ] If using `Enum`, relying on its `__eq__` is acceptable; otherwise implement `__eq__`.
 
+## 2.14 Complexity control and premature abstraction
+
+Rule: Do not introduce new types, layers, helpers, or indirection that increase complexity
+unless the gain is immediate, material. well justified and documented. Prefer the simplest working shape until a clear need emerges.
+
+What this means now:
+- Do not alias simple primitives in public APIs (e.g., `Price = Decimal`, `Volume = Decimal`,
+  `Level = tuple[Decimal, Decimal]`).
+- Prefer explicit types in signatures and attributes (e.g., `tuple[Decimal, Decimal]`).
+- Do not add wrapper classes for tuples/lists/dicts just to name fields; use names and
+  docstrings instead.
+
+When to add a new value object or abstraction (add only if at least one is true):
+- We must enforce invariants/units or validation (e.g., currency, tick size, rounding).
+- We attach behavior that belongs with the data (methods, arithmetic with rounding rules).
+- We need measurable performance/memory improvements in hot paths.
+- The shape is reused across 3+ call sites or modules and duplication is a real maintenance cost.
+- It represents an external boundary (serialization schema, protocol, storage).
+
+If you add one, choose the smallest construct that works:
+- Prefer `NamedTuple` for read-only shapes.
+- Or `@dataclass(frozen=True)` with `__slots__` when validation is needed.
+
+Process and documentation:
+- Include a one-line justification comment above the definition: `# Justification: <reason>`.
+- In docstrings, state the invariant(s) or performance reason explicitly.
+- Avoid `utils` modules/functions with a single call site; keep logic local.
+
+Examples:
+Not allowed:
+```python
+# Adds indirection without clear gain
+Price = Decimal
+Volume = Decimal
+Level = tuple[Decimal, Decimal]
+```
+Preferred:
+```python
+bids: Sequence[tuple[Decimal, Decimal]]
+asks: Sequence[tuple[Decimal, Decimal]]
+```
+Allowed later (when criteria met):
+```python
+from typing import NamedTuple
+
+class BookLevel(NamedTuple):
+    price: Decimal
+    volume: Decimal
+# Justification: Enforce non-negative volume and unify schema across 5 modules.
+```
+
+Acceptance checks:
+- [ ] No primitive aliases (e.g., `Price`, `Volume`) in public APIs.
+- [ ] New abstractions include a `# Justification:` line explaining the concrete reason.
+- [ ] Signatures use explicit types unless a justified value object exists.
+- [ ] `utils` or wrappers introduced only with 3+ reuse sites or explicit hot-path perf need.
+
 # 3. Code organization (supporting)
 
 ## 3.1 Regions
