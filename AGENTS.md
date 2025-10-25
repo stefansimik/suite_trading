@@ -450,6 +450,16 @@ Acceptance checks:
 - [ ] Signatures use explicit types unless a justified value object exists.
 - [ ] `utils` or wrappers introduced only with 3+ reuse sites or explicit hot-path perf need.
 
+## 2.15 Price validation: negative values are allowed when market supports them
+
+Rule: Do not reject negative $price values in generic validation. Some markets can trade
+below zero.
+
+Why:
+- Certain commodities and energy markets (e.g., electricity, power futures) may have
+  negative prices.
+- Interest rate instruments and funding rates can be negative in some regimes.
+
 # 3. Code organization (supporting)
 
 ## 3.1 Regions
