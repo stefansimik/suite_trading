@@ -184,14 +184,15 @@ class TradingEngine:
         Raises:
             ValueError: If a broker of the same class was already added.
         """
-        key = type(broker)
-        # Check: only one broker per concrete class
-        if key in self._brokers_dict:
-            raise ValueError(f"Cannot call `add_broker` because a broker of class {key.__name__} is already added to this TradingEngine")
+        broker_type = type(broker)
 
-        self._brokers_dict[key] = broker
+        # Check: only one broker per concrete class
+        if broker_type in self._brokers_dict:
+            raise ValueError(f"Cannot call `add_broker` because a broker of class {broker_type.__name__} is already added to this TradingEngine")
+
+        self._brokers_dict[broker_type] = broker
         broker.set_callbacks(self._on_broker_execution, self._on_broker_order_update)
-        logger.debug(f"Added Broker (class {key.__name__}) and registered callbacks")
+        logger.debug(f"Added Broker (class {broker_type.__name__}) and registered callbacks")
 
     def remove_broker(self, broker_type: type[Broker]) -> None:
         """Remove a broker by type.
