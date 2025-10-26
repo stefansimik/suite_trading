@@ -282,8 +282,23 @@ logger.debug(
 - Include function name in backticks: `` `function_name` ``
 - Identify variables with `$` and real names; include values when helpful
 - **Message must be single line**, regardless of length
+- If the entire `raise` call fits on one line, write it on a single line; do not wrap it across lines
 
-**Template:**
+**Short message — Preferred (one line):**
+```python
+if self.quantity <= 0:
+    raise ValueError(f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive")
+```
+
+**Short message — Wrong (wrapped unnecessarily):**
+```python
+if self.quantity <= 0:
+    raise ValueError(
+        f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive"
+    )
+```
+
+**Template (long message that doesn't fit on one line):**
 ```python
 raise ValueError(
     f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. "
@@ -291,13 +306,18 @@ raise ValueError(
 )
 ```
 
-**Example:**
+**Example (long message):**
 ```python
 raise ValueError(
     f"Cannot submit Order with $quantity ({quantity}) <= 0. "
     f"Provide a positive quantity or call `cancel_order` instead."
 )
 ```
+
+**Acceptance checks:**
+- [ ] For short messages, the entire `raise` statement is a single line (not wrapped)
+- [ ] Exception messages use f-strings with project terms and variable markers
+- [ ] Message text itself is a single line even when the `raise` spans multiple lines
 
 ---
 
