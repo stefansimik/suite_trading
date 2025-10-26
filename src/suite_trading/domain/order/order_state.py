@@ -1,49 +1,60 @@
+from __future__ import annotations
+
 from suite_trading.utils.state_machine import State, Action, StateMachine
 
 
 class OrderState(State):
     """States representing the lifecycle of an order."""
 
-    # Initial states - Order creation and preparation
-    INITIALIZED = "INITIALIZED"  # Order created but not yet ready for submission (validation, risk checks pending)
-    PENDING = "PENDING"  # Order ready to be submitted to broker (backward compatibility)
+    # region States
+    # Initial states — order creation and intent to submit
+    INITIALIZED = "INITIALIZED"  # Order exists locally; not sent to broker yet
+    PENDING_SUBMIT = "PENDING_SUBMIT"  # Order is in flight to broker
 
-    # Active states - Order is live and can transition to other states
-    SUBMITTED = "SUBMITTED"  # Order sent to broker, awaiting acknowledgment
-    ACCEPTED = "ACCEPTED"  # Order confirmed and accepted by broker, active in market
-    PENDING_UPDATE = "PENDING_UPDATE"  # Order modification request sent, awaiting broker confirmation
-    PENDING_CANCEL = "PENDING_CANCEL"  # Order cancellation request sent, awaiting broker confirmation
-    PARTIALLY_FILLED = "PARTIALLY_FILLED"  # Order partially executed, remaining quantity still active
-    CANCELLED = "CANCELLED"  # Order cancelled but can still receive late executions (race conditions)
-    TRIGGERED = "TRIGGERED"  # Conditional order (stop, stop-limit) has been triggered and can become active
+    # Active states — live order and pending requests
+    SUBMITTED = "SUBMITTED"  # Broker has the order; waiting to go live or be rejected
+    WORKING = "WORKING"  # Order is live on the market and can fill
+    PENDING_UPDATE = "PENDING_UPDATE"  # Update request is in flight; current version still live
+    PENDING_CANCEL = "PENDING_CANCEL"  # Cancel request is in flight
+    PARTIALLY_FILLED = "PARTIALLY_FILLED"  # Order filled partially; some quantity remains unfilled
+    CANCELLED = "CANCELLED"  # Order cancelled; rare late fills may still arrive
 
-    # Terminal states - Final states with no further transitions possible
-    DENIED = "DENIED"  # Order denied before submission (failed validation, risk limits, etc.)
-    REJECTED = "REJECTED"  # Order rejected by broker after submission
-    FILLED = "FILLED"  # Order completely executed, no remaining quantity
-    EXPIRED = "EXPIRED"  # Order expired due to time constraints (GTD, FOK, IOC, etc.)
+    # Triggering
+    TRIGGER_PENDING = "TRIGGER_PENDING"  # Order has a condition; on hold until the condition is met
+    TRIGGERED = "TRIGGERED"  # Condition met; sending the live order now
+
+    # Terminal states — final or effectively final
+    DENIED = "DENIED"  # Denied before submission to broker (local checks or risk rules)
+    REJECTED = "REJECTED"  # Rejected after submission by broker or venue
+    FILLED = "FILLED"  # Filled completely; no quantity remains
+    EXPIRED = "EXPIRED"  # Expired by time-in-force (Day, IOC, FOK, GTD)
+    # endregion
 
 
 class OrderAction(Action):
-    """Actions that can be performed on an order."""
+    """Actions that can be performed on an order.
+
+    Notes:
+        ACCEPT/REJECT always refer to the request in the current state.
+    """
 
     # Submission actions
-    SUBMIT = "SUBMIT"  # Submit order to broker for processing
-    ACCEPT = "ACCEPT"  # Broker accepts and confirms the order
-    DENY = "DENY"  # Deny order before submission (validation, risk management)
-    REJECT = "REJECT"  # Broker rejects the order after submission
+    SUBMIT = "SUBMIT"  # Send the order to the broker
+    ACCEPT = "ACCEPT"  # Current request was accepted (submit/update/cancel)
+    DENY = "DENY"  # Block the order before sending to broker (local checks)
+    REJECT = "REJECT"  # Current request was rejected after sending to broker
 
     # Modification actions
-    UPDATE = "UPDATE"  # Request order modification (price, quantity, etc.)
-    CANCEL = "CANCEL"  # Request order cancellation
+    UPDATE = "UPDATE"  # Ask to change price, quantity, or other order params
+    CANCEL = "CANCEL"  # Ask the broker to cancel the order
 
     # Execution actions
-    PARTIAL_FILL = "PARTIAL_FILL"  # Order partially executed with remaining quantity
-    FILL = "FILL"  # Order completely executed
+    PARTIAL_FILL = "PARTIAL_FILL"  # Some quantity just filled; some remains unfilled
+    FILL = "FILL"  # All remaining quantity just filled; order complete
 
     # System actions
-    EXPIRE = "EXPIRE"  # Order expires due to time constraints
-    TRIGGER = "TRIGGER"  # Conditional order gets triggered
+    EXPIRE = "EXPIRE"  # Order expired by its time-in-force
+    TRIGGER = "TRIGGER"  # The hold condition fired (e.g., stop or trailing)
 
 
 def create_order_state_machine() -> StateMachine:
@@ -53,34 +64,33 @@ def create_order_state_machine() -> StateMachine:
         StateMachine: A configured state machine for managing order states.
     """
     transitions = {
-        # Initial state transitions
+        # Initial submission path
         (OrderState.INITIALIZED, OrderAction.DENY): OrderState.DENIED,
-        (OrderState.INITIALIZED, OrderAction.SUBMIT): OrderState.PENDING,
-        (OrderState.PENDING, OrderAction.SUBMIT): OrderState.SUBMITTED,
-        (OrderState.PENDING, OrderAction.DENY): OrderState.DENIED,
+        (OrderState.INITIALIZED, OrderAction.SUBMIT): OrderState.PENDING_SUBMIT,
+        (OrderState.PENDING_SUBMIT, OrderAction.ACCEPT): OrderState.SUBMITTED,
+        (OrderState.PENDING_SUBMIT, OrderAction.DENY): OrderState.DENIED,
         # Submission state transitions
-        (OrderState.SUBMITTED, OrderAction.ACCEPT): OrderState.ACCEPTED,
+        (OrderState.SUBMITTED, OrderAction.ACCEPT): OrderState.WORKING,
         (OrderState.SUBMITTED, OrderAction.REJECT): OrderState.REJECTED,
-        (OrderState.SUBMITTED, OrderAction.CANCEL): OrderState.CANCELLED,  # FOK/IOC cases
+        (OrderState.SUBMITTED, OrderAction.CANCEL): OrderState.CANCELLED,  # FOK/IOC not fillable
         (OrderState.SUBMITTED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.SUBMITTED, OrderAction.FILL): OrderState.FILLED,
-        # Active order transitions
-        (OrderState.ACCEPTED, OrderAction.UPDATE): OrderState.PENDING_UPDATE,
-        (OrderState.ACCEPTED, OrderAction.CANCEL): OrderState.PENDING_CANCEL,
-        (OrderState.ACCEPTED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
-        (OrderState.ACCEPTED, OrderAction.FILL): OrderState.FILLED,
-        (OrderState.ACCEPTED, OrderAction.EXPIRE): OrderState.EXPIRED,
-        (OrderState.ACCEPTED, OrderAction.TRIGGER): OrderState.TRIGGERED,
+        # Active (working) order transitions
+        (OrderState.WORKING, OrderAction.UPDATE): OrderState.PENDING_UPDATE,
+        (OrderState.WORKING, OrderAction.CANCEL): OrderState.PENDING_CANCEL,
+        (OrderState.WORKING, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
+        (OrderState.WORKING, OrderAction.FILL): OrderState.FILLED,
+        (OrderState.WORKING, OrderAction.EXPIRE): OrderState.EXPIRED,
         # Pending update transitions
-        (OrderState.PENDING_UPDATE, OrderAction.ACCEPT): OrderState.ACCEPTED,
-        (OrderState.PENDING_UPDATE, OrderAction.REJECT): OrderState.ACCEPTED,  # Failed update
+        (OrderState.PENDING_UPDATE, OrderAction.ACCEPT): OrderState.WORKING,  # update applied
+        (OrderState.PENDING_UPDATE, OrderAction.REJECT): OrderState.WORKING,  # update failed, old version continues
         (OrderState.PENDING_UPDATE, OrderAction.CANCEL): OrderState.CANCELLED,
         (OrderState.PENDING_UPDATE, OrderAction.EXPIRE): OrderState.EXPIRED,
         (OrderState.PENDING_UPDATE, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.PENDING_UPDATE, OrderAction.FILL): OrderState.FILLED,
         # Pending cancel transitions
-        (OrderState.PENDING_CANCEL, OrderAction.ACCEPT): OrderState.CANCELLED,  # Cancel confirmed
-        (OrderState.PENDING_CANCEL, OrderAction.REJECT): OrderState.ACCEPTED,  # Cancel failed
+        (OrderState.PENDING_CANCEL, OrderAction.ACCEPT): OrderState.CANCELLED,  # cancel confirmed
+        (OrderState.PENDING_CANCEL, OrderAction.REJECT): OrderState.WORKING,  # cancel failed
         (OrderState.PENDING_CANCEL, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.PENDING_CANCEL, OrderAction.FILL): OrderState.FILLED,
         # Execution state transitions
@@ -89,14 +99,14 @@ def create_order_state_machine() -> StateMachine:
         (OrderState.PARTIALLY_FILLED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.PARTIALLY_FILLED, OrderAction.FILL): OrderState.FILLED,
         (OrderState.PARTIALLY_FILLED, OrderAction.EXPIRE): OrderState.EXPIRED,
-        # Triggered order transitions
-        (OrderState.TRIGGERED, OrderAction.ACCEPT): OrderState.ACCEPTED,
+        # Trigger flow (explicit hold → fire → submit)
+        (OrderState.TRIGGER_PENDING, OrderAction.TRIGGER): OrderState.TRIGGERED,
+        (OrderState.TRIGGERED, OrderAction.SUBMIT): OrderState.PENDING_SUBMIT,
+        (OrderState.TRIGGERED, OrderAction.ACCEPT): OrderState.WORKING,  # broker shortcut
         (OrderState.TRIGGERED, OrderAction.REJECT): OrderState.REJECTED,
-        (OrderState.TRIGGERED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
-        (OrderState.TRIGGERED, OrderAction.FILL): OrderState.FILLED,
         (OrderState.TRIGGERED, OrderAction.CANCEL): OrderState.CANCELLED,
         (OrderState.TRIGGERED, OrderAction.EXPIRE): OrderState.EXPIRED,
-        # Real-world race condition handling
+        # Real-world late fill race handling
         (OrderState.CANCELLED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.CANCELLED, OrderAction.FILL): OrderState.FILLED,
     }
