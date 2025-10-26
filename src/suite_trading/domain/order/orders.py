@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from suite_trading.strategy.strategy import Strategy
 
 
+# region Orders
+
+
 class Order:
     """Base class for all trading orders.
 
@@ -73,6 +76,8 @@ class Order:
         # Validation
         self._validate()
 
+    # region Properties
+
     @property
     def order_id(self) -> str:
         """Get the unique identifier for the order.
@@ -101,72 +106,6 @@ class Order:
         return self._side
 
     @property
-    def quantity(self) -> Decimal:
-        """Get the quantity to trade.
-
-        Returns:
-            Decimal: The order quantity.
-        """
-        return self._quantity
-
-    @property
-    def time_in_force(self) -> TimeInForce:
-        """Get how long the order remains active.
-
-        Returns:
-            TimeInForce: The time in force setting.
-        """
-        return self._time_in_force
-
-    @property
-    def strategy(self) -> Strategy | None:
-        """Get the Strategy that created this order, if available.
-
-        Returns:
-            Optional[Strategy]: The Strategy reference or None.
-        """
-        return self._strategy
-
-    @property
-    def filled_quantity(self) -> Decimal:
-        """Total executed quantity across `executions`.
-
-        Returns:
-            Decimal: Sum of execution quantities.
-        """
-        total = Decimal("0")
-        for e in self.executions:
-            total += e.quantity
-        return total
-
-    @property
-    def average_fill_price(self) -> Decimal | None:
-        """Weighted average price (VWAP) of executions, or None if no fills.
-
-        Note:
-            VWAP is not snapped to tick size; it may fall between ticks. Use
-            presentation-layer formatting if you need display rounding.
-
-        Returns:
-            Decimal | None: VWAP of executions, or None.
-        """
-        filled = self.filled_quantity
-        if filled == 0:
-            return None
-
-        notional = Decimal("0")
-        for e in self.executions:
-            notional += e.price * e.quantity
-
-        avg_price = notional / filled
-        return avg_price
-
-    @property
-    def unfilled_quantity(self) -> Decimal:
-        """Remaining unfilled quantity for this order."""
-        return self.quantity - self.filled_quantity
-
-    @property
     def is_buy(self) -> bool:
         """Check if this is a buy order.
 
@@ -183,6 +122,32 @@ class Order:
             bool: True if this is a sell order.
         """
         return self.side == OrderSide.SELL
+
+    @property
+    def quantity(self) -> Decimal:
+        """Get the quantity to trade.
+
+        Returns:
+            Decimal: The order quantity.
+        """
+        return self._quantity
+
+    @property
+    def filled_quantity(self) -> Decimal:
+        """Total executed quantity across `executions`.
+
+        Returns:
+            Decimal: Sum of execution quantities.
+        """
+        total = Decimal("0")
+        for e in self.executions:
+            total += e.quantity
+        return total
+
+    @property
+    def unfilled_quantity(self) -> Decimal:
+        """Remaining unfilled quantity for this order."""
+        return self.quantity - self.filled_quantity
 
     @property
     def is_unfilled(self) -> bool:
@@ -212,6 +177,59 @@ class Order:
         """
         return self.filled_quantity == self.quantity
 
+    @property
+    def average_fill_price(self) -> Decimal | None:
+        """Weighted average price (VWAP) of executions, or None if no fills.
+
+        Note:
+            VWAP is not snapped to tick size; it may fall between ticks. Use
+            presentation-layer formatting if you need display rounding.
+
+        Returns:
+            Decimal | None: VWAP of executions, or None.
+        """
+        filled = self.filled_quantity
+        if filled == 0:
+            return None
+
+        notional = Decimal("0")
+        for e in self.executions:
+            notional += e.price * e.quantity
+
+        avg_price = notional / filled
+        return avg_price
+
+    @property
+    def time_in_force(self) -> TimeInForce:
+        """Get how long the order remains active.
+
+        Returns:
+            TimeInForce: The time in force setting.
+        """
+        return self._time_in_force
+
+    @property
+    def strategy(self) -> Strategy | None:
+        """Get the Strategy that created this order, if available.
+
+        Returns:
+            Optional[Strategy]: The Strategy reference or None.
+        """
+        return self._strategy
+
+    @property
+    def state(self) -> OrderState:
+        """Get the current state of the order from the state machine.
+
+        Returns:
+            OrderState: The current state of the order.
+        """
+        return self._state_machine.current_state
+
+    # endregion
+
+    # region Main
+
     def add_execution(self, execution: Execution) -> None:
         """Add a new execution for this order in chronological order.
 
@@ -234,15 +252,6 @@ class Order:
 
         self.executions.append(execution)
 
-    @property
-    def state(self) -> OrderState:
-        """Get the current state of the order from the state machine.
-
-        Returns:
-            OrderState: The current state of the order.
-        """
-        return self._state_machine.current_state
-
     def change_state(self, action: OrderAction) -> None:
         """Change order state based on action.
 
@@ -255,6 +264,10 @@ class Order:
         # Execute action on the state machine - state is now managed by the property
         self._state_machine.execute_action(action)
 
+    # endregion
+
+    # region Utilities
+
     def _validate(self) -> None:
         """Validate intrinsic order inputs at construction time.
 
@@ -264,6 +277,10 @@ class Order:
         # Check: positive order quantity
         if self.quantity <= 0:
             raise ValueError(f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive")
+
+    # endregion
+
+    # region Magic
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(order_id={self.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
@@ -290,6 +307,9 @@ class Order:
         Hash is derived from stable `order_id` to be consistent with `__eq__`.
         """
         return hash(self.order_id)
+
+
+# endregion
 
 
 class MarketOrder(Order):
@@ -515,3 +535,6 @@ class StopLimitOrder(Order):
 
         if self.limit_price <= 0:
             raise ValueError(f"$limit_price must be positive, but provided value is: {self.limit_price}")
+
+
+# endregion
