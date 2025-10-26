@@ -7,13 +7,14 @@ class OrderState(State):
     """States representing the lifecycle of an order."""
 
     # region States
+
     # Initial states — order creation and intent to submit
     INITIALIZED = "INITIALIZED"  # Order exists locally; not sent to broker yet
     PENDING_SUBMIT = "PENDING_SUBMIT"  # Order is in flight to broker
 
     # Active states — live order and pending requests
-    SUBMITTED = "SUBMITTED"  # Broker has the order; waiting to go live or be rejected
-    WORKING = "WORKING"  # Order is live on the market and can fill
+    SUBMITTED = "SUBMITTED"  # Broker has the order but it is not live yet. The broker checks it and sends it to the exchange
+    WORKING = "WORKING"  # Order is live on the exchange
     PENDING_UPDATE = "PENDING_UPDATE"  # Update request is in flight; current version still live
     PENDING_CANCEL = "PENDING_CANCEL"  # Cancel request is in flight
     PARTIALLY_FILLED = "PARTIALLY_FILLED"  # Order filled partially; some quantity remains unfilled
@@ -39,14 +40,21 @@ class OrderAction(Action):
     """Actions that can be performed on an order.
 
     Notes:
-        ACCEPT/REJECT always refer to the request in the current state.
+        - ACCEPT and REJECT always answer the request you made in the current state.
+        - Who accepted the request is implied by the previous state; no extra actions are needed:
+            * From state `PENDING_SUBMIT` + action `ACCEPT` → leads to state `SUBMITTED` (accepted by broker).
+            * From state `SUBMITTED` + action `ACCEPT` → leads to state `WORKING` (accepted by exchange).
+            * From state `PENDING_UPDATE` + action `ACCEPT` → leads to state `WORKING` (exchange accepted the update).
+            * From state `PENDING_CANCEL` + action `ACCEPT` → leads to state `CANCELLED` (exchange accepted the cancel).
+            * From state `TRIGGERED` + action `ACCEPT` → leads to state `WORKING` (broker accepts and makes it live now).
+        This convention keeps the state machine small and predictable. It also makes logs and callbacks clear about who accepted what.
     """
 
     # Submission actions
     SUBMIT = "SUBMIT"  # Send the order to the broker
-    ACCEPT = "ACCEPT"  # Current request was accepted (submit/update/cancel)
+    ACCEPT = "ACCEPT"  # Accept the current request; who accepted depends on the previous state
     DENY = "DENY"  # Block the order before sending to broker (local checks)
-    REJECT = "REJECT"  # Current request was rejected after sending to broker
+    REJECT = "REJECT"  # Reject the current request after sending (by broker/exchange)
 
     # Modification actions
     UPDATE = "UPDATE"  # Ask to change price, quantity, or other order params
@@ -109,7 +117,7 @@ def create_order_state_machine() -> StateMachine:
         # Trigger flow (explicit hold → fire → submit)
         (OrderState.TRIGGER_PENDING, OrderAction.TRIGGER): OrderState.TRIGGERED,
         (OrderState.TRIGGERED, OrderAction.SUBMIT): OrderState.PENDING_SUBMIT,
-        (OrderState.TRIGGERED, OrderAction.ACCEPT): OrderState.WORKING,  # broker shortcut
+        (OrderState.TRIGGERED, OrderAction.ACCEPT): OrderState.WORKING,  # broker accepts and makes it live now
         (OrderState.TRIGGERED, OrderAction.REJECT): OrderState.REJECTED,
         (OrderState.TRIGGERED, OrderAction.CANCEL): OrderState.CANCELLED,
         (OrderState.TRIGGERED, OrderAction.EXPIRE): OrderState.EXPIRED,
