@@ -1,377 +1,365 @@
-Project: Modern algorithmic trading framework in Python for backtesting and live trading.
+# Modern Algorithmic Trading Framework - Development Guidelines
 
-# 1. Golden rules and priorities
+**Project**: Python framework for backtesting and live trading.
 
-## 1.1 Core principles
-- KISS: Prefer the simplest working solution
-- YAGNI: Implement only when needed
-- DRY: Do not duplicate information, logic, or business rules
-- Fail fast: Detect and report errors immediately
-- Intuitive domain model: Keep domain objects simple and understandable
-- Single responsibility: Each class has one job
-- Separation of concerns: Split responsibilities across the system
-- Principle of least surprise: Make behavior match user expectations
+---
 
-## 1.2 Initial development mode
-During initial development, backward compatibility is out of scope. Breaking changes are
-allowed; remove or redesign anything to get the design right.
+# 1. Core Principles & Development Philosophy
 
-## 1.3 User‑centric API design
-Rule: Design APIs for the user, not for internal convenience.
+## 1.1. Design Principles
+- **KISS (Keep It Simple, Stupid):** Simplest working solution
+- **YAGNI (You Aren't Gonna Need It):** Implement only when actively required
+- **DRY (Don't Repeat Yourself):** No duplication of information, logic, or business rules
+- **Fail Fast:** Report errors immediately upon detection
+- **Intuitive Domain Model:** Keep objects simple; names/flows match trading mental model
+- **Single Responsibility:** Each class has one distinct purpose
+- **Separation of Concerns:** Divide responsibilities into distinct sections
+- **Principle of Least Surprise:** Behavior aligns with user expectations
+- **User-Centric API:** Design for users, not internal convenience
 
-Prefer user‑friendly choices when cost is low, they fit the existing style and do not add
-ongoing complexity.
+## 1.2. Development Mode
+**Breaking changes allowed** during initial development. Backward compatibility is out of scope.
+Remove or redesign anything to achieve optimal design.
 
-# 2. Code writing rules (critical)
+**Acceptance checks:**
+- [ ] Rules reflected in new modules; reviews mention them explicitly
+- [ ] Acronyms defined inline on first use (KISS, YAGNI, DRY)
 
-## 2.1 Naming
-Rule: Names must be simple, predictable, and self‑documenting.
+---
 
-Use clear, descriptive names: verbs for functions, nouns for variables, specific over vague,
-and Python snake_case. Avoid abbreviations (e.g., user_count, not usr_cnt).
+# 2. Naming Conventions & API Design
 
-Examples:
+## 2.1. General Naming Rules
+Names must be **simple, predictable, and self-documenting**. Use Python `snake_case`.
+Avoid abbreviations.
+
+- **Functions/Methods:** Use verbs describing the action
+- **Variables/Attributes:** Use nouns describing the data
+- **Domain terms:** Use consistently; be concise but never sacrifice clarity
+
+## 2.2. Method Naming Patterns
+
+**Resource access and retrieval:**
+- `list_*`: Return collections
+  - Example: `list_active_orders()`, `list_open_positions()`
+- `get_*`: Retrieve existing single resource; **cheap, no modeling, no heavy computation**
+  - Example: `get_account_info()`, `get_order(order_id)`, `get_best_bid()`
+- `build_*` or `create_*`: Construct/model new objects from inputs (signals expensive operation)
+  - Example: `build_order_book(sample)`, `create_snapshot(now)`, `build_position_report()`
+- `compute_*`: Derived numeric metrics requiring calculation
+  - Example: `compute_realized_pnl(trades)`, `compute_sharpe(returns)`
+- `find_*` or `query_*`: Search/filter with partial/empty results (optional, future scope)
+
+**Critical rule:** ❌ **Never use `get_*` for modeling or heavy computation**
+
+**Examples:**
 ```python
 # ✅ Good
 def calculate_portfolio_value(positions: list) -> Decimal: ...
+def build_order_book(sample: MarketData) -> OrderBook: ...
 
 # ❌ Bad
 def calc_pv(pos: list) -> Decimal: ...
+def get_order_book(sample: MarketData) -> OrderBook: ...  # Should be build_*
 ```
 
-### Improving attribute and variable names
-- Prefer clear, intuitive, and descriptive names for attributes and variables.
-- Keep names concise when possible, but never at the cost of clarity.
-- Use domain terms consistently; pick nouns for values and properties, verbs for functions.
-- Rename confusing names proactively to reduce reading and maintenance effort.
+**Acceptance checks:**
+- [ ] Public APIs use verbs above consistently
+- [ ] No `get_*` performs modeling or heavy calculations
 
-### Method naming for resource access and construction/modeling
+---
 
-- Use `list_*` for methods that return collections (lists, iterables, generators).
-  - Examples: `list_active_orders()`, `list_open_positions()`.
+# 3. Type Annotations & Signatures
 
-- Use `get_*` to retrieve an already existing single resource or value object.
-  - Retrieval rules: no heavy computation, no modeling; return current stored state or a direct
-    property.
-  - Examples: `get_account_info()`, `get_order(order_id)`, `get_best_bid()`.
+## 3.1. Modern Typing Rules
+**Always start modules with:** `from __future__ import annotations`
 
-- Use `build_*` (preferred) or `create_*` when constructing/modeling a new object or derived
-  view from inputs (e.g., to control depth, spread, or slippage). This signals the result is
-  produced now and may be more expensive than retrieval.
-  - Examples: `build_order_book(sample)`, `create_snapshot(now)`, `build_position_report()`.
+**Required practices:**
+- Use direct type names (no quotes, no `"a.b.Type"` strings)
+- Builtin generics only: `list[T]`, `dict[K, V]`, `set[T]`, `tuple[...]`
+- Use `|` and `| None` instead of `Union`/`Optional`
+- Use `type[T]` for class objects
+- `Callable[[...], R]` with explicit return type
+- Import cross-module types unconditionally or under `if TYPE_CHECKING:`
 
-- Use `compute_*` for derived numeric metrics that require calculation.
-  - Examples: `compute_realized_pnl(trades)`, `compute_sharpe(returns)`.
-
-- Use `find_*` or `query_*` only when search/filter semantics are the primary purpose and results
-  may be partial or empty from a larger domain. (Optional, future scope.)
-
-- Do not use `get_*` for operations that perform modeling/simulation or heavy calculations.
-  - Bad: `get_order_book(sample)` when the book is modeled from a `PriceSample`.
-  - Good: `build_order_book(sample)`.
-
-## 2.2 Classes, dataclasses, and named tuples
-Rule: Use standard classes for fundamental domain models. Dataclasses and named tuples are
-allowed for simple config or helper/value objects only.
-
-
-## 2.3 Parameter formatting
-For long signatures, put one parameter per line, consistent indent, trailing comma.
-
-Example:
+**Example:**
 ```python
-def __init__(
-    self,
-    instrument: Instrument,
-    side: OrderDirection,
-    quantity: Decimal,
-    order_id: int | None = None,
-) -> None: ...
-```
+from __future__ import annotations
+from typing import TYPE_CHECKING, Callable
 
-## 2.4 Logging rules (project‑wide)
-Rule: Logs must be precise, consistent, and easy to scan. Use f‑strings everywhere.
+if TYPE_CHECKING:
+    from suite_trading.domain.order.execution import Execution
 
-Always use f‑strings
-- Applies to logs, exceptions, messages, and general strings.
-- Never use logger format args or str.format/percent formatting.
-
-Allowed:
-- `logger.info(f"Started Strategy named '{name}'")`
-- Plain constant strings when no interpolation is needed
-
-Forbidden:
-- `logger.info("Started Strategy '%s'", name)`
-- `logger.info("Started Strategy '{}'".format(name))`
-- `"Hello, %s" % name`
-
-Identify domain objects in logging messages:
-- When referring to Strategies and EventFeeds, use this type of message:
-  - "Strategy named '{strategy_name}'", "EventFeed named '{feed_name}'".
-- When referring to the concept/type only: use the capitalized class name.
-  - Examples: Strategy, EventFeed, Broker, EventFeedProvider.
-- When you must include the class of an instance, make it explicit: "(class {obj.__class__.__name__})".
-
-Pluralization of class concepts
-- Use capitalized class with (s) as needed when referring to counts: "EventFeed(s)",
-  "Strategy(ies)", "broker(s)" only if not a class concept.
-
-Message structure
-- Prefer the pattern: "<Verb> <ClassName> named '{name}' <short context>".
-  - Example: `logger.info(f"Added EventFeed named '{feed_name}' to Strategy named '{s_name}'")`
-- For state transitions: "ClassName named '{name}' transitioned to <STATE>".
-- For errors: start with action/context, then the object, then the error.
-  - Example: `logger.error(f"Error closing EventFeed named '{name}': {e}")`
-
-Capitalization and terminology
-- Capitalize domain class names (Strategy, EventFeed, Broker, EventFeedProvider) when used as nouns.
-- Use "event-feed" (hyphenated) for generic prose; use "EventFeed" when referring to the class.
-
-One‑line rule for all logger calls
-- All logger calls must be on a **single line**, regardless of message length.
-- Do not wrap logger calls; a logger call must be one line even if >100 chars.
-
-Wrong:
-```python
-logger.debug(
-    f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished",
-)
-```
-
-Correct:
-```python
-logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished")
-```
-
-Examples (Do/Don't)
-- Do: `logger.info(f"Started Strategy named '{name}'")`
-- Do: `logger.error(f"Error auto-stopping Strategy named '{name}': {e}")`
-- Do: `logger.debug(f"Cleaned up finished EventFeed named '{feed_name}' for Strategy named '{s}'")`
-- Don't: `logger.info(f"Started strategy '{name}'")`  # wrong casing/pattern
-- Don't: `logger.debug("EventFeed '%s' removed", feed_name)`  # can use only f-strings
-
-## 2.5 String representation methods
-Rule: Use `self.__class__.__name__` in `__str__` and `__repr__`.
-
-Example:
-```python
-# ❌ Wrong
-def __str__(self) -> str:
-    return f"NewBarEvent(bar={self.bar}, dt_received={self.dt_received})"
-
-# ✅ Good
-def __str__(self) -> str:
-    return f"{self.__class__.__name__}(bar={self.bar}, dt_received={self.dt_received})"
-```
-
-## 2.6 Docstrings (API Documentation)
-**Rule: Docstrings document public APIs for external developers using your code.**
-
-Key requirement for docstrings:
-- Use Google-style docstrings with purpose, params, returns, exceptions, and types
-- Write in accessible language that ANY developer can understand
-- All docstrings should be written in simple, conversational English that beginners can follow
-- Avoid dense, technical jargon; prefer plain words and short sentences
-- Include all important information, but explain complex concepts simply
-- Make it immediately understandable without additional research
-- When needed, reference related code that provides essential context
-- Use concrete examples when helpful
-
-## 2.7 Code Comments
-**Rule: Comments explain the "why" and "what" of complex code logic for maintainers.**
-
-### Purpose
-Code comments significantly reduce mental load when developers quickly read or scan code.
-Instead of having to mentally parse and understand complex logic, developers can immediately grasp the intent from clear narrative comments.
-This speeds up code comprehension, debugging, and maintenance.
-
-**AI/LLM Benefit**: Comments and code automatically stay synchronized when using AI models for refactoring or modifications,
-as the AI understands both the implementation and the documented intent.
-
-### Narrative Comments
-- Short "why/what" comment above each logical unit of code
-- Use domain terms and explicit states
-- Explain business logic and reasoning
-- Use simple, conversational English; avoid dense, technical jargon
-
-### Defensive Comments
-- Use "# Check:" prefix exclusively for validation guards
-- Place immediately above the validation check
-- Explain what condition is being validated and why it matters
-
-### Comment Formatting
-- Inline comments: 2 spaces before #
-- Section comments: Sentence case capitalization
-
-### Code Reference Formatting
-Apply universally to comments, docstrings, and error messages:
-- Parameters/attributes/variables: `$parameter_name`
-- Functions/methods: `` `function_name` ``
-
-### Examples
-
-Narrative and defensive comments together:
-```python
-# Collect fills since last event and net the quantity
-fills = broker.get_fills_since(self._last_event_time)
-net_qty = sum(f.qty for f in fills)
-
-# Check: ensure we have quantity to trade
-if net_qty == 0:
-    return
-
-# Send order and record time
-broker.submit(Order(instrument, side, net_qty))
-self._last_order_time = now()
-```
-
-Code references across contexts:
-```python
-# In comments: "Process $user_input through `validate_data` function"
-# In docstrings: "The $timeout parameter controls how long `connect` waits"
-# In errors: "Cannot call `start_strategy` because $name is invalid"
-```
-
-Focus: Complete internal code commenting strategy with universal formatting standards.
-
-## 2.8 Exception messages
-Exception messages checklist:
-- 100% clear, use project terms, guide the fix.
-- Include function name in backticks.
-- Identify variables with $ and real names; include values when helpful.
-- Message inside Exception must be on a **single line**, regardless of message length.
-- Do not wrap message in exception ; message must be one line even if >999 chars.
-
-Template:
-```python
-raise ValueError(f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. Call `reset` or create a new Strategy.")
-```
-
-## 2.9 Markdown formatting
-Keep all Markdown lines (including code) <= 100 chars. Break lines at natural points.
-
-## 2.10 Datetime formatting in `__str__` and `__repr__`
-Rule: If an object includes datetimes in its string representations, they must be formatted with utilities from `suite_trading.utils.datetime_utils`.
-
-Why:
-- Consistency across the codebase
-- Predictable, human-readable output
-- Avoids ad-hoc or locale-dependent formatting
-
-Requirements:
-- Use `format_dt(dt)` for a single timestamp
-- Use `format_range(start_dt, end_dt)` for intervals
-
-Canonical example:
-- `Bar.__str__` uses `format_range(start_dt, end_dt)` correctly
-- `Bar.__repr__` is updated to use the same utility for datetimes
-
-Examples:
-```python
-# Single timestamp
-return f"{self.__class__.__name__}(id={self.id}, at={format_dt(self.timestamp)})"
-
-# Range
-dt_str = format_range(self.start_dt, self.end_dt)
-return f"{self.__class__.__name__}({self.kind}, {dt_str})"
-```
-
-## 2.11 Typing: always enable postponed annotations
-
-Rule: Start every first‑party module with `from __future__ import annotations`. Use direct type
-names everywhere (no quotes) — including self‑references in the same module/class/Protocol.
-Never use string module paths (e.g., "a.b.Type"); import the type.
-
-Imports for types:
-- Prefer unconditional imports unless they cause cycles or are heavy.
-- Otherwise import under `if TYPE_CHECKING:` and still use direct names (unquoted).
-- If using `typing.get_type_hints` at runtime, ensure symbols exist at runtime or pass
-  `globalns`/`localns`.
-
-Annotation style:
-- Builtin generics: `list[T]`, `dict[K, V]`, `set[T]`, `tuple[...]`.
-- Use `|` (and `| None`) instead of `Union`/`Optional`.
-- Use `type[T]` for class objects.
-- `Callable[[...], R]` with explicit return type.
-
-Example:
-```python
 class Broker(Protocol):
     def set_callbacks(
         self,
         on_execution: Callable[[Broker, Order, Execution], None],
         on_order_updated: Callable[[Broker, Order], None],
     ) -> None: ...
-
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from suite_trading.domain.order.execution import Execution
-
-self._on_execution: Callable[[Broker, Order, Execution], None] | None = None
 ```
 
-Acceptance checks:
-- [ ] Module starts with `from __future__ import annotations`.
-- [ ] No quoted forward references (methods, attributes, Protocols, Callables).
-- [ ] Builtin generics only (no `typing.List`/`typing.Dict`).
-- [ ] `|` unions and `| None` (no `Union`/`Optional`).
-- [ ] `Callable[[...], R]` list form with explicit return type.
-- [ ] Cross‑module types imported unconditionally or under `TYPE_CHECKING`.
-- [ ] If `get_type_hints` is used at runtime, symbols resolvable or namespaces provided.
+## 3.2. Parameter Formatting
+Long signatures: **one parameter per line**, consistent indent, **trailing comma**.
 
-## 2.12 __slots__ for high-volume, fixed-shape classes
+```python
+def __init__(
+    self,
+    instrument: Instrument,
+    quantity: Decimal,
+    order_id: int | None = None,
+) -> None: ...
+```
 
-Rule: For classes with many instances (e.g., market data, events), define `__slots__` to reduce
-memory use, improve attribute access speed, and prevent accidental attributes.
+**Acceptance checks:**
+- [ ] Module starts with `from __future__ import annotations`
+- [ ] No quoted forward references
+- [ ] Only builtin generics used (no `typing.List`/`Dict`)
+- [ ] `|` unions and `| None` (no `Union`/`Optional`)
+- [ ] `Callable[[...], R]` style with explicit return type
+- [ ] Types imported properly; `get_type_hints` resolvable
 
-When to use:
-- High instance counts at runtime (Bars, TradeTicks, QuoteTicks, PriceSample, Event subclasses).
-- Fixed attribute schema; no dynamic attributes required.
-- No reliance on an instance `__dict__`.
+---
 
-Inheritance requirement:
-- If a parent class defines `__slots__`, every subclass must also define `__slots__`.
-  - Use `__slots__ = ()` when the subclass adds no new instance fields.
-  - Otherwise list the private attribute names actually assigned (e.g., `"_price"`).
+# 4. Documentation, Comments & Messaging
 
-Implementation tips:
-- Slot the private underscored names used in `__init__`.
-- Do not add `"__weakref__"` unless instances are weak-referenced.
-- If a subclass truly needs dynamic attributes, include `"__dict__"` in its `__slots__`.
+This section covers all developer-facing text: docstrings, comments, logs, and exceptions.
 
-Examples:
+## 4.1. Docstrings (Public API Documentation)
+
+**Purpose:** Document public APIs for external developers.
+
+**Requirements:**
+- Google-style format: purpose, params, returns, exceptions, types
+- **Simple, conversational English** - avoid dense jargon
+- Include all important information; explain complex concepts simply
+- Make immediately understandable without research
+- Use concrete examples when helpful
+
+**Example:**
+```python
+def calculate_portfolio_value(positions: list) -> Decimal:
+    """Calculates the total value of all positions in a portfolio.
+
+    This sums the market value of each position based on current prices.
+    Positions with zero quantity are excluded from the calculation.
+
+    Args:
+        positions: List of Position objects with instrument and quantity.
+
+    Returns:
+        Total portfolio value as a Decimal.
+
+    Raises:
+        ValueError: If any position has invalid price data.
+    """
+    ...
+```
+
+## 4.2. Code Comments (Internal Documentation)
+
+**Purpose:** Explain "why" and "what" of complex logic for maintainers. Reduces mental load
+and makes AI-assisted refactoring safer.
+
+### Narrative Comments
+- Short "why/what" comment above each logical unit
+- Use domain terms and explicit states
+- Explain business logic and reasoning
+- Simple, conversational English
+
+### Defensive Comments
+- Use **`# Check:`** prefix exclusively for validation guards
+- Place **immediately above** validation check
+- Explain what condition is validated and why it matters
+
+### Code Reference Formatting
+Apply to comments, docstrings, and error messages:
+- **Parameters/attributes/variables:** `$parameter_name`
+- **Functions/methods:** `` `function_name` ``
+
+**Example:**
+```python
+# Collect fills since last event and net the quantity
+fills = broker.get_fills_since(self._last_event_time)
+net_qty = sum(f.qty for f in fills)
+
+# Check: ensure we have quantity to trade before submitting order
+if net_qty == 0:
+    return
+
+# Send order and record submission time
+broker.submit(Order(instrument, side, net_qty))
+self._last_order_time = now()
+```
+
+**Acceptance checks:**
+- [ ] `# Check:` used only for validation guards
+- [ ] Placed immediately above guard
+- [ ] Code reference formatting followed (`$var`, `` `func` ``)
+
+## 4.3. Logging
+
+**Core rules:** Logs must be **precise, consistent, easy to scan**.
+
+### Formatting Requirements
+- ✅ **Always use f-strings** for interpolation
+- ❌ **Never use** logger format args: `logger.info("msg %s", var)`
+- ❌ **Never use** `.format()`: `"msg {}".format(var)`
+- ❌ **Never use** `%` formatting: `"msg %s" % var`
+
+### **CRITICAL: One-Line Rule**
+**Every logger call must be a single line**, even if >100 chars. Do not wrap logger calls.
+
+```python
+# ❌ WRONG - Wrapped logger call
+logger.debug(
+    f"EventFeed named '{feed_name}' was already finished",
+)
+
+# ✅ CORRECT - Single line
+logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished")
+```
+
+### Domain Object Identification
+- Strategies/EventFeeds: `"Strategy named '{strategy_name}'"`, `"EventFeed named '{feed_name}'"`
+- Concept/type only: use capitalized class name (`Strategy`, `EventFeed`, `Broker`)
+- Include instance class: `"(class {obj.__class__.__name__})"`
+
+### Message Structure
+- Pattern: `"<Verb> <ClassName> named '{name}' <short context>"`
+- State transitions: `"ClassName named '{name}' transitioned to <STATE>"`
+- Errors: action/context → object → error
+
+### Capitalization & Terminology
+- Capitalize domain class names when used as nouns
+- Use "event-feed" (hyphenated) for generic prose
+- Use `EventFeed` when referring to the class
+- Pluralization: "EventFeed(s)", "Strategy(ies)", "broker(s)"
+
+**Examples:**
+```python
+# ✅ Good
+logger.info(f"Started Strategy named '{strategy_name}'")
+logger.debug(f"EventFeed named '{feed_name}' was already finished")
+logger.error(f"Error closing EventFeed named '{feed_name}': {e}")
+
+# ❌ Bad - using format args
+logger.info("Started Strategy '%s'", strategy_name)
+
+# ❌ Bad - wrapped across lines
+logger.debug(
+    f"EventFeed named '{feed_name}' was already finished",
+)
+```
+
+**Acceptance checks:**
+- [ ] All logger/exception strings use f-strings (no %, .format, or logger args)
+- [ ] No wrapped logger calls; each is one line
+- [ ] Messages use naming/structure rules above
+
+## 4.4. Exception Messages
+
+**Requirements:**
+- 100% clear, use project terms, guide the fix
+- Include function name in backticks: `` `function_name` ``
+- Identify variables with `$` and real names; include values when helpful
+- **Message must be single line**, regardless of length
+
+**Template:**
+```python
+raise ValueError(
+    f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. "
+    f"Call `reset` or create a new Strategy."
+)
+```
+
+**Example:**
+```python
+raise ValueError(
+    f"Cannot submit Order with $quantity ({quantity}) <= 0. "
+    f"Provide a positive quantity or call `cancel_order` instead."
+)
+```
+
+---
+
+# 5. Class Design & Structure
+
+## 5.1. Class Usage Guidelines
+- **Standard Classes:** Use for fundamental domain models
+- **Dataclasses/NamedTuples:** Only for simple config or value objects
+
+## 5.2. String Representation (`__str__`, `__repr__`)
+
+**Always include** `self.__class__.__name__` to make object types clear.
+
+**Datetime formatting:** Use utilities from `suite_trading.utils.datetime_utils`:
+- `format_dt(dt)` for single timestamp
+- `format_range(start_dt, end_dt)` for intervals
+
+**Examples:**
+```python
+# ✅ Good - using class name and datetime utils
+def __str__(self) -> str:
+    return f"{self.__class__.__name__}(id={self.id}, at={format_dt(self.timestamp)})"
+
+def __str__(self) -> str:
+    dt_str = format_range(self.start_dt, self.end_dt)
+    return f"{self.__class__.__name__}(kind={self.kind}, range={dt_str})"
+
+# ❌ Bad - hardcoded class name
+def __str__(self) -> str:
+    return f"BarEvent(bar={self.bar})"
+```
+
+**Acceptance checks:**
+- [ ] `__str__`/`__repr__` use `self.__class__.__name__`
+- [ ] Datetime utils used for timestamp formatting
+
+## 5.3. Memory Optimization (`__slots__`)
+
+**Use for:** Classes with high instance counts (Bars, Ticks, Events) to reduce memory and
+improve speed.
+
+**When to use:**
+- High instance counts at runtime
+- Fixed attribute schema
+- No reliance on instance `__dict__`
+
+### **Critical Inheritance Rule**
+**If parent defines `__slots__`, every subclass MUST define `__slots__` too:**
+- Use `__slots__ = ()` when subclass adds no new fields
+- Otherwise list private attribute names used in `__init__` (e.g., `"_price"`)
+- Do not add `"__weakref__"` unless needed
+- Include `"__dict__"` only when dynamic attrs required
+
+**Example:**
 ```python
 class Event:
     __slots__ = ("_dt_event", "_dt_received")
 
 class BarEvent(Event):
-    __slots__ = ()  # no new instance fields
+    __slots__ = ()  # No new instance fields
 
 class QuoteTick(Event):
-    __slots__ = (
-        "_instrument",
-        "_bid_price",
-        "_ask_price",
-        "_bid_volume",
-        "_ask_volume",
-        "_timestamp",
-    )
+    __slots__ = ("_instrument", "_bid_price", "_ask_price", "_timestamp")
 ```
 
-## 2.13 Comparison and sorting (total ordering)
+**Acceptance checks:**
+- [ ] `__slots__` defined for high-volume classes
+- [ ] Subclasses of slotted classes define `__slots__` (use `()` when none)
 
-Rule: For any custom comparable type, implement full ordering with `@total_ordering`.
+## 5.4. Comparison & Sorting (`@total_ordering`)
 
-Requirements:
-- Implement `__lt__` and ensure `__eq__` is defined. For Enum types, `Enum.__eq__` is enough.
-- If $other is a different type, return `NotImplemented` from the comparison methods.
-- Put ordering in one place (a precedence map or a key function); do not duplicate logic.
-- Annotate returns as `bool | NotImplementedType`.
-- Keep methods short and readable. Follow 2.1 naming and 2.11 typing.
+**For any custom comparable type:** Implement full ordering with `@total_ordering`.
 
-Example (current `PriceType` implementation):
+**Requirements:**
+- Implement `__lt__` and ensure `__eq__` is defined
+- Return `NotImplemented` for different types
+- Single source of truth for ordering (precedence map/key function)
+- Annotate returns as `bool | NotImplementedType`
+
+**Example:**
 ```python
-from __future__ import annotations
 from enum import Enum
 from functools import total_ordering
 from types import NotImplementedType
@@ -388,7 +376,6 @@ class PriceType(Enum):
             return NotImplemented
         return _PRICE_TYPE_ORDER[self] < _PRICE_TYPE_ORDER[other]
 
-# Single source of truth for ordering: defined once and reused
 _PRICE_TYPE_ORDER = {
     PriceType.BID: 0,
     PriceType.ASK: 1,
@@ -397,157 +384,168 @@ _PRICE_TYPE_ORDER = {
 }
 ```
 
-Notes:
-- `__eq__` is provided by `Enum` (identity comparison), which satisfies `@total_ordering`.
+**Acceptance checks:**
+- [ ] Class decorated with `@total_ordering`
+- [ ] `__lt__` returns `NotImplemented` for different types
+- [ ] Single precedence map defined once
+- [ ] Return type hints include `NotImplementedType`
+- [ ] Module starts with `from __future__ import annotations`
 
-Why `NotImplemented`?
-- It enables Python's reflected operations and correct type dispatch during comparisons.
+---
 
-Acceptance checks:
-- [ ] Class is decorated with `@total_ordering`.
-- [ ] `__lt__` returns `NotImplemented` when $other is not the same type.
-- [ ] Ordering uses a single precedence map/key defined once (not recreated per call).
-- [ ] Return type hints include `NotImplementedType`.
-- [ ] Module starts with `from __future__ import annotations`.
-- [ ] If using `Enum`, relying on its `__eq__` is acceptable; otherwise implement `__eq__`.
+# 6. Complexity Control & Premature Abstraction
 
-## 2.14 Complexity control and premature abstraction
+**Core rule:** Do not introduce new types, layers, helpers, or indirection unless gain is
+immediate, material, well-justified, and documented.
 
-Rule: Do not introduce new types, layers, helpers, or indirection that increase complexity
-unless the gain is immediate, material. well justified and documented. Prefer the simplest working shape until a clear need emerges.
+## 6.1. What This Means Now
+- ❌ **Don't alias simple primitives:** `Price = Decimal`, `Volume = Decimal`
+- ✅ **Use explicit types:** `tuple[Decimal, Decimal]`
+- ❌ **Don't add wrapper classes** for tuples/lists/dicts just to name fields
 
-What this means now:
-- Do not alias simple primitives in public APIs (e.g., `Price = Decimal`, `Volume = Decimal`,
-  `Level = tuple[Decimal, Decimal]`).
-- Prefer explicit types in signatures and attributes (e.g., `tuple[Decimal, Decimal]`).
-- Do not add wrapper classes for tuples/lists/dicts just to name fields; use names and
-  docstrings instead.
-
-When to add a new value object or abstraction (add only if at least one is true):
-- We must enforce invariants/units or validation (e.g., currency, tick size, rounding).
-- We attach behavior that belongs with the data (methods, arithmetic with rounding rules).
-- We need measurable performance/memory improvements in hot paths.
-- The shape is reused across 3+ call sites or modules and duplication is a real maintenance cost.
-- It represents an external boundary (serialization schema, protocol, storage).
-
-If you add one, choose the smallest construct that works:
-- Prefer `NamedTuple` for read-only shapes.
-- Or `@dataclass(frozen=True)` with `__slots__` when validation is needed.
-
-Process and documentation:
-- Include a one-line justification comment above the definition: `# Justification: <reason>`.
-- In docstrings, state the invariant(s) or performance reason explicitly.
-- Avoid `utils` modules/functions with a single call site; keep logic local.
-
-Examples:
-Not allowed:
-```python
-# Adds indirection without clear gain
-Price = Decimal
-Volume = Decimal
-Level = tuple[Decimal, Decimal]
-```
-Preferred:
+**Preferred:**
 ```python
 bids: Sequence[tuple[Decimal, Decimal]]
-asks: Sequence[tuple[Decimal, Decimal]]
 ```
-Allowed later (when criteria met):
-```python
-from typing import NamedTuple
 
+## 6.2. When to Add New Value Object
+
+**At least ONE must be true:**
+- Must enforce invariants/units/validation (currency, tick size, rounding)
+- Attach behavior with data (methods, arithmetic with rounding rules)
+- Measurable performance/memory improvements in hot paths
+- Reused across **3+ call sites/modules** with real maintenance cost
+- Represents external boundary (serialization schema, protocol, storage)
+
+## 6.3. If Adding One
+- Prefer `NamedTuple` for read-only shapes
+- Or `@dataclass(frozen=True)` with `__slots__` when validation needed
+- Include **`# Justification: <reason>`** comment above definition
+- State invariant(s) or performance reason in docstring
+
+**Example:**
+```python
+# Justification: Enforce non-negative volume and unify schema across 5 modules
 class BookLevel(NamedTuple):
+    """Represents a single price level in an order book.
+
+    Invariants:
+        - volume must be non-negative
+        - price must be valid Decimal
+    """
     price: Decimal
     volume: Decimal
-# Justification: Enforce non-negative volume and unify schema across 5 modules.
+
+    def __post_init__(self):
+        if self.volume < 0:
+            raise ValueError(f"Volume must be non-negative, got {self.volume}")
 ```
 
-Acceptance checks:
-- [ ] No primitive aliases (e.g., `Price`, `Volume`) in public APIs.
-- [ ] New abstractions include a `# Justification:` line explaining the concrete reason.
-- [ ] Signatures use explicit types unless a justified value object exists.
-- [ ] `utils` or wrappers introduced only with 3+ reuse sites or explicit hot-path perf need.
+**Acceptance checks:**
+- [ ] No primitive aliases exposed in public APIs
+- [ ] New abstractions include `# Justification:` line
+- [ ] Signatures use explicit types unless justified value object exists
+- [ ] Utils/wrappers only with 3+ reuse sites or explicit hot-path perf need
 
-## 2.15 Price validation: negative values are allowed when market supports them
+---
 
-Rule: Do not reject negative $price values in generic validation. Some markets can trade
-below zero.
+# 7. Domain-Specific Rules
 
-Why:
-- Certain commodities and energy markets (e.g., electricity, power futures) may have
-  negative prices.
-- Interest rate instruments and funding rates can be negative in some regimes.
+## 7.1. Price Validation
+**Negative prices are allowed** when market supports them. Do not reject negative `$price`
+values in generic validation.
 
-# 3. Code organization (supporting)
+**Why:** Certain markets (electricity, power futures, interest rate instruments) may have
+negative prices.
 
-## 3.1 Regions
-Improve code regions to present structure clearly and simply.
+**Acceptance checks:**
+- [ ] Generic validators allow negative prices where market supports them
 
-Guidelines:
-- Add short, meaningful regions adapted to each file/class.
-- Suggested generic regions (use when relevant):
-  - Init — constructors/initialization
-  - Main — main functionality/public API
-  - Utilities (or Convenience) — helper functions for comfort operations
-  - Properties — public properties
-  - Orders — order management and routing
-  - Protocol <Name> — e.g., Protocol IBKR; broker/provider-specific methods
-  - Magic — magic methods like __str__, __repr__, etc.
-- You may introduce new, appropriate region names when they create cohesive units of functionality.
-- Not all regions must be used; include only those that make sense for the file.
-- Use regions sparingly: not for tiny items (e.g., a few imports or one short method).
-- Reserve regions for strategic groups of related properties/methods or utilities with a clear purpose.
-- Name regions clearly and expressively; avoid generic names like `Internal`.
-- Prefer simple, expressive names that communicate purpose:
-  `Properties`, `Orders`, `Protocol <Name>`, `Magic` (for dunder methods).
-- Always mark regions with "# region NAME" and "# endregion".
-- Spacing: keep one empty line after "# region NAME" and one empty line before "# endregion".
-- Remove all empty regions.
-- Order functions within a region in a meaningful way: more important first, less important later.
+---
 
-## 3.2 Imports and package structure
+# 8. Code Organization
 
-Import directly from source modules; never re‑export in __init__.py. After changes, remove
-unused imports and add missing ones. Prefer namespace packages; only create __init__.py for
-executable code (e.g., __version__).
+## 8.1. Regions
+Use `# region NAME` and `# endregion` to group related blocks. Use sparingly; not for tiny
+items.
 
-# 4. Testing guidelines
-- Do not generate tests unless explicitly asked
-- Use pytest (not unittest)
+**Suggested regions (use when relevant):**
+- **Init:** Constructors/initialization
+- **Main:** Main functionality/public API
+- **Properties:** Public properties
+- **Utilities** or **Convenience:** Helper functions
+- **Orders:** Order management and routing
+- **Protocol <Name>:** Provider-specific methods (e.g., `Protocol IBKR`)
+- **Magic:** Magic methods (`__str__`, `__repr__`, etc.)
+
+**Format:**
+- Mark with `# region NAME` and `# endregion`
+- Keep one empty line after `# region NAME` and before `# endregion`
+- Remove all empty regions
+- Order functions: more important first
+
+## 8.2. Imports & Package Structure
+- Import directly from source modules; **never re-export in `__init__.py`**
+- After changes, remove unused imports and add missing ones
+- Prefer namespace packages
+- Only create `__init__.py` for executable code (e.g., `__version__`)
+
+**Acceptance checks:**
+- [ ] Regions follow naming/spacing rules; no empty regions
+- [ ] No re-exports from `__init__.py`; imports are clean
+
+## 8.3. Markdown Formatting
+Keep all Markdown lines (including code blocks) **≤100 chars**. Break at natural points.
+
+---
+
+# 9. Testing Guidelines
+
+- **Do not generate tests unless explicitly asked**
+- Use **pytest** (not unittest)
 - Test function names start with `test_` and describe what they test
-- Organize tests in `tests/unit/` and `tests/integration/`
-- Mirror the package structure of the code under test
-- Keep only the root `tests/__init__.py` file
+- Organize: `tests/unit/` and `tests/integration/`
+- Mirror package structure of code under test
+- Keep only root `tests/__init__.py` file
 
-# 5. Git commit guidelines
-- Never auto-commit: Junie must not create commits, tags, or pushes unless explicitly requested
-  by the User in the current message.
-- Write commits in imperative mood (command form)
-  - ✅ "Add user authentication"; ❌ "Added user authentication"
-- Subject line: <= 50 chars; start with a capital letter; no period at end
+---
+
+# 10. Git Commit Guidelines
+
+## 10.1. Critical Rule
+**Never auto-commit:** Do not create commits, tags, or pushes unless explicitly requested by
+user in current message.
+
+## 10.2. Commit Format
+- **Imperative mood** (command form): ✅ "Add user auth"; ❌ "Added user auth"
+- **Subject line:** ≤50 chars, capital letter, no period at end
 - Use present tense imperative verbs: Add, Fix, Remove, Update
 - Be descriptive about what and why
-- For longer commits, add a body separated by a blank line
+- For longer commits: add body separated by blank line
 
-# 6. Plan and code change visualization
-When proposing changes, show per‑file Before/After snippets with minimal unique context. Use
-fenced code blocks labeled Before/After, keep lines <= 100 chars, and include acceptance
-checks. Update imports as needed.
+---
 
-Minimal template:
+# 11. Plan & Code Change Visualization
 
-- Step X — Short description
+When proposing changes, show per-file Before/After snippets with minimal unique context.
+Use fenced code blocks, keep lines ≤100 chars, include acceptance checks, update imports.
 
-File: path/to/file.py
-Context: one‑line why
+**Template:**
+
+**Step X — Short description**
+
+File: `path/to/file.py`
+Context: one-line why
 
 Before:
 ```python
 <minimal unique snippet>
 ```
+
 After:
 ```python
 <updated minimal unique snippet>
 ```
+
 Acceptance checks:
 - [ ] Concrete, verifiable checks
