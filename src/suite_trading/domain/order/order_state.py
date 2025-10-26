@@ -28,6 +28,10 @@ class OrderState(State):
     REJECTED = "REJECTED"  # Rejected after submission by broker or venue
     FILLED = "FILLED"  # Filled completely; no quantity remains
     EXPIRED = "EXPIRED"  # Expired by time-in-force (Day, IOC, FOK, GTD)
+
+    # Communication failure handling
+    UNKNOWN = "UNKNOWN"  # Broker communication lost; actual order status unclear. UNKNOWN is NOT a terminal state; requires reconciliation with broker after recovery
+
     # endregion
 
 
@@ -55,6 +59,9 @@ class OrderAction(Action):
     # System actions
     EXPIRE = "EXPIRE"  # Order expired by its time-in-force
     TRIGGER = "TRIGGER"  # The hold condition fired (e.g., stop or trailing)
+
+    # Communication failure handling
+    COMMUNICATION_FAILURE = "COMMUNICATION_FAILURE"  # Lost connection or received conflicting status
 
 
 def create_order_state_machine() -> StateMachine:
@@ -106,9 +113,17 @@ def create_order_state_machine() -> StateMachine:
         (OrderState.TRIGGERED, OrderAction.REJECT): OrderState.REJECTED,
         (OrderState.TRIGGERED, OrderAction.CANCEL): OrderState.CANCELLED,
         (OrderState.TRIGGERED, OrderAction.EXPIRE): OrderState.EXPIRED,
+        # Communication failure handling - from any non-terminal active state
+        (OrderState.WORKING, OrderAction.COMMUNICATION_FAILURE): OrderState.UNKNOWN,
+        (OrderState.PENDING_UPDATE, OrderAction.COMMUNICATION_FAILURE): OrderState.UNKNOWN,
+        (OrderState.PENDING_CANCEL, OrderAction.COMMUNICATION_FAILURE): OrderState.UNKNOWN,
+        (OrderState.PARTIALLY_FILLED, OrderAction.COMMUNICATION_FAILURE): OrderState.UNKNOWN,
+        (OrderState.SUBMITTED, OrderAction.COMMUNICATION_FAILURE): OrderState.UNKNOWN,
         # Real-world late fill race handling
         (OrderState.CANCELLED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.CANCELLED, OrderAction.FILL): OrderState.FILLED,
+        # Recovery from UNKNOWN
+        # Requires broker reconciliation procedure, during which we set the order-state explicitly
     }
 
     return StateMachine(OrderState.INITIALIZED, transitions)
