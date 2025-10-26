@@ -528,12 +528,10 @@ class TradingEngine:
                         # Cleanup all feeds for this strategy
                         self._close_and_remove_all_feeds_for_strategy(strategy)
 
-                    # Route Events of type PriceSampleSource to capable brokers (when they have active orders)
+                    # Route Events of type PriceSampleSource to all capable brokers
                     if isinstance(next_event, PriceSampleSource):
                         for sample in next_event.iter_price_samples():
                             for broker in self._price_sample_consuming_brokers:
-                                if not broker.list_active_orders():
-                                    continue
                                 broker.process_price_sample(sample)
 
                     # Notify EventFeed listeners after strategy callback.
