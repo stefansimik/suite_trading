@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Union, Optional
+from typing import TYPE_CHECKING
 
 # TYPE_CHECKING lets us use Order for type hints without importing it at runtime.
 # This avoids circular imports since Order also needs to reference Execution.
@@ -13,6 +13,9 @@ from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.utils.id_generator import get_next_id
 from suite_trading.utils.datetime_utils import format_dt
+
+
+# region Executions
 
 
 class Execution:
@@ -42,12 +45,12 @@ class Execution:
     def __init__(
         self,
         order: Order,
-        quantity: Union[Decimal, str, float],
-        price: Union[Decimal, str, float],
+        quantity: Decimal | str | float,
+        price: Decimal | str | float,
         timestamp: datetime,
-        id: Optional[str] = None,
-        commission: Union[Decimal, str, float] = Decimal("0"),
-    ):
+        id: str | None = None,
+        commission: Decimal | str | float = Decimal("0"),
+    ) -> None:
         """Initialize a new execution.
 
         Args:
@@ -76,39 +79,7 @@ class Execution:
         # Explicit validation
         self._validate()
 
-    @staticmethod
-    def _convert_to_decimal(value) -> Decimal:
-        """Convert int/float/double to Decimal for precise financial calculations.
-
-        Args:
-            value: The value to convert (int, float, or Decimal).
-
-        Returns:
-            Decimal: The converted value.
-        """
-        if isinstance(value, Decimal):
-            return value
-        return Decimal(str(value))
-
-    @property
-    def order(self) -> Order:
-        """Get the parent order."""
-        return self._order
-
-    @property
-    def quantity(self) -> Decimal:
-        """Get the executed quantity."""
-        return self._quantity
-
-    @property
-    def price(self) -> Decimal:
-        """Get the execution price."""
-        return self._price
-
-    @property
-    def timestamp(self) -> datetime:
-        """Get the execution timestamp."""
-        return self._timestamp
+    # region Properties
 
     @property
     def id(self) -> str:
@@ -116,9 +87,9 @@ class Execution:
         return self._id
 
     @property
-    def commission(self) -> Decimal:
-        """Get the commission."""
-        return self._commission
+    def order(self) -> Order:
+        """Get the parent order."""
+        return self._order
 
     @property
     def instrument(self) -> Instrument:
@@ -139,6 +110,44 @@ class Execution:
         return self.order.side
 
     @property
+    def is_buy(self) -> bool:
+        """Check if this is a buy execution.
+
+        Returns:
+            bool: True if this is a buy execution.
+        """
+        return self.side == OrderSide.BUY
+
+    @property
+    def is_sell(self) -> bool:
+        """Check if this is a sell execution.
+
+        Returns:
+            bool: True if this is a sell execution.
+        """
+        return self.side == OrderSide.SELL
+
+    @property
+    def quantity(self) -> Decimal:
+        """Get the executed quantity."""
+        return self._quantity
+
+    @property
+    def price(self) -> Decimal:
+        """Get the execution price."""
+        return self._price
+
+    @property
+    def commission(self) -> Decimal:
+        """Get the commission."""
+        return self._commission
+
+    @property
+    def timestamp(self) -> datetime:
+        """Get the execution timestamp."""
+        return self._timestamp
+
+    @property
     def gross_value(self) -> Decimal:
         """Calculate the gross value of this execution (quantity * price).
 
@@ -156,23 +165,23 @@ class Execution:
         """
         return self.gross_value - self.commission
 
-    @property
-    def is_buy(self) -> bool:
-        """Check if this is a buy execution.
+    # endregion
+
+    # region Utilities
+
+    @staticmethod
+    def _convert_to_decimal(value) -> Decimal:
+        """Convert int/float/double to Decimal for precise financial calculations.
+
+        Args:
+            value: The value to convert (int, float, or Decimal).
 
         Returns:
-            bool: True if this is a buy execution.
+            Decimal: The converted value.
         """
-        return self.side == OrderSide.BUY
-
-    @property
-    def is_sell(self) -> bool:
-        """Check if this is a sell execution.
-
-        Returns:
-            bool: True if this is a sell execution.
-        """
-        return self.side == OrderSide.SELL
+        if isinstance(value, Decimal):
+            return value
+        return Decimal(str(value))
 
     def _validate(self) -> None:
         """Validate the execution data.
@@ -195,6 +204,10 @@ class Execution:
         # Check: ensure execution doesn't overfill the order
         if self._quantity > self._order.unfilled_quantity:
             raise ValueError(f"Cannot call `_validate` because $quantity ({self._quantity}) exceeds order $unfilled_quantity ({self._order.unfilled_quantity})")
+
+    # endregion
+
+    # region Magic
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(order_id={self.id})"
@@ -219,3 +232,8 @@ class Execution:
         if not isinstance(other, Execution):
             return False
         return self.id == other.id
+
+    # endregion
+
+
+# endregion
