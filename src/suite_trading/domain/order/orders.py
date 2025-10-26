@@ -64,10 +64,8 @@ class Order:
         # Reference to Strategy that created this order (may be None)
         self._strategy = strategy
 
-        # Mutable execution tracking attributes
-        self.filled_quantity = Decimal("0")  # Always initialize to 0 for new orders
-        self.average_fill_price = None  # Always initialize to None for new orders
-        self.executions: list[Execution] = []  # List of executions in chronological order
+        # Execution tracking (single source of truth)
+        self.executions: list[Execution] = []  # Chronological by append order
 
         # Internal state
         self._state_machine: StateMachine = create_order_state_machine()
@@ -130,12 +128,42 @@ class Order:
         return self._strategy
 
     @property
-    def unfilled_quantity(self) -> Decimal:
-        """Calculate remaining quantity to be filled.
+    def filled_quantity(self) -> Decimal:
+        """Total executed quantity across `executions`.
 
         Returns:
-            Decimal: The quantity still to be filled.
+            Decimal: Sum of execution quantities.
         """
+        total = Decimal("0")
+        for e in self.executions:
+            total += e.quantity
+        return total
+
+    @property
+    def average_fill_price(self) -> Decimal | None:
+        """Weighted average price (VWAP) of executions, or None if no fills.
+
+        Note:
+            VWAP is not snapped to tick size; it may fall between ticks. Use
+            presentation-layer formatting if you need display rounding.
+
+        Returns:
+            Decimal | None: VWAP of executions, or None.
+        """
+        filled = self.filled_quantity
+        if filled == 0:
+            return None
+
+        notional = Decimal("0")
+        for e in self.executions:
+            notional += e.price * e.quantity
+
+        avg_price = notional / filled
+        return avg_price
+
+    @property
+    def unfilled_quantity(self) -> Decimal:
+        """Remaining unfilled quantity for this order."""
         return self.quantity - self.filled_quantity
 
     @property
@@ -156,19 +184,53 @@ class Order:
         """
         return self.side == OrderSide.SELL
 
-    def add_execution(self, execution: Execution) -> None:
-        """Add an execution to this order.
+    @property
+    def is_unfilled(self) -> bool:
+        """Whether no quantity has been filled yet.
 
-        Executions are added in chronological order as they happen.
+        Returns:
+            bool: True if $filled_quantity is 0.
+        """
+        return self.filled_quantity == Decimal("0")
+
+    @property
+    def is_partially_filled(self) -> bool:
+        """Whether some, but not all, quantity has been filled.
+
+        Returns:
+            bool: True if 0 < $filled_quantity < $quantity.
+        """
+        filled = self.filled_quantity
+        return Decimal("0") < filled < self.quantity
+
+    @property
+    def is_fully_filled(self) -> bool:
+        """Whether the order has been completely filled.
+
+        Returns:
+            bool: True if $filled_quantity == $quantity.
+        """
+        return self.filled_quantity == self.quantity
+
+    def add_execution(self, execution: Execution) -> None:
+        """Add a new execution for this order in chronological order.
 
         Args:
-            execution (Execution): The execution to add to this order.
+            execution: The execution to record.
 
         Raises:
-            ValueError: If the execution is not for this order.
+            ValueError: If the execution belongs to a different order, has non-positive $quantity, or would overfill the order.
         """
+        # Check: execution must belong to this order
         if execution.order != self:
-            raise ValueError(f"Execution order with $order_id = '{execution.order.order_id}' does not match this order with $order_id = '{self.order_id}'")
+            raise ValueError(f"Cannot call `add_execution` because $execution.order_id ('{execution.order.order_id}') does not match this Order $order_id ('{self.order_id}')")
+        # Check: positive execution quantity
+        if execution.quantity <= 0:
+            raise ValueError(f"Cannot call `add_execution` with non-positive $quantity ({execution.quantity}); provide a positive quantity")
+        # Check: disallow overfill (quantities already snapped)
+        new_filled = self.filled_quantity + execution.quantity
+        if new_filled > self.quantity:
+            raise ValueError(f"Cannot call `add_execution` because resulting $filled_quantity ({new_filled}) would exceed $quantity ({self.quantity})")
 
         self.executions.append(execution)
 
@@ -194,21 +256,14 @@ class Order:
         self._state_machine.execute_action(action)
 
     def _validate(self) -> None:
-        """Validate the order data.
+        """Validate intrinsic order inputs at construction time.
 
         Raises:
-            ValueError: If order data is invalid.
+            ValueError: If $quantity <= 0.
         """
-        # Validate quantity
+        # Check: positive order quantity
         if self.quantity <= 0:
-            raise ValueError(f"$quantity must be positive, but provided value is: {self.quantity}")
-
-        # Validate filled_quantity
-        if self.filled_quantity < 0:
-            raise ValueError(f"$filled_quantity cannot be negative, but provided value is: {self.filled_quantity}")
-
-        if self.filled_quantity > self.quantity:
-            raise ValueError(f"$filled_quantity ({self.filled_quantity}) cannot exceed $quantity ({self.quantity})")
+            raise ValueError(f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive")
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(order_id={self.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"

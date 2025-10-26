@@ -180,23 +180,21 @@ class Execution:
         Raises:
             ValueError: If execution data is invalid.
         """
-        # Validate quantity
+        # Check: positive execution quantity
         if self._quantity <= 0:
-            raise ValueError(f"$quantity must be positive, but provided value is: {self._quantity}")
+            raise ValueError(f"Cannot call `_validate` because $quantity ({self._quantity}) is not positive")
 
-        # Validate price
-        if self._price <= 0:
-            raise ValueError(f"$price must be positive, but provided value is: {self._price}")
+        # Note: Do not reject negative prices here; some markets allow them (see guideline 7.1)
 
-        # Validate commission (can be 0 but not negative)
+        # Check: commission cannot be negative
         if self._commission < 0:
-            raise ValueError(f"$commission cannot be negative, but provided value is: {self._commission}")
+            raise ValueError(f"Cannot call `_validate` because $commission ({self._commission}) is negative")
 
         # Note: instrument and side consistency is guaranteed by properties that delegate to order
 
-        # Validate that execution quantity doesn't exceed unfilled quantity
+        # Check: ensure execution doesn't overfill the order
         if self._quantity > self._order.unfilled_quantity:
-            raise ValueError(f"Execution $quantity ({self._quantity}) cannot exceed order unfilled quantity ({self._order.unfilled_quantity})")
+            raise ValueError(f"Cannot call `_validate` because $quantity ({self._quantity}) exceeds order $unfilled_quantity ({self._order.unfilled_quantity})")
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(order_id={self.id})"
