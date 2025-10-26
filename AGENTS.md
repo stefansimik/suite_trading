@@ -45,14 +45,30 @@ def calc_pv(pos: list) -> Decimal: ...
 - Use domain terms consistently; pick nouns for values and properties, verbs for functions.
 - Rename confusing names proactively to reduce reading and maintenance effort.
 
-### Method naming for resource access
+### Method naming for resource access and construction/modeling
 
 - Use `list_*` for methods that return collections (lists, iterables, generators).
   - Examples: `list_active_orders()`, `list_open_positions()`.
-- Use `get_*` for methods that return a single resource or value object.
-  - Examples: `get_account_info()`, `get_order(order_id)`.
-- Use `find_*` or `query_*` only when search/filter semantics are the primary purpose and
-  results may be partial or empty from a larger domain. (Optional, future scope.)
+
+- Use `get_*` to retrieve an already existing single resource or value object.
+  - Retrieval rules: no heavy computation, no modeling; return current stored state or a direct
+    property.
+  - Examples: `get_account_info()`, `get_order(order_id)`, `get_best_bid()`.
+
+- Use `build_*` (preferred) or `create_*` when constructing/modeling a new object or derived
+  view from inputs (e.g., to control depth, spread, or slippage). This signals the result is
+  produced now and may be more expensive than retrieval.
+  - Examples: `build_order_book(sample)`, `create_snapshot(now)`, `build_position_report()`.
+
+- Use `compute_*` for derived numeric metrics that require calculation.
+  - Examples: `compute_realized_pnl(trades)`, `compute_sharpe(returns)`.
+
+- Use `find_*` or `query_*` only when search/filter semantics are the primary purpose and results
+  may be partial or empty from a larger domain. (Optional, future scope.)
+
+- Do not use `get_*` for operations that perform modeling/simulation or heavy calculations.
+  - Bad: `get_order_book(sample)` when the book is modeled from a `PriceSample`.
+  - Good: `build_order_book(sample)`.
 
 ## 2.2 Classes, dataclasses, and named tuples
 Rule: Use standard classes for fundamental domain models. Dataclasses and named tuples are
