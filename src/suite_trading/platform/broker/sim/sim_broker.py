@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.market_data.price_sample import PriceSample
 from suite_trading.domain.order.orders import Order
+from suite_trading.domain.order.order_state import OrderAction
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import PriceSampleConsumer
@@ -16,6 +17,7 @@ from suite_trading.platform.broker.sim.fill_model.zero_spread import ZeroSpreadF
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
+    from suite_trading.domain.instrument import Instrument
 
 
 class SimBroker(Broker, PriceSampleConsumer):
@@ -55,6 +57,9 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         # FILL MODEL
         self._fill_model: FillModel = fill_model or self._build_default_fill_model()
+
+        # Known prices per instrument (populated in `process_price_sample`)
+        self._last_sample_by_instrument: dict[Instrument, PriceSample] = {}
 
     # endregion
 
@@ -111,10 +116,17 @@ class SimBroker(Broker, PriceSampleConsumer):
         if order.order_id in self._orders_by_id:
             raise ValueError(f"Cannot call `submit_order` because $order_id ('{order.order_id}') already exists")
 
-        # Track order
+        # TODO: Check the state transitions - they do not seem to be OK
+        # Transition to SUBMITTED; accept now only if we already know a price
+        order.change_state(OrderAction.SUBMIT)  # INITIALIZED -> PENDING
+        order.change_state(OrderAction.SUBMIT)  # PENDING -> SUBMITTED
+        if self._last_sample_by_instrument and order.instrument in self._last_sample_by_instrument:
+            order.change_state(OrderAction.ACCEPT)
+
+        # Track order (non-terminal states only)
         self._orders_by_id[order.order_id] = order
 
-        # Emit initial order update (e.g., Accepted)
+        # Notify listeners once per submission
         if self._on_order_updated is not None:
             self._on_order_updated(self, order)
 
@@ -213,6 +225,9 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     def process_price_sample(self, sample: PriceSample) -> None:
         """Handle a new `PriceSample`."""
+        # Store latest sample for instrument to enable submit-time ACCEPT decision
+        self._last_sample_by_instrument[sample.instrument] = sample
+
         # Build modeled order book from $sample using configured FillModel
         _ = self._fill_model.build_order_book(sample)
 
