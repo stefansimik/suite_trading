@@ -216,7 +216,7 @@ class Order:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(order_id={self.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Check equality with another order.
 
         Args:
@@ -228,6 +228,13 @@ class Order:
         if not isinstance(other, Order):
             return False
         return self.order_id == other.order_id
+
+    def __hash__(self) -> int:
+        """Allow using Order as dictionary key and in sets.
+
+        Hash is derived from stable `order_id` to be consistent with `__eq__`.
+        """
+        return hash(self.order_id)
 
 
 class MarketOrder(Order):
