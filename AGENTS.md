@@ -196,6 +196,25 @@ self._last_order_time = now()
 - [ ] Placed immediately above guard
 - [ ] Code reference formatting followed (`$var`, `` `func` ``)
 
+### Validation Scope & Priorities
+
+- Validate only important, common, or risky issues and domain relationships that are likely
+  to go wrong.
+- Focus guards on domain invariants and cross-object relationships (e.g., non-positive
+  order quantity, time ranges with $start_dt > $end_dt, inconsistent $instrument between
+  legs of a spread, unsupported venues for a given $instrument).
+- Do not clutter code with trivial checks that Python and type checkers already cover:
+  types, existence of attributes, or obvious None access that would fail fast on its own.
+  Prefer clear type hints and let errors surface naturally.
+- Keep validations cheap and close to boundaries. Avoid repeating the same guard in hot
+  paths; validate once at the API boundary or where ownership is clear.
+- Use the `# Check:` prefix only for meaningful guards as described above; do not use it
+  for type/attribute presence checks.
+
+**Acceptance checks:**
+- [ ] Validation guards focus on important/risky domain invariants and relationships
+- [ ] No guards added for trivial type/attribute existence checks or obvious None access
+
 ## 4.3. Logging
 
 **Core rules:** Logs must be **precise, consistent, easy to scan**.
