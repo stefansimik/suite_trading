@@ -59,7 +59,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._fill_model: FillModel = fill_model or self._build_default_fill_model()
 
         # Known prices per instrument (populated in `process_price_sample`)
-        self._last_sample_by_instrument: dict[Instrument, PriceSample] = {}
+        self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}
 
     # endregion
 
@@ -88,6 +88,25 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
+    # region Utilities
+
+    def _apply_order_action_and_publish_update(self, order: Order, action: OrderAction) -> None:
+        """Apply $action to $order and publish `on_order_updated` if state changed.
+
+        This centralizes per-transition publishing so callers remain simple.
+        """
+        previous_state = order.state
+        order.change_state(action)
+        new_state = order.state
+        if new_state != previous_state and self._on_order_updated is not None:
+            self._on_order_updated(self, order)
+
+    def _is_price_known_for_instrument(self, instrument: Instrument) -> bool:
+        sample = self._latest_price_sample_by_instrument.get(instrument)
+        return sample is not None
+
+    # endregion
+
     # region Callbacks (from Broker)
 
     def set_callbacks(
@@ -106,29 +125,29 @@ class SimBroker(Broker, PriceSampleConsumer):
     def submit_order(self, order: Order) -> None:
         """Implements: Broker.submit_order
 
-        Track a new $order and make it eligible for matching.
+        Validate and register a MARKET $order, publishing each state transition.
         """
-        # Check: must be connected
+        # Check: broker must be connected to accept new orders
         if not self._connected:
-            raise ConnectionError("Cannot call `submit_order` because broker is not connected")
+            raise RuntimeError(f"Cannot call `submit_order` because $connected ({self._connected}) is False")
 
-        # Check: enforce unique $order_id globally
+        # Check: enforce unique $order_id among active orders
         if order.order_id in self._orders_by_id:
             raise ValueError(f"Cannot call `submit_order` because $order_id ('{order.order_id}') already exists")
 
-        # TODO: Check the state transitions - they do not seem to be OK
-        # Transition to SUBMITTED; accept now only if we already know a price
-        order.change_state(OrderAction.SUBMIT)  # INITIALIZED -> PENDING
-        order.change_state(OrderAction.SUBMIT)  # PENDING -> SUBMITTED
-        if self._last_sample_by_instrument and order.instrument in self._last_sample_by_instrument:
-            order.change_state(OrderAction.ACCEPT)
-
-        # Track order (non-terminal states only)
+        # Track the order (submission never terminalizes in this step)
         self._orders_by_id[order.order_id] = order
 
-        # Notify listeners once per submission
-        if self._on_order_updated is not None:
-            self._on_order_updated(self, order)
+        # SUBMIT → publish
+        self._apply_order_action_and_publish_update(order, OrderAction.SUBMIT)
+
+        # ACCEPT → publish (reach SUBMITTED)
+        self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
+
+        # ACCEPT → publish (reach WORKING) - only if price for instrument is known
+        instrument = order.instrument
+        if self._is_price_known_for_instrument(instrument):
+            self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
 
     def cancel_order(self, order: Order) -> None:
         """Implements: Broker.cancel_order
@@ -226,7 +245,7 @@ class SimBroker(Broker, PriceSampleConsumer):
     def process_price_sample(self, sample: PriceSample) -> None:
         """Handle a new `PriceSample`."""
         # Store latest sample for instrument to enable submit-time ACCEPT decision
-        self._last_sample_by_instrument[sample.instrument] = sample
+        self._latest_price_sample_by_instrument[sample.instrument] = sample
 
         # Build modeled order book from $sample using configured FillModel
         _ = self._fill_model.build_order_book(sample)
