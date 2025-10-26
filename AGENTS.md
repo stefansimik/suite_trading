@@ -170,11 +170,12 @@ def __str__(self) -> str:
 Key requirement for docstrings:
 - Use Google-style docstrings with purpose, params, returns, exceptions, and types
 - Write in accessible language that ANY developer can understand
+- All docstrings should be written in simple, conversational English that beginners can follow
+- Avoid dense, technical jargon; prefer plain words and short sentences
 - Include all important information, but explain complex concepts simply
 - Make it immediately understandable without additional research
 - When needed, reference related code that provides essential context
 - Use concrete examples when helpful
-.
 
 ## 2.7 Code Comments
 **Rule: Comments explain the "why" and "what" of complex code logic for maintainers.**
@@ -191,6 +192,7 @@ as the AI understands both the implementation and the documented intent.
 - Short "why/what" comment above each logical unit of code
 - Use domain terms and explicit states
 - Explain business logic and reasoning
+- Use simple, conversational English; avoid dense, technical jargon
 
 ### Defensive Comments
 - Use "# Check:" prefix exclusively for validation guards
@@ -487,11 +489,17 @@ Guidelines:
   - Init — constructors/initialization
   - Main — main functionality/public API
   - Utilities (or Convenience) — helper functions for comfort operations
-  - Internal — internal/private methods not part of public API
   - Properties — public properties
+  - Orders — order management and routing
+  - Protocol <Name> — e.g., Protocol IBKR; broker/provider-specific methods
   - Magic — magic methods like __str__, __repr__, etc.
 - You may introduce new, appropriate region names when they create cohesive units of functionality.
 - Not all regions must be used; include only those that make sense for the file.
+- Use regions sparingly: not for tiny items (e.g., a few imports or one short method).
+- Reserve regions for strategic groups of related properties/methods or utilities with a clear purpose.
+- Name regions clearly and expressively; avoid generic names like `Internal`.
+- Prefer simple, expressive names that communicate purpose:
+  `Properties`, `Orders`, `Protocol <Name>`, `Magic` (for dunder methods).
 - Always mark regions with "# region NAME" and "# endregion".
 - Spacing: keep one empty line after "# region NAME" and one empty line before "# endregion".
 - Remove all empty regions.
