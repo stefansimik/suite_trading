@@ -11,6 +11,8 @@ from suite_trading.domain.order.orders import Order
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import PriceSampleConsumer
+from suite_trading.platform.broker.sim.fill_model.protocol import FillModel
+from suite_trading.platform.broker.sim.fill_model.zero_spread import ZeroSpreadFillModel
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
@@ -24,7 +26,17 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # region Init
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        fill_model: FillModel | None = None,
+    ) -> None:
+        """Create a simulation broker.
+
+        Args:
+            fill_model: FillModel used for matching. If None, a default model is built by
+                `_build_default_fill_model()`.
+        """
         # CONNECTION
         self._connected: bool = False
 
@@ -40,6 +52,9 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         # ACCOUNT API
         self._account_info: AccountInfo = AccountInfo(account_id="SIM", funds_by_currency={}, last_update_dt=datetime.now(timezone.utc))
+
+        # FILL MODEL
+        self._fill_model: FillModel = fill_model or self._build_default_fill_model()
 
     # endregion
 
@@ -156,6 +171,18 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
+    # region Default models
+
+    def _build_default_fill_model(self) -> FillModel:
+        """Build the default FillModel used by this broker instance.
+
+        Returns:
+            A FillModel instance. Default is ZeroSpreadFillModel.
+        """
+        return ZeroSpreadFillModel()
+
+    # endregion
+
     # region Price processing
 
     @dataclass(frozen=True)
@@ -186,6 +213,9 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     def process_price_sample(self, sample: PriceSample) -> None:
         """Handle a new `PriceSample`."""
+        # Build modeled order book from $sample using configured FillModel
+        _ = self._fill_model.build_order_book(sample)
+
         # Retrieve candidate orders by scanning (simpler but less efficient)
         orders = [o for o in self._orders_by_id.values() if o.instrument == sample.instrument]
 
