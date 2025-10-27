@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from enum import Enum
+from typing import Final
 from suite_trading.utils.state_machine import State, Action, StateMachine
 
 
@@ -135,3 +137,70 @@ def create_order_state_machine() -> StateMachine:
     }
 
     return StateMachine(OrderState.INITIALIZED, transitions)
+
+
+class OrderStateCategory(Enum):
+    """Groups order states into four simple categories you can use in code.
+
+    Sorted from first to last in a typical lifecycle. Use these to quickly tell if
+    an order can still trade or if it is finished.
+
+    Categories:
+        PRE_LIVE: The order is on its way to becoming live; not tradable yet.
+        FILLABLE: The order can still trade now (it is live, or being changed/cancelled).
+        UNKNOWN: Connection lost or conflicting status; pause and reconcile before acting.
+        TERMINAL: The order is finished (for example: FILLED, CANCELLED, EXPIRED).
+
+    Example:
+        If $state is OrderState.WORKING, the category is OrderStateCategory.FILLABLE.
+    """
+
+    PRE_LIVE = "PRE_LIVE"
+    FILLABLE = "FILLABLE"
+    UNKNOWN = "UNKNOWN"
+    TERMINAL = "TERMINAL"
+
+
+# Single source-of-truth mapping (module-private by convention)
+_ORDER_STATE_CATEGORY_MAP: Final[dict[OrderState, OrderStateCategory]] = {
+    # Initial / submission path
+    OrderState.INITIALIZED: OrderStateCategory.PRE_LIVE,
+    OrderState.PENDING_SUBMIT: OrderStateCategory.PRE_LIVE,
+    # Active / live and still-fillable while requests are in flight
+    OrderState.SUBMITTED: OrderStateCategory.FILLABLE,
+    OrderState.WORKING: OrderStateCategory.FILLABLE,
+    OrderState.PENDING_UPDATE: OrderStateCategory.FILLABLE,
+    OrderState.PENDING_CANCEL: OrderStateCategory.FILLABLE,
+    OrderState.PARTIALLY_FILLED: OrderStateCategory.FILLABLE,
+    # Trigger flow
+    OrderState.TRIGGER_PENDING: OrderStateCategory.PRE_LIVE,
+    OrderState.TRIGGERED: OrderStateCategory.PRE_LIVE,
+    # Terminal / effectively terminal
+    OrderState.DENIED: OrderStateCategory.TERMINAL,
+    OrderState.REJECTED: OrderStateCategory.TERMINAL,
+    OrderState.CANCELLED: OrderStateCategory.TERMINAL,
+    OrderState.FILLED: OrderStateCategory.TERMINAL,
+    OrderState.EXPIRED: OrderStateCategory.TERMINAL,
+    # Connectivity issues
+    OrderState.UNKNOWN: OrderStateCategory.UNKNOWN,
+}
+
+
+def get_order_state_category(state: OrderState) -> OrderStateCategory:
+    """Return the simple category for an order $state.
+
+    This is a quick way to answer: can this order still trade or is it finished?
+
+    Args:
+        state: The order state to classify.
+
+    Returns:
+        The matching OrderStateCategory (PRE_LIVE, FILLABLE, UNKNOWN, or TERMINAL).
+
+    Raises:
+        KeyError: If $state is not in the mapping (should not happen in normal use).
+
+    Example:
+        get_order_state_category(OrderState.WORKING) -> OrderStateCategory.FILLABLE
+    """
+    return _ORDER_STATE_CATEGORY_MAP[state]

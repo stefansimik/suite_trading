@@ -5,12 +5,13 @@ from typing import TYPE_CHECKING
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.order.order_enums import OrderSide, TimeInForce
-from suite_trading.domain.order.order_state import OrderState, OrderAction, create_order_state_machine
+from suite_trading.domain.order.order_state import OrderState, OrderAction, create_order_state_machine, get_order_state_category
 from suite_trading.utils.id_generator import get_next_id
 from suite_trading.utils.state_machine import StateMachine
 
 if TYPE_CHECKING:
     from suite_trading.strategy.strategy import Strategy
+    from suite_trading.domain.order.order_state import OrderStateCategory
 
 
 # region Orders
@@ -225,6 +226,18 @@ class Order:
             OrderState: The current state of the order.
         """
         return self._state_machine.current_state
+
+    @property
+    def state_category(self) -> OrderStateCategory:
+        """Simple category for the current order $state.
+
+        Use this to quickly see intent: can the order still trade (FILLABLE) or is it finished
+        (TERMINAL)? The value comes from the canonical mapping in `order_state`.
+
+        Returns:
+            OrderStateCategory: The category of the current $state.
+        """
+        return get_order_state_category(self.state)
 
     # endregion
 
