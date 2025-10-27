@@ -7,8 +7,8 @@ from suite_trading.domain.market_data.price_sample import PriceSample
 # region Zero-spread implementation
 
 
-class ZeroSpreadFillModel:
-    """Zero-spread OrderFillModel that builds an `OrderBook` at the sample price.
+class ZeroSpreadMarketDepthModel:
+    """Zero-spread MarketDepthModel that builds an `OrderBook` at the sample price.
 
     - BUY fills at best ask, SELL at best bid (both equal to `$sample.price`).
     - Negative prices are allowed and passed through (Guideline 7.1).

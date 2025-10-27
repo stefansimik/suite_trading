@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 # region Interface
 
 
-class OrderFillModel(Protocol):
+class MarketDepthModel(Protocol):
     """Builds a modeled `OrderBook` from a `PriceSample` for fill simulation.
 
     Why convert `PriceSample` to `OrderBook`?

@@ -12,8 +12,8 @@ from suite_trading.domain.order.order_state import OrderAction
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import PriceSampleConsumer
-from suite_trading.platform.broker.sim.fill_model.protocol import OrderFillModel
-from suite_trading.platform.broker.sim.fill_model.zero_spread import ZeroSpreadFillModel
+from suite_trading.platform.broker.sim.market_depth_model.protocol import MarketDepthModel
+from suite_trading.platform.broker.sim.market_depth_model.zero_spread import ZeroSpreadMarketDepthModel
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
@@ -31,13 +31,13 @@ class SimBroker(Broker, PriceSampleConsumer):
     def __init__(
         self,
         *,
-        fill_model: OrderFillModel | None = None,
+        depth_model: MarketDepthModel | None = None,
     ) -> None:
         """Create a simulation broker.
 
         Args:
-            fill_model: OrderFillModel used for matching. If None, a default model is built by
-                `_build_default_fill_model()`.
+            depth_model: MarketDepthModel used for matching. If None, a default model is built by
+                `_build_default_depth_model()`.
         """
         # CONNECTION
         self._connected: bool = False
@@ -56,7 +56,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._account_info: AccountInfo = AccountInfo(account_id="SIM", funds_by_currency={}, last_update_dt=datetime.now(timezone.utc))
 
         # FILL MODEL
-        self._fill_model: OrderFillModel = fill_model or self._build_default_fill_model()
+        self._depth_model: MarketDepthModel = depth_model or self._build_default_depth_model()
 
         # Known prices per instrument (populated in `process_price_sample`)
         self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}
@@ -204,13 +204,13 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # region Default models
 
-    def _build_default_fill_model(self) -> OrderFillModel:
-        """Build the default OrderFillModel used by this broker instance.
+    def _build_default_depth_model(self) -> MarketDepthModel:
+        """Build the default MarketDepthModel used by this broker instance.
 
         Returns:
-            A OrderFillModel instance. Default is ZeroSpreadFillModel.
+            A MarketDepthModel instance. Default is ZeroSpreadMarketDepthModel.
         """
-        return ZeroSpreadFillModel()
+        return ZeroSpreadMarketDepthModel()
 
     # endregion
 
@@ -247,8 +247,8 @@ class SimBroker(Broker, PriceSampleConsumer):
         # Store latest sample for instrument to enable submit-time ACCEPT decision
         self._latest_price_sample_by_instrument[sample.instrument] = sample
 
-        # Build modeled order book from $sample using configured OrderFillModel
-        _ = self._fill_model.build_simulated_order_book(sample)
+        # Build modeled order book from $sample using configured MarketDepthModel
+        _ = self._depth_model.build_simulated_order_book(sample)
 
         # Retrieve candidate orders by scanning (simpler but less efficient)
         orders = [o for o in self._orders_by_id.values() if o.instrument == sample.instrument]
