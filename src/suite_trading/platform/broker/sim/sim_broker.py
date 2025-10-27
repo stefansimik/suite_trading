@@ -12,8 +12,8 @@ from suite_trading.domain.order.order_state import OrderAction
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import PriceSampleConsumer
-from suite_trading.platform.broker.sim.market_depth_model.protocol import MarketDepthModel
-from suite_trading.platform.broker.sim.market_depth_model.zero_spread import ZeroSpreadMarketDepthModel
+from suite_trading.platform.broker.sim.models.market_depth.protocol import MarketDepthModel
+from suite_trading.platform.broker.sim.models.market_depth.zero_spread import ZeroSpreadMarketDepthModel
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
