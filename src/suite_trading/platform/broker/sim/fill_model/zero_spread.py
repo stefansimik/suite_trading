@@ -8,7 +8,7 @@ from suite_trading.domain.market_data.price_sample import PriceSample
 
 
 class ZeroSpreadFillModel:
-    """Zero-spread FillModel that builds an `OrderBook` at the sample price.
+    """Zero-spread OrderFillModel that builds an `OrderBook` at the sample price.
 
     - BUY fills at best ask, SELL at best bid (both equal to `$sample.price`).
     - Negative prices are allowed and passed through (Guideline 7.1).
@@ -17,7 +17,7 @@ class ZeroSpreadFillModel:
 
     __slots__ = ()
 
-    def build_order_book(self, sample: PriceSample) -> OrderBook:
+    def build_simulated_order_book(self, sample: PriceSample) -> OrderBook:
         """Build a zero-spread `OrderBook` from $sample.
 
         Returns:

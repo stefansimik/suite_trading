@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 # region Interface
 
 
-class FillModel(Protocol):
+class OrderFillModel(Protocol):
     """Builds a modeled `OrderBook` from a `PriceSample` for fill simulation.
 
     Why convert `PriceSample` to `OrderBook`?
@@ -27,7 +27,7 @@ class FillModel(Protocol):
         provided for advanced matching.
     """
 
-    def build_order_book(self, sample: PriceSample) -> OrderBook:  # pragma: no cover
+    def build_simulated_order_book(self, sample: PriceSample) -> OrderBook:  # pragma: no cover
         ...
 
 
