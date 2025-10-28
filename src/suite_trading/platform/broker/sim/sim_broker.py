@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Callable, TYPE_CHECKING
-from dataclasses import dataclass
-from collections.abc import Iterable
 
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.market_data.price_sample import PriceSample
-from suite_trading.domain.order.orders import Order
-from suite_trading.domain.order.order_state import OrderAction
+from suite_trading.domain.order.orders import Order, MarketOrder
+from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory
+from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import PriceSampleConsumer
@@ -16,7 +15,6 @@ from suite_trading.platform.broker.sim.models.market_depth.protocol import Marke
 from suite_trading.platform.broker.sim.models.market_depth.zero_spread import ZeroSpreadMarketDepthModel
 
 if TYPE_CHECKING:
-    from suite_trading.domain.order.execution import Execution
     from suite_trading.domain.instrument import Instrument
 
 
@@ -138,16 +136,13 @@ class SimBroker(Broker, PriceSampleConsumer):
         # Track the order (submission never terminalizes in this step)
         self._orders_by_id[order.order_id] = order
 
-        # SUBMIT → publish
+        # Initial order-state transitions:
+        # INITIALIZED -> PENDING_SUBMIT
         self._apply_order_action_and_publish_update(order, OrderAction.SUBMIT)
-
-        # ACCEPT → publish (reach SUBMITTED)
+        # PENDING_SUBMIT -> SUBMITTED
         self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
-
-        # ACCEPT → publish (reach WORKING) - only if price for instrument is known
-        instrument = order.instrument
-        if self._is_price_known_for_instrument(instrument):
-            self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
+        # SUBMITTED → State WORKING
+        self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
 
     def cancel_order(self, order: Order) -> None:
         """Implements: Broker.cancel_order
@@ -216,58 +211,56 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # region Price processing
 
-    @dataclass(frozen=True)
-    class MatchResult:
-        """Result of matching a single `PriceSample` against orders."""
-
-        executions: list[Execution]
-        updated_orders: list[Order]
-
-    def _match_orders_for_sample(
-        self,
-        sample: PriceSample,
-        orders: Iterable[Order],
-    ) -> MatchResult:
-        """Evaluate $sample against $orders and propose effects.
-
-        Args:
-            sample: Single `PriceSample` to evaluate.
-            orders: Active `Order`(s) targeting `sample.instrument`.
-
-        Returns:
-            MatchResult: Proposed executions and order-state transitions.
-
-        Note:
-            Real matching (market/limit/stop, TIF, partials) will be implemented later.
-        """
-        return self.MatchResult(executions=[], updated_orders=[])
-
+    # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
     def process_price_sample(self, sample: PriceSample) -> None:
-        """Handle a new `PriceSample`."""
-        # Store latest sample for instrument to enable submit-time ACCEPT decision
+        """Handle a new `PriceSample` and match it against active (fillable) orders to generate executions and order-state updates."""
+        # Store latest sample per instrument
         self._latest_price_sample_by_instrument[sample.instrument] = sample
 
-        # Build modeled order book from $sample using configured MarketDepthModel
-        _ = self._depth_model.build_simulated_order_book(sample)
+        # Get order-book for simulation of market depth and order-fills
+        order_book = self._depth_model.build_simulated_order_book(sample)
 
-        # Retrieve candidate orders by scanning (simpler but less efficient)
-        orders = [o for o in self._orders_by_id.values() if o.instrument == sample.instrument]
+        # Select FILLABLE orders, that are targeting the same instrument as input price-sample
+        # Orders are processed in order how they were submitted (and added to `self._orders_by_id`)
+        orders_to_process = [order for order in self._orders_by_id.values() if order.instrument == sample.instrument and order.state_category == OrderStateCategory.FILLABLE]
 
-        result = self._match_orders_for_sample(sample, orders)
+        # Determine best prices once
+        best_bid_price = order_book.best_bid.price
+        best_ask_price = order_book.best_ask.price
 
-        # Emit executions first, then order updates
-        if self._on_execution is not None:
-            for exe in result.executions:
-                # NOTE: assume `exe.order_id` maps to a tracked order
-                order = self._orders_by_id.get(exe.order_id)
-                if order is not None:
-                    self._on_execution(self, order, exe)
+        # Process each order and publish (executions + order-state updates) if there are any
+        for order in orders_to_process:
+            # TODO: We should add order-price matching for other order-types (e.g., LIMIT, STOP, STOP-LIMIT)
+            #   - now MARKET orders are only supported
 
-        if self._on_order_updated is not None:
-            for updated in result.updated_orders:
-                # Replace tracked order with updated state
-                self._orders_by_id[updated.order_id] = updated
-                self._on_order_updated(self, updated)
+            # If MARKET order
+            if isinstance(order, MarketOrder):
+                # Create Execution (market order is always filled if there is enough liquidity)
+                # TODO: We should eat all liquidity from order-book, instead of using best bid/ask price
+                execution_price = best_ask_price if order.is_buy else best_bid_price
+                quantity_to_fill = order.unfilled_quantity
+                execution = Execution(
+                    order=order,
+                    price=execution_price,
+                    quantity=quantity_to_fill,
+                    timestamp=sample.dt_event,
+                )
+                order.add_execution(execution)
+
+                # Updated order-state
+                previous_state = order.state
+                order.change_state(OrderAction.FILL)
+                new_state = order.state
+                order_state_changed = new_state != previous_state
+                if new_state != previous_state and self._on_order_updated is not None:
+                    self._on_order_updated(self, order)
+
+                # PUBLISH
+                # First execution
+                self._on_execution(self, order, execution)
+                # Second order-state update
+                if order_state_changed:
+                    self._on_order_updated(self, order)
 
         return
 

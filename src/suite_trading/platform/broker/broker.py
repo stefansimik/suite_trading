@@ -65,11 +65,13 @@ class Broker(Protocol):
         on_execution: Callable[[Broker, Order, Execution], None],
         on_order_updated: Callable[[Broker, Order], None],
     ) -> None:
-        """Register Engine callbacks to report broker events.
+        """Each broker has to report changes in orders into TradingEngine
 
-        The Broker must invoke `on_execution` when a fill/partial-fill occurs and
-        `on_order_updated` when an order changes state. When both happen for the same
-        broker event, call `on_execution` first, then `on_order_updated`.
+        The Broker must invoke:
+         - `on_execution` callback, when a fill/partial-fill occurs
+         - `on_order_updated` callback, when an order changes state
+
+         When both happen for the same broker event, call `on_execution` first, then `on_order_updated`.
         """
         ...
 

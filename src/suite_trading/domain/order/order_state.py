@@ -81,7 +81,7 @@ def create_order_state_machine() -> StateMachine:
         StateMachine: A configured state machine for managing order states.
     """
     transitions = {
-        # Initial submission path
+        # Initial submission of order
         (OrderState.INITIALIZED, OrderAction.DENY): OrderState.DENIED,
         (OrderState.INITIALIZED, OrderAction.SUBMIT): OrderState.PENDING_SUBMIT,
         (OrderState.PENDING_SUBMIT, OrderAction.ACCEPT): OrderState.SUBMITTED,
@@ -132,8 +132,6 @@ def create_order_state_machine() -> StateMachine:
         # Real-world late fill race handling
         (OrderState.CANCELLED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.CANCELLED, OrderAction.FILL): OrderState.FILLED,
-        # Recovery from UNKNOWN
-        # Requires broker reconciliation procedure, during which we set the order-state explicitly
     }
 
     return StateMachine(OrderState.INITIALIZED, transitions)
@@ -166,8 +164,8 @@ _ORDER_STATE_CATEGORY_MAP: Final[dict[OrderState, OrderStateCategory]] = {
     # Initial / submission path
     OrderState.INITIALIZED: OrderStateCategory.PRE_LIVE,
     OrderState.PENDING_SUBMIT: OrderStateCategory.PRE_LIVE,
+    OrderState.SUBMITTED: OrderStateCategory.PRE_LIVE,  # just in broker environment, not tradeable on exchange yet
     # Active / live and still-fillable while requests are in flight
-    OrderState.SUBMITTED: OrderStateCategory.FILLABLE,
     OrderState.WORKING: OrderStateCategory.FILLABLE,
     OrderState.PENDING_UPDATE: OrderStateCategory.FILLABLE,
     OrderState.PENDING_CANCEL: OrderStateCategory.FILLABLE,
@@ -175,7 +173,7 @@ _ORDER_STATE_CATEGORY_MAP: Final[dict[OrderState, OrderStateCategory]] = {
     # Trigger flow
     OrderState.TRIGGER_PENDING: OrderStateCategory.PRE_LIVE,
     OrderState.TRIGGERED: OrderStateCategory.PRE_LIVE,
-    # Terminal / effectively terminal
+    # Terminal states
     OrderState.DENIED: OrderStateCategory.TERMINAL,
     OrderState.REJECTED: OrderStateCategory.TERMINAL,
     OrderState.CANCELLED: OrderStateCategory.TERMINAL,
