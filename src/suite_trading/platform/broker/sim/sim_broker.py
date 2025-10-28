@@ -224,10 +224,6 @@ class SimBroker(Broker, PriceSampleConsumer):
         # Orders are processed in order how they were submitted (and added to `self._orders_by_id`)
         orders_to_process = [order for order in self._orders_by_id.values() if order.instrument == sample.instrument and order.state_category == OrderStateCategory.FILLABLE]
 
-        # Determine best prices once
-        best_bid_price = order_book.best_bid.price
-        best_ask_price = order_book.best_ask.price
-
         # Process each order and publish (executions + order-state updates) if there are any
         for order in orders_to_process:
             # TODO: We should add order-price matching for other order-types (e.g., LIMIT, STOP, STOP-LIMIT)
@@ -237,6 +233,8 @@ class SimBroker(Broker, PriceSampleConsumer):
             if isinstance(order, MarketOrder):
                 # Create Execution (market order is always filled if there is enough liquidity)
                 # TODO: We should eat all liquidity from order-book, instead of using best bid/ask price
+                best_bid_price = order_book.best_bid.price
+                best_ask_price = order_book.best_ask.price
                 execution_price = best_ask_price if order.is_buy else best_bid_price
                 quantity_to_fill = order.unfilled_quantity
                 execution = Execution(
