@@ -82,8 +82,9 @@ class TopicFactory:
         Returns:
             str: The topic name in format 'bar::{instrument}::{value}-{unit}::{price_type}'
         """
+        price_suffix = "last" if bar_type.price_type.name == "LAST_TRADE" else bar_type.price_type.name.lower()
         return TopicFactory.create_topic_from_parts(
-            ["bar", str(bar_type.instrument).lower(), f"{bar_type.value}-{bar_type.unit.name.lower()}", bar_type.price_type.name.lower()],
+            ["bar", str(bar_type.instrument).lower(), f"{bar_type.value}-{bar_type.unit.name.lower()}", price_suffix],
         )
 
     @staticmethod
@@ -155,8 +156,9 @@ class TopicFactory:
         """Create topic for BarEvent using request_details dict."""
         bar_type = request_details.get("bar_type")
         if bar_type:
+            price_suffix = "last" if bar_type.price_type.name == "LAST_TRADE" else bar_type.price_type.name.lower()
             return TopicFactory.create_topic_from_parts(
-                ["bar", str(bar_type.instrument).lower(), f"{bar_type.value}-{bar_type.unit.name.lower()}", bar_type.price_type.name.lower()],
+                ["bar", str(bar_type.instrument).lower(), f"{bar_type.value}-{bar_type.unit.name.lower()}", price_suffix],
             )
         raise ValueError("$bar_type is required in $request_details for BarEvent")
 

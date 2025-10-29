@@ -3,11 +3,21 @@ from decimal import Decimal
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.instrument import Instrument
+from suite_trading.domain.instrument import Instrument, AssetClass
+from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar
 
 # Constants
-INSTRUMENT = Instrument(name="EURUSD", exchange="FOREX", price_increment=Decimal("0.00001"))
+INSTRUMENT = Instrument(
+    name="EURUSD",
+    exchange="FOREX",
+    asset_class=AssetClass.FX_SPOT,
+    price_increment=Decimal("0.00001"),
+    quantity_increment=Decimal("1"),
+    contract_size=Decimal("100000"),
+    contract_unit="EUR",
+    quote_currency=USD,
+)
 BAR_VALUE = 5
 OPEN_PRICE = 1.1000
 HIGH_PRICE = 1.1100

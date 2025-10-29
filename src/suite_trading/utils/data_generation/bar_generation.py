@@ -10,19 +10,14 @@ from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.instrument import Instrument
+from suite_trading.domain.instrument import Instrument, AssetClass
+from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.utils.data_generation.price_patterns import zig_zag_function
 from suite_trading.utils.math import round_to_increment
 
 # DEFAULT VALUES, THAT ARE USED FOR GENERATION OF DEMO BARS
 
-DEFAULT_INSTRUMENT = Instrument(
-    name="EURUSD",
-    exchange="FOREX",
-    price_increment=Decimal("0.0001"),
-    quantity_increment=Decimal("100_000"),
-    contract_value_multiplier=Decimal("1"),
-)
+DEFAULT_INSTRUMENT = Instrument(name="EURUSD", exchange="FOREX", asset_class=AssetClass.FX_SPOT, price_increment=Decimal("0.0001"), quantity_increment=Decimal("100_000"), contract_size=Decimal("100_000"), contract_unit="EUR", quote_currency=USD)
 
 
 def create_bar_type(

@@ -144,12 +144,12 @@ class Position:
             current_price (Decimal): The current market price of the instrument.
 
         Returns:
-            Decimal: The market value (quantity * current_price * contract_value_multiplier).
+            Decimal: The market value (quantity * $current_price * $contract_size).
         """
         if not isinstance(current_price, Decimal):
             current_price = Decimal(str(current_price))
 
-        return self.quantity * current_price * self.instrument.contract_value_multiplier
+        return self.quantity * current_price * self.instrument.contract_size
 
     def update_unrealized_pnl(self, current_price: Decimal) -> Position:
         """Create a new Position with updated unrealized P&L based on current market price.
@@ -167,7 +167,7 @@ class Position:
             new_unrealized_pnl = Decimal("0")
         else:
             price_diff = current_price - self.average_price
-            new_unrealized_pnl = self.quantity * price_diff * self.instrument.contract_value_multiplier
+            new_unrealized_pnl = self.quantity * price_diff * self.instrument.contract_size
 
         return Position(
             instrument=self.instrument,

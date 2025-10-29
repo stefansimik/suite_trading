@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from suite_trading.domain.instrument import Instrument
+from suite_trading.domain.instrument import Instrument, AssetClass
+from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
@@ -20,7 +21,16 @@ CSV_FILE_NAME = "demo_bars.csv"
 CSV_PATH = Path(__file__).with_name(CSV_FILE_NAME)
 
 # Describe BarType for bars constructed in the CSV file
-INSTRUMENT = Instrument("EURUSD", "FOREX", 0.00001, 1)
+INSTRUMENT = Instrument(
+    name="EURUSD",
+    exchange="FOREX",
+    asset_class=AssetClass.FX_SPOT,
+    price_increment="0.00001",
+    quantity_increment="1",
+    contract_size="100000",
+    contract_unit="EUR",
+    quote_currency=USD,
+)
 BAR_TYPE = BarType(INSTRUMENT, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
 
 

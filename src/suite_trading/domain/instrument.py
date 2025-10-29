@@ -1,61 +1,118 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from decimal import Decimal, ROUND_HALF_EVEN
+from enum import Enum
+from suite_trading.domain.monetary.currency import Currency
+
+if TYPE_CHECKING:
+    from suite_trading.domain.monetary.money import Money
+
+
+class AssetClass(Enum):
+    """High-level instrument categories used throughout the engine.
+
+    Keep short; add new values only when really needed (YAGNI).
+    """
+
+    EQUITY = "EQUITY"
+    ETF = "ETF"
+    INDEX = "INDEX"
+    FUTURE = "FUTURE"
+    OPTION = "OPTION"
+    COMMODITY_SPOT = "COMMODITY_SPOT"
+    CRYPTO_SPOT = "CRYPTO_SPOT"
+    FX_SPOT = "FX_SPOT"
+    BOND = "BOND"
 
 
 class Instrument:
     """Represents a financial instrument.
 
     Attributes:
-        name (str): The name of the instrument (e.g., "EURUSD").
-        exchange (str): The exchange where the instrument is traded (e.g., "FOREX").
-        price_increment (Decimal): The minimum price change increment.
-        quantity_increment (Decimal): The minimum quantity change increment.
-        contract_value_multiplier (Decimal): The value of one contract (e.g., 125000 for 6E on CME).
+        name (str): The instrument identifier (e.g., "EURUSD", "6E", "AAPL").
+        exchange (str): Venue where the instrument is traded (e.g., "FOREX", "CME").
+        price_increment (Decimal): Minimum price tick size.
+        quantity_increment (Decimal): Minimum quantity increment.
+        contract_size (Decimal): Underlying amount per contract/lot (e.g., 125000 for 6E).
+        contract_unit (str): Unit of the underlying (e.g., "EUR", "share", "barrel", "troy_oz").
+        quote_currency (Currency): Currency prices are quoted in (denominator of quote).
+        settlement_currency (Currency): Currency where P/L settles.
     """
 
     __slots__ = (
         "_name",
         "_exchange",
+        "_asset_class",
         "_price_increment",
         "_quantity_increment",
-        "_contract_value_multiplier",
+        "_contract_size",
+        "_contract_unit",
+        "_quote_currency",
+        "_settlement_currency",
     )
 
     def __init__(
         self,
         name: str,
         exchange: str,
+        asset_class: AssetClass,
         price_increment: Decimal | str,
-        quantity_increment: Decimal | str = Decimal("1"),
-        contract_value_multiplier: Decimal | str = Decimal("1"),
-    ):
-        """Initialize a new instrument.
+        quantity_increment: Decimal | str,
+        contract_size: Decimal | str,
+        contract_unit: str,
+        quote_currency: Currency,
+        settlement_currency: Currency | None = None,
+    ) -> None:
+        """Initialize a new Instrument with explicit currencies and contract spec.
 
         Args:
-            name: The name of the instrument (e.g., "EURUSD").
-            exchange: The exchange where the instrument is traded (e.g., "FOREX").
-            price_increment: The minimum price change increment.
-            quantity_increment: The minimum quantity change increment.
-            contract_value_multiplier: The value of one contract (e.g., 125000 for 6E on CME).
+            name: The instrument identifier (e.g., "6E", "EURUSD", "AAPL").
+            exchange: Venue name (e.g., "CME", "FOREX", "NASDAQ").
+            price_increment: Minimum price tick size as Decimal or str.
+            quantity_increment: Minimum quantity increment as Decimal or str.
+            contract_size: Underlying amount per contract/lot (e.g., 125000 for 6E).
+            contract_unit: Unit of the underlying (e.g., "EUR", "share", "barrel").
+            quote_currency: Currency in which prices are quoted (denominator of the quote). This
+                expresses how the price is displayed/traded (e.g., USD in EURUSD = 1.1000 USD per 1 EUR).
+            settlement_currency: Currency where cash flows and P/L settle (valuation/payoff currency).
+                If not provided, defaults to $quote_currency. Use explicitly when settlement differs
+                (e.g., inverse crypto, NDF, quanto). Example: The price is shown in USD (USD per 1 BTC),
+                but P/L settles in BTC.
 
         Raises:
-            ValueError: If any increment values are not positive.
+            ValueError: If increments or $contract_size are not positive, or $contract_unit is empty.
         """
         # Explicit type conversion
         self._name = name
         self._exchange = exchange
+        self._asset_class = asset_class
         self._price_increment = Decimal(str(price_increment))
         self._quantity_increment = Decimal(str(quantity_increment))
-        self._contract_value_multiplier = Decimal(str(contract_value_multiplier))
+        self._contract_size = Decimal(str(contract_size))
+        self._contract_unit = contract_unit
 
-        # Explicit validation
+        # Check: ensure $quote_currency is Currency to keep domain model typed and fail fast during migration
+        if not isinstance(quote_currency, Currency):
+            raise TypeError("Cannot init `Instrument` because $quote_currency is not Currency; use `Currency.from_str` to convert string codes at the boundary")
+        # Check: ensure $settlement_currency is Currency when provided (defaults to $quote_currency)
+        if settlement_currency is not None and not isinstance(settlement_currency, Currency):
+            raise TypeError("Cannot init `Instrument` because $settlement_currency is not Currency; pass None for default or convert at the boundary")
+        self._quote_currency = quote_currency
+        self._settlement_currency = self._quote_currency if settlement_currency is None else settlement_currency
+
+        # Check: $price_increment must be positive to define a valid tick size
         if self._price_increment <= 0:
             raise ValueError(f"$price_increment must be positive, but provided value is: {self._price_increment}")
+        # Check: $quantity_increment must be positive to define a valid lot size
         if self._quantity_increment <= 0:
             raise ValueError(f"$quantity_increment must be positive, but provided value is: {self._quantity_increment}")
-        if self._contract_value_multiplier <= 0:
-            raise ValueError(f"$contract_value_multiplier must be positive, but provided value is: {self._contract_value_multiplier}")
+        # Check: $contract_size must be positive to define the contract/lot amount
+        if self._contract_size <= 0:
+            raise ValueError(f"$contract_size must be positive, but provided value is: {self._contract_size}")
+        # Check: $contract_unit must be a non-empty string to describe the underlying unit
+        if not isinstance(self._contract_unit, str) or not self._contract_unit.strip():
+            raise ValueError("Cannot init `Instrument` because $contract_unit is empty")
 
     @property
     def name(self) -> str:
@@ -78,9 +135,36 @@ class Instrument:
         return self._quantity_increment
 
     @property
-    def contract_value_multiplier(self) -> Decimal:
-        """Get the value of one contract."""
-        return self._contract_value_multiplier
+    def contract_size(self) -> Decimal:
+        """Get the underlying amount per 1 contract/lot as Decimal."""
+        return self._contract_size
+
+    @property
+    def contract_unit(self) -> str:
+        """Get the unit of the underlying (e.g., 'EUR', 'share', 'barrel')."""
+        return self._contract_unit
+
+    @property
+    def quote_currency(self) -> Currency:
+        """Get the currency prices are quoted in (denominator of the quote)."""
+        return self._quote_currency
+
+    @property
+    def settlement_currency(self) -> Currency:
+        """Get the currency where P/L settles for this Instrument."""
+        return self._settlement_currency
+
+    @property
+    def asset_class(self) -> AssetClass:
+        """Get the asset class of this Instrument."""
+        return self._asset_class
+
+    def compute_tick_value_money(self) -> Money:
+        """Return tick value as Money in $settlement_currency for 1 contract and 1 tick."""
+        from suite_trading.domain.monetary.money import Money
+
+        tick_amount = self.contract_size * self.price_increment
+        return Money(tick_amount, self.settlement_currency)
 
     # region Convenience
 
@@ -175,14 +259,14 @@ class Instrument:
             Decimal: Price snapped to a multiple of $price_increment.
 
         Raises:
-            ValueError: If $value <= 0.
+            ValueError: If $value is not finite.
         """
         # Convert safely; avoid binary float artifacts by using str(...) for non-Decimal
         v = value if isinstance(value, Decimal) else Decimal(str(value))
 
-        # Check: price must be positive for trading semantics
-        if v <= 0:
-            raise ValueError(f"Cannot call `snap_price` because $value ('{v}') must be > 0.")
+        # Check: input must be finite; negative prices may be valid in some markets
+        if not v.is_finite():
+            raise ValueError(f"Cannot call `snap_price` because $value ('{v}') is not finite")
 
         # Snap to the instrument's price increment (banker's rounding)
         return v.quantize(self.price_increment, rounding=ROUND_HALF_EVEN)
@@ -225,12 +309,12 @@ class Instrument:
         return f"{self.name}@{self.exchange}"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name}, exchange={self.exchange}, price_increment={self.price_increment}, quantity_increment={self.quantity_increment}, contract_value_multiplier={self.contract_value_multiplier})"
+        return f"{self.__class__.__name__}(name={self.name}, exchange={self.exchange}, asset_class={self.asset_class.name}, price_increment={self.price_increment}, quantity_increment={self.quantity_increment}, contract_size={self.contract_size}, contract_unit={self.contract_unit}, quote_currency={self.quote_currency.code}, settlement_currency={self.settlement_currency.code})"
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, Instrument):
             return False
-        return self.name == other.name and self.exchange == other.exchange and self.price_increment == other.price_increment and self.quantity_increment == other.quantity_increment and self.contract_value_multiplier == other.contract_value_multiplier
+        return self.name == other.name and self.exchange == other.exchange and self.asset_class == other.asset_class and self.price_increment == other.price_increment and self.quantity_increment == other.quantity_increment and self.contract_size == other.contract_size and self.contract_unit == other.contract_unit and self.quote_currency == other.quote_currency and self.settlement_currency == other.settlement_currency
 
     def __hash__(self) -> int:
         """Return hash value for the instrument.
@@ -240,6 +324,18 @@ class Instrument:
         Returns:
             int: Hash value based on all attributes.
         """
-        return hash((self.name, self.exchange, self.price_increment, self.quantity_increment, self.contract_value_multiplier))
+        return hash(
+            (
+                self.name,
+                self.exchange,
+                self.asset_class.name,
+                self.price_increment,
+                self.quantity_increment,
+                self.contract_size,
+                self.contract_unit,
+                self.quote_currency.code,
+                self.settlement_currency.code,
+            ),
+        )
 
     # endregion
