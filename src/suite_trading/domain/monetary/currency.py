@@ -8,7 +8,6 @@ class CurrencyType(Enum):
 
     FIAT = "FIAT"
     CRYPTO = "CRYPTO"
-    COMMODITY = "COMMODITY"
 
 
 class Currency:
@@ -18,11 +17,13 @@ class Currency:
         code (str): Currency code (e.g., "USD", "BTC").
         precision (int): Number of decimal places (0-16).
         name (str): Full currency name.
-        currency_type (CurrencyType): Type of currency (FIAT, CRYPTO, COMMODITY).
+        currency_type (CurrencyType): Type of currency (FIAT, CRYPTO).
     """
 
     # Class-level registry for predefined currencies
     _registry: dict[str, Currency] = {}
+
+    # region Init
 
     def __init__(self, code: str, precision: int, name: str, currency_type: CurrencyType):
         """Initialize a Currency instance.
@@ -55,6 +56,10 @@ class Currency:
         self._name = name.strip()
         self._currency_type = currency_type
 
+    # endregion
+
+    # region Properties
+
     @property
     def code(self) -> str:
         """Get the currency code."""
@@ -74,6 +79,10 @@ class Currency:
     def currency_type(self) -> CurrencyType:
         """Get the currency type."""
         return self._currency_type
+
+    # endregion
+
+    # region Class methods
 
     @classmethod
     def register(cls, currency: Currency, overwrite: bool = False) -> None:
@@ -117,6 +126,10 @@ class Currency:
 
         return cls._registry[code]
 
+    # endregion
+
+    # region Properties - Classification
+
     @property
     def is_fiat(self) -> bool:
         """Check if currency is fiat.
@@ -135,14 +148,9 @@ class Currency:
         """
         return self._currency_type == CurrencyType.CRYPTO
 
-    @property
-    def is_commodity(self) -> bool:
-        """Check if currency is commodity.
+    # endregion
 
-        Returns:
-            bool: True if currency is commodity.
-        """
-        return self._currency_type == CurrencyType.COMMODITY
+    # region Magic
 
     def __eq__(self, other) -> bool:
         """Check equality with another Currency."""
@@ -161,3 +169,5 @@ class Currency:
     def __repr__(self) -> str:
         """Return detailed string representation."""
         return f"{self.__class__.__name__}('{self.code}', {self.precision}, '{self.name}', {self.currency_type})"
+
+    # endregion
