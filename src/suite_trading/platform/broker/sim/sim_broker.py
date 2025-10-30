@@ -48,8 +48,8 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._orders_by_id: dict[str, Order] = {}
 
         # Engine callbacks (set via `set_callbacks`)
-        self._on_execution: Callable[[Broker, Execution], None] | None = None
-        self._on_order_updated: Callable[[Broker, Order], None] | None = None
+        self._execution_callback: Callable[[Broker, Execution], None] | None = None
+        self._order_updated_callback: Callable[[Broker, Order], None] | None = None
 
         # STATE: Executions and Positions
         self._executions: list[Execution] = []
@@ -101,8 +101,11 @@ class SimBroker(Broker, PriceSampleConsumer):
         previous_state = order.state
         order.change_state(action)
         new_state = order.state
-        if new_state != previous_state and self._on_order_updated is not None:
-            self._on_order_updated(self, order)
+        if new_state != previous_state:
+            # Check: ensure callback was provided before invoking to avoid calling None
+            cb = self._order_updated_callback
+            if cb is not None:
+                cb(self, order)
 
     def _is_price_known_for_instrument(self, instrument: Instrument) -> bool:
         sample = self._latest_price_sample_by_instrument.get(instrument)
@@ -168,8 +171,8 @@ class SimBroker(Broker, PriceSampleConsumer):
         on_order_updated: Callable[[Broker, Order], None],
     ) -> None:
         """Register Engine callbacks for broker events."""
-        self._on_execution = on_execution
-        self._on_order_updated = on_order_updated
+        self._execution_callback = on_execution
+        self._order_updated_callback = on_order_updated
 
     # endregion
 
@@ -273,7 +276,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         """Build the default MarketDepthModel used by this broker instance.
 
         Returns:
-            A MarketDepthModel instance. Default is ZeroSpreadMarketDepthModel.
+            A MarketDepthModel instance.
         """
         return ZeroSpreadMarketDepthModel()
 
@@ -325,9 +328,15 @@ class SimBroker(Broker, PriceSampleConsumer):
                 order_state_changed = new_state != previous_state
 
                 # PUBLISH — execution first, then order-state update
-                self._on_execution(self, execution)
+                cb_exec = self._execution_callback
+                # Check: ensure callback was provided before invoking
+                if cb_exec is not None:
+                    cb_exec(self, execution)
                 if order_state_changed:
-                    self._on_order_updated(self, order)
+                    cb_update = self._order_updated_callback
+                    # Check: ensure callback was provided before invoking
+                    if cb_update is not None:
+                        cb_update(self, order)
 
         return
 
