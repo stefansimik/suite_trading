@@ -2,8 +2,9 @@
 
 **S**imple, **U**nderstandable, **I**ntuitive **T**rading **E**ngine
 
-> ⚠️ **Work in Progress** (as of 2025-08-18): This project is in active development (~60-70%
-> complete). Core event-driven architecture and strategy framework are implemented.
+> ⚠️ **Work in Progress** (as of 2025-10-31): This project is in active development (~75-80%
+> complete). Core event-driven architecture, strategy framework, and broker integration with
+> simulated execution are implemented.
 
 ## Overview
 
@@ -204,15 +205,16 @@ Tip: See an end-to-end runnable example under tests:
 
 ## Project Status
 
-This project is in **active development** with approximately **60-70% of core functionality** implemented.
+This project is in **active development** with approximately **75-80% of core functionality** implemented.
 
 ### Development status & roadmap
 
-Current status (as of 2025-08-18):
+Current status (as of 2025-10-31):
 - Ready to try: TradingEngine, Strategy lifecycle, Event model (Bar/TradeTick/QuoteTick),
-  EventFeed(s), MessageBus, and demo data utilities (create_bar_series + FixedSequenceEventFeed).
-- Not yet available: EventFeedProvider(s) for live/historical integrations, Broker(s),
-  advanced order types, indicators, performance analytics.
+  EventFeed(s), MessageBus, demo data utilities (create_bar_series + FixedSequenceEventFeed),
+  SimBroker with MARKET order execution, position tracking, and per-strategy execution history.
+- Not yet available: EventFeedProvider(s) for live/historical integrations, live brokers,
+  advanced order execution (LIMIT/STOP orders in SimBroker), indicators, performance analytics.
 
 **Completed:**
 - ✅ Complete event-driven architecture with chronological processing
@@ -223,12 +225,19 @@ Current status (as of 2025-08-18):
 - ✅ EventFeed system with timeline filtering and management
 - ✅ State machines for engine and strategy lifecycle control
 - ✅ Market data events (Bar, TradeTick, QuoteTick) with proper event wrappers
+- ✅ Broker protocol with unified interface for all broker implementations
+- ✅ SimBroker for backtesting/paper trading with MARKET order execution
+- ✅ Order state machine and execution tracking
+- ✅ Position tracking and management per instrument
+- ✅ Per-strategy execution history in TradingEngine
+- ✅ Market depth model for simulated order matching (ZeroSpreadMarketDepthModel)
 
 **Next Priority (Roadmap):**
 1. **EventFeedProvider(s)** ❌ — Real-time market data integration
-2. **Broker(s)** ❌ — Live order execution with multiple brokers + SimulatedBroker (simulated
-   execution, positions, portfolio)
-3. **Advanced order types** ❌ — Stop-loss, take-profit, bracket orders
+2. **Broker execution enhancements** 🔄 — Complete SimBroker (LIMIT/STOP order matching,
+   cancel/modify operations) + live broker implementations
+3. **Advanced order types** 🔄 — Order types are defined; need full SimBroker matching support for
+   LIMIT, STOP, STOP_LIMIT orders
 4. **Indicators library** ❌ — Built-in technical indicators (SMA, EMA, RSI, MACD); composable API
 5. **Performance analytics** ❌ — Strategy performance metrics and reporting
 
@@ -238,4 +247,4 @@ See [LICENSE](LICENSE) file for details.
 
 ## Disclaimer
 
-This software is for educational and research purposes. Use at your own risk in live trading environments.
+This software is for educational and research purposes. Use at your own risk in any live trading environments.
