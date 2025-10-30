@@ -115,11 +115,11 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # region Internal state updates (private)
 
-    def _apply_execution_to_broker_state(self, execution: Execution) -> None:
-        """Apply a fill to broker-local state atomically.
+    def _record_execution_and_update_position(self, execution: Execution) -> None:
+        """Record an execution and update the corresponding position.
 
-        Updates the per-instrument Position first, then records $execution. If any error occurs
-        during position update (e.g., Position validation), nothing is appended to $self._executions.
+        Records $execution to the execution history, then updates the per-instrument Position
+        to reflect the new quantity and average price.
         """
         order = execution.order
         instrument = order.instrument
@@ -127,6 +127,10 @@ class SimBroker(Broker, PriceSampleConsumer):
         trade_price: Decimal = Decimal(execution.price)
         signed_qty: Decimal = trade_qty if order.is_buy else -trade_qty
 
+        # Record execution to history
+        self._executions.append(execution)
+
+        # Update position for this instrument
         prev_pos: Position | None = self._positions_by_instrument.get(instrument)
         prev_qty: Decimal = Decimal("0") if prev_pos is None else prev_pos.quantity
         prev_avg: Decimal = Decimal("0") if prev_pos is None else prev_pos.average_price
@@ -157,9 +161,7 @@ class SimBroker(Broker, PriceSampleConsumer):
                 last_update=execution.timestamp,
             )
 
-        # Positions updated successfully → record this execution
-        self._executions.append(execution)
-        logger.debug(f"Applied execution to Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
+        logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
 
     # endregion
 
@@ -318,8 +320,8 @@ class SimBroker(Broker, PriceSampleConsumer):
                 )
                 order.add_execution(execution)
 
-                # Update broker-local state atomically: positions first, then record execution
-                self._apply_execution_to_broker_state(execution)
+                # Record execution and update position
+                self._record_execution_and_update_position(execution)
 
                 # Apply order-state change to FILLED now; publish update after execution callback
                 previous_state = order.state
