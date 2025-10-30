@@ -10,6 +10,7 @@ from suite_trading.domain.position import Position
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
+    from suite_trading.domain.instrument import Instrument
 
 
 @runtime_checkable
@@ -143,6 +144,17 @@ class Broker(Protocol):
         Raises:
             ConnectionError: If not connected (for live brokers).
             NotSupportedError: If positions are not supported.
+        """
+        ...
+
+    def get_position(self, instrument: Instrument) -> Position | None:
+        """Retrieve the current Position for $instrument, or None if flat.
+
+        Args:
+            instrument: Instrument to look up.
+
+        Returns:
+            Position | None: Current Position for $instrument, or None if no open exposure.
         """
         ...
 

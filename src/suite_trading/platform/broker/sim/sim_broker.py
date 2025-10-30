@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Callable, TYPE_CHECKING
+from decimal import Decimal
+import logging
 
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.market_data.price_sample import PriceSample
@@ -16,6 +18,8 @@ from suite_trading.platform.broker.sim.models.market_depth.zero_spread import Ze
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
+
+logger = logging.getLogger(__name__)
 
 
 class SimBroker(Broker, PriceSampleConsumer):
@@ -47,8 +51,9 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._on_execution: Callable[[Broker, Order, Execution], None] | None = None
         self._on_order_updated: Callable[[Broker, Order], None] | None = None
 
-        # POSITIONS API
-        self._positions: list[Position] = []  # TODO: manage via executions
+        # STATE: Executions and Positions
+        self._executions: list[Execution] = []
+        self._positions_by_instrument: dict[Instrument, Position] = {}
 
         # ACCOUNT API
         self._account_info: AccountInfo = AccountInfo(account_id="SIM", funds_by_currency={}, last_update_dt=datetime.now(timezone.utc))
@@ -102,6 +107,55 @@ class SimBroker(Broker, PriceSampleConsumer):
     def _is_price_known_for_instrument(self, instrument: Instrument) -> bool:
         sample = self._latest_price_sample_by_instrument.get(instrument)
         return sample is not None
+
+    # endregion
+
+    # region Internal state updates (private)
+
+    def _apply_execution_to_broker_state(self, order: Order, execution: Execution) -> None:
+        """Apply a fill to broker-local state atomically.
+
+        Updates the per-instrument Position first, then records $execution. If any error occurs
+        during position update (e.g., Position validation), nothing is appended to $self._executions.
+        """
+        instrument = order.instrument
+        trade_qty: Decimal = Decimal(execution.quantity)
+        trade_price: Decimal = Decimal(execution.price)
+        signed_qty: Decimal = trade_qty if order.is_buy else -trade_qty
+
+        prev_pos: Position | None = self._positions_by_instrument.get(instrument)
+        prev_qty: Decimal = Decimal("0") if prev_pos is None else prev_pos.quantity
+        prev_avg: Decimal = Decimal("0") if prev_pos is None else prev_pos.average_price
+
+        new_qty: Decimal = prev_qty + signed_qty
+
+        if new_qty == 0:
+            # Flat after this trade → drop stored position to keep list_open_positions() minimal
+            self._positions_by_instrument.pop(instrument, None)
+        else:
+            # Determine whether we remain on the same side (long/short) after applying the trade
+            same_side = (prev_qty == 0) or (prev_qty > 0 and new_qty > 0) or (prev_qty < 0 and new_qty < 0)
+            if same_side and prev_qty != 0:
+                # Add to existing same-side exposure → weighted average price by absolute sizes
+                new_avg = (abs(prev_qty) * prev_avg + abs(signed_qty) * trade_price) / abs(new_qty)
+            elif prev_qty == 0:
+                # Opening from flat → average equals executed price
+                new_avg = trade_price
+            else:
+                # Side flip (crosses through zero) → start fresh position at executed price
+                new_avg = trade_price
+
+            # Commit the new/updated Position for this instrument
+            self._positions_by_instrument[instrument] = Position(
+                instrument=instrument,
+                quantity=new_qty,
+                average_price=new_avg,
+                last_update=execution.timestamp,
+            )
+
+        # Positions updated successfully → record this execution
+        self._executions.append(execution)
+        logger.debug(f"Applied execution to Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
 
     # endregion
 
@@ -176,11 +230,26 @@ class SimBroker(Broker, PriceSampleConsumer):
     def list_open_positions(self) -> list[Position]:
         """Implements: Broker.list_open_positions
 
-        Return current open positions.
+        List currently open Positions maintained by the broker.
 
-        TODO: Update positions from executions when matching is implemented.
+        Returns:
+            list[Position]: Non-flat Position objects, one per instrument. Positions that become
+            flat are dropped from storage, so an empty list means no open exposure.
         """
-        return list(self._positions)
+        return [p for p in self._positions_by_instrument.values() if not p.is_flat]
+
+    def get_position(self, instrument: Instrument) -> Position | None:
+        """Retrieve the current Position for $instrument, or None if flat.
+
+        The returned Position is broker-maintained; treat it as read-only.
+
+        Args:
+            instrument: Instrument to look up.
+
+        Returns:
+            Position | None: Current Position for $instrument, or None if no open exposure.
+        """
+        return self._positions_by_instrument.get(instrument)
 
     # endregion
 
@@ -231,8 +300,8 @@ class SimBroker(Broker, PriceSampleConsumer):
 
             # If MARKET order
             if isinstance(order, MarketOrder):
-                # Create Execution (market order is always filled if there is enough liquidity)
-                # TODO: We should eat all liquidity from order-book, instead of using best bid/ask price
+                # Create Execution (MARKET orders fill at best price under our simple model)
+                # TODO: Consume available liquidity levels, instead of single best bid/ask
                 best_bid_price = order_book.best_bid.price
                 best_ask_price = order_book.best_ask.price
                 execution_price = best_ask_price if order.is_buy else best_bid_price
@@ -245,18 +314,17 @@ class SimBroker(Broker, PriceSampleConsumer):
                 )
                 order.add_execution(execution)
 
-                # Updated order-state
+                # Update broker-local state atomically: positions first, then record execution
+                self._apply_execution_to_broker_state(order, execution)
+
+                # Apply order-state change to FILLED now; publish update after execution callback
                 previous_state = order.state
                 order.change_state(OrderAction.FILL)
                 new_state = order.state
                 order_state_changed = new_state != previous_state
-                if new_state != previous_state and self._on_order_updated is not None:
-                    self._on_order_updated(self, order)
 
-                # PUBLISH
-                # First execution
+                # PUBLISH — execution first, then order-state update
                 self._on_execution(self, order, execution)
-                # Second order-state update
                 if order_state_changed:
                     self._on_order_updated(self, order)
 
