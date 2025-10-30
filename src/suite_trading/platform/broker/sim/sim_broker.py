@@ -39,7 +39,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         Args:
             depth_model: MarketDepthModel used for matching. If None, a default model is built by
-                `_build_default_depth_model()`.
+                `_build_default_market_depth_model()`.
         """
         # CONNECTION
         self._connected: bool = False
@@ -59,7 +59,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._account_info: AccountInfo = AccountInfo(account_id="SIM", funds_by_currency={}, last_update_dt=datetime.now(timezone.utc))
 
         # FILL MODEL
-        self._depth_model: MarketDepthModel = depth_model or self._build_default_depth_model()
+        self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
 
         # Known prices per instrument (populated in `process_price_sample`)
         self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}
@@ -159,7 +159,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
 
-    def _build_default_depth_model(self) -> MarketDepthModel:
+    def _build_default_market_depth_model(self) -> MarketDepthModel:
         """Build the default MarketDepthModel used by this broker instance.
 
         Returns:
@@ -321,16 +321,12 @@ class SimBroker(Broker, PriceSampleConsumer):
                 new_state = order.state
                 order_state_changed = new_state != previous_state
 
-                # PUBLISH — execution first, then order-state update
-                cb_exec = self._execution_callback
-                # Check: ensure callback was provided before invoking
-                if cb_exec is not None:
-                    cb_exec(self, execution)
+                # PUBLISH
+                # First publish Execution
+                self._execution_callback(self, execution)
+                # Second publish changed Order
                 if order_state_changed:
-                    cb_update = self._order_updated_callback
-                    # Check: ensure callback was provided before invoking
-                    if cb_update is not None:
-                        cb_update(self, order)
+                    self._order_updated_callback(self, order)
 
         return
 
