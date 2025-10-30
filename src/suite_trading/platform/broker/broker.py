@@ -63,7 +63,7 @@ class Broker(Protocol):
 
     def set_callbacks(
         self,
-        on_execution: Callable[[Broker, Order, Execution], None],
+        on_execution: Callable[[Broker, Execution], None],
         on_order_updated: Callable[[Broker, Order], None],
     ) -> None:
         """Each broker has to report changes in orders into TradingEngine

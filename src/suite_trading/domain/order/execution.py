@@ -218,7 +218,7 @@ class Execution:
         Returns:
             str: String representation of the execution.
         """
-        return f"{self.__class__.__name__}(order_id={self.id}, order_id={self.order.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
+        return f"{self.__class__.__name__}(execution_id={self.id}, order_id={self.order.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another execution.

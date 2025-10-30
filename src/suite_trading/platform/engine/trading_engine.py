@@ -767,7 +767,8 @@ class TradingEngine:
         return broker.list_active_orders()
 
     # Broker → Engine callbacks (deterministic ordering ensured by Broker)
-    def _on_broker_execution(self, broker: Broker, order: Order, execution: Execution) -> None:
+    def _on_broker_execution(self, broker: Broker, execution: Execution) -> None:
+        order = execution.order
         route = self._routes_by_order_dict.get(order)
         if route is None:
             raise ValueError("Cannot call `_on_broker_execution` because $order is unknown to this TradingEngine")

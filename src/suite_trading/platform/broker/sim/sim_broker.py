@@ -48,7 +48,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._orders_by_id: dict[str, Order] = {}
 
         # Engine callbacks (set via `set_callbacks`)
-        self._on_execution: Callable[[Broker, Order, Execution], None] | None = None
+        self._on_execution: Callable[[Broker, Execution], None] | None = None
         self._on_order_updated: Callable[[Broker, Order], None] | None = None
 
         # STATE: Executions and Positions
@@ -112,12 +112,13 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # region Internal state updates (private)
 
-    def _apply_execution_to_broker_state(self, order: Order, execution: Execution) -> None:
+    def _apply_execution_to_broker_state(self, execution: Execution) -> None:
         """Apply a fill to broker-local state atomically.
 
         Updates the per-instrument Position first, then records $execution. If any error occurs
         during position update (e.g., Position validation), nothing is appended to $self._executions.
         """
+        order = execution.order
         instrument = order.instrument
         trade_qty: Decimal = Decimal(execution.quantity)
         trade_price: Decimal = Decimal(execution.price)
@@ -163,7 +164,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     def set_callbacks(
         self,
-        on_execution: Callable[[Broker, Order, Execution], None],
+        on_execution: Callable[[Broker, Execution], None],
         on_order_updated: Callable[[Broker, Order], None],
     ) -> None:
         """Register Engine callbacks for broker events."""
@@ -315,7 +316,7 @@ class SimBroker(Broker, PriceSampleConsumer):
                 order.add_execution(execution)
 
                 # Update broker-local state atomically: positions first, then record execution
-                self._apply_execution_to_broker_state(order, execution)
+                self._apply_execution_to_broker_state(execution)
 
                 # Apply order-state change to FILLED now; publish update after execution callback
                 previous_state = order.state
@@ -324,7 +325,7 @@ class SimBroker(Broker, PriceSampleConsumer):
                 order_state_changed = new_state != previous_state
 
                 # PUBLISH — execution first, then order-state update
-                self._on_execution(self, order, execution)
+                self._on_execution(self, execution)
                 if order_state_changed:
                     self._on_order_updated(self, order)
 
