@@ -66,7 +66,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Connection (from Broker)
+    # region Connection (Broker protocol)
 
     def connect(self) -> None:
         """Implements: Broker.connect
@@ -91,7 +91,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Utilities
+    # region Private Helpers
 
     def _apply_order_action_and_publish_update(self, order: Order, action: OrderAction) -> None:
         """Apply $action to $order and publish `on_order_updated` if state changed.
@@ -110,10 +110,6 @@ class SimBroker(Broker, PriceSampleConsumer):
     def _is_price_known_for_instrument(self, instrument: Instrument) -> bool:
         sample = self._latest_price_sample_by_instrument.get(instrument)
         return sample is not None
-
-    # endregion
-
-    # region Internal state updates (private)
 
     def _record_execution_and_update_position(self, execution: Execution) -> None:
         """Record an execution and update the corresponding position.
@@ -163,9 +159,17 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
 
+    def _build_default_depth_model(self) -> MarketDepthModel:
+        """Build the default MarketDepthModel used by this broker instance.
+
+        Returns:
+            A MarketDepthModel instance.
+        """
+        return ZeroSpreadMarketDepthModel()
+
     # endregion
 
-    # region Callbacks (from Broker)
+    # region Callbacks (Broker protocol)
 
     def set_callbacks(
         self,
@@ -178,7 +182,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Orders (from Broker)
+    # region Orders (Broker protocol)
 
     def submit_order(self, order: Order) -> None:
         """Implements: Broker.submit_order
@@ -231,7 +235,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Positions (from Broker)
+    # region Positions (Broker protocol)
 
     def list_open_positions(self) -> list[Position]:
         """Implements: Broker.list_open_positions
@@ -259,7 +263,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Account (from Broker)
+    # region Account (Broker protocol)
 
     def get_account_info(self) -> AccountInfo:
         """Implements: Broker.get_account_info
@@ -272,19 +276,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Default models
-
-    def _build_default_depth_model(self) -> MarketDepthModel:
-        """Build the default MarketDepthModel used by this broker instance.
-
-        Returns:
-            A MarketDepthModel instance.
-        """
-        return ZeroSpreadMarketDepthModel()
-
-    # endregion
-
-    # region Price processing
+    # region Price Processing (PriceSampleConsumer protocol)
 
     # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
     def process_price_sample(self, sample: PriceSample) -> None:
