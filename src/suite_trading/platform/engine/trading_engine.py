@@ -112,6 +112,9 @@ class TradingEngine:
         # Keep relation of Order to: Strategy + Broker
         self._routes_by_order_dict: dict[Order, StrategyBrokerPair] = {}
 
+        # Track executions per Strategy for later statistics
+        self._executions_by_strategy_name_dict: dict[str, list[Execution]] = {}
+
     # endregion
 
     # region State
@@ -264,6 +267,9 @@ class TradingEngine:
         # Set up EventFeed tracking for this strategy
         self._event_feeds_by_strategy_dict[strategy] = {}
 
+        # Set up execution tracking for this strategy
+        self._executions_by_strategy_name_dict[name] = []
+
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
         logger.debug(f"TradingEngine added Strategy named '{name}' (class {strategy.__class__.__name__})")
@@ -362,6 +368,10 @@ class TradingEngine:
         # Remove EventFeed tracking for this strategy
         del self._event_feeds_by_strategy_dict[strategy]
 
+        # Remove execution tracking for this strategy
+        if name in self._executions_by_strategy_name_dict:
+            del self._executions_by_strategy_name_dict[name]
+
         # Remove from strategies' dictionary
         del self._strategies_by_name_bidict[name]
 
@@ -377,6 +387,32 @@ class TradingEngine:
             Dictionary mapping strategy names to strategy instances.
         """
         return self._strategies_by_name_bidict
+
+    def list_strategy_names(self) -> list[str]:
+        """Returns names of all registered strategies.
+
+        Returns:
+            List of strategy names in registration order.
+        """
+        return list(self._strategies_by_name_bidict.keys())
+
+    def list_executions_for_strategy(self, strategy_name: str) -> list[Execution]:
+        """Returns all executions for the given Strategy.
+
+        Args:
+            strategy_name: Name of the Strategy to get executions for.
+
+        Returns:
+            List of Execution objects in chronological order.
+
+        Raises:
+            KeyError: If $strategy_name is not registered.
+        """
+        # Check: ensure $strategy_name exists
+        if strategy_name not in self._executions_by_strategy_name_dict:
+            raise KeyError(f"Cannot call `list_executions_for_strategy` because Strategy named '{strategy_name}' is not registered")
+
+        return list(self._executions_by_strategy_name_dict[strategy_name])
 
     # endregion
 
@@ -780,6 +816,10 @@ class TradingEngine:
         except Exception as e:
             logger.error(f"Error in `Strategy.on_execution` for Strategy named '{route.strategy.name}': {e}")
             self._transition_strategy_to_error(route.strategy, e)
+
+        # Store execution for later statistics
+        strategy_name = route.strategy.name
+        self._executions_by_strategy_name_dict[strategy_name].append(execution)
 
     def _on_broker_order_update(self, broker: Broker, order: Order) -> None:
         route = self._routes_by_order_dict.get(order)

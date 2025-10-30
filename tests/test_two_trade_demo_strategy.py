@@ -84,3 +84,15 @@ def test_two_trade_demo_strategy_steps_0_and_1():
 
     # The Strategy should have processed at least 5 events and then stopped (feed closed)
     assert strategy.processed_event_count == 5
+
+    # Verify executions were tracked by TradingEngine
+    executions = engine.list_executions_for_strategy("two_trade_demo_strategy")
+    assert len(executions) == 2, "Engine should track exactly two executions"
+
+    # First execution: SELL
+    assert executions[0].order.side == OrderSide.SELL
+    assert executions[0].quantity == Decimal("1")
+
+    # Second execution: BUY
+    assert executions[1].order.side == OrderSide.BUY
+    assert executions[1].quantity == Decimal("1")
