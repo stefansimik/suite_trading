@@ -107,10 +107,10 @@ class TradingEngine:
         self._event_feeds_by_strategy_dict: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
 
         # Tracks per-strategy clocks (last_event and wall-clock)
-        self._strategy_clocks_by_strategy_dict: dict[Strategy, StrategyClocks] = {}
+        self._clocks_by_strategy_dict: dict[Strategy, StrategyClocks] = {}
 
         # Keep relation of Order to: Strategy + Broker
-        self._routes_by_order_dict: dict[Order, StrategyBrokerPair] = {}
+        self._strategy_broker_by_order_dict: dict[Order, StrategyBrokerPair] = {}
 
         # Track executions per Strategy for later statistics
         self._executions_by_strategy_name_dict: dict[str, list[Execution]] = {}
@@ -262,7 +262,7 @@ class TradingEngine:
         self._strategies_by_name_bidict[name] = strategy
 
         # Set up clocks tracking for this strategy
-        self._strategy_clocks_by_strategy_dict[strategy] = StrategyClocks()
+        self._clocks_by_strategy_dict[strategy] = StrategyClocks()
 
         # Set up EventFeed tracking for this strategy
         self._event_feeds_by_strategy_dict[strategy] = {}
@@ -362,8 +362,8 @@ class TradingEngine:
             raise ValueError(f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}")
 
         # Remove clocks tracking for this strategy
-        if strategy in self._strategy_clocks_by_strategy_dict:
-            del self._strategy_clocks_by_strategy_dict[strategy]
+        if strategy in self._clocks_by_strategy_dict:
+            del self._clocks_by_strategy_dict[strategy]
 
         # Remove EventFeed tracking for this strategy
         del self._event_feeds_by_strategy_dict[strategy]
@@ -550,7 +550,7 @@ class TradingEngine:
                     next_event = feed.pop()
 
                     # Update clocks for this strategy
-                    self._strategy_clocks_by_strategy_dict[strategy].update_on_event(next_event.dt_event, next_event.dt_received)
+                    self._clocks_by_strategy_dict[strategy].update_on_event(next_event.dt_event, next_event.dt_received)
 
                     # Process event in its callback
                     try:
@@ -753,12 +753,12 @@ class TradingEngine:
             ValueError: If the order is invalid or cannot be submitted, or if $order is re-owned.
         """
         # Check: do not remap an already submitted order to a different owner
-        route = self._routes_by_order_dict.get(order)
+        route = self._strategy_broker_by_order_dict.get(order)
         if route is not None and route.strategy is not strategy:
             owner_name = self._get_strategy_name(route.strategy)
             raise ValueError(f"Cannot call `submit_order` because $order is already owned by Strategy named '{owner_name}'")
         # Record ownership + routing atomically
-        self._routes_by_order_dict[order] = StrategyBrokerPair(strategy=strategy, broker=broker)
+        self._strategy_broker_by_order_dict[order] = StrategyBrokerPair(strategy=strategy, broker=broker)
         # Delegate to broker
         broker.submit_order(order)
 
@@ -805,7 +805,7 @@ class TradingEngine:
     # Broker → Engine callbacks (deterministic ordering ensured by Broker)
     def _on_broker_execution(self, broker: Broker, execution: Execution) -> None:
         order = execution.order
-        route = self._routes_by_order_dict.get(order)
+        route = self._strategy_broker_by_order_dict.get(order)
         if route is None:
             raise ValueError("Cannot call `_on_broker_execution` because $order is unknown to this TradingEngine")
         # Check: broker emitting the event must match the recorded broker
@@ -822,7 +822,7 @@ class TradingEngine:
         self._executions_by_strategy_name_dict[strategy_name].append(execution)
 
     def _on_broker_order_update(self, broker: Broker, order: Order) -> None:
-        route = self._routes_by_order_dict.get(order)
+        route = self._strategy_broker_by_order_dict.get(order)
         if route is None:
             raise ValueError("Cannot call `_on_broker_order_update` because $order is unknown to this TradingEngine")
         # Check: broker emitting the event must match the recorded broker
@@ -856,7 +856,7 @@ class TradingEngine:
         """
         # Example once states are available:
         # if getattr(order, "state", None) in {OrderState.FILLED, OrderState.CANCELLED, OrderState.REJECTED}:
-        #     self._routes_by_order_dict.pop(order, None)
+        #     self._strategy_broker_by_order_dict.pop(order, None)
         return
 
     # endregion
