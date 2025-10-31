@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 class Broker(Protocol):
     def set_callbacks(
         self,
-        on_execution: Callable[[Broker, Order, Execution], None],
+        on_execution: Callable[[Execution], None],
         on_order_updated: Callable[[Broker, Order], None],
     ) -> None: ...
 ```

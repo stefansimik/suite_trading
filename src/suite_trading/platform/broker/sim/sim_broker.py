@@ -48,7 +48,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._orders_by_id: dict[str, Order] = {}
 
         # Engine callbacks (set via `set_callbacks`)
-        self._execution_callback: Callable[[Broker, Execution], None] | None = None
+        self._execution_callback: Callable[[Execution], None] | None = None
         self._order_updated_callback: Callable[[Broker, Order], None] | None = None
 
         # STATE: Executions and Positions
@@ -173,7 +173,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     def set_callbacks(
         self,
-        on_execution: Callable[[Broker, Execution], None],
+        on_execution: Callable[[Execution], None],
         on_order_updated: Callable[[Broker, Order], None],
     ) -> None:
         """Register Engine callbacks for broker events."""
@@ -323,7 +323,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
                 # PUBLISH
                 # First publish Execution
-                self._execution_callback(self, execution)
+                self._execution_callback(execution)
                 # Second publish changed Order
                 if order_state_changed:
                     self._order_updated_callback(self, order)

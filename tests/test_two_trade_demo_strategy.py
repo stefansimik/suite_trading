@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
+from suite_trading.domain.order.execution import Execution
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.utils.data_generation.bar_generation import create_bar_series
-from suite_trading.domain.order.orders import MarketOrder
+from suite_trading.domain.order.orders import MarketOrder, Order
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
@@ -58,6 +59,12 @@ class TwoTradeDemoStrategy(Strategy):
                 logger.info(f"Submitted BUY Market order on event #{self._event_count}")
                 # Request strategy stop by closing feed (engine will auto-stop it)
                 self.remove_event_feed(self._prices_feed_name)
+
+    def on_execution(self, execution: Execution, broker: Broker) -> None:
+        pass
+
+    def on_order_updated(self, order: Order, broker: Broker) -> None:
+        pass
 
     @property
     def processed_event_count(self) -> int:

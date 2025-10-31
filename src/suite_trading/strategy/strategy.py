@@ -440,13 +440,14 @@ class Strategy(ABC):
 
     # region Broker callbacks
 
-    def on_execution(self, order: Order, execution: Execution, broker: Broker) -> None:
-        """Called when an execution (fill/partial-fill) happens for $order.
+    def on_execution(self, execution: Execution, broker: Broker) -> None:
+        """Called when an execution (fill/partial-fill) happens for $execution.order.
 
         Default implementation is a no-op. Override in your strategy to update positions, PnL,
         or to submit follow-up orders.
         """
-        logger.debug(f"Strategy named '{self.name}' received execution for order on broker {broker.__class__.__name__}")
+        order = execution.order
+        logger.debug(f"Strategy named '{self.name}' received execution for order '{order.order_id}' on broker {broker.__class__.__name__}")
 
     def on_order_updated(self, order: Order, broker: Broker) -> None:
         """Called when $order changes state (Accepted, Cancelled, Rejected, etc.).

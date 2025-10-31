@@ -803,22 +803,20 @@ class TradingEngine:
         return broker.list_active_orders()
 
     # Broker → Engine callbacks (deterministic ordering ensured by Broker)
-    def _on_broker_execution(self, broker: Broker, execution: Execution) -> None:
+    def _on_broker_execution(self, execution: Execution) -> None:
         order = execution.order
-        route = self._strategy_broker_by_order_dict.get(order)
-        if route is None:
+        strategy_broker_pair = self._strategy_broker_by_order_dict.get(order)
+        if strategy_broker_pair is None:
             raise ValueError("Cannot call `_on_broker_execution` because $order is unknown to this TradingEngine")
-        # Check: broker emitting the event must match the recorded broker
-        if route.broker is not broker:
-            raise ValueError("Cannot call `_on_broker_execution` because $broker does not match recorded broker for $order")
+        strategy, broker = strategy_broker_pair
         try:
-            route.strategy.on_execution(order, execution, broker)
+            strategy.on_execution(execution, broker)
         except Exception as e:
-            logger.error(f"Error in `Strategy.on_execution` for Strategy named '{route.strategy.name}': {e}")
-            self._transition_strategy_to_error(route.strategy, e)
+            logger.error(f"Error in `Strategy.on_execution` for Strategy named '{strategy.name}': {e}")
+            self._transition_strategy_to_error(strategy, e)
 
         # Store execution for later statistics
-        strategy_name = route.strategy.name
+        strategy_name = strategy.name
         self._executions_by_strategy_name_dict[strategy_name].append(execution)
 
     def _on_broker_order_update(self, broker: Broker, order: Order) -> None:
