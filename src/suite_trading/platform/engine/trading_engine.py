@@ -245,7 +245,7 @@ class TradingEngine:
             raise ValueError(f"Cannot call `add_broker` because a broker of class {broker_type.__name__} is already added to this TradingEngine")
 
         self._brokers_by_type_dict[broker_type] = broker
-        broker.set_callbacks(self._on_broker_execution, self._on_broker_order_update)
+        broker.set_callbacks(self._route_broker_execution_to_strategy, self._route_broker_order_update_to_strategy)
         logger.debug(f"Broker (class {broker_type.__name__}) was added to {TradingEngine.__name__}.")
 
         # Register brokers that can consume PriceSample-s
@@ -864,7 +864,7 @@ class TradingEngine:
         return route
 
     # Broker → Engine callbacks (deterministic ordering ensured by Broker)
-    def _on_broker_execution(self, execution: Execution) -> None:
+    def _route_broker_execution_to_strategy(self, execution: Execution) -> None:
         strategy, broker = self.get_routing_for_order(execution.order)
 
         try:
@@ -876,7 +876,7 @@ class TradingEngine:
         # Store execution for later statistics
         self._executions_by_strategy_name_dict[strategy.name].append(execution)
 
-    def _on_broker_order_update(self, order: Order) -> None:
+    def _route_broker_order_update_to_strategy(self, order: Order) -> None:
         """Handle order state updates from broker.
 
         Called by broker when order changes state. Routes update to originating Strategy.
