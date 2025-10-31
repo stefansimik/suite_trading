@@ -478,24 +478,22 @@ class TradingEngine:
             raise ValueError(f"Cannot stop engine in state {self.state.name}. Valid actions: {valid_actions}")
 
         try:
-            # Stop all strategies and clean up their event-feeds first
+            # Firsr: Stop all strategies and clean up their event-feeds
             stopped = 0
             for strategy_name, strategy in list(self._strategies_by_name_bidict.items()):
                 if strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
                     self.stop_strategy(strategy_name)
                     logger.info(f"Stopped Strategy named '{strategy_name}'")
                     stopped += 1
-                else:
-                    logger.debug(f"Skip stopping Strategy named '{strategy_name}' in state {strategy.state.name}")
 
-            # Disconnect brokers second
+            # Second: Disconnect brokers
             disconnected_brokers = 0
             for broker_type, broker in self._brokers_by_type_dict.items():
                 broker.disconnect()
                 logger.info(f"Disconnected broker {broker_type.__name__}")
                 disconnected_brokers += 1
 
-            # Disconnect event-feed-providers last
+            # Last: Disconnect event-feed-providers
             disconnected_providers = 0
             for provider_type, provider in self._event_feed_providers_by_type_dict.items():
                 provider.disconnect()
