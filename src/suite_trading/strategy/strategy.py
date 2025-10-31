@@ -11,7 +11,8 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction, create_strategy_state_machine
 
 if TYPE_CHECKING:
-    from suite_trading.platform.engine.trading_engine import TradingEngine, StrategyBrokerPair
+    from suite_trading.platform.engine.trading_engine import TradingEngine
+    from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
     from suite_trading.domain.order.execution import Execution
 
 logger = logging.getLogger(__name__)

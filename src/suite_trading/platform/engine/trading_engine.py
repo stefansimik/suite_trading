@@ -17,6 +17,7 @@ from suite_trading.platform.engine.engine_state_machine import EngineState, Engi
 from bidict import bidict
 
 from suite_trading.utils.state_machine import StateMachine
+from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
@@ -40,56 +41,7 @@ class EventFeedCallbackPair(NamedTuple):
     callback: Callable
 
 
-class StrategyBrokerPair(NamedTuple):
-    """Order routing information pairing Strategy and Broker.
-
-    This NamedTuple represents the routing path for an order and supports both
-    unpacking and attribute access patterns.
-
-    **Routing Concept:**
-    - **Strategy** (origin): The Strategy that submitted the order. It is the source of
-      the trading decision and receives callbacks for executions and order-state updates.
-    - **Broker** (executor): The Broker responsible for executing the order in the market.
-      It handles order submission, matching, fills, and reports execution results back
-      to the engine.
-
-    **Lifecycle:**
-    Order submission establishes this routing:
-    1. Strategy creates Order and calls `engine.submit_order(order, broker, strategy)`
-    2. Engine records this pairing in `_routing_by_order_dict`
-    3. Broker executes order and triggers callbacks
-    4. Engine uses routing to deliver callbacks to correct Strategy
-    5. Routing cleared when order reaches terminal state
-
-    **Usage Patterns:**
-    This NamedTuple can be used two ways:
-
-    1. Unpacking (concise for callbacks):
-       ```python
-       strategy, broker = engine.get_routing_for_order(order)
-       strategy.on_execution(execution, broker)
-       ```
-
-    2. Attribute access (clear for complex logic):
-       ```python
-       route = engine.get_routing_for_order(order)
-       if route.broker.is_connected():
-           route.strategy.notify(...)
-       ```
-
-    This pairing enables the engine to:
-    - Route execution callbacks to the originating Strategy
-    - Route order-state updates to the originating Strategy
-    - Validate broker consistency in callbacks
-    - Track order ownership for lifecycle management
-
-    Attributes:
-        strategy: The Strategy that submitted the order (callback receiver).
-        broker: The Broker executing the order (execution handler).
-    """
-
-    strategy: Strategy
-    broker: Broker
+## StrategyBrokerPair moved to routing module to avoid duplication and engine coupling.
 
 
 @dataclass
