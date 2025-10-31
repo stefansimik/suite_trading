@@ -60,10 +60,10 @@ class TwoTradeDemoStrategy(Strategy):
                 # Request strategy stop by closing feed (engine will auto-stop it)
                 self.remove_event_feed(self._prices_feed_name)
 
-    def on_execution(self, execution: Execution, broker: Broker) -> None:
+    def on_execution(self, execution: Execution) -> None:
         pass
 
-    def on_order_updated(self, order: Order, broker: Broker) -> None:
+    def on_order_updated(self, order: Order) -> None:
         pass
 
     @property
