@@ -41,6 +41,53 @@ class EventFeedCallbackPair(NamedTuple):
 
 
 class StrategyBrokerPair(NamedTuple):
+    """Order routing information pairing Strategy and Broker.
+
+    This NamedTuple represents the routing path for an order and supports both
+    unpacking and attribute access patterns.
+
+    **Routing Concept:**
+    - **Strategy** (origin): The Strategy that submitted the order. It is the source of
+      the trading decision and receives callbacks for executions and order-state updates.
+    - **Broker** (executor): The Broker responsible for executing the order in the market.
+      It handles order submission, matching, fills, and reports execution results back
+      to the engine.
+
+    **Lifecycle:**
+    Order submission establishes this routing:
+    1. Strategy creates Order and calls `engine.submit_order(order, broker, strategy)`
+    2. Engine records this pairing in `_routing_by_order_dict`
+    3. Broker executes order and triggers callbacks
+    4. Engine uses routing to deliver callbacks to correct Strategy
+    5. Routing cleared when order reaches terminal state
+
+    **Usage Patterns:**
+    This NamedTuple can be used two ways:
+
+    1. Unpacking (concise for callbacks):
+       ```python
+       strategy, broker = engine.get_routing_for_order(order)
+       strategy.on_execution(execution, broker)
+       ```
+
+    2. Attribute access (clear for complex logic):
+       ```python
+       route = engine.get_routing_for_order(order)
+       if route.broker.is_connected():
+           route.strategy.notify(...)
+       ```
+
+    This pairing enables the engine to:
+    - Route execution callbacks to the originating Strategy
+    - Route order-state updates to the originating Strategy
+    - Validate broker consistency in callbacks
+    - Track order ownership for lifecycle management
+
+    Attributes:
+        strategy: The Strategy that submitted the order (callback receiver).
+        broker: The Broker executing the order (execution handler).
+    """
+
     strategy: Strategy
     broker: Broker
 
@@ -110,7 +157,7 @@ class TradingEngine:
         self._clocks_by_strategy_dict: dict[Strategy, StrategyClocks] = {}
 
         # Keep relation of Order to: Strategy + Broker
-        self._strategy_broker_by_order_dict: dict[Order, StrategyBrokerPair] = {}
+        self._routing_by_order_dict: dict[Order, StrategyBrokerPair] = {}
 
         # Track executions per Strategy for later statistics
         self._executions_by_strategy_name_dict: dict[str, list[Execution]] = {}
@@ -753,12 +800,13 @@ class TradingEngine:
             ValueError: If the order is invalid or cannot be submitted, or if $order is re-owned.
         """
         # Check: do not remap an already submitted order to a different owner
-        route = self._strategy_broker_by_order_dict.get(order)
-        if route is not None and route.strategy is not strategy:
-            owner_name = self._get_strategy_name(route.strategy)
-            raise ValueError(f"Cannot call `submit_order` because $order is already owned by Strategy named '{owner_name}'")
-        # Record ownership + routing atomically
-        self._strategy_broker_by_order_dict[order] = StrategyBrokerPair(strategy=strategy, broker=broker)
+        existing_route = self._routing_by_order_dict.get(order)
+        if existing_route is not None and existing_route.strategy is not strategy:
+            owner_name = self._get_strategy_name(existing_route.strategy)
+            raise ValueError(f"Cannot call `submit_order` because Order $order_id ('{order.order_id}') is already owned by Strategy named '{owner_name}'")
+
+        # Record routing: Strategy is origin (receives callbacks), Broker is executor
+        self._routing_by_order_dict[order] = StrategyBrokerPair(strategy=strategy, broker=broker)
         # Delegate to broker
         broker.submit_order(order)
 
@@ -802,35 +850,46 @@ class TradingEngine:
         """
         return broker.list_active_orders()
 
+    def get_routing_for_order(self, order: Order) -> StrategyBrokerPair:
+        """Get routing information for an order.
+
+        Returns the Strategy and Broker associated with $order. The Strategy is the origin
+        that submitted the order and receives execution and order-state updates. The Broker
+        is responsible for executing the order.
+
+        Args:
+            order: The order to get routing information for.
+        """
+        route: StrategyBrokerPair = self._routing_by_order_dict[order]
+        return route
+
     # Broker → Engine callbacks (deterministic ordering ensured by Broker)
     def _on_broker_execution(self, execution: Execution) -> None:
-        order = execution.order
-        strategy_broker_pair = self._strategy_broker_by_order_dict.get(order)
-        if strategy_broker_pair is None:
-            raise ValueError("Cannot call `_on_broker_execution` because $order is unknown to this TradingEngine")
-        strategy, broker = strategy_broker_pair
+        strategy, broker = self.get_routing_for_order(execution.order)
+
         try:
-            strategy.on_execution(execution, broker)
+            strategy.on_execution(execution)
         except Exception as e:
             logger.error(f"Error in `Strategy.on_execution` for Strategy named '{strategy.name}': {e}")
             self._transition_strategy_to_error(strategy, e)
 
         # Store execution for later statistics
-        strategy_name = strategy.name
-        self._executions_by_strategy_name_dict[strategy_name].append(execution)
+        self._executions_by_strategy_name_dict[strategy.name].append(execution)
 
-    def _on_broker_order_update(self, broker: Broker, order: Order) -> None:
-        route = self._strategy_broker_by_order_dict.get(order)
-        if route is None:
-            raise ValueError("Cannot call `_on_broker_order_update` because $order is unknown to this TradingEngine")
-        # Check: broker emitting the event must match the recorded broker
-        if route.broker is not broker:
-            raise ValueError("Cannot call `_on_broker_order_update` because $broker does not match recorded broker for $order")
+    def _on_broker_order_update(self, order: Order) -> None:
+        """Handle order state updates from broker.
+
+        Called by broker when order changes state. Routes update to originating Strategy.
+        Broker parameter removed; brokers now call with order only. Engine determines
+        routing via `get_routing_for_order(order)`.
+        """
+        strategy, broker = self.get_routing_for_order(order)
+
         try:
-            route.strategy.on_order_updated(order, broker)
+            strategy.on_order_updated(order)
         except Exception as e:
-            logger.error(f"Error in `Strategy.on_order_updated` for Strategy named '{route.strategy.name}': {e}")
-            self._transition_strategy_to_error(route.strategy, e)
+            logger.error(f"Error in `Strategy.on_order_updated` for Strategy named '{strategy.name}': {e}")
+            self._transition_strategy_to_error(strategy, e)
         finally:
             self._cleanup_if_terminal(order)
 
@@ -854,7 +913,7 @@ class TradingEngine:
         """
         # Example once states are available:
         # if getattr(order, "state", None) in {OrderState.FILLED, OrderState.CANCELLED, OrderState.REJECTED}:
-        #     self._strategy_broker_by_order_dict.pop(order, None)
+        #     self._routing_by_order_dict.pop(order, None)
         return
 
     # endregion

@@ -49,7 +49,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         # Engine callbacks (set via `set_callbacks`)
         self._execution_callback: Callable[[Execution], None] | None = None
-        self._order_updated_callback: Callable[[Broker, Order], None] | None = None
+        self._order_updated_callback: Callable[[Order], None] | None = None
 
         # STATE: Executions and Positions
         self._executions: list[Execution] = []
@@ -105,7 +105,7 @@ class SimBroker(Broker, PriceSampleConsumer):
             # Check: ensure callback was provided before invoking to avoid calling None
             cb = self._order_updated_callback
             if cb is not None:
-                cb(self, order)
+                cb(order)
 
     def _is_price_known_for_instrument(self, instrument: Instrument) -> bool:
         sample = self._latest_price_sample_by_instrument.get(instrument)
@@ -174,7 +174,7 @@ class SimBroker(Broker, PriceSampleConsumer):
     def set_callbacks(
         self,
         on_execution: Callable[[Execution], None],
-        on_order_updated: Callable[[Broker, Order], None],
+        on_order_updated: Callable[[Order], None],
     ) -> None:
         """Register Engine callbacks for broker events."""
         self._execution_callback = on_execution
@@ -326,7 +326,7 @@ class SimBroker(Broker, PriceSampleConsumer):
                 self._execution_callback(execution)
                 # Second publish changed Order
                 if order_state_changed:
-                    self._order_updated_callback(self, order)
+                    self._order_updated_callback(order)
 
         return
 

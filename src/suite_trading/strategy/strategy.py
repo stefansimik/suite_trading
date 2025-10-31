@@ -11,7 +11,7 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction, create_strategy_state_machine
 
 if TYPE_CHECKING:
-    from suite_trading.platform.engine.trading_engine import TradingEngine
+    from suite_trading.platform.engine.trading_engine import TradingEngine, StrategyBrokerPair
     from suite_trading.domain.order.execution import Execution
 
 logger = logging.getLogger(__name__)
@@ -436,26 +436,44 @@ class Strategy(ABC):
 
         return engine.list_active_orders(broker)
 
+    def get_routing_for_order(self, order: Order) -> StrategyBrokerPair:
+        """Lookup  route (strategy, broker) for $order.
+
+        Args:
+            order: The order to look up.
+
+        Raises:
+            KeyError: If $order was not submitted via this TradingEngine.
+        """
+        engine = self._require_trading_engine()
+        return engine.get_routing_for_order(order)
+
     # endregion
 
     # region Broker callbacks
 
-    def on_execution(self, execution: Execution, broker: Broker) -> None:
+    def on_execution(self, execution: Execution) -> None:
         """Called when an execution (fill/partial-fill) happens for $execution.order.
 
         Default implementation is a no-op. Override in your strategy to update positions, PnL,
         or to submit follow-up orders.
-        """
-        order = execution.order
-        logger.debug(f"Strategy named '{self.name}' received execution for order '{order.order_id}' on broker {broker.__class__.__name__}")
+        ```
 
-    def on_order_updated(self, order: Order, broker: Broker) -> None:
+        Args:
+            execution: The execution that occurred.
+        """
+        logger.debug(f"Strategy named '{self.name}' received execution for Order $order_id ('{execution.order.order_id}')")
+
+    def on_order_updated(self, order: Order) -> None:
         """Called when $order changes state (Accepted, Cancelled, Rejected, etc.).
 
         Default implementation is a no-op. Override in your strategy to react to order lifecycle
         changes.
+
+        Args:
+            order: The order that was updated.
         """
-        logger.debug(f"Strategy named '{self.name}' received order update from broker {broker.__class__.__name__}")
+        logger.debug(f"Strategy named '{self.name}' received order update for Order $order_id ('{order.order_id}')")
 
     # endregion
 
