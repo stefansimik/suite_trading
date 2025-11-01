@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderSide
-from suite_trading.utils.id_generator import get_next_id
 from suite_trading.utils.datetime_utils import format_dt
 
 
@@ -31,7 +30,7 @@ class Execution:
         quantity (Decimal): The quantity that was executed in this fill.
         price (Decimal): The price at which this execution occurred.
         timestamp (datetime): When this execution occurred.
-        order_id (str): Unique identifier for this execution.
+        id (str): Unique identifier for this execution ("{order_id}-{n}").
         commission (Money | None): Commission/fees charged for this execution (Money if set).
 
     Properties:
@@ -43,13 +42,14 @@ class Execution:
         is_sell (bool): True if this is a sell execution.
     """
 
+    __slots__ = ("_order", "_quantity", "_price", "_timestamp", "_commission", "_id")
+
     def __init__(
         self,
         order: Order,
         quantity: Decimal | str | float,
         price: Decimal | str | float,
         timestamp: datetime,
-        id: str | None = None,
         commission: Money | None = None,
     ) -> None:
         """Initialize a new execution.
@@ -59,7 +59,6 @@ class Execution:
             quantity: The quantity that was executed in this fill.
             price: The price at which this execution occurred.
             timestamp: When this execution occurred.
-            id: Unique identifier for this execution (auto-generated if None).
             commission: Commission/fees charged for this execution.
 
         Raises:
@@ -69,8 +68,10 @@ class Execution:
         self._order = order
         self._timestamp = timestamp
 
-        # Generate ID if not provided
-        self._id = id if id is not None else get_next_id()
+        # Derive ID as "{order_id}-{next_seq}" (1-based per-order execution index)
+        # We intentionally use the current length of $order.executions so the first fill is 1.
+        executions_count = len(order.executions) + 1
+        self._id = f"{order.order_id}-{executions_count}"
 
         # Normalize to instrument grid for precise financial calculations
         self._quantity = self.instrument.snap_quantity(quantity)
@@ -140,9 +141,21 @@ class Execution:
         return self._price
 
     @property
-    def commission(self) -> "Money | None":
+    def commission(self) -> Money | None:
         """Get the commission as Money or None when not yet set."""
         return self._commission
+
+    @commission.setter
+    def commission(self, value: Money | None) -> None:
+        """Set commission as Money or None.
+
+        Args:
+            value: Commission to set for this execution, or None.
+        """
+        # Check: commission cannot be negative when provided
+        if value is not None and value.value < 0:
+            raise ValueError(f"Cannot set `commission` because $commission ({value}) is negative")
+        self._commission = value
 
     @property
     def timestamp(self) -> datetime:
@@ -213,7 +226,7 @@ class Execution:
     # region Magic
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(order_id={self.id})"
+        return f"{self.__class__.__name__}(execution_id={self.id})"
 
     def __repr__(self) -> str:
         """Return a string representation of the execution.
