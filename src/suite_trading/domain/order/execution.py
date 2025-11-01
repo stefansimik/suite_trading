@@ -46,6 +46,7 @@ class Execution:
         price: Decimal | str | float,
         timestamp: datetime,
         commission: Money,
+        execution_id: str,
     ) -> None:
         """Initialize a new execution.
 
@@ -63,7 +64,8 @@ class Execution:
         self._order = order
         self._timestamp = timestamp
 
-        self._id = f"{order.order_id}-{len(order.executions) + 1}"
+        # Execution identity is assigned by Order
+        self._id = execution_id
 
         # Normalize values
         self._quantity = self.instrument.snap_quantity(quantity)

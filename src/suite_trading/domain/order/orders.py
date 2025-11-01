@@ -5,13 +5,20 @@ from typing import TYPE_CHECKING
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.order.order_enums import OrderSide, TimeInForce
-from suite_trading.domain.order.order_state import OrderState, OrderAction, create_order_state_machine, get_order_state_category
+from suite_trading.domain.order.order_state import (
+    OrderState,
+    OrderAction,
+    OrderStateCategory,
+    create_order_state_machine,
+    get_order_state_category,
+)
 from suite_trading.utils.id_generator import get_next_id
 from suite_trading.utils.state_machine import StateMachine
+from datetime import datetime
+from suite_trading.domain.monetary.money import Money
 
 if TYPE_CHECKING:
     from suite_trading.strategy.strategy import Strategy
-    from suite_trading.domain.order.order_state import OrderStateCategory
 
 
 # region Orders
@@ -22,9 +29,6 @@ class Order:
 
     This class contains all common attributes shared across all order types.
     It is not intended to be used directly - use specific order subclasses instead.
-
-    Attributes:
-        executions (List[Execution]): List of executions for this order, in chronological order.
 
     Properties:
         order_id (str): Unique identifier for the order (read-only).
@@ -42,7 +46,7 @@ class Order:
         quantity: Decimal,
         order_id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Strategy | None = None,
+        strategy: Strategy | None = None,  # TODO: we should remove this. Order should not know this. Orders without Strategy can exist
     ):
         """Initialize a new Order.
 
@@ -69,7 +73,7 @@ class Order:
         self._strategy = strategy
 
         # Execution tracking (single source of truth)
-        self.executions: list[Execution] = []  # Chronological by append order
+        self._executions: list[Execution] = []  # Chronological by append order
 
         # Internal state
         self._state_machine: StateMachine = create_order_state_machine()
@@ -141,7 +145,7 @@ class Order:
             Decimal: Sum of execution quantities.
         """
         total = Decimal("0")
-        for e in self.executions:
+        for e in self._executions:
             total += e.quantity
         return total
 
@@ -194,7 +198,7 @@ class Order:
             return None
 
         notional = Decimal("0")
-        for e in self.executions:
+        for e in self._executions:
             notional += e.price * e.quantity
 
         avg_price = notional / filled
@@ -243,27 +247,72 @@ class Order:
 
     # region Main
 
-    def add_execution(self, execution: Execution) -> None:
-        """Add a new execution for this order in chronological order.
+    def add_execution(
+        self,
+        quantity: Decimal,
+        price: Decimal,
+        timestamp: datetime,
+        commission: Money,
+    ) -> tuple[Execution, OrderState | None]:
+        """Create and record a new `Execution`, then advance `state` based on cumulative fills.
+
+        This method is the single place that keeps the `Order` internally consistent after a fill.
+        It returns the created `Execution` and an optional `OrderState` when the state actually
+        changes (e.g., transitions to PARTIALLY_FILLED or FILLED). Callers (e.g., a Broker) can
+        publish the `Execution` and, if present, the changed order state.
 
         Args:
-            execution: The execution to record.
+            quantity: Executed quantity.
+            price: Execution price.
+            timestamp: When the execution occurred.
+            commission: Commission/fees for this execution.
+
+        Returns:
+            A tuple of (Execution, optional new OrderState). The second element is `None` when the
+            effective state did not change (idempotent partial fills).
 
         Raises:
-            ValueError: If the execution belongs to a different order, has non-positive $quantity, or would overfill the order.
+            ValueError: If `$state_category` is not FILLABLE for the current `$state`, or if the
+                transition is invalid. Validation and snapping of `$quantity` and `$price` (and
+                overfill checks) are performed in `Execution`; this method does not repeat them.
         """
-        # Check: execution must belong to this order
-        if execution.order != self:
-            raise ValueError(f"Cannot call `add_execution` because $execution.order_id ('{execution.order.order_id}') does not match this Order $order_id ('{self.order_id}')")
-        # Check: positive execution quantity
-        if execution.quantity <= 0:
-            raise ValueError(f"Cannot call `add_execution` with non-positive $quantity ({execution.quantity}); provide a positive quantity")
-        # Check: disallow overfill (quantities already snapped)
-        new_filled = self.filled_quantity + execution.quantity
-        if new_filled > self.quantity:
-            raise ValueError(f"Cannot call `add_execution` because resulting $filled_quantity ({new_filled}) would exceed $quantity ({self.quantity})")
+        prev_state = self.state
 
-        self.executions.append(execution)
+        # Check: allow fills only when $state_category is FILLABLE
+        cat = self.state_category
+        if cat is not OrderStateCategory.FILLABLE:
+            raise ValueError(f"Cannot call `add_execution` because $state_category ('{cat.name}') is not FILLABLE for $state ('{self.state}')")
+
+        # Build the execution (snaps/validates quantity & price and overfill in Execution)
+        execution = Execution(
+            order=self,
+            quantity=quantity,
+            price=price,
+            timestamp=timestamp,
+            commission=commission,
+            execution_id=f"{self.order_id}-{len(self._executions) + 1}",
+        )
+
+        # Choose the state action from cumulative fills after this execution
+        new_filled = self.filled_quantity + execution.quantity
+        action = OrderAction.FILL if new_filled == self.quantity else OrderAction.PARTIAL_FILL
+
+        # Apply transition; invalid mapping raises (fail fast)
+        self.change_state(action)
+
+        # Record chronologically
+        self._executions.append(execution)
+
+        new_state = self.state
+        return execution, (new_state if new_state != prev_state else None)
+
+    def list_executions(self) -> tuple[Execution, ...]:
+        """Return executions in chronological order as an immutable tuple.
+
+        Returns:
+            tuple[Execution, ...]: Executions for this order.
+        """
+        return tuple(self._executions)
 
     def change_state(self, action: OrderAction) -> None:
         """Change order state based on action.

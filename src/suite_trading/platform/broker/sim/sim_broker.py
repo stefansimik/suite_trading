@@ -7,6 +7,7 @@ import logging
 
 from suite_trading.domain.account_info import AccountInfo
 from suite_trading.domain.market_data.price_sample import PriceSample
+from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.order.orders import Order, MarketOrder
 from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory
 from suite_trading.domain.order.execution import Execution
@@ -18,7 +19,6 @@ from suite_trading.platform.broker.sim.models.market_depth.zero_spread import Ze
 from suite_trading.platform.broker.sim.models.fee.fee_model import FeeModel
 from suite_trading.platform.broker.sim.models.fee.fixed_fee_model import FixedFeeModel
 from suite_trading.domain.monetary.money import Money
-from suite_trading.domain.monetary.currency import Currency
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
@@ -179,7 +179,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         Returns:
             A FeeModel instance. Defaults to zero per-unit commission in USD.
         """
-        return FixedFeeModel(Money(Decimal("0"), Currency.USD))
+        return FixedFeeModel(fee_per_unit=Money(Decimal("0"), USD))
 
     # endregion
 
@@ -329,33 +329,22 @@ class SimBroker(Broker, PriceSampleConsumer):
                     previous_executions=previous_executions,
                 )
 
-                # Create Execution
-                execution = Execution(
-                    order=order,
-                    price=execution_price,
+                # Create and record Execution via Order (Order assigns execution_id and updates state)
+                execution, changed_order_state = order.add_execution(
                     quantity=quantity_to_fill,
+                    price=execution_price,
                     timestamp=sample.dt_event,
                     commission=commission,
                 )
-
-                order.add_execution(execution)
 
                 # Record execution and update position (commission already set)
                 self._record_execution_and_update_position(execution)
 
                 # TODO(sim-broker-fees): apply $execution.commission to AccountInfo funds in its currency
 
-                # Apply order-state change to FILLED now; publish update after execution callback
-                previous_state = order.state
-                order.change_state(OrderAction.FILL)
-                new_state = order.state
-                order_state_changed = new_state != previous_state
-
-                # PUBLISH
-                # First publish Execution
+                # PUBLISH: Execution first, then Order update if state changed
                 self._execution_callback(execution)
-                # Second publish changed Order
-                if order_state_changed:
+                if changed_order_state is not None:
                     self._order_updated_callback(order)
 
         return
