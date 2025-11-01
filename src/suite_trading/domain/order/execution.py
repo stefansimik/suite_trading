@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 # This avoids circular imports since Order also needs to reference Execution.
 if TYPE_CHECKING:
     from suite_trading.domain.order.orders import Order
+    from suite_trading.domain.monetary.money import Money
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderSide
@@ -31,7 +32,7 @@ class Execution:
         price (Decimal): The price at which this execution occurred.
         timestamp (datetime): When this execution occurred.
         order_id (str): Unique identifier for this execution.
-        commission (Decimal): Commission/fees charged for this execution.
+        commission (Money | None): Commission/fees charged for this execution (Money if set).
 
     Properties:
         instrument (Instrument): The financial instrument that was traded (delegates to order.instrument).
@@ -49,7 +50,7 @@ class Execution:
         price: Decimal | str | float,
         timestamp: datetime,
         id: str | None = None,
-        commission: Decimal | str | float = Decimal("0"),
+        commission: Money | None = None,
     ) -> None:
         """Initialize a new execution.
 
@@ -74,7 +75,8 @@ class Execution:
         # Normalize to instrument grid for precise financial calculations
         self._quantity = self.instrument.snap_quantity(quantity)
         self._price = self.instrument.snap_price(price)
-        self._commission = self._convert_to_decimal(commission)
+        # Commission is Money (or None until broker sets it)
+        self._commission = commission
 
         # Explicit validation
         self._validate()
@@ -138,8 +140,8 @@ class Execution:
         return self._price
 
     @property
-    def commission(self) -> Decimal:
-        """Get the commission."""
+    def commission(self) -> "Money | None":
+        """Get the commission as Money or None when not yet set."""
         return self._commission
 
     @property
@@ -158,12 +160,13 @@ class Execution:
 
     @property
     def net_value(self) -> Decimal:
-        """Calculate the net value of this execution (gross value - commission).
+        """Calculate the net value = gross value minus commission.value if present.
 
         Returns:
-            Decimal: The net value after commissions.
+            Decimal: The net value after commissions (uses $commission.value when set).
         """
-        return self.gross_value - self.commission
+        commission_value: Decimal = Decimal("0") if self._commission is None else self._commission.value
+        return self.gross_value - commission_value
 
     # endregion
 
@@ -195,8 +198,8 @@ class Execution:
 
         # Note: Do not reject negative prices here; some markets allow them (see guideline 7.1)
 
-        # Check: commission cannot be negative
-        if self._commission < 0:
+        # Check: commission cannot be negative (when set)
+        if self._commission is not None and self._commission.value < 0:
             raise ValueError(f"Cannot call `_validate` because $commission ({self._commission}) is negative")
 
         # Note: instrument and side consistency is guaranteed by properties that delegate to order

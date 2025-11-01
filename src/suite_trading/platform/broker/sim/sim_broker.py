@@ -15,6 +15,10 @@ from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import PriceSampleConsumer
 from suite_trading.platform.broker.sim.models.market_depth.protocol import MarketDepthModel
 from suite_trading.platform.broker.sim.models.market_depth.zero_spread import ZeroSpreadMarketDepthModel
+from suite_trading.platform.broker.sim.models.fee.protocol import FeeModel
+from suite_trading.platform.broker.sim.models.fee.fixed_fee_model import FixedFeeModel
+from suite_trading.domain.monetary.money import Money
+from suite_trading.domain.monetary.currency import Currency
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
@@ -34,6 +38,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         self,
         *,
         depth_model: MarketDepthModel | None = None,
+        fee_model: FeeModel | None = None,
     ) -> None:
         """Create a simulation broker.
 
@@ -60,6 +65,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         # FILL MODEL
         self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
+        self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
 
         # Known prices per instrument (populated in `process_price_sample`)
         self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}
@@ -166,6 +172,14 @@ class SimBroker(Broker, PriceSampleConsumer):
             A MarketDepthModel instance.
         """
         return ZeroSpreadMarketDepthModel()
+
+    def _build_default_fee_model(self) -> FeeModel:
+        """Build the default FeeModel used by this broker instance.
+
+        Returns:
+            A FeeModel instance. Defaults to zero per-unit commission in USD.
+        """
+        return FixedFeeModel(Money(Decimal("0"), Currency.USD))
 
     # endregion
 
@@ -310,10 +324,18 @@ class SimBroker(Broker, PriceSampleConsumer):
                     quantity=quantity_to_fill,
                     timestamp=sample.dt_event,
                 )
+
+                # Commission: compute with snapshot of previous executions (excludes current)
+                previous_executions = tuple(self._executions)
+                commission = self._fee_model.compute_commission(execution, previous_executions)
+                execution.commission = commission
+
                 order.add_execution(execution)
 
-                # Record execution and update position
+                # Record execution and update position (commission already set)
                 self._record_execution_and_update_position(execution)
+
+                # TODO(sim-broker-fees): apply $execution.commission to AccountInfo funds in its currency
 
                 # Apply order-state change to FILLED now; publish update after execution callback
                 previous_state = order.state
