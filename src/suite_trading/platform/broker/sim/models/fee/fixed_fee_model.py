@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from typing import Iterable, TYPE_CHECKING
+from datetime import datetime
+from decimal import Decimal
 
 from .fee_model import FeeModel
 
 if TYPE_CHECKING:
     from suite_trading.domain.monetary.money import Money
+    from suite_trading.domain.order.orders import Order
     from suite_trading.domain.order.execution import Execution
 
 
@@ -24,8 +27,14 @@ class FixedFeeModel(FeeModel):
 
     def compute_commission(
         self,
-        execution: Execution,
+        order: Order,
+        price: Decimal,
+        quantity: Decimal,
+        timestamp: datetime,
         previous_executions: Iterable[Execution],
     ) -> Money:
-        result = self._fee_per_unit * execution.quantity
-        return result
+        # Check: ensure positive $quantity
+        if quantity <= 0:
+            raise ValueError(f"Cannot call `compute_commission` because $quantity ({quantity}) <= 0 for $order_id ('{order.order_id}')")
+
+        return self._fee_per_unit * quantity

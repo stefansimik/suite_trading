@@ -318,17 +318,25 @@ class SimBroker(Broker, PriceSampleConsumer):
                 best_ask_price = order_book.best_ask.price
                 execution_price = best_ask_price if order.is_buy else best_bid_price
                 quantity_to_fill = order.unfilled_quantity
+
+                # Commission: compute with snapshot of previous executions (excludes current)
+                previous_executions = tuple(self._executions)
+                commission = self._fee_model.compute_commission(
+                    order=order,
+                    price=execution_price,
+                    quantity=quantity_to_fill,
+                    timestamp=sample.dt_event,
+                    previous_executions=previous_executions,
+                )
+
+                # Create Execution
                 execution = Execution(
                     order=order,
                     price=execution_price,
                     quantity=quantity_to_fill,
                     timestamp=sample.dt_event,
+                    commission=commission,
                 )
-
-                # Commission: compute with snapshot of previous executions (excludes current)
-                previous_executions = tuple(self._executions)
-                commission = self._fee_model.compute_commission(execution, previous_executions)
-                execution.commission = commission
 
                 order.add_execution(execution)
 

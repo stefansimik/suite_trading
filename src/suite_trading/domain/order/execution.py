@@ -8,14 +8,11 @@ from typing import TYPE_CHECKING
 # This avoids circular imports since Order also needs to reference Execution.
 if TYPE_CHECKING:
     from suite_trading.domain.order.orders import Order
-    from suite_trading.domain.monetary.money import Money
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderSide
+from suite_trading.domain.monetary.money import Money
 from suite_trading.utils.datetime_utils import format_dt
-
-
-# region Executions
 
 
 class Execution:
@@ -31,13 +28,11 @@ class Execution:
         price (Decimal): The price at which this execution occurred.
         timestamp (datetime): When this execution occurred.
         id (str): Unique identifier for this execution ("{order_id}-{n}").
-        commission (Money | None): Commission/fees charged for this execution (Money if set).
+        commission (Money): Commission/fees charged for this execution.
 
     Properties:
         instrument (Instrument): The financial instrument that was traded (delegates to order.instrument).
         side (OrderSide): Whether this was a BUY or SELL execution (delegates to order.side).
-        gross_value (Decimal): The gross value of this execution (quantity * price).
-        net_value (Decimal): The net value of this execution (gross value - commission).
         is_buy (bool): True if this is a buy execution.
         is_sell (bool): True if this is a sell execution.
     """
@@ -50,7 +45,7 @@ class Execution:
         quantity: Decimal | str | float,
         price: Decimal | str | float,
         timestamp: datetime,
-        commission: Money | None = None,
+        commission: Money,
     ) -> None:
         """Initialize a new execution.
 
@@ -68,15 +63,13 @@ class Execution:
         self._order = order
         self._timestamp = timestamp
 
-        # Derive ID as "{order_id}-{next_seq}" (1-based per-order execution index)
-        # We intentionally use the current length of $order.executions so the first fill is 1.
-        executions_count = len(order.executions) + 1
-        self._id = f"{order.order_id}-{executions_count}"
+        self._id = f"{order.order_id}-{len(order.executions) + 1}"
 
-        # Normalize to instrument grid for precise financial calculations
+        # Normalize values
         self._quantity = self.instrument.snap_quantity(quantity)
         self._price = self.instrument.snap_price(price)
-        # Commission is Money (or None until broker sets it)
+
+        # Commission
         self._commission = commission
 
         # Explicit validation
@@ -141,21 +134,9 @@ class Execution:
         return self._price
 
     @property
-    def commission(self) -> Money | None:
-        """Get the commission as Money or None when not yet set."""
+    def commission(self) -> Money:
+        """Get the commission as Money."""
         return self._commission
-
-    @commission.setter
-    def commission(self, value: Money | None) -> None:
-        """Set commission as Money or None.
-
-        Args:
-            value: Commission to set for this execution, or None.
-        """
-        # Check: commission cannot be negative when provided
-        if value is not None and value.value < 0:
-            raise ValueError(f"Cannot set `commission` because $commission ({value}) is negative")
-        self._commission = value
 
     @property
     def timestamp(self) -> datetime:
@@ -163,41 +144,23 @@ class Execution:
         return self._timestamp
 
     @property
-    def gross_value(self) -> Decimal:
-        """Calculate the gross value of this execution (quantity * price).
+    def notional_value(self) -> Money:
+        """Return notional Money in $quote_currency.
+
+        Notional value explains the total theoretical value controlled by the position, not the
+        margin posted. Examples:
+            - BTC futures contract for 5x BTC at price $100,000 per BTC → $500,000
+            - 6E futures contract for 2x contracts (125_000 EUR) at price 1.1000 -> 275_000 USD
 
         Returns:
-            Decimal: The gross value before commissions.
+            Money: Notional amount in the instrument's quote currency.
         """
-        return self.quantity * self.price
-
-    @property
-    def net_value(self) -> Decimal:
-        """Calculate the net value = gross value minus commission.value if present.
-
-        Returns:
-            Decimal: The net value after commissions (uses $commission.value when set).
-        """
-        commission_value: Decimal = Decimal("0") if self._commission is None else self._commission.value
-        return self.gross_value - commission_value
+        amount = self.quantity * self.instrument.contract_size * self.price
+        return Money(amount, self.instrument.quote_currency)
 
     # endregion
 
     # region Utilities
-
-    @staticmethod
-    def _convert_to_decimal(value) -> Decimal:
-        """Convert int/float/double to Decimal for precise financial calculations.
-
-        Args:
-            value: The value to convert (int, float, or Decimal).
-
-        Returns:
-            Decimal: The converted value.
-        """
-        if isinstance(value, Decimal):
-            return value
-        return Decimal(str(value))
 
     def _validate(self) -> None:
         """Validate the execution data.
@@ -207,19 +170,29 @@ class Execution:
         """
         # Check: positive execution quantity
         if self._quantity <= 0:
-            raise ValueError(f"Cannot call `_validate` because $quantity ({self._quantity}) is not positive")
+            raise ValueError(f"Validation failed, because $quantity ({self._quantity}) is not positive")
 
-        # Note: Do not reject negative prices here; some markets allow them (see guideline 7.1)
+        # Check: ensure $quantity is snapped to Instrument step
+        expected_qty = self.instrument.snap_quantity(self._quantity)
+        if expected_qty != self._quantity:
+            raise ValueError(f"Validation failed, because $quantity ({self._quantity}) is not snapped to Instrument step (expected {expected_qty})")
 
-        # Check: commission cannot be negative (when set)
-        if self._commission is not None and self._commission.value < 0:
-            raise ValueError(f"Cannot call `_validate` because $commission ({self._commission}) is negative")
+        # Check: ensure $price is snapped to Instrument tick
+        expected_price = self.instrument.snap_price(self._price)
+        if expected_price != self._price:
+            raise ValueError(f"Validation failed, because $price ({self._price}) is not snapped to Instrument tick (expected {expected_price})")
 
-        # Note: instrument and side consistency is guaranteed by properties that delegate to order
+        # Check: ensure commission is provided to avoid half-built executions
+        if self._commission is None:
+            raise ValueError(f"Validation failed, because $commission is None for $order_id ('{self._order.order_id}')")
+
+        # Check: commission cannot be negative
+        if self._commission.value < 0:
+            raise ValueError(f"Validation failed, because $commission ({self._commission}) is negative")
 
         # Check: ensure execution doesn't overfill the order
         if self._quantity > self._order.unfilled_quantity:
-            raise ValueError(f"Cannot call `_validate` because $quantity ({self._quantity}) exceeds order $unfilled_quantity ({self._order.unfilled_quantity})")
+            raise ValueError(f"Validation failed, because $quantity ({self._quantity}) exceeds order $unfilled_quantity ({self._order.unfilled_quantity})")
 
     # endregion
 
@@ -250,6 +223,3 @@ class Execution:
         return self.id == other.id
 
     # endregion
-
-
-# endregion
