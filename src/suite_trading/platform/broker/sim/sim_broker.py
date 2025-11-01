@@ -13,9 +13,9 @@ from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import PriceSampleConsumer
-from suite_trading.platform.broker.sim.models.market_depth.protocol import MarketDepthModel
+from suite_trading.platform.broker.sim.models.market_depth.market_depth_model import MarketDepthModel
 from suite_trading.platform.broker.sim.models.market_depth.zero_spread import ZeroSpreadMarketDepthModel
-from suite_trading.platform.broker.sim.models.fee.protocol import FeeModel
+from suite_trading.platform.broker.sim.models.fee.fee_model import FeeModel
 from suite_trading.platform.broker.sim.models.fee.fixed_fee_model import FixedFeeModel
 from suite_trading.domain.monetary.money import Money
 from suite_trading.domain.monetary.currency import Currency

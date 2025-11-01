@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, TYPE_CHECKING
 
-from .protocol import FeeModel
+from .fee_model import FeeModel
 
 if TYPE_CHECKING:
     from suite_trading.domain.monetary.money import Money

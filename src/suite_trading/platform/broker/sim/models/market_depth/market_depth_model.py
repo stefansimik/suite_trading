@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class MarketDepthModel(Protocol):
-    """Builds a modeled `OrderBook` from a `PriceSample` for fill simulation.
+    """Domain interface for building a simulated `OrderBook` from a `PriceSample`.
 
     Why convert `PriceSample` to `OrderBook`?
     - Customizable simulation surface to encode spread, depth, slippage, liquidity.

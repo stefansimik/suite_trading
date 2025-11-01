@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class FeeModel(Protocol):
-    """Computes the commission for a single execution.
+    """Domain interface for fee modeling used by the simulated broker.
 
     You get two inputs: the $execution being priced now and all $previous_executions recorded
     earlier in the session. We pass previous executions so models can look at cumulative activity
