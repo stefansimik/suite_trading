@@ -171,6 +171,12 @@ and makes AI-assisted refactoring safer.
 - Place **immediately above** validation check
 - Explain what condition is validated and why it matters
 
+#### Guard Block Spacing
+- After a contiguous block of validation guards, insert exactly one empty line before the
+  next block of code that performs actions (assignments, object creation, I/O, state changes).
+  This visual separation improves scan-ability and emphasizes the boundary between validation
+  and behavior.
+
 ### Code Reference Formatting
 Apply to comments, docstrings, and error messages:
 - **Parameters/attributes/variables:** `$parameter_name`
@@ -195,6 +201,7 @@ self._last_order_time = now()
 - [ ] `# Check:` used only for validation guards
 - [ ] Placed immediately above guard
 - [ ] Code reference formatting followed (`$var`, `` `func` ``)
+- [ ] One empty line after a guard block before state-changing code
 
 ### Validation Scope & Priorities
 
@@ -318,6 +325,38 @@ raise ValueError(
 - [ ] For short messages, the entire `raise` statement is a single line (not wrapped)
 - [ ] Exception messages use f-strings with project terms and variable markers
 - [ ] Message text itself is a single line even when the `raise` spans multiple lines
+
+## 4.5. Readability & Debuggability
+
+Keep expressions simple and easy to inspect in a debugger.
+
+### Rules
+- Avoid long, nested expressions in `return` statements or constructor calls. Extract
+  sub-expressions into well‑named local variables.
+- When constructing a non-trivial return value, assign it to a local variable named
+  `result` and `return result`. Returning a simple name or literal directly is fine.
+- Prefer short, single-purpose statements over clever one‑liners.
+
+### Example
+```python
+# ❌ Bad — long nested return makes debugging hard
+return Money(
+    compute_notional_value(price, net_qty, instrument.contract_size) * self._maintenance_ratio,
+    instrument.settlement_currency,
+)
+
+# ✅ Good — extract into locals and return `result`
+notional = compute_notional_value(price, net_qty, instrument.contract_size)
+margin = notional * self._maintenance_ratio
+currency = instrument.settlement_currency
+result = Money(margin, currency)
+return result
+```
+
+**Acceptance checks:**
+- [ ] No multi-line `return` with nested calls; complex expressions are broken into locals
+- [ ] Non-trivial return values are assigned to `result` before returning
+- [ ] Statements remain ≤100 chars per line where practical (see 8.3)
 
 ---
 
@@ -499,8 +538,6 @@ negative prices.
 
 **Acceptance checks:**
 - [ ] Generic validators allow negative prices where market supports them
-
----
 
 # 8. Code Organization
 
