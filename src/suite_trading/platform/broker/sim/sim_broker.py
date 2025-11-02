@@ -358,10 +358,6 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
 
-    def _mark_price(self, instrument: Instrument) -> Decimal:
-        sample = self._latest_price_sample_by_instrument.get(instrument)
-        return Decimal(sample.price) if sample is not None else Decimal("0")
-
     # Model builders (defaults)
     def _build_default_market_depth_model(self) -> MarketDepthModel:
         """Build the default MarketDepthModel used by this broker instance.
@@ -439,7 +435,14 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     def _apply_maintenance_margin(self, instrument: Instrument, timestamp: datetime) -> None:
         """Compute maintenance margin for $instrument at $timestamp and apply the lock."""
-        price = self._mark_price(instrument)
+        sample = self._latest_price_sample_by_instrument.get(instrument)
+
+        # Check: ensure we have a recent price before recomputing maintenance margin to avoid using 0
+        if sample is None:
+            logger.debug(f"Skip maintenance margin for Instrument '{instrument}' due to missing price")
+            return
+
+        price = Decimal(sample.price)
         net_position_quantity = self._positions_by_instrument.get(instrument).quantity if instrument in self._positions_by_instrument else Decimal("0")
         maintenance_margin = self._margin_model.compute_maintenance_margin(
             instrument,
