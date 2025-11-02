@@ -539,6 +539,11 @@ negative prices.
 **Acceptance checks:**
 - [ ] Generic validators allow negative prices where market supports them
 
+## 7.2. Pricing terminology
+
+- Do not use the term "mark price" anywhere in this codebase (code, docs, comments, logs,
+  or tests). Use "last price" instead.
+
 # 8. Code Organization
 
 ## 8.1. Regions
