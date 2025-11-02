@@ -9,7 +9,7 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.domain.market_data.price_sample_source import PriceSampleSource
+from suite_trading.domain.market_data.price_sample_source import PriceSampleIterable
 from suite_trading.platform.broker.capabilities import PriceSampleConsumer
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
@@ -203,7 +203,7 @@ class TradingEngine:
         # Register brokers that can consume PriceSample-s
         if isinstance(broker, PriceSampleConsumer):
             self._price_sample_consuming_brokers.append(broker)
-            logger.debug(f"Broker (class {broker_type.__name__}) was added among brokers, that consume Event-s of type {PriceSampleSource.__name__}.")
+            logger.debug(f"Broker (class {broker_type.__name__}) was added among brokers, that consume Event-s of type {PriceSampleIterable.__name__}.")
 
     def remove_broker(self, broker_type: type[Broker]) -> None:
         """Remove a broker by type.
@@ -561,8 +561,8 @@ class TradingEngine:
                         # Cleanup all feeds for this strategy
                         self._close_and_remove_all_feeds_for_strategy(strategy)
 
-                    # Route Events of type PriceSampleSource to all capable brokers
-                    if isinstance(next_event, PriceSampleSource):
+                    # Route Events of type PriceSampleIterable to all capable brokers
+                    if isinstance(next_event, PriceSampleIterable):
                         for sample in next_event.iter_price_samples():
                             for broker in self._price_sample_consuming_brokers:
                                 broker.process_price_sample(sample)

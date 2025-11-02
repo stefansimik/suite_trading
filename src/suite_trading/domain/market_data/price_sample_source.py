@@ -5,7 +5,7 @@ from suite_trading.domain.market_data.price_sample import PriceSample
 
 
 @runtime_checkable
-class PriceSampleSource(Protocol):
+class PriceSampleIterable(Protocol):
     """Marker Protocol for events that carry price information.
 
     Public API used by broker/matching engine and any consumer that needs to extract

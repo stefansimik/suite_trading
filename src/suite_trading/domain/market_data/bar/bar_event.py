@@ -11,9 +11,6 @@ from suite_trading.domain.market_data.price_sample import PriceSample
 from suite_trading.utils.datetime_utils import format_dt
 
 
-# region Class
-
-
 class BarEvent(Event):
     """Event wrapper carrying bar data with system metadata.
 
@@ -27,6 +24,8 @@ class BarEvent(Event):
     """
 
     __slots__ = ("_bar", "_is_historical")
+
+    # region Init
 
     def __init__(
         self,
@@ -46,39 +45,15 @@ class BarEvent(Event):
         self._bar = bar
         self._is_historical = is_historical
 
-    @property
-    def bar(self) -> Bar:
-        """Get the bar data."""
-        return self._bar
+    # endregion
 
-    @property
-    def dt_received(self) -> datetime:
-        """Get the received timestamp."""
-        return self._dt_received
+    # region Protocol PriceSampleIterable
 
-    @property
-    def is_historical(self) -> bool:
-        """Get whether this bar data is historical or live."""
-        return self._is_historical
-
-    @property
-    def dt_event(self) -> datetime:
-        """Event datetime when the bar period ended.
-
-        For bar events, this is the end time of the bar period.
-
-        Returns:
-            datetime: The bar end timestamp.
-        """
-        return self.bar.end_dt
-
-    # region PriceSampleSource implementation
-
-    # TODO: We should remove the PriceSampleSource protocol from all Event(s) and move the responsibility into some sort configurable PriceDecompositionModel
+    # TODO: We should remove the PriceSampleIterable protocol from all Event(s) and move the responsibility into some sort configurable PriceDecompositionModel
     #  that will be part of Order-Price matching engine
     #  Main point is, that it is not responsibility of Event to decompose the order of prices for order-fills simulation.
     #  Event just has to carry the informations, nothing more.
-    #  Then, we probably don't need this implementation of PriceSampleSource at all, as Order-Price matching engine
+    #  Then, we probably don't need this implementation of PriceSampleIterable at all, as Order-Price matching engine
     #  can automatically do this:
     #       1. it checks the type of structure (Bar / Trade+Quote ticks)
     #       2. it decomposes them into PriceSamples (or ideally some OrderBook type of structure, which is most precise structure for simulating order-fills)
@@ -138,6 +113,38 @@ class BarEvent(Event):
 
     # endregion
 
+    # region Properties
+
+    @property
+    def bar(self) -> Bar:
+        """Get the bar data."""
+        return self._bar
+
+    @property
+    def dt_received(self) -> datetime:
+        """Get the received timestamp."""
+        return self._dt_received
+
+    @property
+    def is_historical(self) -> bool:
+        """Get whether this bar data is historical or live."""
+        return self._is_historical
+
+    @property
+    def dt_event(self) -> datetime:
+        """Event datetime when the bar period ended.
+
+        For bar events, this is the end time of the bar period.
+
+        Returns:
+            datetime: The bar end timestamp.
+        """
+        return self.bar.end_dt
+
+    # endregion
+
+    # region Magic
+
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(bar={self.bar}, dt_received={format_dt(self.dt_received)}, is_historical={self.is_historical})"
 
@@ -157,8 +164,8 @@ class BarEvent(Event):
             return False
         return self.bar == other.bar and self.dt_received == other.dt_received and self.is_historical == other.is_historical
 
+    # endregion
 
-# endregion
 
 # region Utilities
 

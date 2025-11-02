@@ -23,6 +23,8 @@ class QuoteTickEvent(Event):
 
     __slots__ = ("_quote_tick",)
 
+    # region Init
+
     def __init__(self, quote_tick: QuoteTick, dt_received: datetime):
         """Initialize a new quote tick event.
 
@@ -32,6 +34,24 @@ class QuoteTickEvent(Event):
         """
         super().__init__(dt_event=quote_tick.timestamp, dt_received=dt_received)
         self._quote_tick = quote_tick
+
+    # endregion
+
+    # region Protocol PriceSampleIterable
+
+    def iter_price_samples(self) -> Iterator[PriceSample]:
+        """Yield BID then ASK `PriceSample` from $quote_tick in deterministic order."""
+        q = self.quote_tick
+        dt = self.dt_event
+        inst = q.instrument
+
+        # Emit best bid then best ask using existing Decimal values
+        yield PriceSample(inst, dt, PriceType.BID, q.bid_price)
+        yield PriceSample(inst, dt, PriceType.ASK, q.ask_price)
+
+    # endregion
+
+    # region Properties
 
     @property
     def quote_tick(self) -> QuoteTick:
@@ -53,18 +73,6 @@ class QuoteTickEvent(Event):
             datetime: The quote timestamp.
         """
         return self.quote_tick.timestamp
-
-    # region PriceSampleSource implementation
-
-    def iter_price_samples(self) -> Iterator[PriceSample]:
-        """Yield BID then ASK `PriceSample` from $quote_tick in deterministic order."""
-        q = self.quote_tick
-        dt = self.dt_event
-        inst = q.instrument
-
-        # Emit best bid then best ask using existing Decimal values
-        yield PriceSample(inst, dt, PriceType.BID, q.bid_price)
-        yield PriceSample(inst, dt, PriceType.ASK, q.ask_price)
 
     # endregion
 

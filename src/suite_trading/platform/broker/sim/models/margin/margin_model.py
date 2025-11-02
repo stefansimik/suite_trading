@@ -16,12 +16,16 @@ class MarginModel(Protocol):
       checks may depend on order direction and size.
     - Maintenance margin uses position context (`$net_position_quantity`) because ongoing
       requirements are based on current exposure, not a prospective order.
+
+    Notes:
+        This protocol intentionally does not accept a `$price`. Implementations that need
+        pricing data should obtain the broker's last price (or last `PriceSample`) via a
+        dedicated source inside the implementation.
     """
 
     def compute_initial_margin(
         self,
         instrument: Instrument,
-        price: Decimal,
         trade_quantity: Decimal,
         is_buy: bool,
         timestamp: datetime,
@@ -30,7 +34,6 @@ class MarginModel(Protocol):
 
         Args:
             instrument: Instrument to trade.
-            price: Expected trade price used for notional math.
             trade_quantity: Order size for this trade (sign may be ignored by some models).
             is_buy: True for buy orders; enables asymmetric long/short treatment.
             timestamp: Time used for schedule/venue rules.
@@ -40,7 +43,6 @@ class MarginModel(Protocol):
     def compute_maintenance_margin(
         self,
         instrument: Instrument,
-        price: Decimal,
         net_position_quantity: Decimal,
         timestamp: datetime,
     ) -> Money:
@@ -48,7 +50,6 @@ class MarginModel(Protocol):
 
         Args:
             instrument: Instrument whose position is margined.
-            price: Mark price used for notional math.
             net_position_quantity: Current net position (long > 0, short < 0).
             timestamp: Time used for schedule/venue rules.
         """

@@ -233,7 +233,6 @@ class SimBroker(Broker, PriceSampleConsumer):
                 if additional_exposure_quantity > 0:
                     initial_margin = self._margin_model.compute_initial_margin(
                         instrument=order.instrument,
-                        price=execution_price,
                         trade_quantity=additional_exposure_quantity,
                         is_buy=order.is_buy,
                         timestamp=sample.dt_event,
@@ -381,7 +380,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         Returns:
             A MarginModel instance with zero ratios to keep behavior stable unless configured.
         """
-        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"))
+        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"), last_price_sample_source=self)
 
     # Margin & funds
     def _compute_exposure_increase_quantity(
@@ -441,16 +440,21 @@ class SimBroker(Broker, PriceSampleConsumer):
         if sample is None:
             logger.debug(f"Skip maintenance margin for Instrument '{instrument}' due to missing price")
             return
-
-        price = Decimal(sample.price)
         net_position_quantity = self._positions_by_instrument.get(instrument).quantity if instrument in self._positions_by_instrument else Decimal("0")
         maintenance_margin = self._margin_model.compute_maintenance_margin(
             instrument,
-            price,
             net_position_quantity,
             timestamp,
         )
         self._apply_maintenance_margin_lock(maintenance_margin)
+
+    # region Protocol LastPriceSampleSource
+
+    def get_last_price_sample(self, instrument: Instrument) -> PriceSample | None:
+        """Return latest known `PriceSample` for `$instrument`, or None if unknown."""
+        return self._latest_price_sample_by_instrument.get(instrument)
+
+    # endregion
 
     def _apply_maintenance_margin_lock(self, maintenance_margin: Money) -> None:
         """Apply maintenance-margin lock by setting $locked to $maintenance_margin.value.
