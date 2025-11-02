@@ -505,23 +505,20 @@ negative prices.
 # 8. Code Organization
 
 ## 8.1. Regions
-Use `# region NAME` and `# endregion` to group related blocks. Use sparingly; not for tiny
-items.
+Use `# region NAME` / `# endregion` to group related blocks (no tiny regions).
 
-**Suggested regions (use when relevant):**
-- **Init:** Constructors/initialization
-- **Main:** Main functionality/public API
-- **Properties:** Public properties
-- **Utilities** or **Convenience:** Helper functions
-- **Orders:** Order management and routing
-- **Protocol <Name>:** Provider-specific methods (e.g., `Protocol IBKR`)
-- **Magic:** Magic methods (`__str__`, `__repr__`, etc.)
+Preferred set and order:
+1) Init, 2) Protocol <Name>, 3) Main, 4) Properties, 5) Utilities, 6) Magic.
+
+- Use `Protocol <Name>` for protocol API (see 8.5). Use `Main` only for public API not in a
+  protocol. Standardize on `Utilities` (do not use "Helpers").
+- Public‑first order (see 8.4). Remove empty regions.
 
 **Format:**
 - Mark with `# region NAME` and `# endregion`
 - Keep one empty line after `# region NAME` and before `# endregion`
 - Remove all empty regions
-- Order functions: more important first
+- Follow the ordering rules in 8.4
 
 ## 8.2. Imports & Package Structure
 - Import directly from source modules; **never re-export in `__init__.py`**
@@ -535,6 +532,48 @@ items.
 
 ## 8.3. Markdown Formatting
 Keep all Markdown lines (including code blocks) **≤100 chars**. Break at natural points.
+
+## 8.4. Method ordering inside classes
+- Order methods by reader importance:
+  1) Init (constructor), 2) Public API ("Main"), 3) Properties,
+     4) Protected/Private helpers ("Utilities"), 5) Magic (dunder).
+- Use regions to mark these blocks: `# region Init`, `# region Main`, `# region Properties`,
+  `# region Utilities`, `# region Magic`.
+- Do not place protected/private helpers above public API unless there is a strong, documented
+  reason.
+
+Acceptance checks:
+- [ ] Public API appears before protected/private helpers in each class
+- [ ] Regions used and correctly named; no empty regions
+- [ ] Reviews must call out violations explicitly
+
+## 8.5. Region naming for protocol implementations
+- When a class implements a Protocol's public API, name the region `Protocol <Name>` instead of
+  the generic `Main`.
+- Examples:
+  - Use `# region Protocol MarginModel` in a margin model implementation.
+  - Use `# region Protocol FeeModel` in a fee model implementation.
+
+Acceptance checks:
+- [ ] Classes implementing a Protocol use `Protocol <Name>` region for public API
+- [ ] No leftover `Main` region when a protocol name would be clearer
+
+## 8.6. Region naming and order (concise rule)
+- Use only these regions and in this order when present:
+  1) `Init`, 2) `Protocol <Name>`, 3) `Main`, 4) `Properties`, 5) `Utilities`, 6) `Magic`.
+- Public‑first: `Init` → `Protocol <Name>`/`Main` → the rest. See 8.4 for details.
+- If a class implements a Protocol, group those methods under `Protocol <Name>` (e.g., `Protocol
+  MarginModel`). If multiple protocols, create one region per protocol.
+- Use `Main` only for public API that is not part of any Protocol. Omit `Main` if the class is
+  protocol‑only.
+- Standardize on `Utilities` for non‑public helpers; do not use "Helpers".
+- In modules that define a Protocol/interface, you may use a single `Interface` region.
+
+Acceptance checks:
+- [ ] `Protocol <Name>` is used instead of `Main` for protocol API (8.5)
+- [ ] Public API appears before helpers (`Init` → `Protocol`/`Main`) (8.4)
+- [ ] Only the approved region names are used; order is respected; no "Helpers"
+- [ ] No empty regions; remove unused headings (8.1)
 
 ---
 
