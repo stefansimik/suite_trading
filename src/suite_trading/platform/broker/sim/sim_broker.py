@@ -32,7 +32,8 @@ logger = logging.getLogger(__name__)
 class SimBroker(Broker, PriceSampleConsumer):
     """Simulated broker for backtesting/paper trading.
 
-    Regions with '(from Broker)' implement the Broker protocol. Other regions are unique to SimBroker implementation.
+    Public API is grouped under `Protocol Broker` and `Protocol PriceSampleConsumer` regions; other
+    methods are under `Utilities` per AGENTS.md (sections 8.1, 8.4, 8.5, 8.6).
     """
 
     # region Init
@@ -76,7 +77,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Connection (Broker protocol)
+    # region Protocol Broker
 
     def connect(self) -> None:
         """Implements: Broker.connect
@@ -99,104 +100,6 @@ class SimBroker(Broker, PriceSampleConsumer):
         """
         return self._connected
 
-    # endregion
-
-    # region Private Helpers
-
-    def _apply_order_action_and_publish_update(self, order: Order, action: OrderAction) -> None:
-        """Apply $action to $order and publish `on_order_updated` if state changed.
-
-        This centralizes per-transition publishing so callers remain simple.
-        """
-        previous_state = order.state
-        order.change_state(action)
-        new_state = order.state
-        if new_state != previous_state:
-            # Check: ensure callback was provided before invoking to avoid calling None
-            cb = self._order_updated_callback
-            if cb is not None:
-                cb(order)
-
-    def _is_price_known_for_instrument(self, instrument: Instrument) -> bool:
-        sample = self._latest_price_sample_by_instrument.get(instrument)
-        return sample is not None
-
-    def _record_execution_and_update_position(self, execution: Execution) -> None:
-        """Record an execution and update the corresponding position.
-
-        Records $execution to the execution history, then updates the per-instrument Position
-        to reflect the new quantity and average price.
-        """
-        order = execution.order
-        instrument = order.instrument
-        trade_qty: Decimal = Decimal(execution.quantity)
-        trade_price: Decimal = Decimal(execution.price)
-        signed_qty: Decimal = trade_qty if order.is_buy else -trade_qty
-
-        # Record execution to history
-        self._executions.append(execution)
-
-        # Update position for this instrument
-        prev_pos: Position | None = self._positions_by_instrument.get(instrument)
-        prev_qty: Decimal = Decimal("0") if prev_pos is None else prev_pos.quantity
-        prev_avg: Decimal = Decimal("0") if prev_pos is None else prev_pos.average_price
-
-        new_qty: Decimal = prev_qty + signed_qty
-
-        if new_qty == 0:
-            # Flat after this trade → drop stored position to keep list_open_positions() minimal
-            self._positions_by_instrument.pop(instrument, None)
-        else:
-            # Determine whether we remain on the same side (long/short) after applying the trade
-            same_side = (prev_qty == 0) or (prev_qty > 0 and new_qty > 0) or (prev_qty < 0 and new_qty < 0)
-            if same_side and prev_qty != 0:
-                # Add to existing same-side exposure → weighted average price by absolute sizes
-                new_avg = (abs(prev_qty) * prev_avg + abs(signed_qty) * trade_price) / abs(new_qty)
-            elif prev_qty == 0:
-                # Opening from flat → average equals executed price
-                new_avg = trade_price
-            else:
-                # Side flip (crosses through zero) → start fresh position at executed price
-                new_avg = trade_price
-
-            # Commit the new/updated Position for this instrument
-            self._positions_by_instrument[instrument] = Position(
-                instrument=instrument,
-                quantity=new_qty,
-                average_price=new_avg,
-                last_update=execution.timestamp,
-            )
-
-        logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
-
-    def _build_default_market_depth_model(self) -> MarketDepthModel:
-        """Build the default MarketDepthModel used by this broker instance.
-
-        Returns:
-            A MarketDepthModel instance.
-        """
-        return ZeroSpreadMarketDepthModel()
-
-    def _build_default_fee_model(self) -> FeeModel:
-        """Build the default FeeModel used by this broker instance.
-
-        Returns:
-            A FeeModel instance. Defaults to zero per-unit commission in USD.
-        """
-        return FixedFeeModel(fee_per_unit=Money(Decimal("0"), USD))
-
-    def _build_default_margin_model(self) -> MarginModel:
-        """Build the default MarginModel used by this broker instance.
-
-        Returns:
-            A MarginModel instance with zero ratios to keep behavior stable unless configured.
-        """
-        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"))
-
-    # endregion
-
-    # region Callbacks (Broker protocol)
-
     def set_callbacks(
         self,
         on_execution: Callable[[Execution], None],
@@ -205,10 +108,6 @@ class SimBroker(Broker, PriceSampleConsumer):
         """Register Engine callbacks for broker events."""
         self._execution_callback = on_execution
         self._order_updated_callback = on_order_updated
-
-    # endregion
-
-    # region Orders (Broker protocol)
 
     def submit_order(self, order: Order) -> None:
         """Implements: Broker.submit_order
@@ -259,10 +158,6 @@ class SimBroker(Broker, PriceSampleConsumer):
         """
         return list(self._orders_by_id.values())
 
-    # endregion
-
-    # region Positions (Broker protocol)
-
     def list_open_positions(self) -> list[Position]:
         """Implements: Broker.list_open_positions
 
@@ -287,10 +182,6 @@ class SimBroker(Broker, PriceSampleConsumer):
         """
         return self._positions_by_instrument.get(instrument)
 
-    # endregion
-
-    # region Account (Broker protocol)
-
     def get_account_info(self) -> AccountInfo:
         """Implements: Broker.get_account_info
 
@@ -302,7 +193,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Price Processing (PriceSampleConsumer protocol)
+    # region Protocol PriceSampleConsumer
 
     # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
     def process_price_sample(self, sample: PriceSample) -> None:
@@ -397,8 +288,106 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Margin & Funds helpers (SimBroker internals)
+    # region Utilities
 
+    # Order state transitions & publishing
+    def _apply_order_action_and_publish_update(self, order: Order, action: OrderAction) -> None:
+        """Apply $action to $order and publish `on_order_updated` if state changed.
+
+        This centralizes per-transition publishing so callers remain simple.
+        """
+        previous_state = order.state
+        order.change_state(action)
+        new_state = order.state
+        if new_state != previous_state:
+            # Check: ensure callback was provided before invoking to avoid calling None
+            cb = self._order_updated_callback
+            if cb is not None:
+                cb(order)
+
+    # Prices & positions
+    def _is_price_known_for_instrument(self, instrument: Instrument) -> bool:
+        sample = self._latest_price_sample_by_instrument.get(instrument)
+        return sample is not None
+
+    def _record_execution_and_update_position(self, execution: Execution) -> None:
+        """Record an execution and update the corresponding position.
+
+        Records $execution to the execution history, then updates the per-instrument Position
+        to reflect the new quantity and average price.
+        """
+        order = execution.order
+        instrument = order.instrument
+        trade_qty: Decimal = Decimal(execution.quantity)
+        trade_price: Decimal = Decimal(execution.price)
+        signed_qty: Decimal = trade_qty if order.is_buy else -trade_qty
+
+        # Record execution to history
+        self._executions.append(execution)
+
+        # Update position for this instrument
+        prev_pos: Position | None = self._positions_by_instrument.get(instrument)
+        prev_qty: Decimal = Decimal("0") if prev_pos is None else prev_pos.quantity
+        prev_avg: Decimal = Decimal("0") if prev_pos is None else prev_pos.average_price
+
+        new_qty: Decimal = prev_qty + signed_qty
+
+        if new_qty == 0:
+            # Flat after this trade → drop stored position to keep list_open_positions() minimal
+            self._positions_by_instrument.pop(instrument, None)
+        else:
+            # Determine whether we remain on the same side (long/short) after applying the trade
+            same_side = (prev_qty == 0) or (prev_qty > 0 and new_qty > 0) or (prev_qty < 0 and new_qty < 0)
+            if same_side and prev_qty != 0:
+                # Add to existing same-side exposure → weighted average price by absolute sizes
+                new_avg = (abs(prev_qty) * prev_avg + abs(signed_qty) * trade_price) / abs(new_qty)
+            elif prev_qty == 0:
+                # Opening from flat → average equals executed price
+                new_avg = trade_price
+            else:
+                # Side flip (crosses through zero) → start fresh position at executed price
+                new_avg = trade_price
+
+            # Commit the new/updated Position for this instrument
+            self._positions_by_instrument[instrument] = Position(
+                instrument=instrument,
+                quantity=new_qty,
+                average_price=new_avg,
+                last_update=execution.timestamp,
+            )
+
+        logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
+
+    def _mark_price(self, instrument: Instrument) -> Decimal:
+        sample = self._latest_price_sample_by_instrument.get(instrument)
+        return Decimal(sample.price) if sample is not None else Decimal("0")
+
+    # Model builders (defaults)
+    def _build_default_market_depth_model(self) -> MarketDepthModel:
+        """Build the default MarketDepthModel used by this broker instance.
+
+        Returns:
+            A MarketDepthModel instance.
+        """
+        return ZeroSpreadMarketDepthModel()
+
+    def _build_default_fee_model(self) -> FeeModel:
+        """Build the default FeeModel used by this broker instance.
+
+        Returns:
+            A FeeModel instance. Defaults to zero per-unit commission in USD.
+        """
+        return FixedFeeModel(fee_per_unit=Money(Decimal("0"), USD))
+
+    def _build_default_margin_model(self) -> MarginModel:
+        """Build the default MarginModel used by this broker instance.
+
+        Returns:
+            A MarginModel instance with zero ratios to keep behavior stable unless configured.
+        """
+        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"))
+
+    # Margin & funds
     def _compute_additional_exposure_qty(
         self,
         net_position_quantity_before: Decimal,
@@ -453,10 +442,6 @@ class SimBroker(Broker, PriceSampleConsumer):
         new_locked = maintenance_margin.value
         new_available = total - new_locked
         self._set_funds(maintenance_margin.currency, new_available, new_locked)
-
-    def _mark_price(self, instrument: Instrument) -> Decimal:
-        sample = self._latest_price_sample_by_instrument.get(instrument)
-        return Decimal(sample.price) if sample is not None else Decimal("0")
 
     def _on_initial_margin_insufficient(
         self,
