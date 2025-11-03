@@ -134,13 +134,29 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
 
     def cancel_order(self, order: Order) -> None:
-        """Implements: Broker.cancel_order
+        """Implements: Broker.cancel_order.
 
-        Request cancellation of an active $order.
-
-        TODO: Locate across strategies; apply state change; notify listeners.
+        Request cancellation of a tracked $order. If the order is already in a terminal
+        category, log a warning and return without emitting transitions.
         """
-        ...  # TODO: implement
+        # Check: broker must be connected to act on orders
+        if not self._connected:
+            raise RuntimeError(f"Cannot call `cancel_order` because $connected ({self._connected}) is False")
+
+        # Check: order must be known to the broker
+        tracked = self._orders_by_id.get(order.order_id)
+        if tracked is None:
+            raise ValueError(f"Cannot call `cancel_order` because $order_id ('{order.order_id}') is not tracked")
+
+        # Check: If order is already in terminal state (e.g., FILLED, CANCELLED, REJECTED), warn and do nothing
+        if tracked.state_category == OrderStateCategory.TERMINAL:
+            logger.warning(f"Bad logic: Ignoring `cancel_order` for terminal Order $order_id ('{order.order_id}') with $state_category ({tracked.state_category.name})")
+            return
+
+        # Transition to PENDING_CANCEL and notify listeners
+        self._apply_order_action_and_publish_update(tracked, OrderAction.CANCEL)
+        # Transition to CANCELLED and notify listeners
+        self._apply_order_action_and_publish_update(tracked, OrderAction.ACCEPT)
 
     def modify_order(self, order: Order) -> None:
         """Implements: Broker.modify_order
