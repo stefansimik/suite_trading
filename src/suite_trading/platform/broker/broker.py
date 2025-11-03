@@ -11,6 +11,7 @@ from suite_trading.domain.position import Position
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
     from suite_trading.domain.instrument import Instrument
+    from suite_trading.domain.order.order_state import OrderStateCategory
 
 
 @runtime_checkable
@@ -117,17 +118,37 @@ class Broker(Protocol):
         """
         ...
 
-    def list_active_orders(self) -> list[Order]:
-        """Get all currently active orders.
+    def list_orders(
+        self,
+        *,
+        categories: set[OrderStateCategory] | None = None,
+        instrument: Instrument | None = None,
+    ) -> list[Order]:
+        """List orders known to this Broker.
 
-        Active orders include all orders that are not in a terminal state
-        (i.e., not Filled, Cancelled, or Rejected).
+        This is a generic listing API that returns orders and optionally narrows the
+        result using simple filters. If no filters are provided, all orders tracked by
+        the Broker are returned.
+
+        Args:
+            categories: Optional filter. Include only orders whose
+                `OrderStateCategory` is in this set.
+            instrument: Optional filter. Include only orders for $instrument. Pass
+                None to include orders for all instruments.
 
         Returns:
-            List[Order]: List of all active orders for this broker.
+            list[Order]: Matching orders (may be empty).
+        """
+        ...
 
-        Raises:
-            ConnectionError: If not connected to broker.
+    def get_order(self, order_id: int) -> Order | None:
+        """Retrieve a single Order by $order_id, or None if not found.
+
+        Args:
+            order_id: Identifier of the order to retrieve.
+
+        Returns:
+            Order | None: The matching order or None.
         """
         ...
 

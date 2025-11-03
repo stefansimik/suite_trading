@@ -84,7 +84,7 @@ def test_two_trade_demo_strategy_steps_0_and_1():
     engine.start()
 
     # Assert: exactly two submissions on events 3 and 5 with SELL then BUY
-    submitted = broker.list_active_orders()
+    submitted = broker.list_orders()
     assert len(submitted) == 2, "Strategy should submit exactly two orders"
     assert submitted[0].side == OrderSide.SELL
     assert submitted[1].side == OrderSide.BUY

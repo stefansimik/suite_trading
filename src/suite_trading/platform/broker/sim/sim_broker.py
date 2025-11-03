@@ -151,12 +151,50 @@ class SimBroker(Broker, PriceSampleConsumer):
         """
         ...  # TODO: implement
 
-    def list_active_orders(self) -> list[Order]:
-        """Implements: Broker.list_active_orders
+    def list_orders(
+        self,
+        *,
+        categories: set[OrderStateCategory] | None = None,
+        instrument: Instrument | None = None,
+    ) -> list[Order]:
+        """Implements: `Broker.list_orders`.
 
-        Return a flat list of currently tracked active orders.
+        Return orders known to this Broker, optionally narrowed by simple filters. If you do not
+        pass any filters, the method returns all orders tracked by this SimBroker instance.
+
+        Args:
+            categories: Optional filter. Include only orders whose `OrderStateCategory` is in this
+                set. Pass None to include all categories.
+            instrument: Optional filter. Include only orders for $instrument. Pass None to include
+                orders for all instruments.
+
+        Returns:
+            list[Order]: Matching orders (may be empty).
         """
-        return list(self._orders_by_id.values())
+        # Load initial data (all orders) into reusable variable $result
+        result: list[Order] = list(self._orders_by_id.values())
+
+        # Filter — by Instrument
+        if instrument is not None:
+            result = [order for order in result if order.instrument == instrument]
+
+        # Filter — by OrderStateCategory
+        if categories is not None:
+            included_categories = set(categories)
+            result = [order for order in result if order.state_category in included_categories]
+
+        return result
+
+    def get_order(self, order_id: int) -> Order | None:
+        """Implements: `Broker.get_order`.
+
+        Args:
+            order_id: Identifier of the order to retrieve.
+
+        Returns:
+            Order | None: The matching order, or None if this broker does not track it.
+        """
+        return self._orders_by_id.get(order_id)
 
     def list_open_positions(self) -> list[Position]:
         """Implements: Broker.list_open_positions
