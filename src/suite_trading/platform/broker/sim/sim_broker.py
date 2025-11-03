@@ -278,7 +278,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
                 # Reserve initial margin for exposure-increasing trade quantity; block-and-cancel on failure
                 net_position_quantity_before = self._positions_by_instrument.get(order.instrument).quantity if order.instrument in self._positions_by_instrument else Decimal("0")
-                additional_exposure_quantity = self._compute_exposure_increase_quantity(
+                additional_exposure_quantity = self._compute_additional_exposure_quantity(
                     net_position_quantity_before,
                     quantity_to_fill,
                     order.is_buy,
@@ -330,7 +330,7 @@ class SimBroker(Broker, PriceSampleConsumer):
                 # TODO(sim-broker-fees): apply $execution.commission to AccountInfo funds in its currency
 
                 # Maintenance margin reconciliation after successful fills
-                self._apply_maintenance_margin(order.instrument, sample.dt_event)
+                self._update_maintenance_margin(order.instrument, sample.dt_event)
 
                 # PUBLISH: Execution first, then Order update if state changed
                 self._execution_callback(execution)
@@ -359,7 +359,7 @@ class SimBroker(Broker, PriceSampleConsumer):
                 cb(order)
 
     # Prices & positions
-    def _is_price_known_for_instrument(self, instrument: Instrument) -> bool:
+    def _has_price_for_instrument(self, instrument: Instrument) -> bool:
         sample = self._latest_price_sample_by_instrument.get(instrument)
         return sample is not None
 
@@ -437,7 +437,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"), last_price_sample_source=self)
 
     # Margin & funds
-    def _compute_exposure_increase_quantity(
+    def _compute_additional_exposure_quantity(
         self,
         net_position_quantity_before: Decimal,
         trade_quantity: Decimal,
@@ -459,7 +459,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         absolute_quantity_after = abs(net_position_quantity_before + signed_trade_quantity)
         return max(Decimal("0"), Decimal(absolute_quantity_after - absolute_quantity_before))
 
-    def _get_funds(self, currency) -> Funds:
+    def _get_funds_for_currency(self, currency) -> Funds:
         """Cheap lookup of Funds for $currency.
 
         Returns a zeroed `Funds` when the currency is not present.
@@ -469,24 +469,24 @@ class SimBroker(Broker, PriceSampleConsumer):
             return Funds(available=Decimal("0"), locked=Decimal("0"))
         return Funds(available=Decimal(funds.available), locked=Decimal(funds.locked))
 
-    def _set_funds(self, currency, available: Decimal, locked: Decimal) -> None:
+    def _set_funds_for_currency(self, currency, available: Decimal, locked: Decimal) -> None:
         self._account_info.funds_by_currency[currency] = Funds(available=Decimal(available), locked=Decimal(locked))
         # Keep last_update_dt unchanged here; engine may advance it elsewhere
 
     def _can_lock_initial_margin(self, initial_margin: Money) -> bool:
         """Return True when $available covers $initial_margin.value in the same currency."""
-        funds = self._get_funds(initial_margin.currency)
+        funds = self._get_funds_for_currency(initial_margin.currency)
         return funds.available >= initial_margin.value
 
     def _lock_initial_margin(self, initial_margin: Money) -> None:
-        funds = self._get_funds(initial_margin.currency)
-        self._set_funds(
+        funds = self._get_funds_for_currency(initial_margin.currency)
+        self._set_funds_for_currency(
             initial_margin.currency,
             funds.available - initial_margin.value,
             funds.locked + initial_margin.value,
         )
 
-    def _apply_maintenance_margin(self, instrument: Instrument, timestamp: datetime) -> None:
+    def _update_maintenance_margin(self, instrument: Instrument, timestamp: datetime) -> None:
         """Compute maintenance margin for $instrument at $timestamp and apply the lock."""
         sample = self._latest_price_sample_by_instrument.get(instrument)
 
@@ -500,7 +500,7 @@ class SimBroker(Broker, PriceSampleConsumer):
             net_position_quantity,
             timestamp,
         )
-        self._apply_maintenance_margin_lock(maintenance_margin)
+        self._set_maintenance_margin_lock(maintenance_margin)
 
     # region Protocol LastPriceSampleSource
 
@@ -510,16 +510,16 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    def _apply_maintenance_margin_lock(self, maintenance_margin: Money) -> None:
+    def _set_maintenance_margin_lock(self, maintenance_margin: Money) -> None:
         """Apply maintenance-margin lock by setting $locked to $maintenance_margin.value.
 
         Keeps total funds constant by moving the difference between $available and $locked.
         """
-        funds = self._get_funds(maintenance_margin.currency)
+        funds = self._get_funds_for_currency(maintenance_margin.currency)
         total = funds.available + funds.locked
         new_locked = maintenance_margin.value
         new_available = total - new_locked
-        self._set_funds(maintenance_margin.currency, new_available, new_locked)
+        self._set_funds_for_currency(maintenance_margin.currency, new_available, new_locked)
 
     def _handle_initial_margin_insufficient(
         self,
