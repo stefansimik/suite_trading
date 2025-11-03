@@ -728,7 +728,7 @@ class TradingEngine:
             try:
                 feed.close()
             except Exception as e:
-                logger.error(f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}': {e}")
+                logger.error(f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")
 
         # Remove all feeds for this Strategy
         event_feeds_by_name_dict.clear()
@@ -785,20 +785,6 @@ class TradingEngine:
             ValueError: If the order cannot be modified.
         """
         broker.modify_order(order)
-
-    def list_active_orders(self, broker: Broker) -> list[Order]:
-        """Get all your active orders from a broker.
-
-        Args:
-            broker: The broker to get active orders from.
-
-        Returns:
-            List of all active orders for this broker.
-
-        Raises:
-            ConnectionError: If the broker is not connected.
-        """
-        return broker.list_active_orders()
 
     def get_routing_for_order(self, order: Order) -> StrategyBrokerPair:
         """Get routing information for an order.

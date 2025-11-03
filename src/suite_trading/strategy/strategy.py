@@ -413,30 +413,6 @@ class Strategy(ABC):
 
         engine.modify_order(order, broker)
 
-    # TODO: Allow filtering only orders created by this Strategy
-    def list_active_orders(self, broker: Broker) -> list[Order]:
-        """Get all currently active orders.
-
-        Allowed only when the strategy is RUNNING.
-
-        Args:
-            broker (Broker): The broker to get active orders from.
-
-        Returns:
-            List[Order]: List of all active orders for the specified broker.
-
-        Raises:
-            RuntimeError: If $trading_engine is None or $state is not RUNNING.
-        """
-        engine = self._require_trading_engine()
-
-        # Check: state must be RUNNING to retrieve active orders
-        if self.state != StrategyState.RUNNING:
-            valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
-            raise RuntimeError(f"Cannot call `list_active_orders` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
-
-        return engine.list_active_orders(broker)
-
     def get_routing_for_order(self, order: Order) -> StrategyBrokerPair:
         """Lookup  route (strategy, broker) for $order.
 
