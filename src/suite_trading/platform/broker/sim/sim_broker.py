@@ -127,11 +127,11 @@ class SimBroker(Broker, PriceSampleConsumer):
 
         # Initial order-state transitions:
         # INITIALIZED -> PENDING_SUBMIT
-        self._apply_order_action_and_publish_update(order, OrderAction.SUBMIT)
+        self._change_order_state_and_notify(order, OrderAction.SUBMIT)
         # PENDING_SUBMIT -> SUBMITTED
-        self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
+        self._change_order_state_and_notify(order, OrderAction.ACCEPT)
         # SUBMITTED → State WORKING
-        self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
+        self._change_order_state_and_notify(order, OrderAction.ACCEPT)
 
     def cancel_order(self, order: Order) -> None:
         """Implements: Broker.cancel_order.
@@ -153,10 +153,10 @@ class SimBroker(Broker, PriceSampleConsumer):
             logger.warning(f"Bad logic: Ignoring `cancel_order` for terminal Order $order_id ('{order.order_id}') with $state_category ({tracked.state_category.name})")
             return
 
-        # Transition to PENDING_CANCEL and notify listeners
-        self._apply_order_action_and_publish_update(tracked, OrderAction.CANCEL)
-        # Transition to CANCELLED and notify listeners
-        self._apply_order_action_and_publish_update(tracked, OrderAction.ACCEPT)
+        # Transition to PENDING_CANCEL
+        self._change_order_state_and_notify(tracked, OrderAction.CANCEL)
+        # Transition to CANCELLED
+        self._change_order_state_and_notify(tracked, OrderAction.ACCEPT)
 
     def modify_order(self, order: Order) -> None:
         """Implements: Broker.modify_order
@@ -344,7 +344,7 @@ class SimBroker(Broker, PriceSampleConsumer):
     # region Utilities
 
     # Order state transitions & publishing
-    def _apply_order_action_and_publish_update(self, order: Order, action: OrderAction) -> None:
+    def _change_order_state_and_notify(self, order: Order, action: OrderAction) -> None:
         """Apply $action to $order and publish `on_order_updated` if state changed.
 
         This centralizes per-transition publishing so callers remain simple.
@@ -531,7 +531,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         best_ask: Decimal,
     ) -> None:
         """Default policy: block execution and cancel entire $order when margin is insufficient."""
-        self._apply_order_action_and_publish_update(order, OrderAction.CANCEL)
-        self._apply_order_action_and_publish_update(order, OrderAction.ACCEPT)
+        self._change_order_state_and_notify(order, OrderAction.CANCEL)
+        self._change_order_state_and_notify(order, OrderAction.ACCEPT)
 
     # endregion
