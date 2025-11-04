@@ -92,21 +92,18 @@ class TradingEngine:
         self._engine_state_machine: StateMachine = create_engine_state_machine()
 
         # REGISTRIES
-        self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
+        # Brokers
         self._brokers_by_name_bidict: bidict[str, Broker] = bidict()
+        # Strategies
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
-
-        # EVENT FEEDS
+        self._clocks_by_strategy: dict[Strategy, StrategyClocks] = {}
+        self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
+        # EventFeedProviders & EventFeeds
+        self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
         self._event_feeds_by_strategy: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
 
-        # CLOCKS
-        self._clocks_by_strategy: dict[Strategy, StrategyClocks] = {}
-
-        # ROUTING
+        # ORDERS ROUTING
         self._routing_by_order: dict[Order, StrategyBrokerPair] = {}
-
-        # EXECUTIONS
-        self._executions_by_strategy_name: dict[str, list[Execution]] = {}
 
     # endregion
 
@@ -260,8 +257,8 @@ class TradingEngine:
         # Set up EventFeed tracking for this strategy
         self._event_feeds_by_strategy[strategy] = {}
 
-        # Set up execution tracking for this strategy
-        self._executions_by_strategy_name[name] = []
+        # Set up execution tracking for this strategy (keyed by Strategy instance)
+        self._executions_by_strategy[strategy] = []
 
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
@@ -362,8 +359,8 @@ class TradingEngine:
         del self._event_feeds_by_strategy[strategy]
 
         # Remove execution tracking for this strategy
-        if name in self._executions_by_strategy_name:
-            del self._executions_by_strategy_name[name]
+        if strategy in self._executions_by_strategy:
+            del self._executions_by_strategy[strategy]
 
         # Remove from strategies' dictionary
         del self._strategies_by_name_bidict[name]
@@ -390,7 +387,7 @@ class TradingEngine:
         return list(self._strategies_by_name_bidict.keys())
 
     def list_executions_for_strategy(self, strategy_name: str) -> list[Execution]:
-        """Returns all executions for the given Strategy.
+        """Return all executions for Strategy named $strategy_name.
 
         Args:
             strategy_name: Name of the Strategy to get executions for.
@@ -399,13 +396,14 @@ class TradingEngine:
             List of Execution objects in chronological order.
 
         Raises:
-            KeyError: If $strategy_name is not registered.
+            KeyError: If $strategy_name is not registered in this TradingEngine.
         """
-        # Check: ensure $strategy_name exists
-        if strategy_name not in self._executions_by_strategy_name:
-            raise KeyError(f"Cannot call `list_executions_for_strategy` because Strategy named '{strategy_name}' is not registered")
+        # Check: ensure $strategy_name exists in this TradingEngine
+        if strategy_name not in self._strategies_by_name_bidict:
+            raise KeyError(f"Cannot call `list_executions_for_strategy` because Strategy named '{strategy_name}' is not registered in this TradingEngine")
 
-        return list(self._executions_by_strategy_name[strategy_name])
+        strategy = self._strategies_by_name_bidict[strategy_name]
+        return list(self._executions_by_strategy.get(strategy, []))
 
     # endregion
 
@@ -819,7 +817,7 @@ class TradingEngine:
             self._transition_strategy_to_error(strategy, e)
 
         # Store execution for later statistics
-        self._executions_by_strategy_name[strategy.name].append(execution)
+        self._executions_by_strategy[strategy].append(execution)
 
     def _route_broker_order_update_to_strategy(self, order: Order) -> None:
         """Handle order state updates from broker.
