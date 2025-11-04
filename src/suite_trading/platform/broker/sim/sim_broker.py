@@ -292,7 +292,7 @@ class SimBroker(Broker, PriceSampleProcessor):
                         instrument=order.instrument,
                         trade_quantity=additional_exposure_quantity,
                         is_buy=order.is_buy,
-                        timestamp=sample.dt_event,
+                        timestamp=sample.timestamp,
                     )
 
                     if not self._account_info.has_enough_available_money(initial_margin_amount):
@@ -301,7 +301,7 @@ class SimBroker(Broker, PriceSampleProcessor):
                             order=order,
                             quantity=quantity_to_fill,
                             attempted_price=execution_price,
-                            timestamp=sample.dt_event,
+                            timestamp=sample.timestamp,
                             best_bid=best_bid_price,
                             best_ask=best_ask_price,
                         )
@@ -320,7 +320,7 @@ class SimBroker(Broker, PriceSampleProcessor):
                         order=order,
                         price=execution_price,
                         quantity=quantity_to_fill,
-                        timestamp=sample.dt_event,
+                        timestamp=sample.timestamp,
                         previous_executions=previous_executions,
                     )
 
@@ -328,7 +328,7 @@ class SimBroker(Broker, PriceSampleProcessor):
                     execution, changed_order_state = order.add_execution(
                         quantity=quantity_to_fill,
                         price=execution_price,
-                        timestamp=sample.dt_event,
+                        timestamp=sample.timestamp,
                         commission=commission,
                     )
 
@@ -345,7 +345,7 @@ class SimBroker(Broker, PriceSampleProcessor):
                     maintenance_margin_amount = self._margin_model.compute_maintenance_margin(
                         instrument=order.instrument,
                         net_position_quantity=net_position_quantity_after_trade,
-                        timestamp=sample.dt_event,
+                        timestamp=sample.timestamp,
                     )
                     self._account_info.set_maintenance_margin_for_instrument_position(
                         order.instrument,
