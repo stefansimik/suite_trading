@@ -92,7 +92,7 @@ class TradingEngine:
         self._engine_state_machine: StateMachine = create_engine_state_machine()
 
         # REGISTRIES
-        self._event_feed_providers_by_type: dict[type[EventFeedProvider], EventFeedProvider] = {}
+        self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
         self._brokers_by_name_bidict: bidict[str, Broker] = bidict()
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
 
@@ -125,47 +125,51 @@ class TradingEngine:
 
     # region EventFeedProvider(s)
 
-    def add_event_feed_provider(self, provider: EventFeedProvider) -> None:
-        """Add an event feed provider (one per provider class).
+    def add_event_feed_provider(self, name: str, provider: EventFeedProvider) -> None:
+        """Add an EventFeedProvider by name (one unique name per engine).
 
         Args:
+            name: Unique provider name within this TradingEngine.
             provider: The EventFeedProvider instance to add.
 
         Raises:
-            ValueError: If a provider of the same class was already added.
+            ValueError: If an EventFeedProvider with the same $name is already added.
         """
-        key = type(provider)
-        # Check: only one provider per concrete class
-        if key in self._event_feed_providers_by_type:
-            raise ValueError(f"Cannot call `add_event_feed_provider` because a provider of class {key.__name__} is already added to this TradingEngine")
+        # Check: provider name must be unique and not already added
+        if name in self._event_feed_providers_by_name_bidict:
+            raise ValueError(f"Cannot call `add_event_feed_provider` because EventFeedProvider named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
-        self._event_feed_providers_by_type[key] = provider
-        logger.debug(f"Added event feed provider of class {key.__name__}")
+        self._event_feed_providers_by_name_bidict[name] = provider
+        logger.debug(f"TradingEngine added EventFeedProvider named '{name}' (class {provider.__class__.__name__})")
 
-    def remove_event_feed_provider(self, provider_type: type[EventFeedProvider]) -> None:
-        """Remove an event feed provider by type.
+    def remove_event_feed_provider(self, name: str) -> None:
+        """Remove an EventFeedProvider by name.
 
         Args:
-            provider_type: The provider class to remove.
+            name: The provider name to remove.
 
         Raises:
-            KeyError: If no provider of the given class exists.
+            KeyError: If no EventFeedProvider with the given $name exists.
         """
-        # Check: provider type must be added before removing
-        if provider_type not in self._event_feed_providers_by_type:
-            raise KeyError(f"Cannot call `remove_event_feed_provider` because $provider_type ('{provider_type.__name__}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.")
+        # Check: provider name must be added before removing
+        if name not in self._event_feed_providers_by_name_bidict:
+            raise KeyError(f"Cannot call `remove_event_feed_provider` because provider name $name ('{name}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.")
 
-        del self._event_feed_providers_by_type[provider_type]
-        logger.debug(f"Removed event feed provider of class {provider_type.__name__}")
+        del self._event_feed_providers_by_name_bidict[name]
+        logger.debug(f"Removed EventFeedProvider named '{name}'")
 
     @property
-    def event_feed_providers(self) -> dict[type[EventFeedProvider], EventFeedProvider]:
-        """Get all event feed providers keyed by provider type.
+    def event_feed_providers(self) -> bidict[str, EventFeedProvider]:
+        """Get all EventFeedProvider(s) keyed by name.
 
         Returns:
-            dict[type[EventFeedProvider], EventFeedProvider]: Mapping from provider class to instance.
+            bidict[str, EventFeedProvider]: Bi-directional mapping from provider name to instance.
         """
-        return self._event_feed_providers_by_type
+        return self._event_feed_providers_by_name_bidict
+
+    def list_event_feed_provider_names(self) -> list[str]:
+        """List names of all registered EventFeedProvider(s) in registration order."""
+        return list(self._event_feed_providers_by_name_bidict.keys())
 
     # endregion
 
@@ -417,13 +421,13 @@ class TradingEngine:
             valid_actions = [a.value for a in self._engine_state_machine.list_valid_actions()]
             raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
 
-        logger.info(f"Starting TradingEngine: {len(self._event_feed_providers_by_type)} event-feed-provider(s), {len(self._brokers_by_name_bidict)} broker(s), {len(self._strategies_by_name_bidict)} strategy(ies)")
+        logger.info(f"Starting TradingEngine: {len(self._event_feed_providers_by_name_bidict)} event-feed-provider(s), {len(self._brokers_by_name_bidict)} broker(s), {len(self._strategies_by_name_bidict)} strategy(ies)")
 
         try:
             # Connect event-feed-providers first
-            for provider_type, provider in self._event_feed_providers_by_type.items():
+            for provider_name, provider in self._event_feed_providers_by_name_bidict.items():
                 provider.connect()
-                logger.info(f"Connected event feed provider {provider_type.__name__}")
+                logger.info(f"Connected EventFeedProvider named '{provider_name}' (class {provider.__class__.__name__})")
 
             # Connect brokers second
             for broker_name, broker in self._brokers_by_name_bidict.items():
@@ -485,9 +489,9 @@ class TradingEngine:
 
             # Last: Disconnect event-feed-providers
             disconnected_providers = 0
-            for provider_type, provider in self._event_feed_providers_by_type.items():
+            for provider_name, provider in self._event_feed_providers_by_name_bidict.items():
                 provider.disconnect()
-                logger.info(f"Disconnected event-feed-provider {provider_type.__name__}")
+                logger.info(f"Disconnected EventFeedProvider named '{provider_name}' (class {provider.__class__.__name__})")
                 disconnected_providers += 1
 
             # Mark engine as stopped
@@ -673,6 +677,12 @@ class TradingEngine:
             return self._brokers_by_name_bidict.inv[broker]
         except KeyError:
             raise KeyError(f"Cannot call `_get_broker_name` because $broker (class {broker.__class__.__name__}) is not registered in this TradingEngine")
+
+    def _get_event_feed_provider_name(self, provider: EventFeedProvider) -> str:
+        try:
+            return self._event_feed_providers_by_name_bidict.inv[provider]
+        except KeyError:
+            raise KeyError(f"Cannot call `_get_event_feed_provider_name` because $provider (class {provider.__class__.__name__}) is not registered in this TradingEngine")
 
     # endregion
 
