@@ -94,16 +94,20 @@ class TradingEngine:
         # REGISTRIES
         # Brokers
         self._brokers_by_name_bidict: bidict[str, Broker] = bidict()
+
         # Strategies
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
         self._clocks_by_strategy: dict[Strategy, StrategyClocks] = {}
-        self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
+
         # EventFeedProviders & EventFeeds
         self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
         self._event_feeds_by_strategy: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
 
         # ORDERS ROUTING
         self._routing_by_order: dict[Order, StrategyBrokerPair] = {}
+
+        # BACKTEST STATISTICS
+        self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
 
     # endregion
 
@@ -833,8 +837,6 @@ class TradingEngine:
         except Exception as e:
             logger.error(f"Error in `Strategy.on_order_updated` for Strategy named '{strategy.name}' (class {strategy.__class__.__name__}): {e}")
             self._transition_strategy_to_error(strategy, e)
-        finally:
-            self._cleanup_if_terminal(order)
 
     def _transition_strategy_to_error(self, strategy: Strategy, exc: Exception) -> None:
         """Transition Strategy to ERROR and notify via `on_error`."""
@@ -847,16 +849,5 @@ class TradingEngine:
                 strategy.on_error(exc)
             except Exception as inner:
                 logger.error(f"Error in `Strategy.on_error` for Strategy named '{strategy.name}' (class {strategy.__class__.__name__}): {inner}")
-
-    # TODO: this is unfinished, needs some thinking, how to do it well
-    def _cleanup_if_terminal(self, order: Order) -> None:
-        """Remove $order mappings if it is in a terminal state.
-
-        This placeholder will be implemented once `Order` exposes a state field.
-        """
-        # Example once states are available:
-        # if getattr(order, "state", None) in {OrderState.FILLED, OrderState.CANCELLED, OrderState.REJECTED}:
-        #     self._routing_by_order.pop(order, None)
-        return
 
     # endregion
