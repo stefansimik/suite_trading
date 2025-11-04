@@ -56,24 +56,22 @@ class SimBroker(Broker, PriceSampleProcessor):
         # CONNECTION
         self._connected: bool = False
 
-        # CALLBACKS (where this broker should propagate executions & orders-changes?)
-        self._execution_callback: Callable[[Execution], None] | None = None
-        self._order_updated_callback: Callable[[Order], None] | None = None
-
         # MODELS
         self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
         self._margin_model: MarginModel = margin_model or self._build_default_margin_model()
         self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
 
-        # ACCOUNT
-        self._account_info: Account = SimAccount(account_id="SIM")
-
-        # ORDERS
+        # ORDERS & EXECUTIONS & POSITIONS
         self._orders_by_id: dict[int, Order] = {}
-
-        # STATE
         self._executions: list[Execution] = []
         self._positions_by_instrument: dict[Instrument, Position] = {}
+
+        # Callbacks (where this broker should propagate executions & orders-changes?)
+        self._execution_callback: Callable[[Execution], None] | None = None
+        self._order_updated_callback: Callable[[Order], None] | None = None
+
+        # ACCOUNT
+        self._account_info: Account = SimAccount(account_id="SIM")
 
         # PRICE CACHE (last known price per instrument)
         self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}
