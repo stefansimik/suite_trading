@@ -160,7 +160,7 @@ class Strategy(ABC):
         if self._trading_engine is None:
             return None
 
-        return self._trading_engine._clocks_by_strategy_dict[self].last_event_time
+        return self._trading_engine._clocks_by_strategy[self].last_event_time
 
     @property
     def wall_clock_time(self) -> datetime | None:
@@ -179,7 +179,7 @@ class Strategy(ABC):
         if self._trading_engine is None:
             return None
 
-        return self._trading_engine._clocks_by_strategy_dict[self].wall_clock_time
+        return self._trading_engine._clocks_by_strategy[self].wall_clock_time
 
     # endregion
 

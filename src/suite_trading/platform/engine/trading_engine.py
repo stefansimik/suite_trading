@@ -92,21 +92,21 @@ class TradingEngine:
         self._engine_state_machine: StateMachine = create_engine_state_machine()
 
         # REGISTRIES
-        self._event_feed_providers_by_type_dict: dict[type[EventFeedProvider], EventFeedProvider] = {}
-        self._brokers_by_type_dict: dict[type[Broker], Broker] = {}
+        self._event_feed_providers_by_type: dict[type[EventFeedProvider], EventFeedProvider] = {}
+        self._brokers_by_type: dict[type[Broker], Broker] = {}
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
 
         # EVENT FEEDS
-        self._event_feeds_by_strategy_dict: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
+        self._event_feeds_by_strategy: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
 
         # CLOCKS
-        self._clocks_by_strategy_dict: dict[Strategy, StrategyClocks] = {}
+        self._clocks_by_strategy: dict[Strategy, StrategyClocks] = {}
 
         # ROUTING
-        self._routing_by_order_dict: dict[Order, StrategyBrokerPair] = {}
+        self._routing_by_order: dict[Order, StrategyBrokerPair] = {}
 
         # EXECUTIONS
-        self._executions_by_strategy_name_dict: dict[str, list[Execution]] = {}
+        self._executions_by_strategy_name: dict[str, list[Execution]] = {}
 
     # endregion
 
@@ -136,10 +136,10 @@ class TradingEngine:
         """
         key = type(provider)
         # Check: only one provider per concrete class
-        if key in self._event_feed_providers_by_type_dict:
+        if key in self._event_feed_providers_by_type:
             raise ValueError(f"Cannot call `add_event_feed_provider` because a provider of class {key.__name__} is already added to this TradingEngine")
 
-        self._event_feed_providers_by_type_dict[key] = provider
+        self._event_feed_providers_by_type[key] = provider
         logger.debug(f"Added event feed provider of class {key.__name__}")
 
     def remove_event_feed_provider(self, provider_type: type[EventFeedProvider]) -> None:
@@ -152,10 +152,10 @@ class TradingEngine:
             KeyError: If no provider of the given class exists.
         """
         # Check: provider type must be added before removing
-        if provider_type not in self._event_feed_providers_by_type_dict:
+        if provider_type not in self._event_feed_providers_by_type:
             raise KeyError(f"Cannot call `remove_event_feed_provider` because $provider_type ('{provider_type.__name__}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.")
 
-        del self._event_feed_providers_by_type_dict[provider_type]
+        del self._event_feed_providers_by_type[provider_type]
         logger.debug(f"Removed event feed provider of class {provider_type.__name__}")
 
     @property
@@ -165,7 +165,7 @@ class TradingEngine:
         Returns:
             dict[type[EventFeedProvider], EventFeedProvider]: Mapping from provider class to instance.
         """
-        return self._event_feed_providers_by_type_dict
+        return self._event_feed_providers_by_type
 
     # endregion
 
@@ -183,10 +183,10 @@ class TradingEngine:
         broker_type = type(broker)
 
         # Check: only one broker per concrete class
-        if broker_type in self._brokers_by_type_dict:
+        if broker_type in self._brokers_by_type:
             raise ValueError(f"Cannot call `add_broker` because a broker of class {broker_type.__name__} is already added to this TradingEngine")
 
-        self._brokers_by_type_dict[broker_type] = broker
+        self._brokers_by_type[broker_type] = broker
         broker.set_callbacks(self._route_broker_execution_to_strategy, self._route_broker_order_update_to_strategy)
         logger.debug(f"Broker (class {broker_type.__name__}) was added to {TradingEngine.__name__}.")
 
@@ -202,10 +202,10 @@ class TradingEngine:
             KeyError: If no broker of the given class exists.
         """
         # Check: broker type must be added before removing
-        if broker_type not in self._brokers_by_type_dict:
+        if broker_type not in self._brokers_by_type:
             raise KeyError(f"Cannot call `remove_broker` because $broker_type ('{broker_type.__name__}') is not added to this TradingEngine. Add the broker using `add_broker` first.")
 
-        del self._brokers_by_type_dict[broker_type]
+        del self._brokers_by_type[broker_type]
         logger.debug(f"Removed broker of class {broker_type.__name__}")
 
     @property
@@ -215,7 +215,7 @@ class TradingEngine:
         Returns:
             dict[type[Broker], Broker]: Mapping from broker class to instance.
         """
-        return self._brokers_by_type_dict
+        return self._brokers_by_type
 
     # endregion
 
@@ -248,13 +248,13 @@ class TradingEngine:
         self._strategies_by_name_bidict[name] = strategy
 
         # Set up clocks tracking for this strategy
-        self._clocks_by_strategy_dict[strategy] = StrategyClocks()
+        self._clocks_by_strategy[strategy] = StrategyClocks()
 
         # Set up EventFeed tracking for this strategy
-        self._event_feeds_by_strategy_dict[strategy] = {}
+        self._event_feeds_by_strategy[strategy] = {}
 
         # Set up execution tracking for this strategy
-        self._executions_by_strategy_name_dict[name] = []
+        self._executions_by_strategy_name[name] = []
 
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
@@ -348,15 +348,15 @@ class TradingEngine:
             raise ValueError(f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}")
 
         # Remove clocks tracking for this strategy
-        if strategy in self._clocks_by_strategy_dict:
-            del self._clocks_by_strategy_dict[strategy]
+        if strategy in self._clocks_by_strategy:
+            del self._clocks_by_strategy[strategy]
 
         # Remove EventFeed tracking for this strategy
-        del self._event_feeds_by_strategy_dict[strategy]
+        del self._event_feeds_by_strategy[strategy]
 
         # Remove execution tracking for this strategy
-        if name in self._executions_by_strategy_name_dict:
-            del self._executions_by_strategy_name_dict[name]
+        if name in self._executions_by_strategy_name:
+            del self._executions_by_strategy_name[name]
 
         # Remove from strategies' dictionary
         del self._strategies_by_name_bidict[name]
@@ -395,10 +395,10 @@ class TradingEngine:
             KeyError: If $strategy_name is not registered.
         """
         # Check: ensure $strategy_name exists
-        if strategy_name not in self._executions_by_strategy_name_dict:
+        if strategy_name not in self._executions_by_strategy_name:
             raise KeyError(f"Cannot call `list_executions_for_strategy` because Strategy named '{strategy_name}' is not registered")
 
-        return list(self._executions_by_strategy_name_dict[strategy_name])
+        return list(self._executions_by_strategy_name[strategy_name])
 
     # endregion
 
@@ -414,16 +414,16 @@ class TradingEngine:
             valid_actions = [a.value for a in self._engine_state_machine.list_valid_actions()]
             raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
 
-        logger.info(f"Starting TradingEngine: {len(self._event_feed_providers_by_type_dict)} event-feed-provider(s), {len(self._brokers_by_type_dict)} broker(s), {len(self._strategies_by_name_bidict)} strategy(ies)")
+        logger.info(f"Starting TradingEngine: {len(self._event_feed_providers_by_type)} event-feed-provider(s), {len(self._brokers_by_type)} broker(s), {len(self._strategies_by_name_bidict)} strategy(ies)")
 
         try:
             # Connect event-feed-providers first
-            for provider_type, provider in self._event_feed_providers_by_type_dict.items():
+            for provider_type, provider in self._event_feed_providers_by_type.items():
                 provider.connect()
                 logger.info(f"Connected event feed provider {provider_type.__name__}")
 
             # Connect brokers second
-            for broker_type, broker in self._brokers_by_type_dict.items():
+            for broker_type, broker in self._brokers_by_type.items():
                 broker.connect()
                 logger.info(f"Connected broker {broker_type.__name__}")
 
@@ -475,14 +475,14 @@ class TradingEngine:
 
             # Second: Disconnect brokers
             disconnected_brokers = 0
-            for broker_type, broker in self._brokers_by_type_dict.items():
+            for broker_type, broker in self._brokers_by_type.items():
                 broker.disconnect()
                 logger.info(f"Disconnected broker {broker_type.__name__}")
                 disconnected_brokers += 1
 
             # Last: Disconnect event-feed-providers
             disconnected_providers = 0
-            for provider_type, provider in self._event_feed_providers_by_type_dict.items():
+            for provider_type, provider in self._event_feed_providers_by_type.items():
                 provider.disconnect()
                 logger.info(f"Disconnected event-feed-provider {provider_type.__name__}")
                 disconnected_providers += 1
@@ -534,7 +534,7 @@ class TradingEngine:
                     next_event = feed.pop()
 
                     # Update clocks for this strategy
-                    self._clocks_by_strategy_dict[strategy].update_on_event(next_event.dt_event, next_event.dt_received)
+                    self._clocks_by_strategy[strategy].update_on_event(next_event.dt_event, next_event.dt_received)
 
                     # Process event in its callback
                     try:
@@ -550,7 +550,7 @@ class TradingEngine:
 
                     # Route Events of type PriceSampleIterable to all capable brokers
                     if isinstance(next_event, PriceSampleIterable):
-                        brokers = self._brokers_by_type_dict.values()
+                        brokers = self._brokers_by_type.values()
                         processors = [b for b in brokers if isinstance(b, PriceSampleProcessor)]
 
                         for sample in next_event.iter_price_samples():
@@ -611,7 +611,7 @@ class TradingEngine:
             raise ValueError("Cannot call `add_event_feed_for_strategy` because $strategy ({strategy.__class__.__name__}) is not added to this TradingEngine. Add the strategy using `add_strategy` first.")
 
         # Check: feed_name must be unique per strategy
-        event_feeds_by_name_dict = self._event_feeds_by_strategy_dict[strategy]
+        event_feeds_by_name_dict = self._event_feeds_by_strategy[strategy]
         if feed_name in event_feeds_by_name_dict:
             raise ValueError("Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name ('{feed_name}') is already used for this strategy. Choose a different name.")
 
@@ -637,7 +637,7 @@ class TradingEngine:
         strategy_name = self._get_strategy_name(strategy)
 
         # Handle case where feed doesn't exist
-        feed_callback_tuple = self._event_feeds_by_strategy_dict[strategy].get(feed_name, None)
+        feed_callback_tuple = self._event_feeds_by_strategy[strategy].get(feed_name, None)
         feed_does_not_exist = feed_callback_tuple is None
         if feed_does_not_exist:
             logger.warning(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) cannot be removed, as there is no such EventFeed")
@@ -652,7 +652,7 @@ class TradingEngine:
             logger.error(f"Error closing EventFeed named '{feed_name}' for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")
 
         # Remove EventFeed from strategy
-        del self._event_feeds_by_strategy_dict[strategy][feed_name]
+        del self._event_feeds_by_strategy[strategy][feed_name]
         logger.info(f"EventFeed named '{feed_name}' was removed from Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
 
     # endregion
@@ -670,13 +670,13 @@ class TradingEngine:
     # region EventFeeds utils
 
     def _any_active_event_feeds_exist_for_strategy(self, strategy: Strategy):
-        strategy_has_at_least_one_active_event_feed = any(not t.feed.is_finished() for t in self._event_feeds_by_strategy_dict.get(strategy, {}).values())
+        strategy_has_at_least_one_active_event_feed = any(not t.feed.is_finished() for t in self._event_feeds_by_strategy.get(strategy, {}).values())
         return strategy_has_at_least_one_active_event_feed
 
     def _any_active_event_feeds_exist(self) -> bool:
         """Check if any event feeds across all strategies are still active (not finished)."""
         # Check each strategy's event feeds
-        for strategy_event_feeds in self._event_feeds_by_strategy_dict.values():
+        for strategy_event_feeds in self._event_feeds_by_strategy.values():
             # Check each feed for this strategy
             for feed_entry in strategy_event_feeds.values():
                 if not feed_entry.feed.is_finished():
@@ -698,7 +698,7 @@ class TradingEngine:
         winner_tuple: tuple[str, EventFeed, Callable] | None = None
 
         # Find the next feed (name, feed, callback) with the oldest available event.
-        for name, (feed, callback) in self._event_feeds_by_strategy_dict[strategy].items():
+        for name, (feed, callback) in self._event_feeds_by_strategy[strategy].items():
             event = feed.peek()
             if event is None:
                 continue
@@ -713,7 +713,7 @@ class TradingEngine:
         strategy_name = self._get_strategy_name(strategy)
 
         # Close all feeds for this Strategy
-        event_feeds_by_name_dict = self._event_feeds_by_strategy_dict[strategy]
+        event_feeds_by_name_dict = self._event_feeds_by_strategy[strategy]
         for name, (feed, _) in list(event_feeds_by_name_dict.items()):
             try:
                 feed.close()
@@ -740,13 +740,13 @@ class TradingEngine:
             ValueError: If the order is invalid or cannot be submitted, or if $order is re-owned.
         """
         # Check: do not remap an already submitted order to a different owner
-        existing_route = self._routing_by_order_dict.get(order)
+        existing_route = self._routing_by_order.get(order)
         if existing_route is not None and existing_route.strategy is not strategy:
             owner_name = self._get_strategy_name(existing_route.strategy)
             raise ValueError(f"Cannot call `submit_order` because Order $order_id ('{order.order_id}') is already owned by Strategy named '{owner_name}'")
 
         # Record routing: Strategy is origin (receives callbacks), Broker is executor
-        self._routing_by_order_dict[order] = StrategyBrokerPair(strategy=strategy, broker=broker)
+        self._routing_by_order[order] = StrategyBrokerPair(strategy=strategy, broker=broker)
         # Delegate to broker
         broker.submit_order(order)
 
@@ -786,7 +786,7 @@ class TradingEngine:
         Args:
             order: The order to get routing information for.
         """
-        route: StrategyBrokerPair = self._routing_by_order_dict[order]
+        route: StrategyBrokerPair = self._routing_by_order[order]
         return route
 
     # Broker → Engine callbacks (deterministic ordering ensured by Broker)
@@ -800,7 +800,7 @@ class TradingEngine:
             self._transition_strategy_to_error(strategy, e)
 
         # Store execution for later statistics
-        self._executions_by_strategy_name_dict[strategy.name].append(execution)
+        self._executions_by_strategy_name[strategy.name].append(execution)
 
     def _route_broker_order_update_to_strategy(self, order: Order) -> None:
         """Handle order state updates from broker.
@@ -839,7 +839,7 @@ class TradingEngine:
         """
         # Example once states are available:
         # if getattr(order, "state", None) in {OrderState.FILLED, OrderState.CANCELLED, OrderState.REJECTED}:
-        #     self._routing_by_order_dict.pop(order, None)
+        #     self._routing_by_order.pop(order, None)
         return
 
     # endregion
