@@ -10,7 +10,7 @@ from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.domain.market_data.price_sample_source import PriceSampleIterable
-from suite_trading.platform.broker.capabilities import PriceSampleConsumer
+from suite_trading.platform.broker.capabilities import PriceSampleProcessor
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
@@ -96,8 +96,6 @@ class TradingEngine:
 
         # Brokers registry (type-keyed, one instance per class)
         self._brokers_by_type_dict: dict[type[Broker], Broker] = {}
-        # Brokers that consume price samples (capability-based)
-        self._price_sample_consuming_brokers: list[PriceSampleConsumer] = []
 
         # Strategies registry (bi-directional dictionary)
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
@@ -196,10 +194,7 @@ class TradingEngine:
         broker.set_callbacks(self._route_broker_execution_to_strategy, self._route_broker_order_update_to_strategy)
         logger.debug(f"Broker (class {broker_type.__name__}) was added to {TradingEngine.__name__}.")
 
-        # Register brokers that can consume PriceSample-s
-        if isinstance(broker, PriceSampleConsumer):
-            self._price_sample_consuming_brokers.append(broker)
-            logger.debug(f"Broker (class {broker_type.__name__}) was added among brokers, that consume Event-s of type {PriceSampleIterable.__name__}.")
+        # No special registration for price-sample processing; capability is checked at use-site
 
     def remove_broker(self, broker_type: type[Broker]) -> None:
         """Remove a broker by type.
@@ -559,8 +554,11 @@ class TradingEngine:
 
                     # Route Events of type PriceSampleIterable to all capable brokers
                     if isinstance(next_event, PriceSampleIterable):
+                        brokers = self._brokers_by_type_dict.values()
+                        processors = [b for b in brokers if isinstance(b, PriceSampleProcessor)]
+
                         for sample in next_event.iter_price_samples():
-                            for broker in self._price_sample_consuming_brokers:
+                            for broker in processors:
                                 broker.process_price_sample(sample)
 
                     # Notify EventFeed listeners after strategy callback.

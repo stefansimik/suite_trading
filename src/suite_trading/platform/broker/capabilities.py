@@ -7,15 +7,15 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class PriceSampleConsumer(Protocol):
-    """Capability marker for brokers that consume price samples to drive order/price matching.
+class PriceSampleProcessor(Protocol):
+    """Capability marker for component that can process price samples.
 
-    Implement on simulated brokers that need to turn prices into order-executions and order-state updates.
+     Common example is `SimBroker`, that consumes PriceSample's to drive order/price matching.
 
     Args:
         sample (PriceSample): Latest price sample for an instrument.
     """
 
     def process_price_sample(self, sample: PriceSample) -> None:
-        """Consume $sample to advance broker's matching logic."""
+        """Consume and process $sample"""
         ...

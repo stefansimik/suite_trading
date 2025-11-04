@@ -14,7 +14,7 @@ from suite_trading.domain.order.order_state import OrderAction, OrderStateCatego
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import PriceSampleConsumer
+from suite_trading.platform.broker.capabilities import PriceSampleProcessor
 from suite_trading.platform.broker.sim.models.market_depth.market_depth_model import MarketDepthModel
 from suite_trading.platform.broker.sim.models.market_depth.zero_spread import ZeroSpreadMarketDepthModel
 from suite_trading.platform.broker.sim.models.fee.fee_model import FeeModel
@@ -29,10 +29,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SimBroker(Broker, PriceSampleConsumer):
+class SimBroker(Broker, PriceSampleProcessor):
     """Simulated broker for backtesting/paper trading.
 
-    Public API is grouped under `Protocol Broker` and `Protocol PriceSampleConsumer` regions; other
+    Public API is grouped under `Protocol Broker` and `Protocol PriceSampleProcessor` regions; other
     methods are under `Utilities` per AGENTS.md (sections 8.1, 8.4, 8.5, 8.6).
     """
 
@@ -53,7 +53,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         # CONNECTION
         self._connected: bool = False
 
-        # ORDERS API (BROKER)
+        # ORDERS
         self._orders_by_id: dict[str, Order] = {}
 
         # Engine callbacks (set via `set_callbacks`)
@@ -67,7 +67,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         # ACCOUNT API
         self._account_info: Account = SimAccount(account_id="SIM", initial_available_money_by_currency={})
 
-        # FILL MODEL
+        # MODELS
         self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
         self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
         self._margin_model: MarginModel = self._build_default_margin_model()
@@ -247,7 +247,7 @@ class SimBroker(Broker, PriceSampleConsumer):
 
     # endregion
 
-    # region Protocol PriceSampleConsumer
+    # region Protocol PriceSampleProcessor
 
     # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
     def process_price_sample(self, sample: PriceSample) -> None:
