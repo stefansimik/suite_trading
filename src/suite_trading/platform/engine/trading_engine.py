@@ -93,7 +93,7 @@ class TradingEngine:
 
         # REGISTRIES
         self._event_feed_providers_by_type: dict[type[EventFeedProvider], EventFeedProvider] = {}
-        self._brokers_by_type: dict[type[Broker], Broker] = {}
+        self._brokers_by_name_bidict: bidict[str, Broker] = bidict()
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
 
         # EVENT FEEDS
@@ -171,51 +171,54 @@ class TradingEngine:
 
     # region Brokers
 
-    def add_broker(self, broker: Broker) -> None:
-        """Add a broker (one per broker class).
+    def add_broker(self, name: str, broker: Broker) -> None:
+        """Add a Broker by name (one unique name per engine).
 
         Args:
-            broker: The broker instance to add.
+            name: Unique broker name within this TradingEngine.
+            broker: The Broker instance to add.
 
         Raises:
-            ValueError: If a broker of the same class was already added.
+            ValueError: If a Broker with the same $name is already added.
         """
-        broker_type = type(broker)
+        # Check: broker name must be unique and not already added
+        if name in self._brokers_by_name_bidict:
+            raise ValueError(f"Cannot call `add_broker` because Broker named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
-        # Check: only one broker per concrete class
-        if broker_type in self._brokers_by_type:
-            raise ValueError(f"Cannot call `add_broker` because a broker of class {broker_type.__name__} is already added to this TradingEngine")
-
-        self._brokers_by_type[broker_type] = broker
+        self._brokers_by_name_bidict[name] = broker
         broker.set_callbacks(self._route_broker_execution_to_strategy, self._route_broker_order_update_to_strategy)
-        logger.debug(f"Broker (class {broker_type.__name__}) was added to {TradingEngine.__name__}.")
+        logger.debug(f"TradingEngine added Broker named '{name}' (class {broker.__class__.__name__})")
 
         # No special registration for price-sample processing; capability is checked at use-site
 
-    def remove_broker(self, broker_type: type[Broker]) -> None:
-        """Remove a broker by type.
+    def remove_broker(self, name: str) -> None:
+        """Remove a Broker by name.
 
         Args:
-            broker_type: The broker class to remove.
+            name: The broker name to remove.
 
         Raises:
-            KeyError: If no broker of the given class exists.
+            KeyError: If no Broker with the given $name exists.
         """
-        # Check: broker type must be added before removing
-        if broker_type not in self._brokers_by_type:
-            raise KeyError(f"Cannot call `remove_broker` because $broker_type ('{broker_type.__name__}') is not added to this TradingEngine. Add the broker using `add_broker` first.")
+        # Check: broker name must be added before removing
+        if name not in self._brokers_by_name_bidict:
+            raise KeyError(f"Cannot call `remove_broker` because broker name $name ('{name}') is not added to this TradingEngine. Add the broker using `add_broker` first.")
 
-        del self._brokers_by_type[broker_type]
-        logger.debug(f"Removed broker of class {broker_type.__name__}")
+        del self._brokers_by_name_bidict[name]
+        logger.debug(f"Removed Broker named '{name}'")
 
     @property
-    def brokers(self) -> dict[type[Broker], Broker]:
-        """Get all brokers keyed by broker type.
+    def brokers(self) -> bidict[str, Broker]:
+        """Get all Brokers keyed by name.
 
         Returns:
-            dict[type[Broker], Broker]: Mapping from broker class to instance.
+            bidict[str, Broker]: Bi-directional mapping from broker name to instance.
         """
-        return self._brokers_by_type
+        return self._brokers_by_name_bidict
+
+    def list_broker_names(self) -> list[str]:
+        """List names of all registered Brokers in registration order."""
+        return list(self._brokers_by_name_bidict.keys())
 
     # endregion
 
@@ -414,7 +417,7 @@ class TradingEngine:
             valid_actions = [a.value for a in self._engine_state_machine.list_valid_actions()]
             raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
 
-        logger.info(f"Starting TradingEngine: {len(self._event_feed_providers_by_type)} event-feed-provider(s), {len(self._brokers_by_type)} broker(s), {len(self._strategies_by_name_bidict)} strategy(ies)")
+        logger.info(f"Starting TradingEngine: {len(self._event_feed_providers_by_type)} event-feed-provider(s), {len(self._brokers_by_name_bidict)} broker(s), {len(self._strategies_by_name_bidict)} strategy(ies)")
 
         try:
             # Connect event-feed-providers first
@@ -423,9 +426,9 @@ class TradingEngine:
                 logger.info(f"Connected event feed provider {provider_type.__name__}")
 
             # Connect brokers second
-            for broker_type, broker in self._brokers_by_type.items():
+            for broker_name, broker in self._brokers_by_name_bidict.items():
                 broker.connect()
-                logger.info(f"Connected broker {broker_type.__name__}")
+                logger.info(f"Connected Broker named '{broker_name}' (class {broker.__class__.__name__})")
 
             # Start strategies last
             started = 0
@@ -475,9 +478,9 @@ class TradingEngine:
 
             # Second: Disconnect brokers
             disconnected_brokers = 0
-            for broker_type, broker in self._brokers_by_type.items():
+            for broker_name, broker in self._brokers_by_name_bidict.items():
                 broker.disconnect()
-                logger.info(f"Disconnected broker {broker_type.__name__}")
+                logger.info(f"Disconnected Broker named '{broker_name}' (class {broker.__class__.__name__})")
                 disconnected_brokers += 1
 
             # Last: Disconnect event-feed-providers
@@ -550,7 +553,7 @@ class TradingEngine:
 
                     # Route Events of type PriceSampleIterable to all capable brokers
                     if isinstance(next_event, PriceSampleIterable):
-                        brokers = self._brokers_by_type.values()
+                        brokers = self._brokers_by_name_bidict.values()
                         processors = [b for b in brokers if isinstance(b, PriceSampleProcessor)]
 
                         for sample in next_event.iter_price_samples():
@@ -664,6 +667,12 @@ class TradingEngine:
             return self._strategies_by_name_bidict.inv[strategy]
         except KeyError:
             raise KeyError(f"Cannot call `_get_strategy_name` because $strategy (class {strategy.__class__.__name__}) is not registered in this TradingEngine")
+
+    def _get_broker_name(self, broker: Broker) -> str:
+        try:
+            return self._brokers_by_name_bidict.inv[broker]
+        except KeyError:
+            raise KeyError(f"Cannot call `_get_broker_name` because $broker (class {broker.__class__.__name__}) is not registered in this TradingEngine")
 
     # endregion
 

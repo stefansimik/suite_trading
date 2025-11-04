@@ -75,7 +75,7 @@ def test_two_trade_demo_strategy_steps_0_and_1():
     # Arrange: engine + SimBroker + strategy
     engine = TradingEngine()
     broker = SimBroker()
-    engine.add_broker(broker)
+    engine.add_broker("sim_broker", broker)
 
     strategy = TwoTradeDemoStrategy(name="two_trade_demo_strategy", broker=broker)
     engine.add_strategy(strategy)
