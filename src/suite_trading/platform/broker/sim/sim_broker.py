@@ -5,7 +5,8 @@ from typing import Callable, TYPE_CHECKING
 from decimal import Decimal
 import logging
 
-from suite_trading.domain.account_info import AccountInfo
+from suite_trading.platform.broker.account import Account
+from suite_trading.platform.broker.sim.sim_account import SimAccount
 from suite_trading.domain.market_data.price_sample import PriceSample
 from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.order.orders import Order, MarketOrder
@@ -64,10 +65,7 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._positions_by_instrument: dict[Instrument, Position] = {}
 
         # ACCOUNT API
-        self._account_info: AccountInfo = AccountInfo(
-            account_id="SIM",
-            initial_available_money_by_currency={},
-        )
+        self._account_info: Account = SimAccount(account_id="SIM", initial_available_money_by_currency={})
 
         # FILL MODEL
         self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
@@ -238,8 +236,8 @@ class SimBroker(Broker, PriceSampleConsumer):
         """
         return self._positions_by_instrument.get(instrument)
 
-    def get_account_info(self) -> AccountInfo:
-        """Implements: Broker.get_account_info
+    def get_account(self) -> Account:
+        """Implements: Broker.get_account
 
         Return account snapshot.
 
@@ -334,7 +332,7 @@ class SimBroker(Broker, PriceSampleConsumer):
                     # Record execution and update position (commission already set)
                     self._record_execution_and_update_position(execution)
 
-                    # TODO(sim-broker-fees): apply $execution.commission to AccountInfo funds in its currency
+                    # TODO(sim-broker-fees): apply $execution.commission to Account funds in its currency
 
                     # 1) Always return any initial margin to available money for this instrument
                     self._account_info.unblock_all_initial_margin_for_instrument(order.instrument)

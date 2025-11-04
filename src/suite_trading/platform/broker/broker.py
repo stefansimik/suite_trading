@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable, TYPE_CHECKING, Callable
 
-from suite_trading.domain.account_info import AccountInfo
+from suite_trading.platform.broker.account import Account
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.position import Position
 
@@ -183,11 +183,11 @@ class Broker(Protocol):
 
     # region Account
 
-    def get_account_info(self) -> AccountInfo:
+    def get_account(self) -> Account:
         """Return current account information (balances, margins, etc.).
 
         Returns:
-            AccountInfo: Snapshot of account state.
+            Account: Snapshot of account state.
 
         Raises:
             ConnectionError: If not connected (for live brokers).
