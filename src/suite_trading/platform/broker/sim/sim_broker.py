@@ -49,30 +49,32 @@ class SimBroker(Broker, PriceSampleProcessor):
         Args:
             depth_model: MarketDepthModel used for matching. If None, a default model is built by
                 `_build_default_market_depth_model()`.
+            fee_model: FeeModel used to compute commissions. If None, defaults to zero per-unit
+                commission via `_build_default_fee_model()`.
         """
         # CONNECTION
         self._connected: bool = False
 
-        # ORDERS
-        self._orders_by_id: dict[str, Order] = {}
-
-        # Engine callbacks (set via `set_callbacks`)
+        # CALLBACKS (where this broker should propagate executions & orders-changes?)
         self._execution_callback: Callable[[Execution], None] | None = None
         self._order_updated_callback: Callable[[Order], None] | None = None
 
-        # STATE: Executions and Positions
+        # MODELS
+        self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
+        self._margin_model: MarginModel = self._build_default_margin_model()
+        self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
+
+        # ACCOUNT
+        self._account_info: Account = SimAccount(account_id="SIM")
+
+        # ORDERS
+        self._orders_by_id: dict[int, Order] = {}
+
+        # STATE
         self._executions: list[Execution] = []
         self._positions_by_instrument: dict[Instrument, Position] = {}
 
-        # ACCOUNT API
-        self._account_info: Account = SimAccount(account_id="SIM", initial_available_money_by_currency={})
-
-        # MODELS
-        self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
-        self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
-        self._margin_model: MarginModel = self._build_default_margin_model()
-
-        # Known prices per instrument (populated in `process_price_sample`)
+        # PRICE CACHE (last known price per instrument)
         self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}
 
     # endregion

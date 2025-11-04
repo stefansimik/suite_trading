@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 class EventFeedCallbackPair(NamedTuple):
     feed: EventFeed
-    callback: Callable
+    callback: Callable[[Event], None]
 
 
 ## StrategyBrokerPair moved to routing module to avoid duplication and engine coupling.
@@ -88,28 +88,24 @@ class TradingEngine:
     def __init__(self):
         """Create a new TradingEngine."""
 
-        # Engine state machine
+        # STATE
         self._engine_state_machine: StateMachine = create_engine_state_machine()
 
-        # EventFeedProvider registry (type-keyed, one instance per class)
+        # REGISTRIES
         self._event_feed_providers_by_type_dict: dict[type[EventFeedProvider], EventFeedProvider] = {}
-
-        # Brokers registry (type-keyed, one instance per class)
         self._brokers_by_type_dict: dict[type[Broker], Broker] = {}
-
-        # Strategies registry (bi-directional dictionary)
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
 
-        # EventFeeds per Strategy: strategy -> { feed_name: FeedAndCallbackTuple }
+        # EVENT FEEDS
         self._event_feeds_by_strategy_dict: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
 
-        # Tracks per-strategy clocks (last_event and wall-clock)
+        # CLOCKS
         self._clocks_by_strategy_dict: dict[Strategy, StrategyClocks] = {}
 
-        # Keep relation of Order to: Strategy + Broker
+        # ROUTING
         self._routing_by_order_dict: dict[Order, StrategyBrokerPair] = {}
 
-        # Track executions per Strategy for later statistics
+        # EXECUTIONS
         self._executions_by_strategy_name_dict: dict[str, list[Execution]] = {}
 
     # endregion
