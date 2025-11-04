@@ -143,9 +143,7 @@ class TradingEngine:
         key = type(provider)
         # Check: only one provider per concrete class
         if key in self._event_feed_providers_by_type_dict:
-            raise ValueError(
-                f"Cannot call `add_event_feed_provider` because a provider of class {key.__name__} is already added to this TradingEngine",
-            )
+            raise ValueError(f"Cannot call `add_event_feed_provider` because a provider of class {key.__name__} is already added to this TradingEngine")
 
         self._event_feed_providers_by_type_dict[key] = provider
         logger.debug(f"Added event feed provider of class {key.__name__}")
@@ -161,9 +159,7 @@ class TradingEngine:
         """
         # Check: provider type must be added before removing
         if provider_type not in self._event_feed_providers_by_type_dict:
-            raise KeyError(
-                f"Cannot call `remove_event_feed_provider` because $provider_type ('{provider_type.__name__}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.",
-            )
+            raise KeyError(f"Cannot call `remove_event_feed_provider` because $provider_type ('{provider_type.__name__}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.")
 
         del self._event_feed_providers_by_type_dict[provider_type]
         logger.debug(f"Removed event feed provider of class {provider_type.__name__}")
