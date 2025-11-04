@@ -141,7 +141,7 @@ class Broker(Protocol):
         """
         ...
 
-    def get_order(self, order_id: int) -> Order | None:
+    def get_order(self, order_id: str) -> Order | None:
         """Retrieve a single Order by $order_id, or None if not found.
 
         Args:

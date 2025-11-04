@@ -62,7 +62,7 @@ class SimBroker(Broker, PriceSampleProcessor):
         self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
 
         # ORDERS & EXECUTIONS & POSITIONS
-        self._orders_by_id: dict[int, Order] = {}
+        self._orders_by_id: dict[str, Order] = {}
         self._executions: list[Execution] = []
         self._positions_by_instrument: dict[Instrument, Position] = {}
 
@@ -202,7 +202,7 @@ class SimBroker(Broker, PriceSampleProcessor):
 
         return result
 
-    def get_order(self, order_id: int) -> Order | None:
+    def get_order(self, order_id: str) -> Order | None:
         """Implements: `Broker.get_order`.
 
         Args:
