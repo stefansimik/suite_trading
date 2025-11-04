@@ -42,6 +42,7 @@ class SimBroker(Broker, PriceSampleProcessor):
         self,
         *,
         depth_model: MarketDepthModel | None = None,
+        margin_model: MarginModel | None = None,
         fee_model: FeeModel | None = None,
     ) -> None:
         """Create a simulation broker.
@@ -61,7 +62,7 @@ class SimBroker(Broker, PriceSampleProcessor):
 
         # MODELS
         self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
-        self._margin_model: MarginModel = self._build_default_margin_model()
+        self._margin_model: MarginModel = margin_model or self._build_default_margin_model()
         self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
 
         # ACCOUNT
