@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Callable, TYPE_CHECKING
 from decimal import Decimal
 import logging
@@ -21,7 +21,6 @@ from suite_trading.platform.broker.sim.models.fee.fixed_fee_model import FixedFe
 from suite_trading.domain.monetary.money import Money
 from suite_trading.platform.broker.sim.models.margin.margin_model import MarginModel
 from suite_trading.platform.broker.sim.models.margin.fixed_ratio_margin_model import FixedRatioMarginModel
-from suite_trading.domain.account_info import Funds
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
@@ -65,7 +64,10 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._positions_by_instrument: dict[Instrument, Position] = {}
 
         # ACCOUNT API
-        self._account_info: AccountInfo = AccountInfo(account_id="SIM", funds_by_currency={}, last_update_dt=datetime.now(timezone.utc))
+        self._account_info: AccountInfo = AccountInfo(
+            account_id="SIM",
+            initial_available_money_by_currency={},
+        )
 
         # FILL MODEL
         self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
@@ -285,14 +287,14 @@ class SimBroker(Broker, PriceSampleConsumer):
                 )
 
                 if additional_exposure_quantity > 0:
-                    initial_margin = self._margin_model.compute_initial_margin(
+                    initial_margin_amount = self._margin_model.compute_initial_margin(
                         instrument=order.instrument,
                         trade_quantity=additional_exposure_quantity,
                         is_buy=order.is_buy,
                         timestamp=sample.dt_event,
                     )
 
-                    if not self._can_lock_initial_margin(initial_margin):
+                    if not self._account_info.has_enough_available_money(initial_margin_amount):
                         logger.error(f"Insufficient initial margin for Order $order_id ('{order.order_id}'); blocking execution and cancelling order")
                         self._handle_initial_margin_insufficient(
                             order=order,
@@ -304,40 +306,62 @@ class SimBroker(Broker, PriceSampleConsumer):
                         )
                         continue  # skip normal fill path entirely
 
-                    self._lock_initial_margin(initial_margin)
+                    self._account_info.block_initial_margin_for_instrument(order.instrument, initial_margin_amount)
+                else:
+                    initial_margin_amount = None  # type: ignore[assignment]
 
-                # Commission: compute with snapshot of previous executions (excludes current)
-                previous_executions = tuple(self._executions)
-                commission = self._fee_model.compute_commission(
-                    order=order,
-                    price=execution_price,
-                    quantity=quantity_to_fill,
-                    timestamp=sample.dt_event,
-                    previous_executions=previous_executions,
-                )
+                # Perform the rest of the fill path with a safeguard: if anything fails after
+                # blocking initial margin, release that same initial margin back to available money.
+                try:
+                    # Commission: compute with snapshot of previous executions (excludes current)
+                    previous_executions = tuple(self._executions)
+                    commission = self._fee_model.compute_commission(
+                        order=order,
+                        price=execution_price,
+                        quantity=quantity_to_fill,
+                        timestamp=sample.dt_event,
+                        previous_executions=previous_executions,
+                    )
 
-                # Create and record Execution via Order (Order assigns execution_id and updates state)
-                execution, changed_order_state = order.add_execution(
-                    quantity=quantity_to_fill,
-                    price=execution_price,
-                    timestamp=sample.dt_event,
-                    commission=commission,
-                )
+                    # Create and record Execution via Order (Order assigns execution_id and updates state)
+                    execution, changed_order_state = order.add_execution(
+                        quantity=quantity_to_fill,
+                        price=execution_price,
+                        timestamp=sample.dt_event,
+                        commission=commission,
+                    )
 
-                # Record execution and update position (commission already set)
-                self._record_execution_and_update_position(execution)
+                    # Record execution and update position (commission already set)
+                    self._record_execution_and_update_position(execution)
 
-                # TODO(sim-broker-fees): apply $execution.commission to AccountInfo funds in its currency
+                    # TODO(sim-broker-fees): apply $execution.commission to AccountInfo funds in its currency
 
-                # Maintenance margin reconciliation after successful fills
-                self._update_maintenance_margin(order.instrument, sample.dt_event)
+                    # 1) Always return any initial margin to available money for this instrument
+                    self._account_info.unblock_all_initial_margin_for_instrument(order.instrument)
 
-                # PUBLISH: Execution first, then Order update if state changed
-                self._execution_callback(execution)
-                if changed_order_state is not None:
-                    self._order_updated_callback(order)
+                    # 2) Compute and set maintenance margin for the full net position
+                    net_position_quantity_after_trade = self._positions_by_instrument[order.instrument].quantity if order.instrument in self._positions_by_instrument else Decimal("0")
+                    maintenance_margin_amount = self._margin_model.compute_maintenance_margin(
+                        instrument=order.instrument,
+                        net_position_quantity=net_position_quantity_after_trade,
+                        timestamp=sample.dt_event,
+                    )
+                    self._account_info.set_maintenance_margin_for_instrument_position(
+                        order.instrument,
+                        maintenance_margin_amount,
+                    )
 
-        return
+                    # PUBLISH: Execution first, then Order update if state changed
+                    self._execution_callback(execution)
+                    if changed_order_state is not None:
+                        self._order_updated_callback(order)
+                except Exception:
+                    # If we had previously blocked initial margin, release the same amount back
+                    if additional_exposure_quantity > 0 and initial_margin_amount is not None:
+                        self._account_info.unblock_initial_margin_for_instrument(order.instrument, initial_margin_amount)
+                    raise
+
+                return
 
     # endregion
 
@@ -354,9 +378,9 @@ class SimBroker(Broker, PriceSampleConsumer):
         new_state = order.state
         if new_state != previous_state:
             # Check: ensure callback was provided before invoking to avoid calling None
-            cb = self._order_updated_callback
-            if cb is not None:
-                cb(order)
+            order_updated_callback = self._order_updated_callback
+            if order_updated_callback is not None:
+                order_updated_callback(order)
 
     # Prices & positions
     def _has_price_for_instrument(self, instrument: Instrument) -> bool:
@@ -379,37 +403,37 @@ class SimBroker(Broker, PriceSampleConsumer):
         self._executions.append(execution)
 
         # Update position for this instrument
-        prev_pos: Position | None = self._positions_by_instrument.get(instrument)
-        prev_qty: Decimal = Decimal("0") if prev_pos is None else prev_pos.quantity
-        prev_avg: Decimal = Decimal("0") if prev_pos is None else prev_pos.average_price
+        previous_position: Position | None = self._positions_by_instrument.get(instrument)
+        previous_quantity: Decimal = Decimal("0") if previous_position is None else previous_position.quantity
+        previous_average_price: Decimal = Decimal("0") if previous_position is None else previous_position.average_price
 
-        new_qty: Decimal = prev_qty + signed_qty
+        new_quantity: Decimal = previous_quantity + signed_qty
 
-        if new_qty == 0:
+        if new_quantity == 0:
             # Flat after this trade → drop stored position to keep list_open_positions() minimal
             self._positions_by_instrument.pop(instrument, None)
         else:
             # Determine whether we remain on the same side (long/short) after applying the trade
-            same_side = (prev_qty == 0) or (prev_qty > 0 and new_qty > 0) or (prev_qty < 0 and new_qty < 0)
-            if same_side and prev_qty != 0:
+            remains_on_same_side = (previous_quantity == 0) or (previous_quantity > 0 and new_quantity > 0) or (previous_quantity < 0 and new_quantity < 0)
+            if remains_on_same_side and previous_quantity != 0:
                 # Add to existing same-side exposure → weighted average price by absolute sizes
-                new_avg = (abs(prev_qty) * prev_avg + abs(signed_qty) * trade_price) / abs(new_qty)
-            elif prev_qty == 0:
+                new_average_price = (abs(previous_quantity) * previous_average_price + abs(signed_qty) * trade_price) / abs(new_quantity)
+            elif previous_quantity == 0:
                 # Opening from flat → average equals executed price
-                new_avg = trade_price
+                new_average_price = trade_price
             else:
                 # Side flip (crosses through zero) → start fresh position at executed price
-                new_avg = trade_price
+                new_average_price = trade_price
 
             # Commit the new/updated Position for this instrument
             self._positions_by_instrument[instrument] = Position(
                 instrument=instrument,
-                quantity=new_qty,
-                average_price=new_avg,
+                quantity=new_quantity,
+                average_price=new_average_price,
                 last_update=execution.timestamp,
             )
 
-        logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={prev_qty}, new_qty={new_qty}, trade_price={trade_price}")
+        logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={previous_quantity}, new_qty={new_quantity}, trade_price={trade_price}")
 
     # Model builders (defaults)
     def _build_default_market_depth_model(self) -> MarketDepthModel:
@@ -459,68 +483,6 @@ class SimBroker(Broker, PriceSampleConsumer):
         absolute_quantity_after = abs(net_position_quantity_before + signed_trade_quantity)
         return max(Decimal("0"), Decimal(absolute_quantity_after - absolute_quantity_before))
 
-    def _get_funds_for_currency(self, currency) -> Funds:
-        """Cheap lookup of Funds for $currency.
-
-        Returns a zeroed `Funds` when the currency is not present.
-        """
-        funds = self._account_info.funds_by_currency.get(currency)
-        if funds is None:
-            return Funds(available=Decimal("0"), locked=Decimal("0"))
-        return Funds(available=Decimal(funds.available), locked=Decimal(funds.locked))
-
-    def _set_funds_for_currency(self, currency, available: Decimal, locked: Decimal) -> None:
-        self._account_info.funds_by_currency[currency] = Funds(available=Decimal(available), locked=Decimal(locked))
-        # Keep last_update_dt unchanged here; engine may advance it elsewhere
-
-    def _can_lock_initial_margin(self, initial_margin: Money) -> bool:
-        """Return True when $available covers $initial_margin.value in the same currency."""
-        funds = self._get_funds_for_currency(initial_margin.currency)
-        return funds.available >= initial_margin.value
-
-    def _lock_initial_margin(self, initial_margin: Money) -> None:
-        funds = self._get_funds_for_currency(initial_margin.currency)
-        self._set_funds_for_currency(
-            initial_margin.currency,
-            funds.available - initial_margin.value,
-            funds.locked + initial_margin.value,
-        )
-
-    def _update_maintenance_margin(self, instrument: Instrument, timestamp: datetime) -> None:
-        """Compute maintenance margin for $instrument at $timestamp and apply the lock."""
-        sample = self._latest_price_sample_by_instrument.get(instrument)
-
-        # Check: ensure we have a recent price before recomputing maintenance margin to avoid using 0
-        if sample is None:
-            logger.debug(f"Skip maintenance margin for Instrument '{instrument}' due to missing price")
-            return
-        net_position_quantity = self._positions_by_instrument.get(instrument).quantity if instrument in self._positions_by_instrument else Decimal("0")
-        maintenance_margin = self._margin_model.compute_maintenance_margin(
-            instrument,
-            net_position_quantity,
-            timestamp,
-        )
-        self._set_maintenance_margin_lock(maintenance_margin)
-
-    # region Protocol LastPriceSampleSource
-
-    def get_last_price_sample(self, instrument: Instrument) -> PriceSample | None:
-        """Return latest known `PriceSample` for `$instrument`, or None if unknown."""
-        return self._latest_price_sample_by_instrument.get(instrument)
-
-    # endregion
-
-    def _set_maintenance_margin_lock(self, maintenance_margin: Money) -> None:
-        """Apply maintenance-margin lock by setting $locked to $maintenance_margin.value.
-
-        Keeps total funds constant by moving the difference between $available and $locked.
-        """
-        funds = self._get_funds_for_currency(maintenance_margin.currency)
-        total = funds.available + funds.locked
-        new_locked = maintenance_margin.value
-        new_available = total - new_locked
-        self._set_funds_for_currency(maintenance_margin.currency, new_available, new_locked)
-
     def _handle_initial_margin_insufficient(
         self,
         order: Order,
@@ -533,5 +495,13 @@ class SimBroker(Broker, PriceSampleConsumer):
         """Default policy: block execution and cancel entire $order when margin is insufficient."""
         self._change_order_state_and_notify(order, OrderAction.CANCEL)
         self._change_order_state_and_notify(order, OrderAction.ACCEPT)
+
+    # endregion
+
+    # region Protocol LastPriceSampleSource
+
+    def get_last_price_sample(self, instrument: Instrument) -> PriceSample | None:
+        """Return latest known `PriceSample` for `$instrument`, or None if unknown."""
+        return self._latest_price_sample_by_instrument.get(instrument)
 
     # endregion
