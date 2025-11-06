@@ -432,20 +432,13 @@ class Strategy(ABC):
     def on_execution(self, execution: Execution) -> None:
         """Called when an execution (fill/partial-fill) happens for $execution.order.
 
-        Default implementation is a no-op. Override in your strategy to update positions, PnL,
-        or to submit follow-up orders.
-        ```
-
         Args:
             execution: The execution that occurred.
         """
         logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received execution for Order $order_id ('{execution.order.order_id}')")
 
     def on_order_updated(self, order: Order) -> None:
-        """Called when $order changes state (Accepted, Cancelled, Rejected, etc.).
-
-        Default implementation is a no-op. Override in your strategy to react to order lifecycle
-        changes.
+        """Called when $order changes one of its attributes (most common is filled/unfilled or order-state).
 
         Args:
             order: The order that was updated.

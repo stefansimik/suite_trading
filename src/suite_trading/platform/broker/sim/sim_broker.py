@@ -9,7 +9,9 @@ from suite_trading.platform.broker.account import Account
 from suite_trading.platform.broker.sim.sim_account import SimAccount
 from suite_trading.domain.market_data.price_sample import PriceSample
 from suite_trading.domain.monetary.currency_registry import USD
-from suite_trading.domain.order.orders import Order, MarketOrder
+from suite_trading.domain.order.orders import (
+    Order,
+)
 from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
@@ -22,6 +24,10 @@ from suite_trading.platform.broker.sim.models.fee.fixed_fee_model import FixedFe
 from suite_trading.domain.monetary.money import Money
 from suite_trading.platform.broker.sim.models.margin.margin_model import MarginModel
 from suite_trading.platform.broker.sim.models.margin.fixed_ratio_margin_model import FixedRatioMarginModel
+from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
+from suite_trading.platform.broker.sim.order_matching import (
+    select_simulate_fills_function_for_order,
+)
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
@@ -71,7 +77,7 @@ class SimBroker(Broker, PriceSampleProcessor):
         self._order_updated_callback: Callable[[Order], None] | None = None
 
         # ACCOUNT
-        self._account_info: Account = SimAccount(account_id="SIM")
+        self._account: Account = SimAccount(account_id="SIM")
 
         # PRICE CACHE (last known price per instrument)
         self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}
@@ -244,7 +250,7 @@ class SimBroker(Broker, PriceSampleProcessor):
 
         TODO: Keep this updated with fees/margin impacts as executions happen.
         """
-        return self._account_info
+        return self._account
 
     # endregion
 
@@ -252,119 +258,110 @@ class SimBroker(Broker, PriceSampleProcessor):
 
     # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
     def process_price_sample(self, sample: PriceSample) -> None:
-        """Handle a new `PriceSample` and match it against active (fillable) orders to generate executions and order-state updates."""
+        """Handle a new `PriceSample` and simulate fills for fillable orders.
+
+        Stores the latest sample, builds an `OrderBook` via the depth model, selects
+        fillable orders for the instrument, then for each order simulates fills using
+        the appropriate function and applies them via the unified post-match pipeline.
+        """
+
         # Store latest sample per instrument
         self._latest_price_sample_by_instrument[sample.instrument] = sample
 
-        # Get order-book for simulation of market depth and order-fills
+        # Get order-book for fill simulation
         order_book = self._depth_model.build_simulated_order_book(sample)
 
-        # Select FILLABLE orders, that are targeting the same instrument as input price-sample
-        # Orders are processed in order how they were submitted (and added to `self._orders_by_id`)
-        orders_to_process = [order for order in self._orders_by_id.values() if order.instrument == sample.instrument and order.state_category == OrderStateCategory.FILLABLE]
+        # Select FILLABLE orders (targeting the same instrument as input price-sample)
+        orders_to_process = [order for order in self._orders_by_id.values() if (order.instrument == sample.instrument) and (order.state_category == OrderStateCategory.FILLABLE)]
 
-        # Process each order and publish (executions + order-state updates) if there are any
+        # Process each order
         for order in orders_to_process:
-            # TODO: We should add order-price matching for other order-types (e.g., LIMIT, STOP, STOP-LIMIT)
-            #   - now MARKET orders are only supported
+            # Match Order/Price -> get fill-slices
+            simulate_fill_slices_function = select_simulate_fills_function_for_order(order)
+            fill_slices: list[FillSlice] = simulate_fill_slices_function(order, order_book, sample)
+            if not fill_slices:
+                continue
 
-            # If MARKET order
-            if isinstance(order, MarketOrder):
-                # Create Execution (MARKET orders fill at best price under our simple model)
-                # TODO: Consume available liquidity levels, instead of single best bid/ask
-                best_bid_price = order_book.best_bid.price
-                best_ask_price = order_book.best_ask.price
-                execution_price = best_ask_price if order.is_buy else best_bid_price
-                quantity_to_fill = order.unfilled_quantity
-
-                # Reserve initial margin for exposure-increasing trade quantity; block-and-cancel on failure
-                net_position_quantity_before = self._positions_by_instrument.get(order.instrument).quantity if order.instrument in self._positions_by_instrument else Decimal("0")
-                additional_exposure_quantity = self._compute_additional_exposure_quantity(
-                    net_position_quantity_before,
-                    quantity_to_fill,
-                    order.is_buy,
-                )
-
-                if additional_exposure_quantity > 0:
-                    initial_margin_amount = self._margin_model.compute_initial_margin(
-                        instrument=order.instrument,
-                        trade_quantity=additional_exposure_quantity,
-                        is_buy=order.is_buy,
-                        timestamp=sample.timestamp,
-                    )
-
-                    if not self._account_info.has_enough_available_money(initial_margin_amount):
-                        logger.error(f"Insufficient initial margin for Order $order_id ('{order.order_id}'); blocking execution and cancelling order")
-                        self._handle_initial_margin_insufficient(
-                            order=order,
-                            quantity=quantity_to_fill,
-                            attempted_price=execution_price,
-                            timestamp=sample.timestamp,
-                            best_bid=best_bid_price,
-                            best_ask=best_ask_price,
-                        )
-                        continue  # skip normal fill path entirely
-
-                    self._account_info.block_initial_margin_for_instrument(order.instrument, initial_margin_amount)
-                else:
-                    initial_margin_amount = None  # type: ignore[assignment]
-
-                # Perform the rest of the fill path with a safeguard: if anything fails after
-                # blocking initial margin, release that same initial margin back to available money.
-                try:
-                    # Commission: compute with snapshot of previous executions (excludes current)
-                    previous_executions = tuple(self._executions)
-                    commission = self._fee_model.compute_commission(
-                        order=order,
-                        price=execution_price,
-                        quantity=quantity_to_fill,
-                        timestamp=sample.timestamp,
-                        previous_executions=previous_executions,
-                    )
-
-                    # Create and record Execution via Order (Order assigns execution_id and updates state)
-                    execution, changed_order_state = order.add_execution(
-                        quantity=quantity_to_fill,
-                        price=execution_price,
-                        timestamp=sample.timestamp,
-                        commission=commission,
-                    )
-
-                    # Record execution and update position (commission already set)
-                    self._record_execution_and_update_position(execution)
-
-                    # TODO(sim-broker-fees): apply $execution.commission to Account funds in its currency
-
-                    # 1) Always return any initial margin to available money for this instrument
-                    self._account_info.unblock_all_initial_margin_for_instrument(order.instrument)
-
-                    # 2) Compute and set maintenance margin for the full net position
-                    net_position_quantity_after_trade = self._positions_by_instrument[order.instrument].quantity if order.instrument in self._positions_by_instrument else Decimal("0")
-                    maintenance_margin_amount = self._margin_model.compute_maintenance_margin(
-                        instrument=order.instrument,
-                        net_position_quantity=net_position_quantity_after_trade,
-                        timestamp=sample.timestamp,
-                    )
-                    self._account_info.set_maintenance_margin_for_instrument_position(
-                        order.instrument,
-                        maintenance_margin_amount,
-                    )
-
-                    # PUBLISH: Execution first, then Order update if state changed
-                    self._execution_callback(execution)
-                    if changed_order_state is not None:
-                        self._order_updated_callback(order)
-                except Exception:
-                    # If we had previously blocked initial margin, release the same amount back
-                    if additional_exposure_quantity > 0 and initial_margin_amount is not None:
-                        self._account_info.unblock_initial_margin_for_instrument(order.instrument, initial_margin_amount)
-                    raise
-
-                return
+            # Process each fill-slice
+            for fill_slice in fill_slices:
+                self._process_fill_slice(order, fill_slice, sample, order_book)
+                # Stop if the order was terminalized by this fill-slice (e.g., order could be canceled on margin-call)
+                if order.state_category == OrderStateCategory.TERMINAL:
+                    break
 
     # endregion
 
     # region Utilities
+
+    # TODO: Check this function, if it is well written
+    def _process_fill_slice(
+        self,
+        order: Order,
+        fill_slice: FillSlice,
+        price_sample: PriceSample,
+        order_book: OrderBook,
+    ) -> None:
+        """Apply a single $fill_slice to $order.
+
+        Steps:
+        - handle initial margin for new exposure (block → proceed)
+        - append execution
+        - update Position
+        - convert initial to maintenance margin
+        - compute fees
+        - publish execution + update order
+
+        Args:
+            order: Order being filled.
+            fill_slice: Single FillSlice to apply.
+            price_sample: PriceSample used for $timestamp and margin/fee models.
+            order_book: OrderBook for best bid/ask context in error handling.
+        """
+        instrument = order.instrument
+        timestamp = price_sample.timestamp
+
+        # INITIAL MARGIN
+        # Compute net position quantity BEFORE applying this $fill_slice
+        position_before = self._positions_by_instrument.get(instrument)
+        net_position_quantity_before: Decimal = position_before.quantity if position_before is not None else Decimal("0")
+        # Compute additional exposure introduced by this $fill_slice
+        added_exposure_quantity = self._compute_additional_exposure_quantity(net_position_quantity_before=net_position_quantity_before, trade_quantity=fill_slice.quantity, is_buy=order.is_buy)
+
+        initial_margin_amount: Money | None = None
+        if added_exposure_quantity > 0:
+            # Calculate amount for initial margin
+            initial_margin_amount = self._margin_model.compute_initial_margin(instrument=instrument, trade_quantity=added_exposure_quantity, is_buy=order.is_buy, timestamp=timestamp)
+            # Require available money for initial margin
+            if not self._account.has_enough_available_money(initial_margin_amount):
+                self._handle_initial_margin_insufficient(order=order, quantity=fill_slice.quantity, attempted_price=fill_slice.price, timestamp=timestamp, best_bid=order_book.best_bid.price, best_ask=order_book.best_ask.price)
+                return
+            # Block initial margin
+            self._account.block_initial_margin_for_instrument(instrument, initial_margin_amount)
+
+        # ADD EXECUTION
+        previous_executions = tuple(self._executions)
+        commission = self._fee_model.compute_commission(order=order, price=fill_slice.price, quantity=fill_slice.quantity, timestamp=timestamp, previous_executions=previous_executions)
+        execution, changed_order_state = order.add_execution(quantity=fill_slice.quantity, price=fill_slice.price, timestamp=timestamp, commission=commission)
+        self._record_execution_and_update_position(execution)
+
+        # MARGIN: SWITCH INITIAL -> MAINTENANCE
+        # Unblock initial margin if needed
+        if initial_margin_amount is not None:
+            self._account.unblock_initial_margin_for_instrument(instrument, initial_margin_amount)
+        # Compute maintenance margin
+        position_after = self._positions_by_instrument.get(instrument)
+        net_position_quantity_after = position_after.quantity if position_after is not None else Decimal("0")
+        maintenance_margin_amount = self._margin_model.compute_maintenance_margin(instrument=instrument, net_position_quantity=net_position_quantity_after, timestamp=timestamp)
+        # Set maintenance margin
+        self._account.set_maintenance_margin_for_instrument_position(instrument, maintenance_margin_amount)
+
+        # TODO: We should handle the fees here
+
+        # PUBLISH EXECUTION + UPDATED ORDER
+        # Execution
+        self._execution_callback(execution)
+        # Updated order
+        self._order_updated_callback(order)
 
     # Order state transitions & publishing
     def _change_order_state_and_notify(self, order: Order, action: OrderAction) -> None:

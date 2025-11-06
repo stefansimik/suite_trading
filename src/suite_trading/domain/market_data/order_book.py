@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Sequence, NamedTuple, TYPE_CHECKING
+from suite_trading.domain.order.order_enums import OrderSide
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
 
 
-# Justification: Allow named access to price and volume across modules; avoid index errors (2.14).
 class BookLevel(NamedTuple):
     """
     Price level with a limit $price and total resting $volume.
@@ -19,6 +19,18 @@ class BookLevel(NamedTuple):
 
     price: Decimal
     volume: Decimal
+
+
+class FillSlice(NamedTuple):
+    """Represents a pre-fee fill slice: how much filled and at what price.
+
+    This is intentionally an "execution-like" piece of information (quantity and price only)
+    without details such as commission, instrument, ... It is used during matching
+    to describe fills before fees/margins/accounting are applied by the broker.
+    """
+
+    quantity: Decimal
+    price: Decimal
 
 
 class OrderBook:
@@ -106,7 +118,67 @@ class OrderBook:
 
     # endregion
 
-    # region Public properties
+    # region Main
+
+    def list_bids(self) -> tuple[BookLevel, ...]:
+        """Return bid levels as BookLevel(price, volume), best-first (highest price first)."""
+        return self._bids
+
+    def list_asks(self) -> tuple[BookLevel, ...]:
+        """Return ask levels as BookLevel(price, volume), best-first (lowest price first)."""
+        return self._asks
+
+    def simulate_fills(
+        self,
+        order_side: OrderSide,
+        target_quantity: Decimal,
+        *,
+        min_price: Decimal | None = None,
+        max_price: Decimal | None = None,
+    ) -> list[FillSlice]:
+        """Simulate fills by taking liquidity from this order book.
+
+        Takes the opposite side, best-first, until $target_quantity is reached or depth runs out.
+        Negative prices are allowed.
+
+        Args:
+            order_side: BUY consumes asks; SELL consumes bids.
+            target_quantity: Total quantity to fill.
+            min_price: Optional floor price on the chosen side.
+            max_price: Optional ceiling price on the chosen side.
+
+        Returns:
+            List of `FillSlice(quantity, price)` (pre-fee).
+        """
+        price_levels = self._asks if order_side == OrderSide.BUY else self._bids
+        if not price_levels or target_quantity <= 0:
+            return []
+
+        def _eligible(level: BookLevel) -> bool:
+            if min_price is not None and level.price < min_price:
+                return False
+            if max_price is not None and level.price > max_price:
+                return False
+            return True
+
+        remaining = target_quantity
+        result: list[FillSlice] = []
+
+        for level in price_levels:
+            if remaining <= 0:
+                break
+            if not _eligible(level):
+                continue
+            take = level.volume if level.volume <= remaining else remaining
+            if take > 0:
+                result.append(FillSlice(quantity=take, price=level.price))
+                remaining -= take
+
+        return result
+
+    # endregion
+
+    # region Properties
 
     @property
     def instrument(self) -> Instrument:
@@ -155,19 +227,7 @@ class OrderBook:
 
     # endregion
 
-    # region Public methods
-
-    def list_bids(self) -> tuple[BookLevel, ...]:
-        """Return bid levels as BookLevel(price, volume), best-first (highest price first)."""
-        return self._bids
-
-    def list_asks(self) -> tuple[BookLevel, ...]:
-        """Return ask levels as BookLevel(price, volume), best-first (lowest price first)."""
-        return self._asks
-
-    # endregion
-
-    # region Validation
+    # region Utilities
 
     def _validate(self) -> None:
         """Validate $bids and $asks shape, types, finiteness, non-negative volume, and ordering.
@@ -211,7 +271,7 @@ class OrderBook:
 
     # endregion
 
-    # region Magic methods
+    # region Magic
 
     def __str__(self) -> str:
         best_bid_price = self.best_bid.price if self.best_bid else None
