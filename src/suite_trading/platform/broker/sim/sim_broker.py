@@ -170,9 +170,27 @@ class SimBroker(Broker, PriceSampleProcessor):
 
         Request modification of an existing order.
 
-        TODO: Apply validations and state transitions; re-index if needed.
+        Validates that the broker is connected, the $order is tracked, and not in a terminal
+        category. Emits UPDATE → ACCEPT transitions via the centralized notifier. Re-indexing is
+        not required for the current set of modifications; callers should pass a fully updated
+        `Order` instance where identifiers do not change.
         """
-        ...  # TODO: implement
+        # Check: broker must be connected to act on orders
+        if not self._connected:
+            raise RuntimeError(f"Cannot call `modify_order` because $connected ({self._connected}) is False")
+
+        # Check: order must be known to the broker
+        tracked = self._orders_by_id.get(order.order_id)
+        if tracked is None:
+            raise ValueError(f"Cannot call `modify_order` because $order_id ('{order.order_id}') is not tracked")
+
+        # Check: terminal orders cannot be modified
+        if tracked.state_category == OrderStateCategory.TERMINAL:
+            raise ValueError(f"Cannot call `modify_order` because Order $state_category ({tracked.state_category.name}) is terminal.")
+
+        # Transitions: UPDATE → ACCEPT
+        self._change_order_state_and_notify(tracked, OrderAction.UPDATE)
+        self._change_order_state_and_notify(tracked, OrderAction.ACCEPT)
 
     def list_orders(
         self,
@@ -305,10 +323,10 @@ class SimBroker(Broker, PriceSampleProcessor):
 
         Steps:
         - handle initial margin for new exposure (block → proceed)
-        - append execution
+        - append execution (commission computed by $fee_model)
         - update Position
         - convert initial to maintenance margin
-        - compute fees
+        - pay commission from available cash (no notional cash transfer)
         - publish execution + update order
 
         Args:
@@ -355,7 +373,8 @@ class SimBroker(Broker, PriceSampleProcessor):
         # Set maintenance margin
         self._account.set_maintenance_margin_for_instrument_position(instrument, maintenance_margin_amount)
 
-        # TODO: We should handle the fees here
+        # COMMISSION
+        self._account.subtract_available_money(execution.commission)
 
         # PUBLISH EXECUTION + UPDATED ORDER
         # Execution
