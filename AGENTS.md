@@ -233,7 +233,7 @@ self._last_order_time = now()
 - ❌ **Never use** `%` formatting: `"msg %s" % var`
 
 ### **CRITICAL: One-Line Rule**
-**Every logger call must be a single line**, even if >100 chars. Do not wrap logger calls.
+**Every logger call must be a single line**, even if >150 chars. Do not wrap logger calls.
 
 ```python
 # ❌ WRONG - Wrapped logger call
@@ -356,7 +356,7 @@ return result
 **Acceptance checks:**
 - [ ] No multi-line `return` with nested calls; complex expressions are broken into locals
 - [ ] Non-trivial return values are assigned to `result` before returning
-- [ ] Statements remain ≤100 chars per line where practical (see 8.3)
+- [ ] Statements remain ≤150 chars per line where practical (see 8.3)
 
 ---
 
@@ -573,7 +573,7 @@ Preferred set and order:
 - [ ] No re-exports from `__init__.py`; imports are clean
 
 ## 8.3. Markdown Formatting
-Keep all Markdown lines (including code blocks) **≤100 chars**. Break at natural points.
+Keep all Markdown lines (including code blocks) **≤150 chars**. Break at natural points.
 
 ## 8.4. Method ordering inside classes
 - Order methods by reader importance:
@@ -648,7 +648,7 @@ user in current message.
 # 11. Plan & Code Change Visualization
 
 When proposing changes, show per-file Before/After snippets with minimal unique context.
-Use fenced code blocks, keep lines ≤100 chars, include acceptance checks, update imports.
+Use fenced code blocks, keep lines ≤150 chars, include acceptance checks, update imports.
 
 **Template:**
 
