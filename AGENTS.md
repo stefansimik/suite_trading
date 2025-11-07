@@ -21,21 +21,16 @@
 **Breaking changes allowed** during initial development. Backward compatibility is out of scope.
 Remove or redesign anything to achieve optimal design.
 
-**Acceptance checks:**
-- [ ] Rules reflected in new modules; reviews mention them explicitly
-- [ ] Acronyms defined inline on first use (KISS, YAGNI, DRY)
-
 ---
 
 # 2. Naming Conventions & API Design
 
 ## 2.1. General Naming Rules
-Names must be **simple, predictable, and self-documenting**. Use Python `snake_case`.
-Avoid abbreviations.
+Names must be **descriptive, intuitive. self-documenting and with natural english phrasing**. Use Python `snake_case`. Avoid abbreviations. If possible, try to be consise, but never sacrifice clarity.
 
 - **Functions/Methods:** Use verbs describing the action
 - **Variables/Attributes:** Use nouns describing the data
-- **Domain terms:** Use consistently; be concise but never sacrifice clarity
+- **Domain terms:** Use consistently;
 
 ## 2.2. Method Naming Patterns
 
@@ -50,25 +45,6 @@ Avoid abbreviations.
   - Example: `compute_realized_pnl(trades)`, `compute_sharpe(returns)`
 - `find_*` or `query_*`: Search/filter with partial/empty results (optional, future scope)
 
-**Critical rule:** ❌ **Never use `get_*` for modeling or heavy computation**
-
-**Examples:**
-```python
-# ✅ Good
-def calculate_portfolio_value(positions: list) -> Decimal: ...
-def build_order_book(sample: MarketData) -> OrderBook: ...
-
-# ❌ Bad
-def calc_pv(pos: list) -> Decimal: ...
-def get_order_book(sample: MarketData) -> OrderBook: ...  # Should be build_*
-```
-
-**Acceptance checks:**
-- [ ] Public APIs use verbs above consistently
-- [ ] No `get_*` performs modeling or heavy calculations
-
----
-
 # 3. Type Annotations & Signatures
 
 ## 3.1. Modern Typing Rules
@@ -81,42 +57,6 @@ def get_order_book(sample: MarketData) -> OrderBook: ...  # Should be build_*
 - Use `type[T]` for class objects
 - `Callable[[...], R]` with explicit return type
 - Import cross-module types unconditionally or under `if TYPE_CHECKING:`
-
-**Example:**
-```python
-from __future__ import annotations
-from typing import TYPE_CHECKING, Callable
-
-if TYPE_CHECKING:
-    from suite_trading.domain.order.execution import Execution
-
-class Broker(Protocol):
-    def set_callbacks(
-        self,
-        on_execution: Callable[[Execution], None],
-        on_order_updated: Callable[[Broker, Order], None],
-    ) -> None: ...
-```
-
-## 3.2. Parameter Formatting
-Long signatures: **one parameter per line**, consistent indent, **trailing comma**.
-
-```python
-def __init__(
-    self,
-    instrument: Instrument,
-    quantity: Decimal,
-    order_id: int | None = None,
-) -> None: ...
-```
-
-**Acceptance checks:**
-- [ ] Module starts with `from __future__ import annotations`
-- [ ] No quoted forward references
-- [ ] Only builtin generics used (no `typing.List`/`Dict`)
-- [ ] `|` unions and `| None` (no `Union`/`Optional`)
-- [ ] `Callable[[...], R]` style with explicit return type
-- [ ] Types imported properly; `get_type_hints` resolvable
 
 ## 3.3. Parameter Layout in Calls
 
@@ -180,7 +120,7 @@ This section covers all developer-facing text: docstrings, comments, logs, and e
 
 **Requirements:**
 - Google-style format: purpose, params, returns, exceptions, types
-- **Simple, conversational English** - avoid dense jargon
+- **Simple, conversational English** - avoid complex or very technical jargon
 - Include all important information; explain complex concepts simply
 - Make immediately understandable without research
 - Use concrete examples when helpful
@@ -214,7 +154,7 @@ and makes AI-assisted refactoring safer.
 - Short "why/what" comment above each logical unit
 - Use domain terms and explicit states
 - Explain business logic and reasoning
-- Simple, conversational English
+- Use simple conversational English
 
 ### Defensive Comments
 - Use **`# Check:`** prefix exclusively for validation guards
