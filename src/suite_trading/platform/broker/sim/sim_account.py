@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
+from datetime import datetime
 
 from suite_trading.platform.broker.account import Account, MarginRequirements, PaidFee
 from suite_trading.domain.monetary.currency import Currency
@@ -43,7 +44,7 @@ class SimAccount(Account):
     def account_id(self) -> str:
         return self._account_id
 
-    # MONEY (AVAILABLE FUNDS)
+    # AVAILABLE MONEY
 
     def list_available_money_by_currency(self) -> list[tuple[Currency, Money]]:
         result: list[tuple[Currency, Money]] = []
@@ -78,6 +79,27 @@ class SimAccount(Account):
             raise ValueError(f"Cannot call `subtract_available_money` because resulting $available ({new_value} {currency}) would be negative")
 
         self._available_money_by_currency[currency] = Money(new_value, currency)
+
+    # FEES
+
+    def record_paid_fee(self, timestamp: datetime, amount: Money, description: str) -> None:
+        """Record a paid fee for audit purposes without changing balances.
+
+        This method appends a `PaidFee` entry to the internal list. It does not
+        modify $available money or margins to avoid double subtraction, since cash
+        effects are already applied at the broker layer.
+        """
+        self._paid_fees.append(PaidFee(timestamp=timestamp, amount=amount, description=description))
+
+    def list_paid_fees(self, limit: int = 100) -> list[PaidFee]:
+        """Return up to the last $limit paid fee records (most recent last).
+
+        Args:
+            limit: Maximum number of records to return; non-positive returns empty list.
+        """
+        if limit <= 0:
+            return []
+        return self._paid_fees[-limit:]
 
     # MARGIN (PER-INSTRUMENT)
 
@@ -119,16 +141,20 @@ class SimAccount(Account):
         instrument: Instrument,
         maintenance_margin_amount: Money,
     ) -> None:
-        previous_pair = self._margins_by_instrument.get(instrument)
         currency = maintenance_margin_amount.currency
+
+        # Calculate delta in maintenance margin
+        previous_pair = self._margins_by_instrument.get(instrument)
         if previous_pair is None:
             previous_pair = MarginRequirements(initial=Money(Decimal("0"), currency), maintenance=Money(Decimal("0"), currency))
         delta = maintenance_margin_amount.value - previous_pair.maintenance.value
+
         if delta > 0:
             # Check: available money cannot go negative when increasing maintenance
             self.subtract_available_money(Money(delta, currency))
         elif delta < 0:
             self.add_available_money(Money(-delta, currency))
+
         self._margins_by_instrument[instrument] = MarginRequirements(initial=previous_pair.initial, maintenance=maintenance_margin_amount)
 
     # endregion
