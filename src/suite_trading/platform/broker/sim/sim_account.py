@@ -82,24 +82,33 @@ class SimAccount(Account):
 
     # FEES
 
-    def record_paid_fee(self, timestamp: datetime, amount: Money, description: str) -> None:
-        """Record a paid fee for audit purposes without changing balances.
+    def pay_fee(self, timestamp: datetime, amount: Money, description: str) -> None:
+        """Pay a fee and record it.
 
-        This method appends a `PaidFee` entry to the internal list. It does not
-        modify $available money or margins to avoid double subtraction, since cash
-        effects are already applied at the broker layer.
-        """
-        self._paid_fees.append(PaidFee(timestamp=timestamp, amount=amount, description=description))
-
-    def list_paid_fees(self, limit: int = 100) -> list[PaidFee]:
-        """Return up to the last $limit paid fee records (most recent last).
+        This is a high-level operation that subtracts from $available money and stores a
+        `PaidFee` record. Only strictly positive $amount is allowed.
 
         Args:
-            limit: Maximum number of records to return; non-positive returns empty list.
+            timestamp: When the fee was applied.
+            amount: Money to charge (must be strictly positive).
+            description: Human-readable context.
+
+        Raises:
+            ValueError: If $amount.value <= 0 or subtracting would make $available negative.
         """
-        if limit <= 0:
-            return []
-        return self._paid_fees[-limit:]
+        # Check: $amount must be strictly positive (no zero or rebates for now)
+        if amount.value <= 0:
+            raise ValueError(f"Cannot call `pay_fee` because $amount ({amount.value} {amount.currency}) is not positive")
+
+        # Subtract fee from available money
+        self.subtract_available_money(amount)
+
+        # Record fee
+        self._paid_fees.append(PaidFee(timestamp=timestamp, amount=amount, description=description))
+
+    def list_paid_fees(self) -> list[PaidFee]:
+        """Return the full list of paid fee records (most recent last)."""
+        return list(self._paid_fees)
 
     # MARGIN (PER-INSTRUMENT)
 

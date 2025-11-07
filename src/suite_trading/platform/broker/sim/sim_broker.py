@@ -402,10 +402,10 @@ class SimBroker(Broker, PriceSampleProcessor):
         # Block maintenance margin
         self._account.set_maintenance_margin_for_instrument_position(instrument, maintenance_margin_amount_after_trade)
 
-        # PAY COMMISSION
+        # PAY COMMISSION (use high-level Account API)
         if execution.commission.value > 0:
-            self._account.subtract_available_money(execution.commission)
-            self._account.record_paid_fee(execution.timestamp, execution.commission, f"commission for Order '{order.order_id}'")
+            fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {execution.quantity} Order ID / Execution ID: {execution.order.order_id} / {execution.execution_id}"
+            self._account.pay_fee(execution.timestamp, execution.commission, fee_description)
 
         # PUBLISH EXECUTION + UPDATED ORDER
         if self._execution_callback is not None:
