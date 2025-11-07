@@ -764,7 +764,7 @@ class TradingEngine:
         existing_route = self._routing_by_order.get(order)
         if existing_route is not None and existing_route.strategy is not strategy:
             owner_name = self._get_strategy_name(existing_route.strategy)
-            raise ValueError(f"Cannot call `submit_order` because Order $order_id ('{order.order_id}') is already owned by Strategy named '{owner_name}'")
+            raise ValueError(f"Cannot call `submit_order` because Order $order_id ('{order.id}') is already owned by Strategy named '{owner_name}'")
 
         # Record routing: Strategy is origin (receives callbacks), Broker is executor
         self._routing_by_order[order] = StrategyBrokerPair(strategy=strategy, broker=broker)

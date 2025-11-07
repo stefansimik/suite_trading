@@ -101,7 +101,7 @@ def select_simulate_fills_function_for_order(
         return simulate_fills_for_stop_order
     if isinstance(order, StopLimitOrder):
         return simulate_fills_for_stop_limit_order
-    raise ValueError(f"Unsupported order type in `select_simulate_fills_function_for_order` for $order_id ('{order.order_id}') with class '{order.__class__.__name__}'")
+    raise ValueError(f"Unsupported order type in `select_simulate_fills_function_for_order` for $order_id ('{order.id}') with class '{order.__class__.__name__}'")
 
 
 # endregion

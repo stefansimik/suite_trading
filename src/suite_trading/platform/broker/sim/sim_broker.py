@@ -125,12 +125,12 @@ class SimBroker(Broker, PriceSampleProcessor):
         if not self._connected:
             raise RuntimeError(f"Cannot call `submit_order` because $connected ({self._connected}) is False")
 
-        # Check: enforce unique $order_id among active orders
-        if order.order_id in self._orders_by_id:
-            raise ValueError(f"Cannot call `submit_order` because $order_id ('{order.order_id}') already exists")
+        # Check: enforce unique $id among active orders
+        if order.id in self._orders_by_id:
+            raise ValueError(f"Cannot call `submit_order` because $id ('{order.id}') already exists")
 
         # Track the order (submission never terminalizes in this step)
-        self._orders_by_id[order.order_id] = order
+        self._orders_by_id[order.id] = order
 
         # Initial order-state transitions:
         # INITIALIZED -> PENDING_SUBMIT
@@ -151,13 +151,13 @@ class SimBroker(Broker, PriceSampleProcessor):
             raise RuntimeError(f"Cannot call `cancel_order` because $connected ({self._connected}) is False")
 
         # Check: order must be known to the broker
-        tracked = self._orders_by_id.get(order.order_id)
+        tracked = self._orders_by_id.get(order.id)
         if tracked is None:
-            raise ValueError(f"Cannot call `cancel_order` because $order_id ('{order.order_id}') is not tracked")
+            raise ValueError(f"Cannot call `cancel_order` because $id ('{order.id}') is not tracked")
 
         # Check: If order is already in terminal state (e.g., FILLED, CANCELLED, REJECTED), warn and do nothing
         if tracked.state_category == OrderStateCategory.TERMINAL:
-            logger.warning(f"Bad logic: Ignoring `cancel_order` for terminal Order $order_id ('{order.order_id}') with $state_category ({tracked.state_category.name})")
+            logger.warning(f"Bad logic: Ignoring `cancel_order` for terminal Order $id ('{order.id}') with $state_category ({tracked.state_category.name})")
             return
 
         # Transition to PENDING_CANCEL
@@ -180,9 +180,9 @@ class SimBroker(Broker, PriceSampleProcessor):
             raise RuntimeError(f"Cannot call `modify_order` because $connected ({self._connected}) is False")
 
         # Check: order must be known to the broker
-        tracked = self._orders_by_id.get(order.order_id)
+        tracked = self._orders_by_id.get(order.id)
         if tracked is None:
-            raise ValueError(f"Cannot call `modify_order` because $order_id ('{order.order_id}') is not tracked")
+            raise ValueError(f"Cannot call `modify_order` because $id ('{order.id}') is not tracked")
 
         # Check: terminal orders cannot be modified
         if tracked.state_category == OrderStateCategory.TERMINAL:
@@ -404,7 +404,7 @@ class SimBroker(Broker, PriceSampleProcessor):
 
         # PAY COMMISSION (use high-level Account API)
         if execution.commission.value > 0:
-            fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {execution.quantity} Order ID / Execution ID: {execution.order.order_id} / {execution.execution_id}"
+            fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {execution.quantity} Order ID / Execution ID: {execution.order.id} / {execution.id}"
             self._account.pay_fee(execution.timestamp, execution.commission, fee_description)
 
         # PUBLISH EXECUTION + UPDATED ORDER
@@ -617,7 +617,7 @@ class SimBroker(Broker, PriceSampleProcessor):
     ) -> None:
         """Cancel $order and log a one-line message with all affordability components."""
         req_init = required_initial_margin_amount if required_initial_margin_amount is not None else commission_amount.__class__(Decimal("0"), commission_amount.currency)
-        logger.error(f"Reject FillSlice for Order '{order.order_id}': required_initial={req_init}, commission={commission_amount}, maintenance_release={maintenance_margin_amount_released_by_trade}, net_commission_cash_out={net_commission_cash_out_after_release}, total_required_now={total_amount_required_now_to_execute_slice}, available_now={available_money_now}, best_bid={best_bid}, best_ask={best_ask}, qty={fill_slice.quantity}, price={fill_slice.price}, ts={timestamp}")
+        logger.error(f"Reject FillSlice for Order '{order.id}': required_initial={req_init}, commission={commission_amount}, maintenance_release={maintenance_margin_amount_released_by_trade}, net_commission_cash_out={net_commission_cash_out_after_release}, total_required_now={total_amount_required_now_to_execute_slice}, available_now={available_money_now}, best_bid={best_bid}, best_ask={best_ask}, qty={fill_slice.quantity}, price={fill_slice.price}, ts={timestamp}")
 
         self._change_order_state_and_notify(order, OrderAction.CANCEL)
         self._change_order_state_and_notify(order, OrderAction.ACCEPT)

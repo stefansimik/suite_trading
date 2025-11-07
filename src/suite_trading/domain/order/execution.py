@@ -27,7 +27,7 @@ class Execution:
         quantity (Decimal): The quantity that was executed in this fill.
         price (Decimal): The price at which this execution occurred.
         timestamp (datetime): When this execution occurred.
-        id (str): Unique identifier for this execution ("{order_id}-{n}").
+        id (str): Unique identifier for this execution ("{id}-{n}").
         commission (Money): Commission/fees charged for this execution.
 
     Properties:
@@ -46,7 +46,7 @@ class Execution:
         price: Decimal | str | float,
         timestamp: datetime,
         commission: Money,
-        execution_id: str,
+        id: str,
     ) -> None:
         """Initialize a new execution.
 
@@ -65,7 +65,7 @@ class Execution:
         self._timestamp = timestamp
 
         # Execution identity is assigned by Order
-        self._id = execution_id
+        self._id = id
 
         # Normalize values
         self._quantity = self.instrument.snap_quantity(quantity)
@@ -186,7 +186,7 @@ class Execution:
 
         # Check: ensure commission is provided to avoid half-built executions
         if self._commission is None:
-            raise ValueError(f"Validation failed, because $commission is None for $order_id ('{self._order.order_id}')")
+            raise ValueError(f"Validation failed, because $commission is None for $id ('{self._order.id}')")
 
         # Check: commission cannot be negative
         if self._commission.value < 0:
@@ -201,7 +201,7 @@ class Execution:
     # region Magic
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(execution_id={self.id})"
+        return f"{self.__class__.__name__}(id={self.id})"
 
     def __repr__(self) -> str:
         """Return a string representation of the execution.
@@ -209,7 +209,7 @@ class Execution:
         Returns:
             str: String representation of the execution.
         """
-        return f"{self.__class__.__name__}(execution_id={self.id}, order_id={self.order.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
+        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another execution.

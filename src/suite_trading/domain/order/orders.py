@@ -31,7 +31,7 @@ class Order:
     It is not intended to be used directly - use specific order subclasses instead.
 
     Properties:
-        order_id (str): Unique identifier for the order (read-only).
+        id (str): Unique identifier for the order (read-only).
         instrument (Instrument): The financial instrument to trade (read-only).
         side (OrderSide): Whether this is a BUY or SELL order (read-only).
         quantity (Decimal): The quantity to trade (read-only).
@@ -44,7 +44,7 @@ class Order:
         instrument: Instrument,
         side: OrderSide,
         quantity: Decimal,
-        order_id: str | None = None,
+        id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         strategy: Strategy | None = None,  # TODO: we should remove this. Order should not know this. Orders without Strategy can exist
     ):
@@ -54,12 +54,12 @@ class Order:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
             quantity (Decimal): The quantity to trade.
-            order_id (str, optional): Unique identifier for the order. If None, generates a new ID.
+            id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
         # Order identification (private attributes with public properties)
-        self._order_id = str(order_id) if order_id is not None else str(get_next_id())
+        self._id = str(id) if id is not None else str(get_next_id())
 
         # Trading details (private attributes with public properties)
         self._instrument = instrument
@@ -84,13 +84,13 @@ class Order:
     # region Properties
 
     @property
-    def order_id(self) -> str:
+    def id(self) -> str:
         """Get the unique identifier for the order.
 
         Returns:
             str: The order ID.
         """
-        return self._order_id
+        return self._id
 
     @property
     def instrument(self) -> Instrument:
@@ -279,8 +279,8 @@ class Order:
             raise ValueError(f"Cannot call `add_execution` because $state_category ('{cat.name}') is not FILLABLE for $state ('{self.state}')")
 
         # Create execution
-        execution_id = f"{self.order_id}-{len(self._executions) + 1}"
-        execution = Execution(order=self, quantity=quantity, price=price, timestamp=timestamp, commission=commission, execution_id=execution_id)
+        child_id = f"{self.id}-{len(self._executions) + 1}"
+        execution = Execution(order=self, quantity=quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
 
         # Update state of the order (partial or full fill)
         new_filled_quantity = self.filled_quantity + execution.quantity
@@ -331,10 +331,10 @@ class Order:
     # region Magic
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(order_id={self.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
+        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(order_id={self.order_id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
+        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
 
     def __eq__(self, other: object) -> bool:
         """Check equality with another order.
@@ -347,14 +347,14 @@ class Order:
         """
         if not isinstance(other, Order):
             return False
-        return self.order_id == other.order_id
+        return self.id == other.id
 
     def __hash__(self) -> int:
         """Allow using Order as dictionary key and in sets.
 
-        Hash is derived from stable `order_id` to be consistent with `__eq__`.
+        Hash is derived from stable `id` to be consistent with `__eq__`.
         """
-        return hash(self.order_id)
+        return hash(self.id)
 
 
 # endregion
