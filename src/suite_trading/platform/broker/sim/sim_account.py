@@ -37,6 +37,32 @@ class SimAccount(Account):
 
     # region Protocol Account
 
+    # IDENTITY
+
+    @property
+    def account_id(self) -> str:
+        return self._account_id
+
+    # MONEY (AVAILABLE FUNDS)
+
+    def list_available_money_by_currency(self) -> list[tuple[Currency, Money]]:
+        result: list[tuple[Currency, Money]] = []
+        for currency in sorted(self._available_money_by_currency.keys(), key=lambda c: c.code):
+            result.append((currency, self._available_money_by_currency[currency]))
+        return result
+
+    def get_available_money(self, currency: Currency) -> Money:
+        """Return current available money for the given $currency.
+
+        This is a cheap read with no side effects.
+        """
+        return self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
+
+    def has_enough_available_money(self, required_amount: Money) -> bool:
+        currency = required_amount.currency
+        current = self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
+        return current.value >= required_amount.value
+
     def add_available_money(self, amount: Money) -> None:
         currency = amount.currency
         current = self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
@@ -46,19 +72,20 @@ class SimAccount(Account):
         currency = amount.currency
         current = self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
         new_value = current.value - amount.value
+
         # Check: available money cannot go below zero
         if new_value < 0:
             raise ValueError(f"Cannot call `subtract_available_money` because resulting $available ({new_value} {currency}) would be negative")
+
         self._available_money_by_currency[currency] = Money(new_value, currency)
 
-    def has_enough_available_money(self, required_amount: Money) -> bool:
-        currency = required_amount.currency
-        current = self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
-        return current.value >= required_amount.value
+    # MARGIN (PER-INSTRUMENT)
 
     def block_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None:
+        # Check: available money must be sufficient to block initial margin
         if not self.has_enough_available_money(amount):
             raise ValueError(f"Cannot call `block_initial_margin_for_instrument` because $available in {amount.currency} is insufficient for $amount ({amount.value})")
+
         self.subtract_available_money(amount)
         pair = self._margins_by_instrument.get(instrument)
         if pair is None:
@@ -70,9 +97,11 @@ class SimAccount(Account):
         if pair is None:
             pair = MarginRequirements(initial=Money(Decimal("0"), amount.currency), maintenance=Money(Decimal("0"), amount.currency))
         new_initial_value = pair.initial.value - amount.value
+
         # Check: initial margin cannot become negative
         if new_initial_value < 0:
             raise ValueError(f"Cannot call `unblock_initial_margin_for_instrument` because resulting initial margin would be negative for $instrument ({instrument})")
+
         new_initial = Money(new_initial_value, amount.currency)
         self._margins_by_instrument[instrument] = MarginRequirements(initial=new_initial, maintenance=pair.maintenance)
         self.add_available_money(amount)
@@ -101,24 +130,6 @@ class SimAccount(Account):
         elif delta < 0:
             self.add_available_money(Money(-delta, currency))
         self._margins_by_instrument[instrument] = MarginRequirements(initial=previous_pair.initial, maintenance=maintenance_margin_amount)
-
-    def list_available_money_by_currency(self) -> list[tuple[Currency, Money]]:
-        result: list[tuple[Currency, Money]] = []
-        for currency in sorted(self._available_money_by_currency.keys(), key=lambda c: c.code):
-            result.append((currency, self._available_money_by_currency[currency]))
-        return result
-
-    # endregion
-
-    # region Properties
-
-    @property
-    def account_id(self) -> str:
-        return self._account_id
-
-    @property
-    def available_money_by_currency(self) -> dict[Currency, Money]:
-        return dict(self._available_money_by_currency)
 
     # endregion
 

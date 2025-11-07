@@ -253,13 +253,11 @@ class Order:
         price: Decimal,
         timestamp: datetime,
         commission: Money,
-    ) -> tuple[Execution, OrderState | None]:
+    ) -> Execution:
         """Create and record a new `Execution`, then advance `state` based on cumulative fills.
 
-        This method is the single place that keeps the `Order` internally consistent after a fill.
-        It returns the created `Execution` and an optional `OrderState` when the state actually
-        changes (e.g., transitions to PARTIALLY_FILLED or FILLED). Callers (e.g., a Broker) can
-        publish the `Execution` and, if present, the changed order state.
+        This method keeps the `Order` internally consistent after a fill. Callers can read
+        `self.state` or `self.state_category` after the call if they need the latest state.
 
         Args:
             quantity: Executed quantity.
@@ -268,43 +266,31 @@ class Order:
             commission: Commission/fees for this execution.
 
         Returns:
-            A tuple of (Execution, optional new OrderState). The second element is `None` when the
-            effective state did not change (idempotent partial fills).
+            The created `Execution`.
 
         Raises:
             ValueError: If `$state_category` is not FILLABLE for the current `$state`, or if the
-                transition is invalid. Validation and snapping of `$quantity` and `$price` (and
-                overfill checks) are performed in `Execution`; this method does not repeat them.
+                transition is invalid. Validation and snapping are performed in `Execution`.
         """
-        prev_state = self.state
 
         # Check: allow fills only when $state_category is FILLABLE
         cat = self.state_category
         if cat is not OrderStateCategory.FILLABLE:
             raise ValueError(f"Cannot call `add_execution` because $state_category ('{cat.name}') is not FILLABLE for $state ('{self.state}')")
 
-        # Build the execution (snaps/validates quantity & price and overfill in Execution)
-        execution = Execution(
-            order=self,
-            quantity=quantity,
-            price=price,
-            timestamp=timestamp,
-            commission=commission,
-            execution_id=f"{self.order_id}-{len(self._executions) + 1}",
-        )
+        # Create execution
+        execution_id = f"{self.order_id}-{len(self._executions) + 1}"
+        execution = Execution(order=self, quantity=quantity, price=price, timestamp=timestamp, commission=commission, execution_id=execution_id)
 
-        # Choose the state action from cumulative fills after this execution
-        new_filled = self.filled_quantity + execution.quantity
-        action = OrderAction.FILL if new_filled == self.quantity else OrderAction.PARTIAL_FILL
-
-        # Apply transition; invalid mapping raises (fail fast)
+        # Update state of the order (partial or full fill)
+        new_filled_quantity = self.filled_quantity + execution.quantity
+        action = OrderAction.FILL if new_filled_quantity == self.quantity else OrderAction.PARTIAL_FILL
         self.change_state(action)
 
-        # Record chronologically
+        # Store execution
         self._executions.append(execution)
 
-        new_state = self.state
-        return execution, (new_state if new_state != prev_state else None)
+        return execution
 
     def list_executions(self) -> tuple[Execution, ...]:
         """Return executions in chronological order as an immutable tuple.

@@ -31,36 +31,30 @@ class Account(Protocol):
     Implementations should be side-effect free except for updating internal state. Monetary moves are same-currency.
     """
 
-    # region Main
+    # region Interface
+
+    # IDENTITY
+    @property
+    def account_id(self) -> str: ...
+
+    # MONEY (AVAILABLE FUNDS)
+    def list_available_money_by_currency(self) -> list[tuple[Currency, Money]]: ...
+
+    def get_available_money(self, currency: Currency) -> Money: ...
+
+    def has_enough_available_money(self, required_amount: Money) -> bool: ...
 
     def add_available_money(self, amount: Money) -> None: ...
 
     def subtract_available_money(self, amount: Money) -> None: ...
 
-    def has_enough_available_money(self, required_amount: Money) -> bool: ...
-
+    # MARGIN (PER-INSTRUMENT)
     def block_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None: ...
 
     def unblock_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None: ...
 
     def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> None: ...
 
-    def set_maintenance_margin_for_instrument_position(
-        self,
-        instrument: Instrument,
-        maintenance_margin_amount: Money,
-    ) -> None: ...
-
-    def list_available_money_by_currency(self) -> list[tuple[Currency, Money]]: ...
-
-    # endregion
-
-    # region Properties
-
-    @property
-    def account_id(self) -> str: ...
-
-    @property
-    def available_money_by_currency(self) -> dict[Currency, Money]: ...
+    def set_maintenance_margin_for_instrument_position(self, instrument: Instrument, maintenance_margin_amount: Money) -> None: ...
 
     # endregion

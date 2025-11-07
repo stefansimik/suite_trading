@@ -311,7 +311,6 @@ class SimBroker(Broker, PriceSampleProcessor):
 
     # region Utilities
 
-    # TODO: Check this function, if it is well written
     def _process_fill_slice(
         self,
         order: Order,
@@ -322,11 +321,12 @@ class SimBroker(Broker, PriceSampleProcessor):
         """Apply a single $fill_slice to $order.
 
         Steps:
-        - handle initial margin for new exposure (block → proceed)
-        - append execution (commission computed by $fee_model)
+        - compute affordability (initial margin, commission, maintenance release)
+        - block initial margin (only if position increases)
+        - create and store execution
         - update Position
         - convert initial to maintenance margin
-        - pay commission from available cash (no notional cash transfer)
+        - pay commission
         - publish execution + update order
 
         Args:
@@ -338,49 +338,78 @@ class SimBroker(Broker, PriceSampleProcessor):
         instrument = order.instrument
         timestamp = price_sample.timestamp
 
-        # INITIAL MARGIN
-        # Compute net position quantity BEFORE applying this $fill_slice
-        position_before = self._positions_by_instrument.get(instrument)
-        net_position_quantity_before: Decimal = position_before.quantity if position_before is not None else Decimal("0")
-        # Compute additional exposure introduced by this $fill_slice
-        added_exposure_quantity = self._compute_additional_exposure_quantity(net_position_quantity_before=net_position_quantity_before, trade_quantity=fill_slice.quantity, is_buy=order.is_buy)
+        # CONTEXT — read current position, compute signed impact and net quantities
+        position_before_trade = self._positions_by_instrument.get(instrument)
+        net_position_quantity_before_trade: Decimal = position_before_trade.quantity if position_before_trade is not None else Decimal("0")
+        signed_trade_quantity: Decimal = fill_slice.quantity if order.is_buy else -fill_slice.quantity
+        net_position_quantity_after_trade: Decimal = net_position_quantity_before_trade + signed_trade_quantity
 
-        initial_margin_amount: Money | None = None
-        if added_exposure_quantity > 0:
-            # Calculate amount for initial margin
-            initial_margin_amount = self._margin_model.compute_initial_margin(instrument=instrument, trade_quantity=added_exposure_quantity, is_buy=order.is_buy, timestamp=timestamp)
-            # Require available money for initial margin
-            if not self._account.has_enough_available_money(initial_margin_amount):
-                self._handle_initial_margin_insufficient(order=order, quantity=fill_slice.quantity, attempted_price=fill_slice.price, timestamp=timestamp, best_bid=order_book.best_bid.price, best_ask=order_book.best_ask.price)
-                return
-            # Block initial margin
-            self._account.block_initial_margin_for_instrument(instrument, initial_margin_amount)
+        # PRE-CALCULATE MARGINS AND COMMISSION (no state changes yet)
+        added_exposure_quantity_from_trade = self._compute_additional_exposure_quantity(net_position_quantity_before=net_position_quantity_before_trade, trade_quantity=fill_slice.quantity, is_buy=order.is_buy)
 
-        # ADD EXECUTION
-        previous_executions = tuple(self._executions)
-        commission = self._fee_model.compute_commission(order=order, price=fill_slice.price, quantity=fill_slice.quantity, timestamp=timestamp, previous_executions=previous_executions)
-        execution, changed_order_state = order.add_execution(quantity=fill_slice.quantity, price=fill_slice.price, timestamp=timestamp, commission=commission)
+        (
+            initial_margin_amount_to_block_now,
+            maintenance_margin_amount_after_trade,
+            maintenance_margin_amount_released_by_trade,
+            commission_amount,
+            net_commission_cash_out_after_release,
+            total_amount_required_now_to_execute_slice,
+        ) = self._compute_affordability_and_margin_for_fill_slice(
+            instrument=instrument,
+            order=order,
+            fill_slice=fill_slice,
+            net_position_quantity_before_trade=net_position_quantity_before_trade,
+            net_position_quantity_after_trade=net_position_quantity_after_trade,
+            added_exposure_quantity_from_trade=added_exposure_quantity_from_trade,
+            timestamp=timestamp,
+            previous_executions=tuple(self._executions),
+        )
+
+        # Check: ensure we can fund initial margin and net commission cash out after release
+        available_money_now = self._account.get_available_money(commission_amount.currency)
+
+        has_enough_money = self._account.has_enough_available_money(total_amount_required_now_to_execute_slice)
+        if not has_enough_money:
+            self._handle_insufficient_funds_for_fill_slice(
+                order=order,
+                fill_slice=fill_slice,
+                timestamp=timestamp,
+                best_bid=order_book.best_bid.price,
+                best_ask=order_book.best_ask.price,
+                required_initial_margin_amount=initial_margin_amount_to_block_now,
+                commission_amount=commission_amount,
+                maintenance_margin_amount_released_by_trade=maintenance_margin_amount_released_by_trade,
+                net_commission_cash_out_after_release=net_commission_cash_out_after_release,
+                total_amount_required_now_to_execute_slice=total_amount_required_now_to_execute_slice,
+                available_money_now=available_money_now,
+            )
+            return
+
+        # BLOCK INITIAL MARGIN (IF ANY)
+        can_block_initial_margin = (initial_margin_amount_to_block_now is not None) and (initial_margin_amount_to_block_now.value > 0)
+        if can_block_initial_margin:
+            self._account.block_initial_margin_for_instrument(instrument, initial_margin_amount_to_block_now)
+
+        # STORE EXECUTION AND UPDATE POSITION
+        execution = order.add_execution(quantity=fill_slice.quantity, price=fill_slice.price, timestamp=timestamp, commission=commission_amount)
         self._record_execution_and_update_position(execution)
 
-        # MARGIN: SWITCH INITIAL -> MAINTENANCE
-        # Unblock initial margin if needed
-        if initial_margin_amount is not None:
-            self._account.unblock_initial_margin_for_instrument(instrument, initial_margin_amount)
-        # Compute maintenance margin
-        position_after = self._positions_by_instrument.get(instrument)
-        net_position_quantity_after = position_after.quantity if position_after is not None else Decimal("0")
-        maintenance_margin_amount = self._margin_model.compute_maintenance_margin(instrument=instrument, net_position_quantity=net_position_quantity_after, timestamp=timestamp)
-        # Set maintenance margin
-        self._account.set_maintenance_margin_for_instrument_position(instrument, maintenance_margin_amount)
+        # SWITCH INITIAL -> MAINTENANCE MARGIN
+        # Unblock initial margin
+        can_unblock_initial_margin = (initial_margin_amount_to_block_now is not None) and (initial_margin_amount_to_block_now.value > 0)
+        if can_unblock_initial_margin:
+            self._account.unblock_initial_margin_for_instrument(instrument, initial_margin_amount_to_block_now)
+        # Block maintenance margin
+        self._account.set_maintenance_margin_for_instrument_position(instrument, maintenance_margin_amount_after_trade)
 
-        # COMMISSION
+        # PAY COMMISSION
         self._account.subtract_available_money(execution.commission)
 
         # PUBLISH EXECUTION + UPDATED ORDER
-        # Execution
-        self._execution_callback(execution)
-        # Updated order
-        self._order_updated_callback(order)
+        if self._execution_callback is not None:
+            self._execution_callback(execution)
+        if self._order_updated_callback is not None:
+            self._order_updated_callback(order)
 
     # Order state transitions & publishing
     def _change_order_state_and_notify(self, order: Order, action: OrderAction) -> None:
@@ -498,16 +527,96 @@ class SimBroker(Broker, PriceSampleProcessor):
         absolute_quantity_after = abs(net_position_quantity_before + signed_trade_quantity)
         return max(Decimal("0"), Decimal(absolute_quantity_after - absolute_quantity_before))
 
-    def _handle_initial_margin_insufficient(
+    def _compute_affordability_and_margin_for_fill_slice(
         self,
+        *,
+        instrument: Instrument,
         order: Order,
-        quantity: Decimal,
-        attempted_price: Decimal,
+        fill_slice: FillSlice,
+        net_position_quantity_before_trade: Decimal,
+        net_position_quantity_after_trade: Decimal,
+        added_exposure_quantity_from_trade: Decimal,
+        timestamp: datetime,
+        previous_executions: tuple[Execution, ...],
+    ) -> tuple[Money | None, Money, Money, Money, Money, Money]:
+        """Compute figures needed for affordability and post-trade margin.
+
+        Returns (in order):
+          - $initial_margin_amount_to_block_now
+          - $maintenance_margin_amount_after_trade
+          - $maintenance_margin_amount_released_by_trade_clamped_to_zero
+          - $commission_amount
+          - $net_commission_cash_out_after_release
+          - $total_amount_required_now_to_execute_slice
+        """
+        commission_amount = self._fee_model.compute_commission(
+            order=order,
+            price=fill_slice.price,
+            quantity=fill_slice.quantity,
+            timestamp=timestamp,
+            previous_executions=previous_executions,
+        )
+
+        initial_margin_amount_to_block_now: Money | None = None
+        if added_exposure_quantity_from_trade > 0:
+            initial_margin_amount_to_block_now = self._margin_model.compute_initial_margin(
+                instrument=instrument,
+                trade_quantity=added_exposure_quantity_from_trade,
+                is_buy=order.is_buy,
+                timestamp=timestamp,
+            )
+
+        maintenance_before = self._margin_model.compute_maintenance_margin(
+            instrument=instrument,
+            net_position_quantity=net_position_quantity_before_trade,
+            timestamp=timestamp,
+        )
+        maintenance_after = self._margin_model.compute_maintenance_margin(
+            instrument=instrument,
+            net_position_quantity=net_position_quantity_after_trade,
+            timestamp=timestamp,
+        )
+
+        maintenance_release = maintenance_before - maintenance_after
+        zero_commission_ccy = commission_amount.__class__(Decimal("0"), commission_amount.currency)
+        if maintenance_release.value < 0:
+            maintenance_release = zero_commission_ccy
+
+        net_commission_cash_out_after_release = commission_amount - maintenance_release
+        if net_commission_cash_out_after_release.value < 0:
+            net_commission_cash_out_after_release = zero_commission_ccy
+
+        initial_now = initial_margin_amount_to_block_now if initial_margin_amount_to_block_now is not None else zero_commission_ccy
+        total_required_now = initial_now + net_commission_cash_out_after_release
+
+        return (
+            initial_margin_amount_to_block_now,
+            maintenance_after,
+            maintenance_release,
+            commission_amount,
+            net_commission_cash_out_after_release,
+            total_required_now,
+        )
+
+    def _handle_insufficient_funds_for_fill_slice(
+        self,
+        *,
+        order: Order,
+        fill_slice: FillSlice,
         timestamp: datetime,
         best_bid: Decimal,
         best_ask: Decimal,
+        required_initial_margin_amount: Money | None,
+        commission_amount: Money,
+        maintenance_margin_amount_released_by_trade: Money,
+        net_commission_cash_out_after_release: Money,
+        total_amount_required_now_to_execute_slice: Money,
+        available_money_now: Money,
     ) -> None:
-        """Default policy: block execution and cancel entire $order when margin is insufficient."""
+        """Cancel $order and log a one-line message with all affordability components."""
+        req_init = required_initial_margin_amount if required_initial_margin_amount is not None else commission_amount.__class__(Decimal("0"), commission_amount.currency)
+        logger.error(f"Reject FillSlice for Order '{order.order_id}': required_initial={req_init}, commission={commission_amount}, maintenance_release={maintenance_margin_amount_released_by_trade}, net_commission_cash_out={net_commission_cash_out_after_release}, total_required_now={total_amount_required_now_to_execute_slice}, available_now={available_money_now}, best_bid={best_bid}, best_ask={best_ask}, qty={fill_slice.quantity}, price={fill_slice.price}, ts={timestamp}")
+
         self._change_order_state_and_notify(order, OrderAction.CANCEL)
         self._change_order_state_and_notify(order, OrderAction.ACCEPT)
 
