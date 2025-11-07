@@ -26,10 +26,10 @@ class SimAccount(Account):
     def __init__(
         self,
         *,
-        account_id: str,
+        id: str,
         initial_available_money_by_currency: Mapping[Currency, Money] | None = None,
     ) -> None:
-        self._account_id = account_id
+        self._id = id
         self._available_money_by_currency: dict[Currency, Money] = dict(initial_available_money_by_currency or {})
         self._margins_by_instrument: dict[Instrument, MarginRequirements] = {}
         self._paid_fees: list[PaidFee] = []
@@ -41,8 +41,8 @@ class SimAccount(Account):
     # IDENTITY
 
     @property
-    def account_id(self) -> str:
-        return self._account_id
+    def id(self) -> str:
+        return self._id
 
     # AVAILABLE MONEY
 
@@ -171,10 +171,10 @@ class SimAccount(Account):
     # region Magic
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(account_id={self._account_id})"
+        return f"{self.__class__.__name__}(id={self._id})"
 
     def __repr__(self) -> str:
         balances = {c.code: m.value for c, m in self._available_money_by_currency.items()}
-        return f"{self.__class__.__name__}(account_id={self._account_id}, available_money={balances}, instruments_with_margin={len(self._margins_by_instrument)})"
+        return f"{self.__class__.__name__}(id={self._id}, available_money={balances}, instruments_with_margin={len(self._margins_by_instrument)})"
 
     # endregion

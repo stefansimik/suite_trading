@@ -435,7 +435,7 @@ class Strategy(ABC):
         Args:
             execution: The execution that occurred.
         """
-        logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received execution for Order $order_id ('{execution.order.id}')")
+        logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received execution for Order $id ('{execution.order.id}')")
 
     def on_order_updated(self, order: Order) -> None:
         """Called when $order changes one of its attributes (most common is filled/unfilled or order-state).
@@ -443,7 +443,7 @@ class Strategy(ABC):
         Args:
             order: The order that was updated.
         """
-        logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received order update for Order $order_id ('{order.id}')")
+        logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received order update for Order $id ('{order.id}')")
 
     # endregion
 

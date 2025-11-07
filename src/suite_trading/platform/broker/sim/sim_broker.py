@@ -77,7 +77,7 @@ class SimBroker(Broker, PriceSampleProcessor):
         self._order_updated_callback: Callable[[Order], None] | None = None
 
         # ACCOUNT
-        self._account: Account = SimAccount(account_id="SIM")
+        self._account: Account = SimAccount(id="SIM")
 
         # PRICE CACHE (last known price per instrument)
         self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}

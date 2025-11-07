@@ -141,11 +141,11 @@ class Broker(Protocol):
         """
         ...
 
-    def get_order(self, order_id: str) -> Order | None:
+    def get_order(self, id: str) -> Order | None:
         """Retrieve a single Order by $id, or None if not found.
 
         Args:
-            order_id: Identifier of the order to retrieve.
+            id: Identifier of the order to retrieve.
 
         Returns:
             Order | None: The matching order or None.

@@ -35,6 +35,6 @@ class FixedFeeModel(FeeModel):
     ) -> Money:
         # Check: ensure positive $quantity
         if quantity <= 0:
-            raise ValueError(f"Cannot call `compute_commission` because $quantity ({quantity}) <= 0 for $order_id ('{order.id}')")
+            raise ValueError(f"Cannot call `compute_commission` because $quantity ({quantity}) <= 0 for order $id ('{order.id}')")
 
         return self._fee_per_unit * quantity
