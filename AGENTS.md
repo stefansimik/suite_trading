@@ -203,6 +203,84 @@ self._last_order_time = now()
 - [ ] Code reference formatting followed (`$var`, `` `func` ``)
 - [ ] One empty line after a guard block before state-changing code
 
+### Section Header Comments
+
+- Use ALL CAPS for comments that label a multi-line section.
+- Keep a short noun phrase; parentheses optional.
+- No trailing period; lines ≤150 chars.
+- Use to group related API methods or logic inside a region or long function.
+- Scope: from header until the next ALL‑CAPS header at the same indentation or the end of the region.
+- Only use when at least two following lines belong to the section.
+
+Examples:
+```python
+# Short example — group two small sections
+
+# region Interface
+
+# MONEY (AVAILABLE FUNDS)
+def list_available_money_by_currency(self) -> list[tuple[Currency, Money]]: ...
+def get_available_money(self, currency: Currency) -> Money: ...
+
+# MARGIN (PER-INSTRUMENT)
+def block_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None: ...
+def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> None: ...
+
+# endregion
+```
+
+```python
+# More scenarios — inside a long function
+
+def place_order(self, order: Order) -> None:
+    # PARAM VALIDATION
+    if order.quantity <= 0:
+        raise ValueError(f"Cannot call `place_order` because $order.quantity ({order.quantity}) <= 0")
+
+    # ACTIONS (SIDE EFFECTS)
+    self._state = "SUBMITTED"
+    self._last_order_dt = now()
+    broker.submit(order)
+```
+
+```python
+# More scenarios — inside a Properties region
+
+# region Properties
+
+# ORDER (IDENTITY)
+@property
+def order_id(self) -> str: ...
+
+@property
+def client_order_id(self) -> str: ...
+
+# PRICES (SNAPSHOT)
+@property
+def last_price(self) -> Money: ...
+
+@property
+def bid_ask(self) -> tuple[Money, Money]: ...
+
+# endregion
+```
+
+```python
+# Anti-examples — do not do this
+
+# Validation.  # Trailing period — wrong
+if qty <= 0: ...
+
+# Validation   # Not ALL CAPS — wrong
+if qty <= 0: ...
+```
+
+Acceptance checks:
+- [ ] Header comments used only for multi-line sections (≥2 following lines)
+- [ ] Headers are ALL CAPS (parentheses optional) and have no trailing period
+- [ ] Scope ends at the next ALL‑CAPS header at the same indentation or region end
+- [ ] Lines ≤150 chars
+
 ### Validation Scope & Priorities
 
 - Validate only important, common, or risky issues and domain relationships that are likely
