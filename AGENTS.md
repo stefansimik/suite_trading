@@ -118,6 +118,56 @@ def __init__(
 - [ ] `Callable[[...], R]` style with explicit return type
 - [ ] Types imported properly; `get_type_hints` resolvable
 
+## 3.3. Parameter Layout in Calls
+
+When calling functions/methods/constructors, keep simple argument lists on a single line for fast scanning.
+
+### One-Line Parameters Rule
+- If arguments are only simple values, keep the entire call on one line — even if >150 chars.
+- "Simple" means: names/attributes (e.g., `qty`, `order.id`), literals (`10`, `"USD"`, `True`, `None`), and simple `key=value` pairs.
+- Do not split such calls across multiple lines just for visual width.
+
+### When to use multi-line
+- Use multi-line layout only if any argument contains complex logic: nested calls, arithmetic/boolean chains, comprehensions, lambdas, ternary expressions, or long f-strings.
+- In multi-line layout:
+  - Put one argument per line.
+  - Keep a trailing comma and align the closing parenthesis with the start of the call.
+
+### Examples
+```python
+# ✅ Good — simple arguments kept on one line (fast to read)
+order = Order(instrument, side, quantity, limit_price, tif, reduce_only=False, client_tag="alpha_v1")
+
+# ❌ Bad — splitting simple arguments without need
+order = Order(
+    instrument,
+    side,
+    quantity,
+    limit_price,
+    tif,
+    reduce_only=False,
+    client_tag="alpha_v1",
+)
+
+# ✅ Good — multi-line because arguments contain expressions/nested calls
+order = Order(
+    instrument,
+    compute_qty(signal, position, risk_model),
+    side,
+    compute_limit_price(book.best_bid(),
+    slippage=bps_to_price(2, instrument)),
+    client_tag=f"alpha_{now().date()}",
+)
+
+# ✅ Good — method call with only simple params stays on one line
+broker.place_order(strategy_name, instrument, side, quantity, limit_price, tif)
+```
+
+**Acceptance checks:**
+- [ ] Calls with only simple arguments are written on a single line (even if >150 chars)
+- [ ] Multi-line layout is used only when any argument includes an expression or nested call
+- [ ] Multi-line calls use one-argument-per-line with a trailing comma and aligned closing parenthesis
+
 ---
 
 # 4. Documentation, Comments & Messaging
