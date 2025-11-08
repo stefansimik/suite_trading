@@ -9,7 +9,7 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.domain.market_data.price_sample_source import PriceSampleIterable
+from suite_trading.domain.market_data.price_sample_iterable import PriceSampleIterable
 from suite_trading.platform.broker.capabilities import PriceSampleProcessor
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
@@ -559,12 +559,17 @@ class TradingEngine:
 
                     # Route Events of type PriceSampleIterable to all capable brokers
                     if isinstance(next_event, PriceSampleIterable):
-                        brokers = self._brokers_by_name_bidict.values()
-                        processors = [b for b in brokers if isinstance(b, PriceSampleProcessor)]
+                        # Prepare brokers (to process price-samples)
+                        all_brokers = self._brokers_by_name_bidict.values()
+                        filtered_brokers = [b for b in all_brokers if isinstance(b, PriceSampleProcessor)]
 
-                        for sample in next_event.iter_price_samples():
-                            for broker in processors:
-                                broker.process_price_sample(sample)
+                        # Prepare price-samples
+                        price_samples_iterator = next_event.iter_price_samples()
+
+                        # Report price-sample to each broker
+                        for price_sample in price_samples_iterator:
+                            for broker in filtered_brokers:
+                                broker.process_price_sample(price_sample)
 
                     # Notify EventFeed listeners after strategy callback.
                     # This is the single place listeners are invoked for EventFeed(s); feeds must not self-notify.
