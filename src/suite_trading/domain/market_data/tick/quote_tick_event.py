@@ -5,12 +5,13 @@ from datetime import datetime
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.price_sample import PriceSample
+from suite_trading.domain.market_data.price_sample_iterable import PriceSampleIterable
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.utils.datetime_utils import format_dt
 
 
-class QuoteTickEvent(Event):
+class QuoteTickEvent(Event, PriceSampleIterable):
     """Event wrapper carrying quote tick data with system metadata.
 
     This event represents the arrival of new quote tick data in the trading system.

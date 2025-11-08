@@ -8,10 +8,11 @@ from random import getrandbits
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.price_sample import PriceSample
+from suite_trading.domain.market_data.price_sample_iterable import PriceSampleIterable
 from suite_trading.utils.datetime_utils import format_dt
 
 
-class BarEvent(Event):
+class BarEvent(Event, PriceSampleIterable):
     """Event wrapper carrying bar data with system metadata.
 
     This event represents the arrival of new bar data in the trading system.

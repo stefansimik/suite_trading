@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 
 from suite_trading.domain.event import Event
+from suite_trading.domain.market_data.price_sample_iterable import PriceSampleIterable
 from suite_trading.domain.market_data.tick.trade_tick import TradeTick
 from suite_trading.utils.datetime_utils import format_dt
 
 
-class TradeTickEvent(Event):
+class TradeTickEvent(Event, PriceSampleIterable):
     """Event wrapper carrying trade tick data with system metadata.
 
     This event represents the arrival of new trade tick data in the trading system.
