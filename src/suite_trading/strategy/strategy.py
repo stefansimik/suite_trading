@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Callable
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
@@ -164,17 +164,21 @@ class Strategy(ABC):
 
     @property
     def wall_clock_time(self) -> datetime | None:
-        """Get the latest known wall clock time (max `dt_received` from all events) for this strategy.
+        """Get wall-clock time for this Strategy.
 
-        Returns the maximum dt_received seen across all events processed by this strategy. Use this
-        value for live cutoffs, timeouts, and latency checks. This is separate from
-        last_event_time.
+        Policy:
+            - LIVE: return the real system clock in UTC (`datetime.now(timezone.utc)`).
+            - Other states (e.g., NEW/ADDED/RUNNING/STOPPED/ERROR today): return the engine-tracked
+              maximum `dt_received` seen for this strategy.
+
+        Notes:
+            - This is separate from `last_event_time`, which tracks the last event’s `dt_event` for
+              this strategy only.
+            - Forward-compatible: if `LIVE` is not present in the state machine yet, behavior
+              remains unchanged for current states.
         """
-        # TODO:  Strategy state machine will be extended in the future with more granular state like: HISTORICAL / TRANSITION / LIVE
-        # This property will have to be updated then and computed based on the current state:
-        # - HISTORICAL: keep using the maximum dt_received from processed events
-        # - TRANSITION: decide behavior when this state is introduced
-        # - LIVE: use the real system clock (current NOW) for a realistic wall-clock time
+        if self.state == StrategyState.LIVE:
+            return datetime.now(timezone.utc)
 
         if self._trading_engine is None:
             return None
