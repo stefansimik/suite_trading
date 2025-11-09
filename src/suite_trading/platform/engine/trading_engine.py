@@ -9,12 +9,14 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.domain.market_data.price_sample_iterable import PriceSampleIterable
 from suite_trading.platform.broker.capabilities import PriceSampleProcessor
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
 from bidict import bidict
+
+from suite_trading.platform.broker.sim.models.aggregated_market_data_splitter.protocol import AggregatedMarketDataSplitter
+from suite_trading.platform.broker.sim.models.aggregated_market_data_splitter.impl.default import DefaultAggregatedMarketDataSplitter
 
 from suite_trading.utils.state_machine import StateMachine
 from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
@@ -108,6 +110,9 @@ class TradingEngine:
 
         # BACKTEST STATISTICS
         self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
+
+        # MODELS — aggregated market‑data splitter used to decompose events into PriceSample(s)
+        self._aggregated_market_data_splitter: AggregatedMarketDataSplitter = DefaultAggregatedMarketDataSplitter()
 
     # endregion
 
@@ -557,17 +562,12 @@ class TradingEngine:
                         # Cleanup all feeds for this strategy
                         self._close_and_remove_all_feeds_for_strategy(strategy)
 
-                    # Route Events of type PriceSampleIterable to all capable brokers
-                    if isinstance(next_event, PriceSampleIterable):
-                        # Prepare brokers (to process price-samples)
-                        all_brokers = self._brokers_by_name_bidict.values()
-                        filtered_brokers = [b for b in all_brokers if isinstance(b, PriceSampleProcessor)]
+                    # Route aggregated market‑data via the configured splitter to all PriceSampleProcessor brokers
+                    all_brokers = self._brokers_by_name_bidict.values()
+                    filtered_brokers = [b for b in all_brokers if isinstance(b, PriceSampleProcessor)]
 
-                        # Prepare price-samples
-                        price_samples_iterator = next_event.iter_price_samples()
-
-                        # Report price-sample to each broker
-                        for price_sample in price_samples_iterator:
+                    if self._aggregated_market_data_splitter.can_event_be_splitted(next_event):
+                        for price_sample in self._aggregated_market_data_splitter.split_event_into_price_samples(next_event):
                             for broker in filtered_brokers:
                                 broker.process_price_sample(price_sample)
 

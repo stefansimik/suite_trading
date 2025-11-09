@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
 from datetime import datetime
 
 from suite_trading.domain.event import Event
-from suite_trading.domain.market_data.price_sample import PriceSample
-from suite_trading.domain.market_data.price_sample_iterable import PriceSampleIterable
-from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.utils.datetime_utils import format_dt
 
 
-class QuoteTickEvent(Event, PriceSampleIterable):
+class QuoteTickEvent(Event):
     """Event wrapper carrying quote tick data with system metadata.
 
     This event represents the arrival of new quote tick data in the trading system.
@@ -35,20 +31,6 @@ class QuoteTickEvent(Event, PriceSampleIterable):
         """
         super().__init__(dt_event=quote_tick.timestamp, dt_received=dt_received)
         self._quote_tick = quote_tick
-
-    # endregion
-
-    # region Protocol PriceSampleIterable
-
-    def iter_price_samples(self) -> Iterator[PriceSample]:
-        """Yield BID then ASK `PriceSample` from $quote_tick in deterministic order."""
-        q = self.quote_tick
-        dt = self.dt_event
-        inst = q.instrument
-
-        # Emit best bid then best ask using existing Decimal values
-        yield PriceSample(inst, dt, PriceType.BID, q.bid_price)
-        yield PriceSample(inst, dt, PriceType.ASK, q.ask_price)
 
     # endregion
 
