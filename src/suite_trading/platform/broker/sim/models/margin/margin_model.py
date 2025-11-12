@@ -19,8 +19,8 @@ class MarginModel(Protocol):
 
     Notes:
         This protocol intentionally does not accept a `$price`. Implementations that need
-        pricing data should obtain the broker's last price (or last `PriceSample`) via a
-        dedicated source inside the implementation.
+        pricing data should obtain the broker's last OrderBook via a dedicated source
+        (e.g., LastOrderBookSource) inside the implementation.
     """
 
     def compute_initial_margin(

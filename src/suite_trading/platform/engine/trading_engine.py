@@ -9,14 +9,14 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import PriceSampleProcessor
+from suite_trading.platform.broker.capabilities import OrderBookProcessor
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
 from bidict import bidict
 
-from suite_trading.platform.broker.sim.models.aggregated_market_data_splitter.protocol import AggregatedMarketDataSplitter
-from suite_trading.platform.broker.sim.models.aggregated_market_data_splitter.impl.default import DefaultAggregatedMarketDataSplitter
+from suite_trading.platform.broker.sim.models.order_book_converter.protocol import OrderBookConverter
+from suite_trading.platform.broker.sim.models.order_book_converter.impl.default import DefaultOrderBookConverter
 
 from suite_trading.utils.state_machine import StateMachine
 from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
@@ -111,8 +111,8 @@ class TradingEngine:
         # BACKTEST STATISTICS
         self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
 
-        # MODELS — aggregated market‑data splitter used to decompose events into PriceSample(s)
-        self._aggregated_market_data_splitter: AggregatedMarketDataSplitter = DefaultAggregatedMarketDataSplitter()
+        # MODELS — OrderBook converter used to convert events into OrderBook(s)
+        self._order_book_converter: OrderBookConverter = DefaultOrderBookConverter()
 
     # endregion
 
@@ -562,14 +562,14 @@ class TradingEngine:
                         # Cleanup all feeds for this strategy
                         self._close_and_remove_all_feeds_for_strategy(strategy)
 
-                    # Route aggregated market‑data via the configured splitter to all PriceSampleProcessor brokers
-                    all_brokers = self._brokers_by_name_bidict.values()
-                    filtered_brokers = [b for b in all_brokers if isinstance(b, PriceSampleProcessor)]
+                    # Route market data via converter to all OrderBookProcessor brokers
+                    if self._order_book_converter.can_convert(next_event):
+                        order_books = self._order_book_converter.convert_to_order_books(next_event)
 
-                    if self._aggregated_market_data_splitter.can_event_be_splitted(next_event):
-                        for price_sample in self._aggregated_market_data_splitter.split_event_into_price_samples(next_event):
-                            for broker in filtered_brokers:
-                                broker.process_price_sample(price_sample)
+                        # Route to brokers implementing OrderBookProcessor
+                        for book in order_books:
+                            for broker in self._get_order_book_processors():
+                                broker.process_order_book(book)
 
                     # Notify EventFeed listeners after strategy callback.
                     # This is the single place listeners are invoked for EventFeed(s); feeds must not self-notify.
@@ -690,6 +690,14 @@ class TradingEngine:
             return self._event_feed_providers_by_name_bidict.inv[provider]
         except KeyError:
             raise KeyError(f"Cannot call `_get_event_feed_provider_name` because $provider (class {provider.__class__.__name__}) is not registered in this TradingEngine")
+
+    def _get_order_book_processors(self) -> list[OrderBookProcessor]:
+        """Return all brokers implementing OrderBookProcessor protocol.
+
+        Returns:
+            list[OrderBookProcessor]: Brokers that can process OrderBooks.
+        """
+        return [b for b in self._brokers_by_name_bidict.values() if isinstance(b, OrderBookProcessor)]
 
     # endregion
 

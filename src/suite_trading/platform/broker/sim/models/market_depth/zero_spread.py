@@ -1,34 +1,35 @@
 from __future__ import annotations
 
-from suite_trading.domain.market_data.order_book import OrderBook, BookLevel
-from suite_trading.domain.market_data.price_sample import PriceSample
+from suite_trading.domain.market_data.order_book import OrderBook
 
 
 # region Zero-spread implementation
 
 
 class ZeroSpreadMarketDepthModel:
-    """Zero-spread MarketDepthModel that builds an `OrderBook` at the sample price.
+    """Pass-through depth model - uses canonical OrderBook as-is.
 
-    - BUY fills at best ask, SELL at best bid (both equal to `$sample.price`).
-    - Negative prices are allowed and passed through (Guideline 7.1).
-    - Stateless and deterministic; no side effects.
+    This model performs no enrichment, returning the canonical OrderBook
+    unchanged. Suitable for backtesting with zero-spread assumptions or
+    when canonical OrderBooks already contain desired liquidity.
+
+    Notes:
+        - Stateless and deterministic; no side effects.
+        - Negative prices are allowed and passed through.
     """
 
     __slots__ = ()
 
-    def build_simulated_order_book(self, sample: PriceSample) -> OrderBook:
-        """Build a zero-spread `OrderBook` from $sample.
+    def enrich_order_book(self, canonical_book: OrderBook) -> OrderBook:
+        """Return canonical OrderBook unchanged (pass-through).
+
+        Args:
+            canonical_book: Canonical OrderBook from converter.
 
         Returns:
-            `OrderBook` with identical best bid/ask at `$sample.price` and large depth.
+            OrderBook: Same OrderBook instance, no enrichment applied.
         """
-        instrument = sample.instrument
-        single_level = BookLevel(
-            price=sample.price,
-            volume=instrument.quantity_from_lots(100_000_000),
-        )
-        return OrderBook(instrument=instrument, bids=[single_level], asks=[single_level])
+        return canonical_book
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}"

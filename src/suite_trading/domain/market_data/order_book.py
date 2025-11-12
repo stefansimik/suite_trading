@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Sequence, NamedTuple, TYPE_CHECKING
 from suite_trading.domain.order.order_enums import OrderSide
+from suite_trading.utils.datetime_utils import expect_utc, format_dt
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
@@ -49,6 +51,7 @@ class OrderBook:
 
     Args:
         instrument (Instrument): Instrument this OrderBook belongs to.
+        timestamp (datetime): Timestamp of this OrderBook snapshot (must be timezone-aware UTC).
         bids (Sequence[BookLevel]): Bid levels, best-first (highest price first).
         asks (Sequence[BookLevel]): Ask levels, best-first (lowest price first).
 
@@ -93,7 +96,7 @@ class OrderBook:
         1
     """
 
-    __slots__ = ("_instrument", "_bids", "_asks")
+    __slots__ = ("_instrument", "_timestamp", "_bids", "_asks")
 
     # Enable or disable validation for all instances of OrderBook.
     VALIDATE: bool = False
@@ -103,10 +106,12 @@ class OrderBook:
     def __init__(
         self,
         instrument: Instrument,
+        timestamp: datetime,
         bids: Sequence[BookLevel] = (),
         asks: Sequence[BookLevel] = (),
     ) -> None:
         self._instrument = instrument
+        self._timestamp = expect_utc(timestamp)
 
         # Store as immutable tuples of BookLevel.
         self._bids: tuple[BookLevel, ...] = tuple(bids)
@@ -184,6 +189,11 @@ class OrderBook:
     def instrument(self) -> Instrument:
         """Return the related Instrument."""
         return self._instrument
+
+    @property
+    def timestamp(self) -> datetime:
+        """Get the timestamp of this OrderBook snapshot."""
+        return self._timestamp
 
     @property
     def bids(self) -> tuple[BookLevel, ...]:
@@ -273,10 +283,33 @@ class OrderBook:
 
     # region Magic
 
+    def __eq__(self, other) -> bool:
+        """Check equality with another OrderBook.
+
+        Args:
+            other: The other object to compare with.
+
+        Returns:
+            bool: True if OrderBooks are equal, False otherwise.
+        """
+        if not isinstance(other, OrderBook):
+            return False
+        return self.instrument == other.instrument and self.timestamp == other.timestamp and self.bids == other.bids and self.asks == other.asks
+
+    def __hash__(self) -> int:
+        """Return hash value for the OrderBook.
+
+        This allows OrderBook objects to be used as dictionary keys.
+
+        Returns:
+            int: Hash value based on all attributes.
+        """
+        return hash((self.instrument, self.timestamp, self.bids, self.asks))
+
     def __str__(self) -> str:
         best_bid_price = self.best_bid.price if self.best_bid else None
         best_ask_price = self.best_ask.price if self.best_ask else None
-        return f"{self.__class__.__name__}(instrument={self._instrument}, best_bid={best_bid_price}, best_ask={best_ask_price}, bid_levels={len(self._bids)}, ask_levels={len(self._asks)})"
+        return f"{self.__class__.__name__}(instrument={self._instrument}, timestamp={format_dt(self.timestamp)}, best_bid={best_bid_price}, best_ask={best_ask_price}, bid_levels={len(self._bids)}, ask_levels={len(self._asks)})"
 
     __repr__ = __str__
 

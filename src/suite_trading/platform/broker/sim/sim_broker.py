@@ -7,7 +7,6 @@ import logging
 
 from suite_trading.platform.broker.account import Account
 from suite_trading.platform.broker.sim.sim_account import SimAccount
-from suite_trading.domain.market_data.price_sample import PriceSample
 from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.order.orders import (
     Order,
@@ -16,7 +15,7 @@ from suite_trading.domain.order.order_state import OrderAction, OrderStateCatego
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import PriceSampleProcessor
+from suite_trading.platform.broker.capabilities import OrderBookProcessor
 from suite_trading.platform.broker.sim.models.market_depth.market_depth_model import MarketDepthModel
 from suite_trading.platform.broker.sim.models.market_depth.zero_spread import ZeroSpreadMarketDepthModel
 from suite_trading.platform.broker.sim.models.fee.fee_model import FeeModel
@@ -35,10 +34,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SimBroker(Broker, PriceSampleProcessor):
+class SimBroker(Broker, OrderBookProcessor):
     """Simulated broker for backtesting/paper trading.
 
-    Public API is grouped under `Protocol Broker` and `Protocol PriceSampleProcessor` regions; other
+    Public API is grouped under `Protocol Broker` and `Protocol OrderBookProcessor` regions; other
     methods are under `Utilities` per AGENTS.md (sections 8.1, 8.4, 8.5, 8.6).
     """
 
@@ -79,8 +78,8 @@ class SimBroker(Broker, PriceSampleProcessor):
         # ACCOUNT
         self._account: Account = SimAccount(id="SIM")
 
-        # PRICE CACHE (last known price per instrument)
-        self._latest_price_sample_by_instrument: dict[Instrument, PriceSample] = {}
+        # ORDER BOOK CACHE (last known OrderBook per instrument)
+        self._latest_order_book_by_instrument: dict[Instrument, OrderBook] = {}
 
     # endregion
 
@@ -272,37 +271,41 @@ class SimBroker(Broker, PriceSampleProcessor):
 
     # endregion
 
-    # region Protocol PriceSampleProcessor
+    # region Protocol OrderBookProcessor
 
     # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
-    def process_price_sample(self, sample: PriceSample) -> None:
-        """Handle a new `PriceSample` and simulate fills for fillable orders.
+    def process_order_book(self, book: OrderBook) -> None:
+        """Process OrderBook snapshot for order matching.
 
-        Stores the latest sample, builds an `OrderBook` via the depth model, selects
-        fillable orders for the instrument, then for each order simulates fills using
-        the appropriate function and applies them via the unified post-match pipeline.
+        Steps:
+        1. Store latest book for instrument
+        2. Enrich via depth model (adds spread/depth)
+        3. Select fillable orders for instrument
+        4. Simulate fills and process
+
+        Args:
+            book: OrderBook snapshot to process.
         """
+        # Store latest book
+        self._latest_order_book_by_instrument[book.instrument] = book
 
-        # Store latest sample per instrument
-        self._latest_price_sample_by_instrument[sample.instrument] = sample
+        # Enrich with depth model
+        enriched_book = self._depth_model.enrich_order_book(book)
 
-        # Get order-book for fill simulation
-        order_book = self._depth_model.build_simulated_order_book(sample)
-
-        # Select FILLABLE orders (targeting the same instrument as input price-sample)
-        orders_to_process = [order for order in self._orders_by_id.values() if (order.instrument == sample.instrument) and (order.state_category == OrderStateCategory.FILLABLE)]
+        # Select FILLABLE orders
+        orders_to_process = [order for order in self._orders_by_id.values() if order.instrument == book.instrument and order.state_category == OrderStateCategory.FILLABLE]
 
         # Process each order
         for order in orders_to_process:
-            # Match Order/Price -> get fill-slices
+            # Match Order/OrderBook -> get fill-slices
             simulate_fill_slices_function = select_simulate_fills_function_for_order(order)
-            fill_slices: list[FillSlice] = simulate_fill_slices_function(order, order_book, sample)
+            fill_slices: list[FillSlice] = simulate_fill_slices_function(order, enriched_book)
             if not fill_slices:
                 continue
 
             # Process each fill-slice
             for fill_slice in fill_slices:
-                self._process_fill_slice(order, fill_slice, sample, order_book)
+                self._process_fill_slice(order, fill_slice, book, enriched_book)
                 # Stop if the order was terminalized by this fill-slice (e.g., order could be canceled on margin-call)
                 if order.state_category == OrderStateCategory.TERMINAL:
                     break
@@ -315,8 +318,8 @@ class SimBroker(Broker, PriceSampleProcessor):
         self,
         order: Order,
         fill_slice: FillSlice,
-        price_sample: PriceSample,
-        order_book: OrderBook,
+        book: OrderBook,
+        enriched_book: OrderBook,
     ) -> None:
         """Apply a single $fill_slice to $order.
 
@@ -332,11 +335,11 @@ class SimBroker(Broker, PriceSampleProcessor):
         Args:
             order: Order being filled.
             fill_slice: Single FillSlice to apply.
-            price_sample: PriceSample used for $timestamp and margin/fee models.
-            order_book: OrderBook for best bid/ask context in error handling.
+            book: Canonical OrderBook snapshot (for timestamp).
+            enriched_book: Enriched OrderBook used for matching (for best bid/ask context in error handling).
         """
         instrument = order.instrument
-        timestamp = price_sample.timestamp
+        timestamp = book.timestamp
 
         # CONTEXT — read current position, compute signed impact and net quantities
         position_before_trade = self._positions_by_instrument.get(instrument)
@@ -374,8 +377,8 @@ class SimBroker(Broker, PriceSampleProcessor):
                 order=order,
                 fill_slice=fill_slice,
                 timestamp=timestamp,
-                best_bid=order_book.best_bid.price,
-                best_ask=order_book.best_ask.price,
+                best_bid=enriched_book.best_bid.price,
+                best_ask=enriched_book.best_ask.price,
                 required_initial_margin_amount=initial_margin_amount_to_block_now,
                 commission_amount=commission_amount,
                 maintenance_margin_amount_released_by_trade=maintenance_margin_amount_released_by_trade,
@@ -430,8 +433,8 @@ class SimBroker(Broker, PriceSampleProcessor):
 
     # Prices & positions
     def _has_price_for_instrument(self, instrument: Instrument) -> bool:
-        sample = self._latest_price_sample_by_instrument.get(instrument)
-        return sample is not None
+        book = self._latest_order_book_by_instrument.get(instrument)
+        return book is not None
 
     def _record_execution_and_update_position(self, execution: Execution) -> None:
         """Record an execution and update the corresponding position.
@@ -504,7 +507,7 @@ class SimBroker(Broker, PriceSampleProcessor):
         Returns:
             A MarginModel instance with zero ratios to keep behavior stable unless configured.
         """
-        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"), last_price_sample_source=self)
+        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"), last_order_book_source=self)
 
     # Margin & funds
     def _compute_additional_exposure_quantity(
@@ -624,10 +627,17 @@ class SimBroker(Broker, PriceSampleProcessor):
 
     # endregion
 
-    # region Protocol LastPriceSampleSource
+    # region Protocol LastOrderBookSource
 
-    def get_last_price_sample(self, instrument: Instrument) -> PriceSample | None:
-        """Return latest known `PriceSample` for `$instrument`, or None if unknown."""
-        return self._latest_price_sample_by_instrument.get(instrument)
+    def get_last_order_book(self, instrument: Instrument) -> OrderBook | None:
+        """Return latest known OrderBook for $instrument, or None if unknown.
+
+        Args:
+            instrument: Instrument to get OrderBook for.
+
+        Returns:
+            OrderBook | None: Latest OrderBook snapshot, or None if not available.
+        """
+        return self._latest_order_book_by_instrument.get(instrument)
 
     # endregion

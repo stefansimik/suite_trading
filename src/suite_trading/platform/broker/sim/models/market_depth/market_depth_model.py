@@ -1,33 +1,46 @@
 from __future__ import annotations
 
 from typing import Protocol, TYPE_CHECKING
-from suite_trading.domain.market_data.order_book import OrderBook
 
 if TYPE_CHECKING:
-    from suite_trading.domain.market_data.price_sample import PriceSample
+    from suite_trading.domain.market_data.order_book import OrderBook
 
 
 # region Interface
 
 
 class MarketDepthModel(Protocol):
-    """Domain interface for building a simulated `OrderBook` from a `PriceSample`.
+    """Protocol for enriching canonical OrderBooks with market microstructure.
 
-    Why convert `PriceSample` to `OrderBook`?
-    - Customizable simulation surface to encode spread, depth, slippage, liquidity.
-    - Separation of concerns: Brokers match against an `OrderBook` without knowing how it
-      was modeled.
-    - Deterministic matching: Explicit best bid/ask (and levels) for predictable tests.
+    Purpose:
+        Take a canonical (thin/zero-spread) OrderBook from the converter and return
+        an enriched version with added spread, depth, and liquidity modeling. This
+        allows different brokers to test with different market microstructure assumptions.
 
-    Args:
-        sample: Latest price sample for an instrument.
+    Enrichment may include:
+        - Adding spread for zero-spread books (realistic bid/ask)
+        - Adding depth for thin books (multiple price levels)
+        - Modeling slippage and market impact
+        - Broker-specific liquidity assumptions
 
-    Returns:
-        An `OrderBook` snapshot. Brokers typically use best bid/ask; deeper levels may be
-        provided for advanced matching.
+    Notes:
+        - Implementations may return the input unchanged (pass-through) or create
+          a new OrderBook with added microstructure.
+        - The enriched OrderBook is used for order matching by the broker.
     """
 
-    def build_simulated_order_book(self, sample: PriceSample) -> OrderBook:  # pragma: no cover
+    def enrich_order_book(self, canonical_book: OrderBook) -> OrderBook:
+        """Enrich canonical OrderBook with market microstructure.
+
+        Takes a canonical (thin/zero-spread) OrderBook and returns an enriched
+        version with added spread, depth, and liquidity modeling.
+
+        Args:
+            canonical_book: Canonical OrderBook from converter (thin/zero-spread).
+
+        Returns:
+            OrderBook: Enriched OrderBook with market microstructure applied.
+        """
         ...
 
 
