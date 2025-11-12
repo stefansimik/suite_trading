@@ -169,10 +169,9 @@ class SimBroker(Broker, OrderBookProcessor):
 
         Request modification of an existing order.
 
-        Validates that the broker is connected, the $order is tracked, and not in a terminal
-        category. Emits UPDATE → ACCEPT transitions via the centralized notifier. Re-indexing is
-        not required for the current set of modifications; callers should pass a fully updated
-        `Order` instance where identifiers do not change.
+        Validates that the broker is connected, the $order is tracked, not in a terminal
+        category, and that immutable fields ($instrument) have not changed. Emits UPDATE → ACCEPT
+        transitions via the centralized notifier.
         """
         # Check: broker must be connected to act on orders
         if not self._connected:
@@ -186,6 +185,10 @@ class SimBroker(Broker, OrderBookProcessor):
         # Check: terminal orders cannot be modified
         if tracked.state_category == OrderStateCategory.TERMINAL:
             raise ValueError(f"Cannot call `modify_order` because Order $state_category ({tracked.state_category.name}) is terminal.")
+
+        # Check: instrument cannot be changed via modification
+        if tracked.instrument != order.instrument:
+            raise ValueError(f"Cannot call `modify_order` because $instrument changed from '{tracked.instrument}' to '{order.instrument}' for Order $id ('{order.id}')")
 
         # Transitions: UPDATE → ACCEPT
         self._change_order_state_and_notify(tracked, OrderAction.UPDATE)

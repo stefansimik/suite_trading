@@ -96,24 +96,32 @@ class Broker(Protocol):
     def cancel_order(self, order: Order) -> None:
         """Cancel an existing $order.
 
+        Implementations should be idempotent: calling this method on a terminal order
+        (already cancelled/filled/rejected) should not raise an error. Implementations
+        may log a warning and return without state changes.
+
         Args:
             order (Order): The Order to cancel.
 
         Raises:
             ConnectionError: If not connected to broker.
-            ValueError: If $order cannot be cancelled (e.g., already filled or not found).
+            ValueError: If $order is not tracked by this broker.
         """
         ...
 
     def modify_order(self, order: Order) -> None:
         """Modify an existing order in place.
 
+        The following fields are immutable and must not change between the tracked order
+        and the modified order: $id, $instrument. Implementations must validate these
+        constraints and raise ValueError if violated.
+
         Args:
-            order (Order): The order carrying updated fields (e.g., limit price, quantity).
+            order (Order): The order carrying updated fields (must have same $id and $instrument as tracked order).
 
         Raises:
             ConnectionError: If not connected to broker.
-            ValueError: If the order cannot be modified (e.g., already filled or not found).
+            ValueError: If $order is not tracked, order is terminal, or immutable fields ($id, $instrument) have changed.
             NotSupportedError: If the broker does not support order modification.
         """
         ...
