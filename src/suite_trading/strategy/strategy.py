@@ -369,44 +369,38 @@ class Strategy(ABC):
 
         engine.submit_order(order, broker, self)
 
-    # FIXME: Order is already created and should already know to which Broker it is attached.
-    #   So we should not need to pass it as an argument here.
-    def cancel_order(self, order: Order, broker: Broker) -> None:
+    def cancel_order(self, order: Order) -> None:
         """Cancel an existing order.
 
         Allowed only when the strategy is RUNNING.
 
         Args:
             order (Order): The order to cancel.
-            broker (Broker): The broker to cancel the order with.
 
         Raises:
             RuntimeError: If $trading_engine is None or $state is not RUNNING.
+            KeyError: If $order was not submitted through this Strategy.
         """
         engine = self._require_trading_engine()
 
         # Check: state must be RUNNING to cancel orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
-            raise RuntimeError(
-                f"Cannot call `cancel_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}",
-            )
+            raise RuntimeError(f"Cannot call `cancel_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
-        engine.cancel_order(order, broker)
+        engine.cancel_order(order)
 
-    # FIXME: Order is already created and should already know to which Broker it is attached.
-    #   So we should not need to pass it as an argument here.
-    def modify_order(self, order: Order, broker: Broker) -> None:
+    def modify_order(self, order: Order) -> None:
         """Modify an existing order.
 
         Allowed only when the strategy is RUNNING.
 
         Args:
             order (Order): The order to modify with updated parameters.
-            broker (Broker): The broker to modify the order with.
 
         Raises:
             RuntimeError: If $trading_engine is None or $state is not RUNNING.
+            KeyError: If $order was not submitted through this Strategy.
         """
         engine = self._require_trading_engine()
 
@@ -415,7 +409,7 @@ class Strategy(ABC):
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `modify_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
-        engine.modify_order(order, broker)
+        engine.modify_order(order)
 
     def get_routing_for_order(self, order: Order) -> StrategyBrokerPair:
         """Lookup  route (strategy, broker) for $order.

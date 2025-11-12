@@ -784,30 +784,40 @@ class TradingEngine:
         # Delegate to broker
         broker.submit_order(order)
 
-    def cancel_order(self, order: Order, broker: Broker) -> None:
+    def cancel_order(self, order: Order) -> None:
         """Cancel an order with your broker.
 
         Args:
             order: The order to cancel.
-            broker: The broker to use.
 
         Raises:
             ConnectionError: If the broker is not connected.
             ValueError: If the order cannot be cancelled.
+            KeyError: If $order was not submitted through this TradingEngine.
         """
+        # Check: order must have been submitted through this engine
+        if order not in self._routing_by_order:
+            raise KeyError(f"Cannot call `cancel_order` because $order (id '{order.id}') was not submitted through this TradingEngine")
+
+        strategy, broker = self.get_routing_for_order(order)
         broker.cancel_order(order)
 
-    def modify_order(self, order: Order, broker: Broker) -> None:
+    def modify_order(self, order: Order) -> None:
         """Change an order with your broker.
 
         Args:
             order: The order to modify with updated parameters.
-            broker: The broker to use.
 
         Raises:
             ConnectionError: If the broker is not connected.
             ValueError: If the order cannot be modified.
+            KeyError: If $order was not submitted through this TradingEngine.
         """
+        # Check: order must have been submitted through this engine
+        if order not in self._routing_by_order:
+            raise KeyError(f"Cannot call `modify_order` because $order (id '{order.id}') was not submitted through this TradingEngine")
+
+        strategy, broker = self.get_routing_for_order(order)
         broker.modify_order(order)
 
     def get_routing_for_order(self, order: Order) -> StrategyBrokerPair:
