@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import TYPE_CHECKING, Callable
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
@@ -145,22 +144,6 @@ class Strategy(ABC):
             StrategyState: Current lifecycle state of this strategy.
         """
         return self._state_machine.current_state
-
-    # endregion
-
-    # region Times
-
-    @property
-    def last_event_time(self) -> datetime | None:
-        """Get time (`dt_event`) of the last event for this strategy.
-
-        Returns the dt_event of the last processed event for this strategy. Advances only when this
-        strategy processes an event. Each strategy has its own independent timeline.
-        """
-        if self._trading_engine is None:
-            return None
-
-        return self._trading_engine._clocks_by_strategy[self].last_event_time
 
     # endregion
 

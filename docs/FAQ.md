@@ -371,15 +371,17 @@ Implications:
 
 ### Strategy clocks
 
-Each strategy tracks its own timeline using the last processed event time:
+Each strategy tracks its own timeline internally using the last processed event time. This value is used by
+the engine for consistency and future statistics, but it is not exposed as a public property on `Strategy` yet.
 
-- `last_event_time`: time of the last event you processed (`event.dt_event`)
+In your strategy code, you typically work directly with event timestamps:
 
-You can still access the event's receive time directly from the `$event` object when needed:
+- `event.dt_event`: official event timestamp
+- `event.dt_received`: when the event was received by the system
 
 ```python
 def on_event(self, event):
-    print(f"Processing event at {self.last_event_time}")
+    print(f"Processing event at {event.dt_event}")
     print(f"System received it at {event.dt_received}")
 ```
 

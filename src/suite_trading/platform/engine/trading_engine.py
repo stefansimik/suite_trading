@@ -1,6 +1,5 @@
 from __future__ import annotations
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, NamedTuple, TYPE_CHECKING
 
@@ -43,18 +42,6 @@ class EventFeedCallbackPair(NamedTuple):
     callback: Callable[[Event], None]
 
 
-## StrategyBrokerPair moved to routing module to avoid duplication and engine coupling.
-
-
-@dataclass
-class StrategyClocks:
-    last_event_time: datetime | None = None
-
-    def update_on_event(self, dt_event: datetime) -> None:
-        # Advance timeline to official event time
-        self.last_event_time = dt_event
-
-
 # endregion
 
 
@@ -95,7 +82,7 @@ class TradingEngine:
 
         # Strategies
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
-        self._clocks_by_strategy: dict[Strategy, StrategyClocks] = {}
+        self._last_event_time_by_strategy: dict[Strategy, datetime | None] = {}
 
         # EventFeedProviders & EventFeeds
         self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
@@ -256,8 +243,8 @@ class TradingEngine:
         strategy.set_trading_engine(self)
         self._strategies_by_name_bidict[name] = strategy
 
-        # Set up clocks tracking for this strategy
-        self._clocks_by_strategy[strategy] = StrategyClocks()
+        # Set up last-event-time tracking for this strategy (no events processed yet)
+        self._last_event_time_by_strategy[strategy] = None
 
         # Set up EventFeed tracking for this strategy
         self._event_feeds_by_strategy[strategy] = {}
@@ -356,9 +343,9 @@ class TradingEngine:
             valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}")
 
-        # Remove clocks tracking for this strategy
-        if strategy in self._clocks_by_strategy:
-            del self._clocks_by_strategy[strategy]
+        # Remove last-event-time tracking for this strategy
+        if strategy in self._last_event_time_by_strategy:
+            del self._last_event_time_by_strategy[strategy]
 
         # Remove EventFeed tracking for this strategy
         del self._event_feeds_by_strategy[strategy]
@@ -543,8 +530,8 @@ class TradingEngine:
                     feed_name, feed, callback = next_feed_tuple
                     next_event = feed.pop()
 
-                    # Update clocks for this strategy
-                    self._clocks_by_strategy[strategy].update_on_event(next_event.dt_event)
+                    # Update last event time for this strategy
+                    self._last_event_time_by_strategy[strategy] = next_event.dt_event
 
                     # Process event in its callback
                     try:
@@ -626,8 +613,9 @@ class TradingEngine:
             raise ValueError("Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name ('{feed_name}') is already used for this strategy. Choose a different name.")
 
         # Timeline filtering if the strategy already processed events
-        if strategy.last_event_time is not None:
-            event_feed.remove_events_before(strategy.last_event_time)
+        last_event_time = self._last_event_time_by_strategy.get(strategy)
+        if last_event_time is not None:
+            event_feed.remove_events_before(last_event_time)
 
         # Register locally
         event_feeds_by_name_dict[feed_name] = EventFeedCallbackPair(event_feed, callback)
