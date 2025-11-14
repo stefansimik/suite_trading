@@ -371,15 +371,16 @@ Implications:
 
 ### Strategy clocks
 
-Each strategy tracks two times automatically:
+Each strategy tracks its own timeline using the last processed event time:
 
 - `last_event_time`: time of the last event you processed (`event.dt_event`)
-- `wall_clock_time`: when the event was received (`event.dt_received`)
+
+You can still access the event's receive time directly from the `$event` object when needed:
 
 ```python
 def on_event(self, event):
     print(f"Processing event at {self.last_event_time}")
-    print(f"System received it at {self.wall_clock_time}")
+    print(f"System received it at {event.dt_received}")
 ```
 
 If you need frequent “ticks,” add `FixedIntervalEventFeed` to nudge your logic.

@@ -49,14 +49,10 @@ class EventFeedCallbackPair(NamedTuple):
 @dataclass
 class StrategyClocks:
     last_event_time: datetime | None = None
-    wall_clock_time: datetime | None = None
 
-    def update_on_event(self, dt_event: datetime, dt_received: datetime) -> None:
+    def update_on_event(self, dt_event: datetime) -> None:
         # Advance timeline to official event time
         self.last_event_time = dt_event
-        # Keep monotonic max of when the system received events
-        if self.wall_clock_time is None or dt_received > self.wall_clock_time:
-            self.wall_clock_time = dt_received
 
 
 # endregion
@@ -548,7 +544,7 @@ class TradingEngine:
                     next_event = feed.pop()
 
                     # Update clocks for this strategy
-                    self._clocks_by_strategy[strategy].update_on_event(next_event.dt_event, next_event.dt_received)
+                    self._clocks_by_strategy[strategy].update_on_event(next_event.dt_event)
 
                     # Process event in its callback
                     try:

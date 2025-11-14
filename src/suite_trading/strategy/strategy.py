@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING, Callable
 from suite_trading.domain.event import Event
 from suite_trading.domain.order.orders import Order
@@ -161,29 +161,6 @@ class Strategy(ABC):
             return None
 
         return self._trading_engine._clocks_by_strategy[self].last_event_time
-
-    @property
-    def wall_clock_time(self) -> datetime | None:
-        """Get wall-clock time for this Strategy.
-
-        Policy:
-            - LIVE: return the real system clock in UTC (`datetime.now(timezone.utc)`).
-            - Other states (e.g., NEW/ADDED/RUNNING/STOPPED/ERROR today): return the engine-tracked
-              maximum `dt_received` seen for this strategy.
-
-        Notes:
-            - This is separate from `last_event_time`, which tracks the last event’s `dt_event` for
-              this strategy only.
-            - Forward-compatible: if `LIVE` is not present in the state machine yet, behavior
-              remains unchanged for current states.
-        """
-        if self.state == StrategyState.LIVE:
-            return datetime.now(timezone.utc)
-
-        if self._trading_engine is None:
-            return None
-
-        return self._trading_engine._clocks_by_strategy[self].wall_clock_time
 
     # endregion
 
