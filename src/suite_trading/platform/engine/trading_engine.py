@@ -19,6 +19,7 @@ from suite_trading.platform.broker.sim.models.order_book_converter.impl.default 
 
 from suite_trading.utils.state_machine import StateMachine
 from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
+from suite_trading.utils.datetime_utils import format_dt
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
@@ -83,6 +84,7 @@ class TradingEngine:
         # Strategies
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
         self._last_event_time_by_strategy: dict[Strategy, datetime | None] = {}
+        self._last_order_book_timestamp_by_strategy: dict[Strategy, datetime | None] = {}
 
         # EventFeedProviders & EventFeeds
         self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
@@ -246,6 +248,9 @@ class TradingEngine:
         # Set up last-event-time tracking for this strategy (no events processed yet)
         self._last_event_time_by_strategy[strategy] = None
 
+        # Set up last-order-book-timestamp tracking for this strategy (no OrderBooks processed yet)
+        self._last_order_book_timestamp_by_strategy[strategy] = None
+
         # Set up EventFeed tracking for this strategy
         self._event_feeds_by_strategy[strategy] = {}
 
@@ -346,6 +351,10 @@ class TradingEngine:
         # Remove last-event-time tracking for this strategy
         if strategy in self._last_event_time_by_strategy:
             del self._last_event_time_by_strategy[strategy]
+
+        # Remove last-order-book-timestamp tracking for this strategy
+        if strategy in self._last_order_book_timestamp_by_strategy:
+            del self._last_order_book_timestamp_by_strategy[strategy]
 
         # Remove EventFeed tracking for this strategy
         del self._event_feeds_by_strategy[strategy]
@@ -530,10 +539,33 @@ class TradingEngine:
                     feed_name, feed, callback = next_feed_tuple
                     next_event = feed.pop()
 
+                    # Convert event to OrderBooks FIRST (before delivering to Strategy)
+                    if self._order_book_converter.can_convert(next_event):
+                        order_books = self._order_book_converter.convert_to_order_books(next_event)
+
+                        # Filter and process OrderBooks chronologically (no going back in time)
+                        # Get last OrderBook timestamp for this Strategy
+                        last_order_book_timestamp = self._last_order_book_timestamp_by_strategy[strategy]
+                        for order_book in order_books:
+                            # Check: OrderBook timestamp must be after last processed timestamp
+                            if (last_order_book_timestamp is not None) and (order_book.timestamp <= last_order_book_timestamp):
+                                logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than or equal to last processed {format_dt(last_order_book_timestamp)}")
+                                continue
+
+                            # Process OrderBook with valid timestamp
+                            logger.debug(f"Processing OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
+
+                            # Route to brokers implementing OrderBookProcessor for price matching
+                            for broker in self._get_order_book_processors():
+                                broker.process_order_book(order_book)
+
+                            # Update last OrderBook timestamp for this Strategy
+                            self._last_order_book_timestamp_by_strategy[strategy] = order_book.timestamp
+
                     # Update last event time for this strategy
                     self._last_event_time_by_strategy[strategy] = next_event.dt_event
 
-                    # Process event in its callback
+                    # Process event in its callback (deliver to Strategy)
                     try:
                         callback(next_event)
                     except Exception as e:
@@ -544,15 +576,6 @@ class TradingEngine:
                         strategy.on_error(e)
                         # Cleanup all feeds for this strategy
                         self._close_and_remove_all_feeds_for_strategy(strategy)
-
-                    # Route market data via converter to all OrderBookProcessor brokers
-                    if self._order_book_converter.can_convert(next_event):
-                        order_books = self._order_book_converter.convert_to_order_books(next_event)
-
-                        # Route to brokers implementing OrderBookProcessor
-                        for book in order_books:
-                            for broker in self._get_order_book_processors():
-                                broker.process_order_book(book)
 
                     # Notify EventFeed listeners after strategy callback.
                     # This is the single place listeners are invoked for EventFeed(s); feeds must not self-notify.
