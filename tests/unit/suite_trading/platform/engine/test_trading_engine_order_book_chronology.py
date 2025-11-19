@@ -24,7 +24,7 @@ from suite_trading.domain.order.orders import Order
 # region Mock Components
 
 
-class MockOrderBookProcessor(Broker):
+class MockOrderBookDrivenBroker(Broker):
     """Mock broker that tracks processed OrderBooks for testing."""
 
     def __init__(self):
@@ -120,7 +120,7 @@ def test_order_book_chronology_with_mixed_tick_and_bar_feeds():
     """
     # Create test components
     instrument = create_test_instrument()
-    mock_broker = MockOrderBookProcessor()
+    mock_broker = MockOrderBookDrivenBroker()
     strategy = TestStrategy("test_strategy")
     engine = TradingEngine()
 
@@ -217,7 +217,7 @@ def test_order_book_chronology_with_delayed_bars():
     """
     # Create test components
     instrument = create_test_instrument()
-    mock_broker = MockOrderBookProcessor()
+    mock_broker = MockOrderBookDrivenBroker()
     strategy = TestStrategy("test_strategy")
     engine = TradingEngine()
 

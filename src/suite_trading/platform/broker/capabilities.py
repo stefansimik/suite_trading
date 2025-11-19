@@ -7,15 +7,15 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class OrderBookProcessor(Protocol):
-    """Capability marker for components that process order book snapshots.
+class OrderBookDrivenBroker(Protocol):
+    """Brokers that rely on OrderBook updates to simulate price matching.
 
-    Common example is `SimBroker`, that consumes OrderBook snapshots to drive
-    order matching and fill simulation.
+    Used to distinguish simulated/paper/backtest brokers that need detailed price
+    updates to drive order matching. Live brokers typically ignore these updates.
     """
 
     def process_order_book(self, book: OrderBook) -> None:
-        """Process OrderBook for order matching and fills.
+        """Consume an OrderBook snapshot to perform simulated order-price matching.
 
         Args:
             book: OrderBook snapshot to process.

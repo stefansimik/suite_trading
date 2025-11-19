@@ -8,7 +8,7 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import OrderBookProcessor
+from suite_trading.platform.broker.capabilities import OrderBookDrivenBroker
 from suite_trading.domain.order.orders import Order
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
@@ -555,8 +555,8 @@ class TradingEngine:
                             # Process OrderBook with valid timestamp
                             logger.debug(f"Processing OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
 
-                            # Route to brokers implementing OrderBookProcessor for price matching
-                            for broker in self._get_order_book_processors():
+                            # Route to brokers implementing OrderBookDrivenBroker for order-price matching
+                            for broker in self._get_order_book_driven_brokers():
                                 broker.process_order_book(order_book)
 
                             # Update last OrderBook timestamp for this Strategy
@@ -698,13 +698,13 @@ class TradingEngine:
         except KeyError:
             raise KeyError(f"Cannot call `_get_event_feed_provider_name` because $provider (class {provider.__class__.__name__}) is not registered in this TradingEngine")
 
-    def _get_order_book_processors(self) -> list[OrderBookProcessor]:
-        """Return all brokers implementing OrderBookProcessor protocol.
+    def _get_order_book_driven_brokers(self) -> list[OrderBookDrivenBroker]:
+        """Return brokers that consume OrderBook updates for simulated matching.
 
         Returns:
-            list[OrderBookProcessor]: Brokers that can process OrderBooks.
+            list[OrderBookDrivenBroker]: Brokers that require OrderBook updates.
         """
-        return [b for b in self._brokers_by_name_bidict.values() if isinstance(b, OrderBookProcessor)]
+        return [b for b in self._brokers_by_name_bidict.values() if isinstance(b, OrderBookDrivenBroker)]
 
     # endregion
 

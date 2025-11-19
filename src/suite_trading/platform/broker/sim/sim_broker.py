@@ -15,7 +15,7 @@ from suite_trading.domain.order.order_state import OrderAction, OrderStateCatego
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import OrderBookProcessor
+from suite_trading.platform.broker.capabilities import OrderBookDrivenBroker
 from suite_trading.platform.broker.sim.models.market_depth.market_depth_model import MarketDepthModel
 from suite_trading.platform.broker.sim.models.market_depth.zero_spread import ZeroSpreadMarketDepthModel
 from suite_trading.platform.broker.sim.models.fee.fee_model import FeeModel
@@ -34,10 +34,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SimBroker(Broker, OrderBookProcessor):
+class SimBroker(Broker, OrderBookDrivenBroker):
     """Simulated broker for backtesting/paper trading.
 
-    Public API is grouped under `Protocol Broker` and `Protocol OrderBookProcessor` regions; other
+    Public API is grouped under `Protocol Broker` and `Protocol OrderBookDrivenBroker` regions; other
     methods are under `Utilities` per AGENTS.md (sections 8.1, 8.4, 8.5, 8.6).
     """
 
@@ -274,7 +274,7 @@ class SimBroker(Broker, OrderBookProcessor):
 
     # endregion
 
-    # region Protocol OrderBookProcessor
+    # region Protocol OrderBookDrivenBroker
 
     # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
     def process_order_book(self, book: OrderBook) -> None:
