@@ -14,10 +14,10 @@ class OrderBookDrivenBroker(Protocol):
     updates to drive order matching. Live brokers typically ignore these updates.
     """
 
-    def process_order_book(self, book: OrderBook) -> None:
+    def process_order_book(self, order_book: OrderBook) -> None:
         """Consume an OrderBook snapshot to perform simulated order-price matching.
 
         Args:
-            book: OrderBook snapshot to process.
+            order_book: OrderBook snapshot to process.
         """
         ...

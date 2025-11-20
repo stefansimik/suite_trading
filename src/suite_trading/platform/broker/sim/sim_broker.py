@@ -139,6 +139,14 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         # SUBMITTED → State WORKING
         self._change_order_state_and_notify(order, OrderAction.ACCEPT)
 
+        # Try to immediately match the new order against the latest known canonical OrderBook for its instrument.
+        # This mirrors real broker behavior where new orders are evaluated against the current book without waiting
+        # for another price update. If we have no OrderBook yet for this instrument, the order will be matched later
+        # when the first OrderBook arrives.
+        last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
+        if last_order_book is not None and order.state_category == OrderStateCategory.FILLABLE:
+            self._simulate_and_apply_fills_for_order_with_order_book(order, last_order_book)
+
     def cancel_order(self, order: Order) -> None:
         """Implements: Broker.cancel_order.
 
@@ -277,54 +285,82 @@ class SimBroker(Broker, OrderBookDrivenBroker):
     # region Protocol OrderBookDrivenBroker
 
     # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
-    def process_order_book(self, book: OrderBook) -> None:
+    def process_order_book(self, order_book: OrderBook) -> None:
         """Process OrderBook snapshot for order matching.
 
-        Steps:
-        1. Store latest book for instrument
-        2. Enrich via depth model (adds spread/depth)
-        3. Select fillable orders for instrument
-        4. Simulate fills and process
+        The incoming $order_book is enriched via the configured MarketDepthModel and the
+        resulting snapshot becomes the canonical OrderBook used for matching and stored
+        as the latest book for this instrument.
 
         Args:
-            book: OrderBook snapshot to process.
+            order_book: OrderBook snapshot to process.
         """
-        # Store latest book
-        self._latest_order_book_by_instrument[book.instrument] = book
+        # Enrich with depth model and treat the result as canonical OrderBook
+        enriched_order_book = self._depth_model.enrich_order_book(order_book)
 
-        # Enrich with depth model
-        enriched_book = self._depth_model.enrich_order_book(book)
+        # Store latest canonical OrderBook (already enriched)
+        self._latest_order_book_by_instrument[enriched_order_book.instrument] = enriched_order_book
 
-        # Select FILLABLE orders
-        orders_to_process = [order for order in self._orders_by_id.values() if order.instrument == book.instrument and order.state_category == OrderStateCategory.FILLABLE]
+        # Select FILLABLE orders for this instrument
+        orders_to_process = [order for order in self._orders_by_id.values() if order.instrument == enriched_order_book.instrument and order.state_category == OrderStateCategory.FILLABLE]
 
-        # Process each order
+        # Process each order using shared fill simulation logic
         for order in orders_to_process:
-            # Match Order/OrderBook -> get fill-slices
-            simulate_fill_slices_function = select_simulate_fills_function_for_order(order)
-            fill_slices: list[FillSlice] = simulate_fill_slices_function(order, enriched_book)
-            if not fill_slices:
-                continue
+            self._simulate_and_apply_fills_for_order_with_order_book(order, enriched_order_book)
 
-            # Process each fill-slice
-            for fill_slice in fill_slices:
-                self._process_fill_slice(order, fill_slice, book, enriched_book)
-                # Stop if the order was terminalized by this fill-slice (e.g., order could be canceled on margin-call)
-                if order.state_category == OrderStateCategory.TERMINAL:
-                    break
+    # endregion
+
+    # region Protocol LastOrderBookSource
+
+    def get_last_order_book(self, instrument: Instrument) -> OrderBook | None:
+        """Return latest known OrderBook for $instrument, or None if unknown.
+
+        Args:
+            instrument: Instrument to get OrderBook for.
+
+        Returns:
+            OrderBook | None: Latest OrderBook snapshot, or None if not available.
+        """
+        return self._latest_order_book_by_instrument.get(instrument)
 
     # endregion
 
     # region Utilities
 
+    def _simulate_and_apply_fills_for_order_with_order_book(
+        self,
+        order: Order,
+        order_book: OrderBook,
+    ) -> None:
+        """Simulate and apply fills for a single $order using canonical OrderBook.
+
+        The $order_book was already enriched by MarketDepthModel and is treated as
+        the canonical snapshot for matching, margin, and logging.
+        """
+        if order.state_category != OrderStateCategory.FILLABLE:
+            return
+
+        simulate_fill_slices_function = select_simulate_fills_function_for_order(order)
+        fill_slices: list[FillSlice] = simulate_fill_slices_function(order, order_book)
+        if not fill_slices:
+            return
+
+        for fill_slice in fill_slices:
+            self._process_fill_slice(order, fill_slice, order_book)
+            # Stop if the order was terminalized by this fill-slice (e.g., order could be canceled on margin-call)
+            if order.state_category == OrderStateCategory.TERMINAL:
+                break
+
     def _process_fill_slice(
         self,
         order: Order,
         fill_slice: FillSlice,
-        book: OrderBook,
-        enriched_book: OrderBook,
+        order_book: OrderBook,
     ) -> None:
-        """Apply a single $fill_slice to $order.
+        """Apply a single $fill_slice to $order using canonical OrderBook.
+
+        The $order_book was already enriched by MarketDepthModel and is the single
+        source for timestamp and best bid/ask context.
 
         Steps:
         - compute affordability (initial margin, commission, maintenance release)
@@ -338,11 +374,10 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         Args:
             order: Order being filled.
             fill_slice: Single FillSlice to apply.
-            book: Canonical OrderBook snapshot (for timestamp).
-            enriched_book: Enriched OrderBook used for matching (for best bid/ask context in error handling).
+            order_book: Canonical OrderBook snapshot used for matching and margin.
         """
         instrument = order.instrument
-        timestamp = book.timestamp
+        timestamp = order_book.timestamp
 
         # CONTEXT — read current position, compute signed impact and net quantities
         position_before_trade = self._positions_by_instrument.get(instrument)
@@ -380,8 +415,8 @@ class SimBroker(Broker, OrderBookDrivenBroker):
                 order=order,
                 fill_slice=fill_slice,
                 timestamp=timestamp,
-                best_bid=enriched_book.best_bid.price,
-                best_ask=enriched_book.best_ask.price,
+                best_bid=order_book.best_bid.price,
+                best_ask=order_book.best_ask.price,
                 required_initial_margin_amount=initial_margin_amount_to_block_now,
                 commission_amount=commission_amount,
                 maintenance_margin_amount_released_by_trade=maintenance_margin_amount_released_by_trade,
@@ -627,20 +662,5 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
         self._change_order_state_and_notify(order, OrderAction.CANCEL)
         self._change_order_state_and_notify(order, OrderAction.ACCEPT)
-
-    # endregion
-
-    # region Protocol LastOrderBookSource
-
-    def get_last_order_book(self, instrument: Instrument) -> OrderBook | None:
-        """Return latest known OrderBook for $instrument, or None if unknown.
-
-        Args:
-            instrument: Instrument to get OrderBook for.
-
-        Returns:
-            OrderBook | None: Latest OrderBook snapshot, or None if not available.
-        """
-        return self._latest_order_book_by_instrument.get(instrument)
 
     # endregion

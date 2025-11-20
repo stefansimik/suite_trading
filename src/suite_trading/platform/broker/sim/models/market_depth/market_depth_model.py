@@ -26,20 +26,23 @@ class MarketDepthModel(Protocol):
     Notes:
         - Implementations may return the input unchanged (pass-through) or create
           a new OrderBook with added microstructure.
-        - The enriched OrderBook is used for order matching by the broker.
+        - The enriched OrderBook is used as the canonical OrderBook for order
+          matching, margin, and logging.
     """
 
-    def enrich_order_book(self, canonical_book: OrderBook) -> OrderBook:
-        """Enrich canonical OrderBook with market microstructure.
+    def enrich_order_book(self, order_book: OrderBook) -> OrderBook:
+        """Return canonical OrderBook snapshot for trading, margin, and logging.
 
-        Takes a canonical (thin/zero-spread) OrderBook and returns an enriched
-        version with added spread, depth, and liquidity modeling.
+        Implementations may adjust spreads, depth, or liquidity based on broker
+        assumptions, but must preserve $instrument and $timestamp from the input
+        $order_book. The returned OrderBook becomes the single source of truth
+        for this timestamp inside simulated brokers.
 
         Args:
-            canonical_book: Canonical OrderBook from converter (thin/zero-spread).
+            order_book: Input OrderBook snapshot to enrich.
 
         Returns:
-            OrderBook: Enriched OrderBook with market microstructure applied.
+            OrderBook: Canonical OrderBook snapshot for this timestamp.
         """
         ...
 
