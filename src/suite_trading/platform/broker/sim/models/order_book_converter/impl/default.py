@@ -10,9 +10,10 @@ from suite_trading.platform.broker.sim.models.order_book_converter.conversion_fu
     trade_tick_to_order_book,
     quote_tick_to_order_book,
 )
+from suite_trading.platform.broker.sim.models.order_book_converter.protocol import OrderBookConverter
 
 
-class DefaultOrderBookConverter:
+class DefaultOrderBookConverter(OrderBookConverter):
     """Default implementation of OrderBookConverter protocol.
 
     Converts market data events to OrderBook snapshots:
@@ -28,7 +29,7 @@ class DefaultOrderBookConverter:
             event: Event to check.
 
         Returns:
-            bool: True if event is BarEvent, TradeTickEvent, or QuoteTickEvent.
+            bool: True if event is BarEvent, TradeTickEvent or QuoteTickEvent.
         """
         return isinstance(event, (BarEvent, TradeTickEvent, QuoteTickEvent))
 
