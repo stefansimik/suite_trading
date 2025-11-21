@@ -612,6 +612,34 @@ negative prices.
 - Do not use the term "mark price" anywhere in this codebase (code, docs, comments, logs,
   or tests). Use "last price" instead.
 
+## 7.3. Broker and SimBroker semantics
+
+**Core rules:**
+
+- One `Broker` instance (like `SimBroker`) represents one logical trading account.
+- Account-level data (cash, margin, positions, open orders) must never mix multiple accounts
+  inside a single Broker instance.
+- Multiple accounts are modelled by multiple Broker instances added to a `TradingEngine` via
+  `add_broker(name, broker)`.
+
+**SimBroker usage:**
+
+- A `SimBroker` instance holds state for exactly one simulated account (orders, executions,
+  positions, account snapshot, last OrderBook per instrument).
+- To simulate multiple accounts you must create multiple `SimBroker` instances (for example,
+  `"sim_portfolio"`, `"sim_A"`, `"sim_B"`) and register them under different names.
+- Strategies that share a `SimBroker` share one simulated account; strategies wired to
+  different `SimBroker` instances are account-isolated.
+
+**Responsibilities split:**
+
+- Brokers simulate realistic order lifecycle, execution, margin, and fee handling for their
+  account.
+- `TradingEngine` records executions per Strategy and provides the raw data for backtest
+  statistics.
+- Reporting utilities should reconstruct per-Strategy and portfolio metrics from executions and
+  positions instead of embedding reporting into Broker implementations.
+
 # 8. Code Organization
 
 ## 8.1. Regions

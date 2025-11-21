@@ -1,4 +1,16 @@
-"""Broker protocol definition."""
+"""Broker protocol definition for single-account brokers.
+
+Each `Broker` instance (including `SimBroker` and live/paper brokers) represents
+one logical trading account. All account-level data – cash balances, margin,
+positions, and open orders – belong to that single account.
+
+Multiple accounts are modelled by multiple Broker instances, typically added to a
+`TradingEngine` via `add_broker(name, broker)`. This keeps the protocol simple:
+- no account identifiers in method signatures,
+- the same interface works for both simulated and real brokers,
+- configuration decides which account a Strategy trades by choosing a Broker
+  instance.
+"""
 
 from __future__ import annotations
 
@@ -18,14 +30,32 @@ if TYPE_CHECKING:
 class Broker(Protocol):
     """Protocol for brokers.
 
-    This protocol defines the interface that brokers must implement
-    to handle core brokerage operations including:
-    - Connection management (connect, disconnect, status checking)
-    - Order management (submitting, canceling, modifying, and retrieving orders)
-    - Position tracking (retrieving current positions)
+    Brokers connect Strategies and the `TradingEngine` to a single trading
+    account at a provider (simulated, paper, or live). The protocol defines the
+    minimal interface needed to manage that account:
 
-    Brokers serve as the bridge between trading strategies and
-    actual broker/exchange systems, handling essential trading operations.
+    - Connection management (connect, disconnect, status checking).
+    - Order lifecycle (submitting, canceling, modifying, and listing orders).
+    - Position tracking (listing and retrieving open positions).
+    - Account snapshots (current balances, margin, and related info).
+
+    Account semantics:
+
+    - One Broker instance represents one logical trading account.
+    - All methods that expose orders, positions, or account state operate on
+      this Broker's own account only.
+    - To model multiple accounts, create multiple Broker instances and register
+      each under a different name in `TradingEngine.add_broker`.
+
+    Typical mappings:
+
+    - Single-account portfolio: one Broker (for example `SimBroker`) shared by
+      many Strategy instances; they all trade the same account.
+    - Per-strategy simulations: multiple `SimBroker` instances, one per Strategy
+      (or per experiment), so each Strategy has its own simulated account.
+    - Warmup + go-live: a Strategy may use a `sim_broker` for historical warmup
+      and a `live_broker` for real orders; both are standard Broker instances
+      representing different accounts.
     """
 
     # region Connection
@@ -165,10 +195,14 @@ class Broker(Protocol):
     # region Positions
 
     def list_open_positions(self) -> list[Position]:
-        """Return currently open positions.
+        """Return currently open positions for this Broker's account.
+
+        This method exposes the non-flat Position objects maintained by this
+        Broker instance for its own account. Positions from other accounts are
+        never mixed into this view; they must come from other Broker instances.
 
         Returns:
-            List[Position]: All open positions known to this Broker.
+            list[Position]: All open positions known to this Broker instance.
 
         Raises:
             ConnectionError: If not connected (for live brokers).
@@ -183,7 +217,8 @@ class Broker(Protocol):
             instrument: Instrument to look up.
 
         Returns:
-            Position | None: Current Position for $instrument, or None if no open exposure.
+            Position | None: Current Position for $instrument in this Broker's
+            account, or None if there is no open exposure.
         """
         ...
 
@@ -194,8 +229,13 @@ class Broker(Protocol):
     def get_account(self) -> Account:
         """Return current account information (balances, margins, etc.).
 
+        The returned `Account` snapshot describes the single logical trading
+        account represented by this Broker instance. To inspect multiple
+        accounts, query multiple Broker instances instead of passing account
+        identifiers into this method.
+
         Returns:
-            Account: Snapshot of account state.
+            Account: Snapshot of this Broker's account state.
 
         Raises:
             ConnectionError: If not connected (for live brokers).

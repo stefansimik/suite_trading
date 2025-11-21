@@ -35,10 +35,30 @@ logger = logging.getLogger(__name__)
 
 
 class SimBroker(Broker, OrderBookDrivenBroker):
-    """Simulated broker for backtesting/paper trading.
+    """Simulated broker for backtesting and paper trading.
 
-    Public API is grouped under `Protocol Broker` and `Protocol OrderBookDrivenBroker` regions; other
-    methods are under `Utilities` per AGENTS.md (sections 8.1, 8.4, 8.5, 8.6).
+    This class implements the single-account `Broker` protocol using simulated
+    order matching driven by OrderBook updates.
+
+    - One `SimBroker` instance models exactly one simulated trading account.
+      All orders, executions, positions, and account balances stored here
+      belong to that single account.
+    - To model multiple simulated accounts, create multiple `SimBroker`
+      instances (for example, ``"sim_portfolio"``, ``"sim_strategy_A"``) and
+      register each under a different name in the `TradingEngine`.
+    - Strategies that share a `SimBroker` share one account; Strategies wired
+      to different `SimBroker` instances are account-isolated.
+
+    Common usage patterns:
+
+    - Pattern 1 (shared account): many Strategy instances share one
+      `SimBroker` instance to simulate a multi-strategy portfolio on a single
+      account.
+    - Pattern 2 (separate accounts): each Strategy uses unique `SimBroker` instance
+      for isolated results while still sharing the engine's global simulated time.
+
+    Public API is grouped under `Protocol Broker` and `Protocol
+    OrderBookDrivenBroker` regions; other methods are under `Utilities`.
     """
 
     # region Init
@@ -66,7 +86,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         self._margin_model: MarginModel = margin_model or self._build_default_margin_model()
         self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
 
-        # ORDERS & EXECUTIONS & POSITIONS
+        # ORDERS, EXECUTIONS, POSITIONS for this simulated account instance
         self._orders_by_id: dict[str, Order] = {}
         self._executions: list[Execution] = []
         self._positions_by_instrument: dict[Instrument, Position] = {}
@@ -75,10 +95,10 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         self._execution_callback: Callable[[Execution], None] | None = None
         self._order_updated_callback: Callable[[Order], None] | None = None
 
-        # ACCOUNT
+        # ACCOUNT for this simulated broker instance (single logical account)
         self._account: Account = SimAccount(id="SIM")
 
-        # ORDER BOOK CACHE (last known OrderBook per instrument)
+        # ORDER BOOK CACHE (last known OrderBook per instrument for this account)
         self._latest_order_book_by_instrument: dict[Instrument, OrderBook] = {}
 
     # endregion
@@ -250,18 +270,20 @@ class SimBroker(Broker, OrderBookDrivenBroker):
     def list_open_positions(self) -> list[Position]:
         """Implements: Broker.list_open_positions
 
-        List currently open Positions maintained by the broker.
+        List currently open Positions maintained by this simulated account.
 
         Returns:
             list[Position]: Non-flat Position objects, one per instrument. Positions that become
-            flat are dropped from storage, so an empty list means no open exposure.
+            flat are dropped from storage, so an empty list means no open exposure in this
+            `SimBroker` instance.
         """
         return [p for p in self._positions_by_instrument.values() if not p.is_flat]
 
     def get_position(self, instrument: Instrument) -> Position | None:
         """Retrieve the current Position for $instrument, or None if flat.
 
-        The returned Position is broker-maintained; treat it as read-only.
+        The returned Position is broker-maintained for this simulated account;
+        treat it as read-only.
 
         Args:
             instrument: Instrument to look up.
@@ -274,9 +296,12 @@ class SimBroker(Broker, OrderBookDrivenBroker):
     def get_account(self) -> Account:
         """Implements: Broker.get_account
 
-        Return account snapshot.
+        Return account snapshot for this simulated account.
 
-        TODO: Keep this updated with fees/margin impacts as executions happen.
+        The returned `Account` describes the single logical trading account
+        represented by this `SimBroker` instance. To simulate multiple accounts,
+        create multiple `SimBroker` instances and register each one separately
+        in the `TradingEngine`.
         """
         return self._account
 
