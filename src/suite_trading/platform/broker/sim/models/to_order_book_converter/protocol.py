@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from suite_trading.domain.market_data.order_book import OrderBook
 
 
-class OrderBookConverter(Protocol):
+class ToOrderBookConverter(Protocol):
     """Protocol for converting market data events to OrderBook snapshots.
 
     Purpose:

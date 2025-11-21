@@ -14,8 +14,8 @@ from suite_trading.strategy.strategy_state_machine import StrategyState, Strateg
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
 from bidict import bidict
 
-from suite_trading.platform.broker.sim.models.order_book_converter.protocol import OrderBookConverter
-from suite_trading.platform.broker.sim.models.order_book_converter.impl.default import DefaultOrderBookConverter
+from suite_trading.platform.broker.sim.models.to_order_book_converter.protocol import ToOrderBookConverter
+from suite_trading.platform.broker.sim.models.to_order_book_converter.default_impl import DefaultToOrderBookConverter
 
 from suite_trading.utils.state_machine import StateMachine
 from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
@@ -87,8 +87,8 @@ class TradingEngine:
         # BACKTEST STATISTICS
         self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
 
-        # MODELS — OrderBook converter used to convert events into OrderBook(s)
-        self._order_book_converter: OrderBookConverter = DefaultOrderBookConverter()
+        # MODELS — converter used to transform market data events into OrderBook snapshot(s)
+        self._order_book_converter: ToOrderBookConverter = DefaultToOrderBookConverter()
 
     # endregion
 
