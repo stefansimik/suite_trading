@@ -47,26 +47,17 @@ class EventFeedCallbackPair(NamedTuple):
 
 
 class TradingEngine:
-    """Runs multiple trading strategies at the same time, each with its own timeline.
+    """Runs multiple trading strategies over a single shared timeline.
 
-    TradingEngine lets you run many strategies together. Each strategy has its own
-    independent timeline and processes events at its own pace.
+    TradingEngine owns Strategies, Brokers, and EventFeedProvider(s) and drives the
+    main event-processing loop. All Strategies attached to one TradingEngine share
+    a single simulated "now": at each step the engine picks the earliest available
+    Event across all EventFeed(s) and delivers it to the owning Strategy.
 
-    How timelines work:
-    A timeline is simply a date range (from-until) that a strategy processes events through.
-    The engine creates a combined timeline from all event-feeds across all strategies.
-    This timeline starts with the first event from any event-feed and ends with the
-    last event from any event-feed. Each strategy moves through this timeline based
-    only on the events it receives.
-
-    What you can do:
-    - Run multiple backtests with different time periods at once
-    - Mix live trading with historical testing strategies
-    - Each strategy processes its own events independently
-
-    By default, strategies work independently and don't interact with each other.
-    However, you can program strategies to communicate if needed - each strategy
-    simply follows its own timeline based on the events it gets.
+    Individual Strategies may subscribe to different instruments or time ranges,
+    and some may finish earlier than others, but they always advance through time
+    in one global chronological order defined by `Event.dt_event` (and
+    `Event.dt_received` for ties).
     """
 
     # region Init
@@ -76,6 +67,7 @@ class TradingEngine:
 
         # STATE
         self._engine_state_machine: StateMachine = create_engine_state_machine()
+        self._last_event_time: datetime | None = None
 
         # REGISTRIES
         # Brokers
@@ -83,7 +75,6 @@ class TradingEngine:
 
         # Strategies
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
-        self._last_event_time_by_strategy: dict[Strategy, datetime | None] = {}
         self._last_order_book_timestamp_by_strategy: dict[Strategy, datetime | None] = {}
 
         # EventFeedProviders & EventFeeds
@@ -245,9 +236,6 @@ class TradingEngine:
         strategy.set_trading_engine(self)
         self._strategies_by_name_bidict[name] = strategy
 
-        # Set up last-event-time tracking for this strategy (no events processed yet)
-        self._last_event_time_by_strategy[strategy] = None
-
         # Set up last-order-book-timestamp tracking for this strategy (no OrderBooks processed yet)
         self._last_order_book_timestamp_by_strategy[strategy] = None
 
@@ -347,10 +335,6 @@ class TradingEngine:
         if not strategy._state_machine.is_in_terminal_state():
             valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}")
-
-        # Remove last-event-time tracking for this strategy
-        if strategy in self._last_event_time_by_strategy:
-            del self._last_event_time_by_strategy[strategy]
 
         # Remove last-order-book-timestamp tracking for this strategy
         if strategy in self._last_order_book_timestamp_by_strategy:
@@ -502,21 +486,19 @@ class TradingEngine:
             raise
 
     def run_event_processing_loop(self) -> None:
-        """Process events for all strategies until they're finished.
+        """Process events in global chronological order until all feeds finish.
 
         How it works:
-        Each strategy gets events independently and have their own timeline.
-        Strategies just process their events one-by-one and when all event-feeds are finished,
-        strategy stops and is finished.
+        - Considers all EventFeed(s) across all RUNNING strategies.
+        - At each step, finds the earliest available Event using the Event ordering
+          (`dt_event`, then `dt_received`).
+        - Pops that Event from its feed, routes any derived OrderBook snapshots to
+          OrderBook-driven brokers, then delivers the Event to the owning Strategy
+          via its callback.
+        - Repeats until all EventFeed(s) report finished.
 
-        What happens:
-        1. For each strategy, find its oldest event from all its event-feeds
-        2. Give that event to the strategy and update its time
-        3. Keep going until all event-feeds are finished
-
-        When more events have the same time `dt_event`, then event coming from first event-feed wins.
-
-        The engine stops automatically when all event-feeds for all strategies are finished.
+        The engine stops automatically when all EventFeed(s) for all strategies are
+        finished.
 
         Raises:
             ValueError: If engine is not in RUNNING state.
@@ -527,66 +509,72 @@ class TradingEngine:
 
         logger.info("Starting event processing loop")
 
-        # While any active event-feeds exist, keep processing events
+        # While any active event-feeds exist, keep processing events in global time order
         while self._any_active_event_feeds_exist():
-            # Go over all strategies in RUNNING state
-            running_strategies = [s for s in self._strategies_by_name_bidict.values() if s.state == StrategyState.RUNNING]
-            for strategy in running_strategies:
-                strategy_name = self._get_strategy_name(strategy)
+            next_tuple = self._find_global_feed_with_oldest_event()
 
-                # Find the oldest event and if found, then process it
-                if (next_feed_tuple := self._find_feed_with_oldest_event(strategy)) is not None:
-                    feed_name, feed, callback = next_feed_tuple
-                    next_event = feed.pop()
+            # If no Event is currently available across active feeds, break to avoid a busy loop.
+            # For pure backtests, all events should normally be ready;
+            # TODO: handle live streaming behaviour (sleep/yield and retry) can be added later when needed.
+            if next_tuple is None:
+                logger.debug("No next Event available across active EventFeed(s); breaking event processing loop early")
+                break
 
-                    # Convert event to OrderBooks FIRST (before delivering to Strategy)
-                    if self._order_book_converter.can_convert(next_event):
-                        order_books = self._order_book_converter.convert_to_order_books(next_event)
+            strategy, event_feed_name, event_feed, callback = next_tuple
+            strategy_name = self._get_strategy_name(strategy)
 
-                        # Filter and process OrderBooks chronologically (no going back in time)
-                        # Get last OrderBook timestamp for this Strategy
-                        last_order_book_timestamp = self._last_order_book_timestamp_by_strategy[strategy]
-                        for order_book in order_books:
-                            # Check: OrderBook timestamp must be after last processed timestamp
-                            if (last_order_book_timestamp is not None) and (order_book.timestamp <= last_order_book_timestamp):
-                                logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than or equal to last processed {format_dt(last_order_book_timestamp)}")
-                                continue
+            next_event = event_feed.pop()
+            if next_event is None:
+                # Event disappeared between peek() and pop(); continue to next iteration.
+                continue
 
-                            # Process OrderBook with valid timestamp
-                            logger.debug(f"Processing OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
+            # Check event, if it can be converted to OrderBook and processed (before delivering event to Strategy)
+            if self._order_book_converter.can_convert(next_event):
+                order_books = self._order_book_converter.convert_to_order_books(next_event)
 
-                            # Route to brokers implementing OrderBookDrivenBroker for order-price matching
-                            for broker in self._get_order_book_driven_brokers():
-                                broker.process_order_book(order_book)
+                # Filter and process OrderBooks chronologically (no going back in time per strategy)
+                last_order_book_timestamp = self._last_order_book_timestamp_by_strategy[strategy]
+                for order_book in order_books:
+                    # Check: OrderBook timestamp must be after last processed timestamp
+                    if (last_order_book_timestamp is not None) and (order_book.timestamp <= last_order_book_timestamp):
+                        logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than or equal to last processed {format_dt(last_order_book_timestamp)}")
+                        continue
 
-                            # Update last OrderBook timestamp for this Strategy
-                            self._last_order_book_timestamp_by_strategy[strategy] = order_book.timestamp
+                    # Process OrderBook with valid timestamp
+                    logger.debug(f"Processing OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
 
-                    # Update last event time for this strategy
-                    self._last_event_time_by_strategy[strategy] = next_event.dt_event
+                    # Route to brokers implementing OrderBookDrivenBroker for order-price matching
+                    for broker in self._get_order_book_driven_brokers():
+                        broker.process_order_book(order_book)
 
-                    # Process event in its callback (deliver to Strategy)
+                    # Update last OrderBook timestamp for this Strategy
+                    self._last_order_book_timestamp_by_strategy[strategy] = order_book.timestamp
+
+            # Update last event time (global engine time)
+            self._last_event_time = next_event.dt_event
+
+            # Process event in its callback (deliver to Strategy)
+            try:
+                callback(next_event)
+            except Exception as e:
+                logger.error(f"Error processing {next_event} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")
+                # Move strategy to error state
+                strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
+                # Allow strategy to handle error state (do some cleanup)
+                strategy.on_error(e)
+                # Cleanup all feeds for this strategy
+                self._close_and_remove_all_feeds_for_strategy(strategy)
+
+            # Notify EventFeed listeners after strategy callback.
+            # This is the single place listeners are invoked for EventFeed(s); feeds must not self-notify.
+            try:
+                for listener in event_feed.list_listeners():
                     try:
-                        callback(next_event)
-                    except Exception as e:
-                        logger.error(f"Error processing {next_event} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")
-                        # Move strategy to error state
-                        strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
-                        # Allow strategy to handler error state (do some cleanup)
-                        strategy.on_error(e)
-                        # Cleanup all feeds for this strategy
-                        self._close_and_remove_all_feeds_for_strategy(strategy)
-
-                    # Notify EventFeed listeners after strategy callback.
-                    # This is the single place listeners are invoked for EventFeed(s); feeds must not self-notify.
-                    try:
-                        for listener in feed.list_listeners():
-                            try:
-                                listener(next_event)
-                            except Exception as le:
-                                logger.error(f"Error in EventFeed listener for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) on EventFeed named '{feed_name}': {le}")
-                    except Exception as outer:
-                        logger.error(f"Error retrieving listeners for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) on EventFeed named '{feed_name}': {outer}")
+                        listener(next_event)
+                    except Exception as le:
+                        logger.error(f"Error in EventFeed listener for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) on EventFeed named '{event_feed_name}': {le}")
+            except Exception as outer:
+                logger.error(f"Error retrieving listeners for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) on EventFeed named '{event_feed_name}': {outer}")
 
             # Auto-stop strategies that have no active event-feeds left
             for name, strategy in list(self._strategies_by_name_bidict.items()):
@@ -635,8 +623,8 @@ class TradingEngine:
         if feed_name in event_feeds_by_name_dict:
             raise ValueError("Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name ('{feed_name}') is already used for this strategy. Choose a different name.")
 
-        # Timeline filtering if the strategy already processed events
-        last_event_time = self._last_event_time_by_strategy.get(strategy)
+        # Timeline filtering if the engine already processed events (shared global time)
+        last_event_time = self._last_event_time
         if last_event_time is not None:
             event_feed.remove_events_before(last_event_time)
 
@@ -724,31 +712,37 @@ class TradingEngine:
                     return True
         return False
 
-    def _find_feed_with_oldest_event(self, strategy: Strategy) -> tuple[str, EventFeed, Callable] | None:
-        """
-        Next returned event is always the oldest event from all this strategy's event-feeds.
-        If more events have the same time `dt_event`, then event coming from first event-feed wins.
+    def _find_global_feed_with_oldest_event(self) -> tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None:
+        """Return the next (Strategy, feed, callback) pair with the globally earliest Event.
 
-        :param strategy: specify strategy for which to find next event
-        :return: tuple of (name, feed, callback), where
-            name = name of event-feed
-            feed = EventFeed containing the next event
-            callback = callback function to process event
+        This scans all EventFeed(s) for strategies currently known to the engine and
+        selects the earliest available Event using the Event ordering (`dt_event`,
+        then `dt_received`). Strategies that are not in RUNNING state are ignored.
+
+        Returns:
+            tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None: The owning
+            Strategy, feed name, EventFeed, and callback for the earliest Event, or None
+            if no Event is currently available across active feeds.
         """
         oldest_event: Event | None = None
-        winner_tuple: tuple[str, EventFeed, Callable] | None = None
+        winner: tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None = None
 
-        # Find the next feed (name, feed, callback) with the oldest available event.
-        for name, (feed, callback) in self._event_feeds_by_strategy[strategy].items():
-            event = feed.peek()
-            if event is None:
+        # TODO: Let's improve name of variables
+        for strategy, feeds_by_name in self._event_feeds_by_strategy.items():
+            if strategy.state != StrategyState.RUNNING:
                 continue
-            if oldest_event is None or event.dt_event < oldest_event.dt_event:
-                # We found a new oldest event sourced from this feed.
-                oldest_event = event
-                winner_tuple = (name, feed, callback)
 
-        return winner_tuple
+            for feed_name, pair in feeds_by_name.items():
+                feed, callback = pair
+                event = feed.peek()
+                if event is None:
+                    continue
+
+                if oldest_event is None or event < oldest_event:
+                    oldest_event = event
+                    winner = (strategy, feed_name, feed, callback)
+
+        return winner
 
     def _close_and_remove_all_feeds_for_strategy(self, strategy: Strategy) -> None:
         strategy_name = self._get_strategy_name(strategy)
