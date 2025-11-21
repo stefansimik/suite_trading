@@ -373,6 +373,25 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         The $order_book was already enriched by MarketDepthModel and is the single
         source for timestamp and best bid/ask context.
 
+        Margin and funds policy (slice-by-slice):
+
+        - Affordability is evaluated independently for each FillSlice. For the current
+          slice, the broker computes the additional absolute exposure introduced by this
+          trade and calls `MarginModel.compute_initial_margin` only for that incremental
+          exposure.
+        - Initial margin is blocked *incrementally* per slice, immediately before the
+          execution is recorded, and only when absolute exposure increases.
+        - After recording the execution, initial margin blocked for this slice is
+          released and the required maintenance margin for the post-trade net position
+          is set instead.
+        - Commission is charged per slice using the configured FeeModel; any margin
+          release from shrinking positions can offset the commission cash out, but never
+          produce a net credit.
+        - If, at the moment of a slice, the account cannot fund the required initial
+          margin plus net commission cash out (all represented as $Money in a single
+          settlement currency), the slice is rejected and the entire $order is
+          immediately terminalized via a CANCEL/ACCEPT transition.
+
         Steps:
         - compute affordability (initial margin, commission, maintenance release)
         - block initial margin (only if position increases)
@@ -595,6 +614,18 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         previous_executions: tuple[Execution, ...],
     ) -> tuple[Money | None, Money, Money, Money, Money, Money]:
         """Compute figures needed for affordability and post-trade margin.
+
+        For the given FillSlice this method:
+
+        - Computes per-slice commission using the configured FeeModel.
+        - Computes $initial_margin_amount_to_block_now only when
+          $added_exposure_quantity_from_trade is positive, using the provided
+          MarginModel.
+        - Recomputes maintenance margin before and after the trade for the full
+          net position and derives the non-negative
+          $maintenance_margin_amount_released_by_trade_clamped_to_zero.
+        - Uses $Money arithmetic in a single settlement currency; negative releases
+          or net cash-outs are clamped to zero to avoid creating artificial credits.
 
         Returns (in order):
           - $initial_margin_amount_to_block_now
