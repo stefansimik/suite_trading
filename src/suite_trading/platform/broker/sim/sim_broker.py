@@ -460,10 +460,6 @@ class SimBroker(Broker, OrderBookDrivenBroker):
                 order_updated_callback(order)
 
     # Prices & positions
-    def _has_price_for_instrument(self, instrument: Instrument) -> bool:
-        book = self._latest_order_book_by_instrument.get(instrument)
-        return book is not None
-
     def _record_execution_and_update_position(self, execution: Execution) -> None:
         """Record an execution and update the corresponding position.
 

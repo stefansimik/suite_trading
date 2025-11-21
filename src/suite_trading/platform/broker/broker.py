@@ -67,7 +67,7 @@ class Broker(Protocol):
         on_execution: Callable[[Execution], None],
         on_order_updated: Callable[[Order], None],
     ) -> None:
-        """Each broker has to report changes in orders into TradingEngine
+        """Each broker has to report executions + order updates into TradingEngine
 
         The Broker must invoke:
          - `on_execution` callback, when a fill/partial-fill occurs
