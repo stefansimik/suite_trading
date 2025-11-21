@@ -47,17 +47,27 @@ class EventFeed(Protocol):
     def remove_events_before(self, cutoff_time: datetime) -> None:
         """Remove all events before $cutoff_time from this event feed.
 
-        Why this matters:
-        Each strategy maintains its own timeline that starts when it processes its first event.
-        As events are processed chronologically, the strategy's timeline moves forward.
+        This method is used by `TradingEngine` when attaching an EventFeed to a Strategy
+        while the engine is already RUNNING. All strategies in one engine share a single
+        simulated timeline, so a newly attached feed must not emit events that are "in
+        the past" relative to the engine's current global time.
 
-        When you add a new event feed to an already-running strategy, we must maintain chronological order. The strategy cannot process events that are "in the past" relative to its current timeline position.
+        Semantics:
 
-        Example scenario:
-        - Strategy starts at 9:00 AM, processes events until 9:15 AM
-        - At 9:15 AM, we add a new event feed containing older data
-        - We must remove all events before 9:15 AM to keep timeline integrity
-        - Strategy continues processing only events from 9:15 AM forward
+        - $cutoff_time is the engine's current global `Event.dt_event` when the feed is
+          attached (UTC, timezone-aware).
+        - Implementations should drop or skip all events whose effective event time is
+          strictly less than $cutoff_time (for example, BarEvent $end_dt or Event.dt_event).
+        - Events at or after $cutoff_time remain available and will be delivered in
+          global chronological order together with events from other feeds.
+
+        Example scenario (shared timeline):
+
+        - Engine has already processed events up to 9:15 AM.
+        - At 9:15 AM, you add a new EventFeed containing older data starting at 9:00 AM.
+        - `TradingEngine` calls `remove_events_before(cutoff_time=9:15)` on the new feed.
+        - The feed discards all events before 9:15 AM and continues from 9:15 AM forward,
+          keeping the global event stream strictly non-decreasing in time.
         """
         ...
 

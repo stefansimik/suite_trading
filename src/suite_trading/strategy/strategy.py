@@ -18,28 +18,24 @@ logger = logging.getLogger(__name__)
 
 
 class Strategy(ABC):
-    """Base class for all trading strategies with independent timeline management.
+    """Base class for all trading strategies executed by a TradingEngine.
 
-    **Timeline Isolation:**
-    Each Strategy operates with its own independent timeline, completely isolated from other
-    strategies' timelines. This means:
+    **Shared engine timeline:**
+    All Strategy instances attached to the same `TradingEngine` share a single simulated
+    timeline. The engine is responsible for scheduling events in global chronological
+    order; a Strategy never advances its own time.
 
-    - **No Global Time Synchronization**: There is no global time that syncs across all strategies
-    - **Independent Event Processing**: Each strategy processes events at its own pace and timeline
-    - **Flexible Time Ranges**: Strategies can process different time periods simultaneously
-    - **Mixed Execution Modes**: Historical backtests and live strategies can run together
+    Timeline model:
 
-    **Benefits:**
-    - Run multiple historical backtests with different time periods simultaneously
-    - Combine live trading strategies with historical analysis strategies
-    - Each strategy maintains its own `last_event_time` based on the last processed event
-    - Strategies never interfere with each other's timeline progression
+    - There is one engine "now" defined by the last processed `Event.dt_event`.
+    - Different strategies may subscribe to different instruments or date ranges, but
+      events are always delivered in non-decreasing event time across the whole engine.
+    - Account isolation is achieved via Broker instances (one Broker instance = one
+      account), not via separate per-strategy timelines.
 
-    **Example Use Cases:**
-    - Strategy A: Historical backtest from 2020-2023
-    - Strategy B: Live trading starting from current time
-    - Strategy C: Historical analysis from 2019-2021
-    - All three can run simultaneously, each with their own timeline
+    Strategies focus on reacting to events and submitting orders. They should not try to
+    re-order events or manage their own notion of time; the `TradingEngine` guarantees
+    correct global ordering across all strategies and EventFeed(s).
     """
 
     # region Init
@@ -212,21 +208,29 @@ class Strategy(ABC):
     ) -> None:
         """Attach an EventFeed to this Strategy.
 
-        Connect an EventFeed so this strategy can receive events from it. Call this during
-        `on_start` (when the strategy is ADDED) or later while RUNNING.
+        Connect an EventFeed so this Strategy can receive events from it. Call this during
+        `on_start` (when the Strategy is ADDED) or later while RUNNING.
+
+        Under the shared engine timeline model, all strategies in a `TradingEngine` share
+        one simulated "now". When you add a new EventFeed while the engine is already
+        RUNNING and has processed some events, the engine ensures global chronological
+        ordering by calling `EventFeed.remove_events_before` with the current engine time.
+        This means the new feed will never emit events that are "in the past" relative to
+        the rest of the system.
 
         Args:
-            feed_name (str): User-assigned name for this feed, unique within this strategy.
+            feed_name (str): User-assigned name for this feed, unique within this Strategy.
                 This value appears in logs and is required later to remove the feed with
                 `remove_event_feed`. Choose a stable, descriptive name, for example:
                 "binance_btcusdt_1m".
             event_feed (EventFeed): The EventFeed instance to attach.
             callback (Optional[Callable]): Optional event handler. If None, uses `self.on_event`.
-                If you explicitly don't need to callback for informing your strategy, then you can use `callback =lambda e: None`.
+                If you explicitly do not need to notify your Strategy, you can use
+                `callback = lambda e: None`.
 
         Raises:
             RuntimeError: If $_trading_engine is None or $state does not allow adding feeds.
-            ValueError: If $feed_name is already used for this strategy.
+            ValueError: If $feed_name is already used for this Strategy.
         """
         engine = self._require_trading_engine()
 

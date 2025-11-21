@@ -603,13 +603,20 @@ class TradingEngine:
         event_feed: EventFeed,
         callback: Callable,
     ) -> None:
-        """Attach an EventFeed to a strategy and register metadata.
+        """Attach an EventFeed to a Strategy and register metadata.
+
+        The engine owns the global simulated timeline for all strategies. When you add a
+        new EventFeed while the engine is already RUNNING and has processed events, the
+        engine calls `EventFeed.remove_events_before` with the current global
+        `Event.dt_event` before registering the feed. This ensures that the new feed does
+        not emit events that are "in the past" relative to other feeds and keeps the
+        overall event stream in non-decreasing time order.
 
         Args:
-            strategy: The strategy that will receive events. Type: Strategy.
-            feed_name: Unique name for this event-feed within the strategy. Type: str.
-            event_feed: The EventFeed instance to manage. Type: EventFeed.
-            callback: Function to call when events are received. Type: Callable.
+            strategy: The Strategy that will receive events.
+            feed_name: Unique name for this EventFeed within the Strategy.
+            event_feed: The EventFeed instance to manage.
+            callback: Function to call when events are received.
 
         Raises:
             ValueError: If $strategy is not added to this TradingEngine or $feed_name is duplicate.
