@@ -159,7 +159,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         # SUBMITTED → State WORKING
         self._change_order_state_and_notify(order, OrderAction.ACCEPT)
 
-        # Try to immediately match the new order against the latest known canonical OrderBook for its instrument.
+        # Try to immediately match the new order against the latest broker OrderBook snapshot for its instrument.
         # This mirrors real broker behavior where new orders are evaluated against the current book without waiting
         # for another price update. If we have no OrderBook yet for this instrument, the order will be matched later
         # when the first OrderBook arrives.
@@ -311,19 +311,20 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
     # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
     def process_order_book(self, order_book: OrderBook) -> None:
-        """Process OrderBook snapshot for order matching.
+        """Process an OrderBook snapshot for order matching and margin.
 
         The incoming $order_book is enriched via the configured MarketDepthModel and the
-        resulting snapshot becomes the canonical OrderBook used for matching and stored
-        as the latest book for this instrument.
+        resulting snapshot becomes the broker's current OrderBook used as the single
+        source of pricing truth for matching and margin. It is stored as the latest book
+        for this instrument.
 
         Args:
             order_book: OrderBook snapshot to process.
         """
-        # Enrich with depth model and treat the result as canonical OrderBook
+        # Enrich with depth model and treat the result as the broker's current OrderBook snapshot
         enriched_order_book = self._depth_model.enrich_order_book(order_book)
 
-        # Store latest canonical OrderBook (already enriched)
+        # Store latest broker OrderBook snapshot (already enriched)
         self._latest_order_book_by_instrument[enriched_order_book.instrument] = enriched_order_book
 
         # Select FILLABLE orders for this instrument
@@ -342,10 +343,10 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         order: Order,
         order_book: OrderBook,
     ) -> None:
-        """Simulate and apply fills for a single $order using canonical OrderBook.
+        """Simulate and apply fills for a single $order using the broker's OrderBook.
 
         The $order_book was already enriched by MarketDepthModel and is treated as
-        the canonical snapshot for matching, margin, and logging.
+        the broker's current snapshot for matching, margin, and logging.
         """
         if order.state_category != OrderStateCategory.FILLABLE:
             return
@@ -367,7 +368,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         fill_slice: FillSlice,
         order_book: OrderBook,
     ) -> None:
-        """Apply a single $fill_slice to $order using canonical OrderBook.
+        """Apply a single $fill_slice to $order using the broker's OrderBook.
 
         The $order_book was already enriched by MarketDepthModel and is the single
         source for timestamp and best bid/ask context.
@@ -384,7 +385,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         Args:
             order: Order being filled.
             fill_slice: Single FillSlice to apply.
-            order_book: Canonical OrderBook snapshot used for matching and margin.
+            order_book: Broker OrderBook snapshot used for matching and margin.
         """
         instrument = order.instrument
 

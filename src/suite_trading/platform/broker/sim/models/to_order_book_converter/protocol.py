@@ -16,8 +16,9 @@ class ToOrderBookConverter(Protocol):
         snapshots that brokers can process for order matching.
 
     Notes:
-        - Implementations dispatch by concrete $event type and return canonical
-          (thin/zero-spread) OrderBooks that represent the event.
+        - Implementations dispatch by concrete $event type and return thin, zero-spread
+          OrderBook snapshots that represent the event and can be used directly by
+          brokers for matching and margin calculations.
         - Prices may be negative when the market supports them; do not filter or
           reject negative values.
         - Bar events typically produce 4 OrderBooks (OHLC decomposition).

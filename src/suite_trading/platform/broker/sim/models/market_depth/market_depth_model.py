@@ -10,12 +10,13 @@ if TYPE_CHECKING:
 
 
 class MarketDepthModel(Protocol):
-    """Protocol for enriching canonical OrderBooks with market microstructure.
+    """Protocol for enriching thin OrderBooks with market microstructure.
 
     Purpose:
-        Take a canonical (thin/zero-spread) OrderBook from the converter and return
-        an enriched version with added spread, depth, and liquidity modeling. This
-        allows different brokers to test with different market microstructure assumptions.
+        Take a thin or zero-spread OrderBook from the converter and return an
+        enriched version with added spread, depth, and liquidity modeling. This
+        allows different brokers to test with different market microstructure
+        assumptions.
 
     Enrichment may include:
         - Adding spread for zero-spread books (realistic bid/ask)
@@ -26,12 +27,13 @@ class MarketDepthModel(Protocol):
     Notes:
         - Implementations may return the input unchanged (pass-through) or create
           a new OrderBook with added microstructure.
-        - The enriched OrderBook is used as the canonical OrderBook for order
-          matching, margin, and logging.
+        - The enriched OrderBook becomes the broker's current OrderBook used as the
+          single source of pricing truth for matching, margin, and logging at that
+          timestamp.
     """
 
     def enrich_order_book(self, order_book: OrderBook) -> OrderBook:
-        """Return canonical OrderBook snapshot for trading, margin, and logging.
+        """Return an enriched OrderBook snapshot for trading, margin, and logging.
 
         Implementations may adjust spreads, depth, or liquidity based on broker
         assumptions, but must preserve $instrument and $timestamp from the input
@@ -42,7 +44,7 @@ class MarketDepthModel(Protocol):
             order_book: Input OrderBook snapshot to enrich.
 
         Returns:
-            OrderBook: Canonical OrderBook snapshot for this timestamp.
+            OrderBook: Enriched OrderBook snapshot for this timestamp.
         """
         ...
 

@@ -17,10 +17,11 @@ class MarginModel(Protocol):
     - Maintenance margin uses position context (`$net_position_quantity`) because ongoing
       requirements are based on current exposure, not a prospective order.
 
-    Both methods receive the canonical `OrderBook` snapshot used for matching the trade or
-    valuing the position. Callers are responsible for selecting the correct snapshot for
-    their own timeline; implementations should treat the provided `OrderBook` as the single
-    source of pricing truth rather than reading global broker state.
+    Both methods receive the same `OrderBook` snapshot that the broker uses to match the
+    trade or value the position. Callers are responsible for selecting the correct
+    snapshot for their own timeline; implementations should treat the provided
+    `OrderBook` as the single source of pricing truth rather than reading global broker
+    state.
 
     The `$timestamp` argument represents the time when margin is calculated. In the simple
     simulation broker this is usually the same as `$order_book.timestamp`, but callers may
@@ -37,7 +38,7 @@ class MarginModel(Protocol):
         """Compute initial margin required for a prospective trade.
 
         Args:
-            order_book: Canonical OrderBook snapshot to use for pricing this trade.
+            order_book: OrderBook snapshot that the broker uses to price and match this trade.
             trade_quantity: Order size for this trade (sign may be ignored by some models).
             is_buy: True for buy orders; enables asymmetric long/short treatment.
             timestamp: Time when margin is calculated for this trade. Usually the same as
@@ -54,7 +55,7 @@ class MarginModel(Protocol):
         """Compute maintenance margin for the current net position.
 
         Args:
-            order_book: Canonical OrderBook snapshot to use for valuing this position.
+            order_book: OrderBook snapshot that the broker uses to value this position.
             net_position_quantity: Current net position (long > 0, short < 0).
             timestamp: Time when margin is calculated for this position. Usually the same as
                 `$order_book.timestamp`, but callers can pass a different evaluation time.
