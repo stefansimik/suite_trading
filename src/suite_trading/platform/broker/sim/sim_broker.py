@@ -310,21 +310,6 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
     # endregion
 
-    # region Protocol LastOrderBookSource
-
-    def get_last_order_book(self, instrument: Instrument) -> OrderBook | None:
-        """Return latest known OrderBook for $instrument, or None if unknown.
-
-        Args:
-            instrument: Instrument to get OrderBook for.
-
-        Returns:
-            OrderBook | None: Latest OrderBook snapshot, or None if not available.
-        """
-        return self._latest_order_book_by_instrument.get(instrument)
-
-    # endregion
-
     # region Utilities
 
     def _simulate_and_apply_fills_for_order_with_order_book(
@@ -377,6 +362,11 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             order_book: Canonical OrderBook snapshot used for matching and margin.
         """
         instrument = order.instrument
+
+        # Check: ensure $order.instrument matches $order_book.instrument for pricing and margin
+        if order_book.instrument != instrument:
+            raise ValueError(f"Cannot call `_process_fill_slice` because $order.instrument ('{instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
+
         timestamp = order_book.timestamp
 
         # CONTEXT — read current position, compute signed impact and net quantities
@@ -396,13 +386,13 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             net_commission_cash_out_after_release,
             total_amount_required_now_to_execute_slice,
         ) = self._compute_affordability_and_margin_for_fill_slice(
-            instrument=instrument,
             order=order,
             fill_slice=fill_slice,
             net_position_quantity_before_trade=net_position_quantity_before_trade,
             net_position_quantity_after_trade=net_position_quantity_after_trade,
             added_exposure_quantity_from_trade=added_exposure_quantity_from_trade,
             timestamp=timestamp,
+            order_book=order_book,
             previous_executions=tuple(self._executions),
         )
 
@@ -545,7 +535,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         Returns:
             A MarginModel instance with zero ratios to keep behavior stable unless configured.
         """
-        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"), last_order_book_source=self)
+        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"))
 
     # Margin & funds
     def _compute_additional_exposure_quantity(
@@ -573,13 +563,13 @@ class SimBroker(Broker, OrderBookDrivenBroker):
     def _compute_affordability_and_margin_for_fill_slice(
         self,
         *,
-        instrument: Instrument,
         order: Order,
         fill_slice: FillSlice,
         net_position_quantity_before_trade: Decimal,
         net_position_quantity_after_trade: Decimal,
         added_exposure_quantity_from_trade: Decimal,
         timestamp: datetime,
+        order_book: OrderBook,
         previous_executions: tuple[Execution, ...],
     ) -> tuple[Money | None, Money, Money, Money, Money, Money]:
         """Compute figures needed for affordability and post-trade margin.
@@ -602,23 +592,10 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
         initial_margin_amount_to_block_now: Money | None = None
         if added_exposure_quantity_from_trade > 0:
-            initial_margin_amount_to_block_now = self._margin_model.compute_initial_margin(
-                instrument=instrument,
-                trade_quantity=added_exposure_quantity_from_trade,
-                is_buy=order.is_buy,
-                timestamp=timestamp,
-            )
+            initial_margin_amount_to_block_now = self._margin_model.compute_initial_margin(order_book=order_book, trade_quantity=added_exposure_quantity_from_trade, is_buy=order.is_buy, timestamp=timestamp)
 
-        maintenance_before = self._margin_model.compute_maintenance_margin(
-            instrument=instrument,
-            net_position_quantity=net_position_quantity_before_trade,
-            timestamp=timestamp,
-        )
-        maintenance_after = self._margin_model.compute_maintenance_margin(
-            instrument=instrument,
-            net_position_quantity=net_position_quantity_after_trade,
-            timestamp=timestamp,
-        )
+        maintenance_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity_before_trade, timestamp=timestamp)
+        maintenance_after = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity_after_trade, timestamp=timestamp)
 
         maintenance_release = maintenance_before - maintenance_after
         zero_commission_ccy = commission_amount.__class__(Decimal("0"), commission_amount.currency)
