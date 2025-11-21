@@ -369,10 +369,12 @@ Implications:
 
 ---
 
-### Strategy clocks
+### Engine clock and event timestamps
 
-Each strategy tracks its own timeline internally using the last processed event time. This value is used by
-the engine for consistency and future statistics, but it is not exposed as a public property on `Strategy` yet.
+`TradingEngine` maintains one shared simulated "now" across all strategies. It
+processes events in global chronological order using `Event.dt_event` (and
+`Event.dt_received` to break ties). Strategies do not manage their own clocks;
+they simply react to events.
 
 In your strategy code, you typically work directly with event timestamps:
 
@@ -421,12 +423,13 @@ Aggregation rules (5‑min windows), straight from `TimeBarAggregationEventFeed`
    Learn `EventFeed` once and handle any data source — nothing more to knoow & no special cases.
 
 2) Perfect synchronization
-   The engine guarantees chronological ordering across multiple feeds / per each Strategy.
+   The engine guarantees chronological ordering across multiple feeds and all
+   strategies using one shared simulated timeline.
 
 3) Flexible timing
-   - Independent timelines per `Strategy` (no global clock)
+   - Different strategies can subscribe to different instruments and date ranges
    - No start/end dates to manage — strategies stop naturally when their EventFeed(s) finish
-   - Strategy can add or remove feeds anytime
+   - A strategy can add or remove feeds anytime; the engine keeps global time
 
 
 ---
@@ -451,12 +454,13 @@ class MyStrategy(Strategy):
 ```
 
 2) Fixed Broker for Strategy
-- Choose a specific Broker directly inside the Strategy using `get_broker` with its concrete
-  class, for example `self.get_broker(SimulatedBroker)`.
+- Choose a specific Broker directly inside the Strategy using `get_broker` with
+  a known broker name, for example `self.get_broker("sim_portfolio")`. This is
+  convenient when you already know the account name you want to trade.
 
 ```python
-# Retrieve a concrete Broker instance by its class
-sim_broker = self.get_broker(SimulatedBroker)
+# Retrieve a concrete Broker instance by its registered name
+sim_broker = self.get_broker("sim_portfolio")
 self.submit_order(create_order(event), sim_broker)
 ```
 
@@ -466,13 +470,17 @@ self.submit_order(create_order(event), sim_broker)
 
 ```python
 # Inspect all available brokers and choose one based on your own rules
-for broker_type, broker in self.brokers.items():
+for broker_name, broker in self.brokers.items():
     if supports_instrument(broker, event):  # example of some logic
         self.submit_order(create_order(event), broker)
         break
 ```
 
 Notes:
-- The $brokers property returns a mapping: dict[type[Broker], Broker].
-- `get_broker(broker_type)` raises an error if the requested broker type was not added to the
-  TradingEngine.
+- The $brokers property returns a mapping: dict[str, Broker], keyed by broker
+  name as passed to `TradingEngine.add_broker`. Each Broker instance represents
+  one logical trading account.
+- `get_broker(name)` returns the Broker instance registered under $name. It
+  raises KeyError if no Broker with $name exists. In more complex setups prefer
+  passing Broker instances into your Strategy configuration or using the
+  $brokers mapping directly.

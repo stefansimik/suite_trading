@@ -278,35 +278,57 @@ class Strategy(ABC):
     # region Brokers
 
     @property
-    def brokers(self) -> dict[type[Broker], Broker]:
+    def brokers(self) -> dict[str, Broker]:
         """Get all Broker instances added to the attached TradingEngine.
 
+        The returned mapping is backed by the engine's broker registry:
+
+        - Keys are broker *names* as passed to `TradingEngine.add_broker`.
+        - Values are Broker instances, each representing one logical account.
+
+        Use this primarily for inspection and advanced wiring (for example,
+        picking a Broker dynamically). For most strategies it is clearer to
+        receive concrete Broker instances via configuration (for example,
+        constructor arguments like `$sim_broker` and `$live_broker`).
+
         Returns:
-            dict[type[Broker], Broker]: Mapping from concrete Broker class to instance.
+            dict[str, Broker]: Mapping from broker name to Broker instance.
 
         Raises:
             RuntimeError: If $_trading_engine is None.
         """
         return self._require_trading_engine().brokers
 
-    def get_broker(self, broker_type: type[Broker]) -> Broker:
-        """Get a specific Broker by its concrete class.
+    def get_broker(self, name: str) -> Broker:
+        """Get a Broker by its registered name from the attached TradingEngine.
+
+        This is a thin convenience wrapper over the engine-level broker
+        registry. It simply returns the Broker instance that was added to the
+        TradingEngine under $name.
+
+        For most strategies it is clearer to inject a specific Broker instance
+        via constructor parameters and store it on the Strategy. Use this
+        helper only for simple wiring or debugging when you already know the
+        broker name.
 
         Args:
-            broker_type (type[Broker]): The concrete Broker class to retrieve.
+            name: Broker name as registered via `TradingEngine.add_broker`.
 
         Returns:
-            Broker: The Broker instance registered for the given class.
+            The Broker instance registered under $name.
 
         Raises:
             RuntimeError: If $_trading_engine is None.
-            KeyError: If the requested broker type is not added to the attached TradingEngine.
+            KeyError: If no Broker with $name is registered in the attached TradingEngine.
         """
         engine = self._require_trading_engine()
-        try:
-            return engine.brokers[broker_type]
-        except KeyError:
-            raise KeyError(f"Cannot call `get_broker` because broker type '{broker_type.__name__}' is not added to the attached TradingEngine. Add the broker to the TradingEngine using `add_broker` first.")
+
+        # Check: broker name must be present in the attached TradingEngine
+        if name not in engine.brokers:
+            raise KeyError(f"Cannot call `get_broker` because Broker named '{name}' is not registered in the attached TradingEngine. Add the broker using `add_broker` first.")
+
+        result = engine.brokers[name]
+        return result
 
     # endregion
 

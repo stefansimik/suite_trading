@@ -160,9 +160,22 @@ class TradingEngine:
     def add_broker(self, name: str, broker: Broker) -> None:
         """Add a Broker by name (one unique name per engine).
 
+        Each registered Broker instance represents a **separate trading account**.
+        To model multiple accounts, register multiple Broker instances under
+        different names, for example ``"sim_portfolio"``, ``"sim_A"``,
+        ``"sim_B"``. Strategies choose which account they trade by passing a
+        specific Broker instance to `Strategy.submit_order`.
+
+        Typical patterns:
+
+        - Single-account portfolio: one shared Broker (for example a
+          `SimBroker`) used by many Strategy(ies).
+        - Per-strategy simulations: multiple `SimBroker` instances registered
+          under different names; each Strategy uses its own instance.
+
         Args:
             name: Unique broker name within this TradingEngine.
-            broker: The Broker instance to add.
+            broker: The Broker instance to add (one logical account).
 
         Raises:
             ValueError: If a Broker with the same $name is already added.
@@ -197,13 +210,28 @@ class TradingEngine:
     def brokers(self) -> bidict[str, Broker]:
         """Get all Brokers keyed by name.
 
+        The returned bi-directional mapping exposes the engine's Broker
+        registry:
+
+        - Keys are broker names as passed to `add_broker`.
+        - Values are Broker instances, each representing one logical account.
+
+        This mapping is intended for inspection and advanced wiring. Most
+        strategies should receive concrete Broker instances via configuration
+        (for example, constructor arguments) rather than relying on global
+        lookups.
+
         Returns:
             bidict[str, Broker]: Bi-directional mapping from broker name to instance.
         """
         return self._brokers_by_name_bidict
 
     def list_broker_names(self) -> list[str]:
-        """List names of all registered Brokers in registration order."""
+        """List names of all registered Brokers in registration order.
+
+        Each name identifies one Broker instance and therefore one trading
+        account registered in this TradingEngine.
+        """
         return list(self._brokers_by_name_bidict.keys())
 
     # endregion
