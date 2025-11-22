@@ -764,24 +764,23 @@ class TradingEngine:
             if no Event is currently available across active feeds.
         """
         oldest_event: Event | None = None
-        winner: tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None = None
+        result: tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None = None
 
-        # TODO: Let's improve name of variables
-        for strategy, feeds_by_name in self._event_feeds_by_strategy.items():
+        for strategy, event_feeds_by_name_dict in self._event_feeds_by_strategy.items():
             if strategy.state != StrategyState.RUNNING:
                 continue
 
-            for feed_name, pair in feeds_by_name.items():
-                feed, callback = pair
-                event = feed.peek()
-                if event is None:
+            for event_feed_name, feed_callback_pair in event_feeds_by_name_dict.items():
+                event_feed, callback = feed_callback_pair
+                peeked_event = event_feed.peek()
+                if peeked_event is None:
                     continue
 
-                if oldest_event is None or event < oldest_event:
-                    oldest_event = event
-                    winner = (strategy, feed_name, feed, callback)
+                if oldest_event is None or peeked_event < oldest_event:
+                    oldest_event = peeked_event
+                    result = (strategy, event_feed_name, event_feed, callback)
 
-        return winner
+        return result
 
     def _close_and_remove_all_feeds_for_strategy(self, strategy: Strategy) -> None:
         strategy_name = self._get_strategy_name(strategy)
