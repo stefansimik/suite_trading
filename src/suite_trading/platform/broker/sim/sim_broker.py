@@ -17,7 +17,7 @@ from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import OrderBookDrivenBroker
 from suite_trading.platform.broker.sim.models.market_depth.market_depth_model import MarketDepthModel
-from suite_trading.platform.broker.sim.models.market_depth.zero_spread import ZeroSpreadMarketDepthModel
+from suite_trading.platform.broker.sim.models.market_depth.pass_through_market_depth_model import PassThroughMarketDepthModel
 from suite_trading.platform.broker.sim.models.fee.fee_model import FeeModel
 from suite_trading.platform.broker.sim.models.fee.fixed_fee_model import FixedFeeModel
 from suite_trading.domain.monetary.money import Money
@@ -560,7 +560,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         Returns:
             A MarketDepthModel instance.
         """
-        return ZeroSpreadMarketDepthModel()
+        return PassThroughMarketDepthModel()
 
     def _build_default_fee_model(self) -> FeeModel:
         """Build the default FeeModel used by this broker instance.

@@ -230,7 +230,7 @@ Current status (as of 2025-10-31):
 - ✅ Order state machine and execution tracking
 - ✅ Position tracking and management per instrument
 - ✅ Per-strategy execution history in TradingEngine
-- ✅ Market depth model for simulated order matching (ZeroSpreadMarketDepthModel)
+- ✅ Market depth model for simulated order matching (PassThroughMarketDepthModel)
 
 **Next Priority (Roadmap):**
 1. **EventFeedProvider(s)** ❌ — Real-time market data integration

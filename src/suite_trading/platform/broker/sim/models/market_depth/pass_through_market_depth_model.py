@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from suite_trading.domain.market_data.order_book import OrderBook
+from typing import TYPE_CHECKING
+
+from .market_depth_model import MarketDepthModel
+
+if TYPE_CHECKING:
+    from suite_trading.domain.market_data.order_book import OrderBook
 
 
-# region Zero-spread implementation
+# region Protocol MarketDepthModel
 
 
-class ZeroSpreadMarketDepthModel:
+class PassThroughMarketDepthModel(MarketDepthModel):
     """Pass-through depth model – returns the incoming OrderBook as-is.
 
     This model performs no enrichment, returning the provided OrderBook
