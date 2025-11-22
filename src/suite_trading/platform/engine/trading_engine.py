@@ -69,25 +69,28 @@ class TradingEngine:
         self._engine_state_machine: StateMachine = create_engine_state_machine()
         self._last_event_time: datetime | None = None
 
-        # REGISTRIES
         # Brokers
         self._brokers_by_name_bidict: bidict[str, Broker] = bidict()
 
         # Strategies
         self._strategies_by_name_bidict: bidict[str, Strategy] = bidict()
-        self._last_order_book_timestamp_by_strategy: dict[Strategy, datetime | None] = {}
 
         # EventFeedProviders & EventFeeds
         self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
         self._event_feeds_by_strategy: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
 
-        # ORDERS ROUTING
+        # Track last time (per strategy)
+        # TODO: this is probably no more needed, as there is one timeline for whole trading-engine - see `self._last_event_time`
+        self._last_order_book_timestamp_by_strategy: dict[Strategy, datetime | None] = {}
+
+        # Orders
         self._routing_by_order: dict[Order, StrategyBrokerPair] = {}
 
-        # BACKTEST STATISTICS
+        # Executions
         self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
 
-        # MODELS — converter used to transform market data events into OrderBook snapshot(s)
+        # Models — converter used to transform market data events into OrderBook snapshot(s)
+        # TODO: ToOrderBookConverter probably does not belong to Broker, but to TradingEngine
         self._order_book_converter: ToOrderBookConverter = DefaultToOrderBookConverter()
 
     # endregion
