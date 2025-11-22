@@ -89,7 +89,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         self._executions: list[Execution] = []
         self._positions_by_instrument: dict[Instrument, Position] = {}
 
-        # Callbacks (where this broker should propagate executions & orders-changes?)
+        # Callbacks (where this broker should propagate executions and orders-changes?)
         self._execution_callback: Callable[[Execution], None] | None = None
         self._order_updated_callback: Callable[[Order], None] | None = None
 
@@ -220,39 +220,10 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         self._change_order_state_and_notify(tracked, OrderAction.UPDATE)
         self._change_order_state_and_notify(tracked, OrderAction.ACCEPT)
 
-    def list_orders(
-        self,
-        *,
-        categories: set[OrderStateCategory] | None = None,
-        instrument: Instrument | None = None,
-    ) -> list[Order]:
-        """Implements: `Broker.list_orders`.
-
-        Return orders known to this Broker, optionally narrowed by simple filters. If you do not
-        pass any filters, the method returns all orders tracked by this SimBroker instance.
-
-        Args:
-            categories: Optional filter. Include only orders whose `OrderStateCategory` is in this
-                set. Pass None to include all categories.
-            instrument: Optional filter. Include only orders for $instrument. Pass None to include
-                orders for all instruments.
-
-        Returns:
-            list[Order]: Matching orders (may be empty).
-        """
-        # Load initial data (all orders) into reusable variable $result
-        result: list[Order] = list(self._orders_by_id.values())
-
-        # Filter — by Instrument
-        if instrument is not None:
-            result = [order for order in result if order.instrument == instrument]
-
-        # Filter — by OrderStateCategory
-        if categories is not None:
-            included_categories = set(categories)
-            result = [order for order in result if order.state_category in included_categories]
-
-        return result
+    def list_active_orders(self) -> list[Order]:
+        """Implements: `Broker.list_active_orders`."""
+        # Since we clean up terminal orders immediately, _orders_by_id contains only active ones.
+        return list(self._orders_by_id.values())
 
     def get_order(self, order_id: str) -> Order | None:
         """Implements: `Broker.get_order`.
@@ -307,7 +278,6 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
     # region Protocol OrderBookDrivenBroker
 
-    # TODO: No cleanup of terminal orders here; TradingEngine should do this at end-of-cycle cleanup.
     def process_order_book(self, order_book: OrderBook) -> None:
         """Process an OrderBook snapshot for order matching and margin.
 
@@ -484,10 +454,21 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         # PUBLISH EXECUTION + UPDATED ORDER
         if self._execution_callback is not None:
             self._execution_callback(execution)
-        if self._order_updated_callback is not None:
-            self._order_updated_callback(order)
 
-    # Order state transitions & publishing
+        self._notify_and_cleanup_order(order)
+
+    # Order state transitions and publishing
+    def _notify_and_cleanup_order(self, order: Order) -> None:
+        """Notify listeners of order update and clean up if terminal."""
+        # Check: ensure callback was provided before invoking to avoid calling None
+        order_updated_callback = self._order_updated_callback
+        if order_updated_callback is not None:
+            order_updated_callback(order)
+
+        # CLEANUP: If order is terminal, remove it from internal storage
+        if order.state_category == OrderStateCategory.TERMINAL:
+            self._orders_by_id.pop(order.id, None)
+
     def _change_order_state_and_notify(self, order: Order, action: OrderAction) -> None:
         """Apply $action to $order and publish `on_order_updated` if state changed.
 
@@ -496,11 +477,9 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         previous_state = order.state
         order.change_state(action)
         new_state = order.state
+        # TODO: check, if multiple partial fills are also notified. Strategy needs to be notified, on all partial fills
         if new_state != previous_state:
-            # Check: ensure callback was provided before invoking to avoid calling None
-            order_updated_callback = self._order_updated_callback
-            if order_updated_callback is not None:
-                order_updated_callback(order)
+            self._notify_and_cleanup_order(order)
 
     # Prices & positions
     def _record_execution_and_update_position(self, execution: Execution) -> None:

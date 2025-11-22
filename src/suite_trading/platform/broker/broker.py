@@ -23,7 +23,6 @@ from suite_trading.domain.position import Position
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution
     from suite_trading.domain.instrument import Instrument
-    from suite_trading.domain.order.order_state import OrderStateCategory
 
 
 @runtime_checkable
@@ -156,37 +155,29 @@ class Broker(Protocol):
         """
         ...
 
-    def list_orders(
-        self,
-        *,
-        categories: set[OrderStateCategory] | None = None,
-        instrument: Instrument | None = None,
-    ) -> list[Order]:
-        """List orders known to this Broker.
+    def list_active_orders(self) -> list[Order]:
+        """List active (non-terminal) orders known to this Broker.
 
-        This is a generic listing API that returns orders and optionally narrows the
-        result using simple filters. If no filters are provided, all orders tracked by
-        the Broker are returned.
-
-        Args:
-            categories: Optional filter. Include only orders whose
-                `OrderStateCategory` is in this set.
-            instrument: Optional filter. Include only orders for $instrument. Pass
-                None to include orders for all instruments.
+        The Broker tracks only orders that are currently active (e.g. WORKING, PENDING).
+        Orders that reach a terminal state (FILLED, CANCELLED, REJECTED) are removed
+        from tracking and will not appear in this list.
 
         Returns:
-            list[Order]: Matching orders (may be empty).
+            list[Order]: All active orders (may be empty).
         """
         ...
 
     def get_order(self, id: str) -> Order | None:
-        """Retrieve a single Order by $id, or None if not found.
+        """Retrieve a single active Order by $id, or None if not found.
+
+        Returns None if the order is not tracked or has reached a terminal state
+        and was removed from tracking.
 
         Args:
             id: Identifier of the order to retrieve.
 
         Returns:
-            Order | None: The matching order or None.
+            Order | None: The matching active order or None.
         """
         ...
 

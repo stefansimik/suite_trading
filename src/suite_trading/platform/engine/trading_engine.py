@@ -10,6 +10,7 @@ from suite_trading.platform.market_data.event_feed_provider import EventFeedProv
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import OrderBookDrivenBroker
 from suite_trading.domain.order.orders import Order
+from suite_trading.domain.order.order_state import OrderStateCategory
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
 from bidict import bidict
@@ -899,6 +900,10 @@ class TradingEngine:
         except Exception as e:
             logger.error(f"Error in `Strategy.on_order_updated` for Strategy named '{strategy.name}' (class {strategy.__class__.__name__}): {e}")
             self._transition_strategy_to_error(strategy, e)
+
+        # CLEANUP: If order is terminal, remove routing info
+        if order.state_category == OrderStateCategory.TERMINAL:
+            self._routing_by_order.pop(order, None)
 
     def _transition_strategy_to_error(self, strategy: Strategy, exc: Exception) -> None:
         """Transition Strategy to ERROR and notify via `on_error`."""
