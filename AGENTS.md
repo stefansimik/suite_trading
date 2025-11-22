@@ -717,6 +717,7 @@ Acceptance checks:
 
 # 9. Testing Guidelines
 
+- **Do not automatically run tests**; the maintainer will run tests manually to save tokens/resources
 - **Do not generate tests unless explicitly asked**
 - Use **pytest** (not unittest)
 - Test function names start with `test_` and describe what they test
