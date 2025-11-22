@@ -4,7 +4,7 @@ from typing import Iterable, TYPE_CHECKING
 from datetime import datetime
 from decimal import Decimal
 
-from .fee_model import FeeModel
+from .protocol import FeeModel
 
 if TYPE_CHECKING:
     from suite_trading.domain.monetary.money import Money
@@ -16,7 +16,7 @@ class FixedFeeModel(FeeModel):
     """Fixed per-unit commission model.
 
     Args:
-        fee_per_unit: Commission `Money` charged for each 1 unit executed.
+        fee_per_unit: Commission $fee_per_unit charged for each 1 unit executed.
             Example: 0.005 USD per share → Money(Decimal("0.005"), USD)
     """
 

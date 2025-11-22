@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .market_depth_model import MarketDepthModel
+from .protocol import MarketDepthModel
 
 if TYPE_CHECKING:
     from suite_trading.domain.market_data.order_book import OrderBook

@@ -8,21 +8,19 @@ import logging
 from suite_trading.platform.broker.account import Account
 from suite_trading.platform.broker.sim.sim_account import SimAccount
 from suite_trading.domain.monetary.currency_registry import USD
-from suite_trading.domain.order.orders import (
-    Order,
-)
+from suite_trading.domain.order.orders import Order
 from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.capabilities import OrderBookDrivenBroker
-from suite_trading.platform.broker.sim.models.market_depth.market_depth_model import MarketDepthModel
-from suite_trading.platform.broker.sim.models.market_depth.pass_through_market_depth_model import PassThroughMarketDepthModel
-from suite_trading.platform.broker.sim.models.fee.fee_model import FeeModel
-from suite_trading.platform.broker.sim.models.fee.fixed_fee_model import FixedFeeModel
+from suite_trading.platform.broker.sim.models.market_depth.protocol import MarketDepthModel
+from suite_trading.platform.broker.sim.models.market_depth.pass_through import PassThroughMarketDepthModel
+from suite_trading.platform.broker.sim.models.fee.protocol import FeeModel
+from suite_trading.platform.broker.sim.models.fee.fixed_fee import FixedFeeModel
 from suite_trading.domain.monetary.money import Money
-from suite_trading.platform.broker.sim.models.margin.margin_model import MarginModel
-from suite_trading.platform.broker.sim.models.margin.fixed_ratio_margin_model import FixedRatioMarginModel
+from suite_trading.platform.broker.sim.models.margin.protocol import MarginModel
+from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRatioMarginModel
 from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
 from suite_trading.platform.broker.sim.order_matching import (
     select_simulate_fills_function_for_order,
