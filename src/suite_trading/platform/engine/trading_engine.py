@@ -66,8 +66,10 @@ class TradingEngine:
     def __init__(self):
         """Create a new TradingEngine."""
 
-        # STATE
+        # Current state
         self._engine_state_machine: StateMachine = create_engine_state_machine()
+
+        # Global time
         self._last_event_time: datetime | None = None
 
         # Brokers
@@ -79,10 +81,6 @@ class TradingEngine:
         # EventFeedProviders & EventFeeds
         self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
         self._event_feeds_by_strategy: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
-
-        # Track last time (per strategy)
-        # TODO: this is probably no more needed, as there is one timeline for whole trading-engine - see `self._last_event_time`
-        self._last_order_book_timestamp_by_strategy: dict[Strategy, datetime | None] = {}
 
         # Orders
         self._routing_by_order: dict[Order, StrategyBrokerPair] = {}
@@ -268,9 +266,6 @@ class TradingEngine:
         strategy.set_trading_engine(self)
         self._strategies_by_name_bidict[name] = strategy
 
-        # Set up last-order-book-timestamp tracking for this strategy (no OrderBooks processed yet)
-        self._last_order_book_timestamp_by_strategy[strategy] = None
-
         # Set up EventFeed tracking for this strategy
         self._event_feeds_by_strategy[strategy] = {}
 
@@ -367,10 +362,6 @@ class TradingEngine:
         if not strategy._state_machine.is_in_terminal_state():
             valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}")
-
-        # Remove last-order-book-timestamp tracking for this strategy
-        if strategy in self._last_order_book_timestamp_by_strategy:
-            del self._last_order_book_timestamp_by_strategy[strategy]
 
         # Remove EventFeed tracking for this strategy
         del self._event_feeds_by_strategy[strategy]
@@ -547,10 +538,10 @@ class TradingEngine:
 
             # If no Event is currently available across active feeds, break to avoid a busy loop.
             # For pure backtests, all events should normally be ready;
-            # TODO: handle live streaming behaviour (sleep/yield and retry) can be added later when needed.
+            # TODO: handle live streaming behaviour. Right now, when there are no more events, we get out of while cycle and engine stops. To live-streamed events, we need to wait for new event
             if next_tuple is None:
                 logger.debug("No next Event available across active EventFeed(s); breaking event processing loop early")
-                break
+                continue
 
             strategy, event_feed_name, event_feed, callback = next_tuple
             strategy_name = self._get_strategy_name(strategy)
@@ -564,12 +555,11 @@ class TradingEngine:
             if self._order_book_converter.can_convert(next_event):
                 order_books = self._order_book_converter.convert_to_order_books(next_event)
 
-                # Filter and process OrderBooks chronologically (no going back in time per strategy)
-                last_order_book_timestamp = self._last_order_book_timestamp_by_strategy[strategy]
+                # Filter and process OrderBooks using the engine's last processed event time as the floor
                 for order_book in order_books:
-                    # Check: OrderBook timestamp must be after last processed timestamp
-                    if (last_order_book_timestamp is not None) and (order_book.timestamp <= last_order_book_timestamp):
-                        logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than or equal to last processed {format_dt(last_order_book_timestamp)}")
+                    # Check: OrderBook timestamp must not be earlier than engine time (allow equals during current event)
+                    if (self._last_event_time is not None) and (order_book.timestamp < self._last_event_time):
+                        logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than engine time {format_dt(self._last_event_time)}")
                         continue
 
                     # Process OrderBook with valid timestamp
@@ -578,9 +568,6 @@ class TradingEngine:
                     # Route to brokers implementing OrderBookDrivenBroker for order-price matching
                     for broker in self._get_order_book_driven_brokers():
                         broker.process_order_book(order_book)
-
-                    # Update last OrderBook timestamp for this Strategy
-                    self._last_order_book_timestamp_by_strategy[strategy] = order_book.timestamp
 
             # Update last event time (global engine time)
             self._last_event_time = next_event.dt_event

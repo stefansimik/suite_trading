@@ -175,8 +175,8 @@ def test_order_book_chronology_with_mixed_tick_and_bar_feeds():
     timestamps = [ob.timestamp for ob in mock_broker.processed_order_books]
     assert timestamps == sorted(timestamps), "OrderBook timestamps not in chronological order"
 
-    # Verify last OrderBook timestamp tracking
-    assert engine._last_order_book_timestamp_by_strategy[strategy] == dt(9, 1, 10)
+    # Verify last processed OrderBook timestamp via broker-observable state
+    assert mock_broker.processed_order_books[-1].timestamp == dt(9, 1, 10)
 
 
 # endregion
@@ -252,11 +252,18 @@ def test_order_book_chronology_with_delayed_bars():
 
     # ASSERTIONS
 
-    # Verify only tick OrderBooks were processed (all 8 bar OrderBooks skipped)
-    assert len(mock_broker.processed_order_books) == 13, f"Expected 13 OrderBooks (from ticks only), got {len(mock_broker.processed_order_books)}"
+    # Verify tick OrderBooks AND Bar Close OrderBooks were processed (13 ticks + 2 bar closes)
+    # The engine allows multiple updates at the same timestamp. Since Bar Close prices differ
+    # from Ticks in this test (99.0 vs 101.0), they are not deduped and are processed.
+    assert len(mock_broker.processed_order_books) == 15, f"Expected 15 OrderBooks, got {len(mock_broker.processed_order_books)}"
 
-    # Verify tick timestamps (every 10 seconds from 09:00:00 to 09:02:00)
+    # Construct expected timestamps: 13 ticks + 2 extra for the Bar Closes at 09:01:00 and 09:02:00
     expected_timestamps = [dt(9, 0, 0) + timedelta(seconds=10 * i) for i in range(13)]
+    # Insert Bar Close 1 (09:01:00) after Tick 7 (09:01:00)
+    expected_timestamps.insert(7, dt(9, 1, 0))
+    # Append Bar Close 2 (09:02:00) after Tick 13 (09:02:00)
+    expected_timestamps.append(dt(9, 2, 0))
+
     for i, expected_ts in enumerate(expected_timestamps):
         assert mock_broker.processed_order_books[i].timestamp == expected_ts, f"OrderBook {i} timestamp mismatch: expected {expected_ts}, got {mock_broker.processed_order_books[i].timestamp}"
 
@@ -278,8 +285,8 @@ def test_order_book_chronology_with_delayed_bars():
     timestamps = [ob.timestamp for ob in mock_broker.processed_order_books]
     assert timestamps == sorted(timestamps), "OrderBook timestamps not in chronological order"
 
-    # Verify last OrderBook timestamp
-    assert engine._last_order_book_timestamp_by_strategy[strategy] == dt(9, 2, 0)
+    # Verify last processed OrderBook timestamp via broker-observable state
+    assert mock_broker.processed_order_books[-1].timestamp == dt(9, 2, 0)
 
 
 # endregion
