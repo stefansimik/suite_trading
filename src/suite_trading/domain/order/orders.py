@@ -18,7 +18,8 @@ from datetime import datetime
 from suite_trading.domain.monetary.money import Money
 
 if TYPE_CHECKING:
-    from suite_trading.strategy.strategy import Strategy
+    # No type-only imports needed in this module at the moment
+    pass
 
 
 # region Orders
@@ -46,7 +47,6 @@ class Order:
         quantity: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Strategy | None = None,  # TODO: we should remove this. Order should not know this. Orders without Strategy can exist
     ):
         """Initialize a new Order.
 
@@ -56,7 +56,6 @@ class Order:
             quantity (Decimal): The quantity to trade.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
-            strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
         # Order identification (private attributes with public properties)
         self._id = str(id) if id is not None else str(get_next_id())
@@ -68,9 +67,6 @@ class Order:
 
         # Execution details (private attributes with public properties)
         self._time_in_force = time_in_force
-
-        # Reference to Strategy that created this order (may be None)
-        self._strategy = strategy
 
         # Execution tracking (single source of truth)
         self._executions: list[Execution] = []  # Chronological by append order
@@ -212,15 +208,6 @@ class Order:
             TimeInForce: The time in force setting.
         """
         return self._time_in_force
-
-    @property
-    def strategy(self) -> Strategy | None:
-        """Get the Strategy that created this order, if available.
-
-        Returns:
-            Optional[Strategy]: The Strategy reference or None.
-        """
-        return self._strategy
 
     @property
     def state(self) -> OrderState:
@@ -374,7 +361,6 @@ class MarketOrder(Order):
         quantity: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Strategy | None = None,
     ):
         """Initialize a new MarketOrder.
 
@@ -384,9 +370,8 @@ class MarketOrder(Order):
             quantity (Decimal): The quantity to trade.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
-            strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
-        super().__init__(instrument, side, quantity, id, time_in_force, strategy)
+        super().__init__(instrument, side, quantity, id, time_in_force)
 
 
 class LimitOrder(Order):
@@ -407,7 +392,6 @@ class LimitOrder(Order):
         limit_price: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Strategy | None = None,
     ):
         """Initialize a new LimitOrder.
 
@@ -418,13 +402,12 @@ class LimitOrder(Order):
             limit_price (Decimal): The limit price for the order.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
-            strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
         # Set limit price (private attribute with public property)
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, strategy)
+        super().__init__(instrument, side, quantity, id, time_in_force)
 
     @property
     def limit_price(self) -> Decimal:
@@ -467,7 +450,6 @@ class StopOrder(Order):
         stop_price: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Strategy | None = None,
     ):
         """Initialize a new StopOrder.
 
@@ -478,13 +460,12 @@ class StopOrder(Order):
             stop_price (Decimal): The stop price for the order.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
-            strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
         # Set stop price (private attribute with public property)
         self._stop_price = instrument.snap_price(stop_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, strategy)
+        super().__init__(instrument, side, quantity, id, time_in_force)
 
     @property
     def stop_price(self) -> Decimal:
@@ -529,7 +510,6 @@ class StopLimitOrder(Order):
         limit_price: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
-        strategy: Strategy | None = None,
     ):
         """Initialize a new StopLimitOrder.
 
@@ -541,14 +521,13 @@ class StopLimitOrder(Order):
             limit_price (Decimal): The limit price for the order once triggered.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
-            strategy (Strategy | None, optional): Strategy that created this order, if any.
         """
         # Set prices (private attributes with public properties)
         self._stop_price = instrument.snap_price(stop_price)
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, strategy)
+        super().__init__(instrument, side, quantity, id, time_in_force)
 
     @property
     def stop_price(self) -> Decimal:
