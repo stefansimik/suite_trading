@@ -28,14 +28,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# TODO
-#  Fix all problems, where we are logging Strategies like this: `{strategy.__class__.__name__}`
-#  This is not sufficient, as we can have more variously configured Strategy instances of the same class,
-#  so we have to recognize them by name;
-#  One option is to use bi-directional dictionary for 1:1 mapping between Strategies and their names.
-#   We will need to implement this structure, but then using it will be simple like: `d[key]` or `d.inverse[value]`
-#  Another possible action would be remove manual naming of Strategies and add to them abstract function: `get_unique_name()`
-
 # region Helper classes
 
 
