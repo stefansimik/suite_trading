@@ -528,9 +528,9 @@ class TradingEngine:
         while self._any_active_event_feeds_exist():
             next_tuple = self._find_global_feed_with_oldest_event()
 
-            # If no Event is currently available across active feeds, break to avoid a busy loop.
-            # For pure backtests, all events should normally be ready;
-            # TODO: handle live streaming behaviour. Right now, when there are no more events, we get out of while cycle and engine stops. To live-streamed events, we need to wait for new event
+            # If no Event is currently available across active feeds, we just continue.
+            # - For backtesting, all events should normally be ready.
+            # - But in live-streaming behaviour, being busy and burn cpu-cycles with polling looks like inefficient approach. We should consider some sort of push-event, that would wake the engine, when new data arrives in any event-feeds
             if next_tuple is None:
                 logger.debug("No next Event available across active EventFeed(s); breaking event processing loop early")
                 continue
