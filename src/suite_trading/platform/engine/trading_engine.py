@@ -15,8 +15,8 @@ from suite_trading.strategy.strategy_state_machine import StrategyState, Strateg
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
 from bidict import bidict
 
-from suite_trading.platform.broker.sim.models.to_order_book_converter.protocol import ToOrderBookConverter
-from suite_trading.platform.broker.sim.models.to_order_book_converter.default_impl import DefaultToOrderBookConverter
+from suite_trading.platform.engine.models.event_to_order_book.protocol import EventToOrderBookConverter
+from suite_trading.platform.engine.models.event_to_order_book.default_impl import DefaultEventToOrderBookConverter
 
 from suite_trading.utils.state_machine import StateMachine
 from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
@@ -80,9 +80,9 @@ class TradingEngine:
         # Executions
         self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
 
-        # Models — converter used to transform market data events into OrderBook snapshot(s)
-        # TODO: ToOrderBookConverter probably does not belong to Broker, but to TradingEngine
-        self._order_book_converter: ToOrderBookConverter = DefaultToOrderBookConverter()
+        # MODELS (EVENT → ORDER BOOK)
+        # Converter used to transform market‑data `Event`(s) into `OrderBook` snapshot(s)
+        self._event_to_order_book_converter: EventToOrderBookConverter = DefaultEventToOrderBookConverter()
 
     # endregion
 
@@ -96,6 +96,21 @@ class TradingEngine:
             EngineState: Current state (NEW, RUNNING, or STOPPED).
         """
         return self._engine_state_machine.current_state
+
+    # endregion
+
+    # region Main
+
+    def set_order_book_converter(self, converter: EventToOrderBookConverter) -> None:
+        """Replace the Event→OrderBook converter used by the engine.
+
+        This lets you customize how market‑data $event(s) are converted to OrderBook
+        snapshot(s) before they are sent to OrderBook‑driven broker(s).
+
+        Args:
+            converter: Implementation of `EventToOrderBookConverter` to install.
+        """
+        self._event_to_order_book_converter = converter
 
     # endregion
 
@@ -544,8 +559,8 @@ class TradingEngine:
                 continue
 
             # Check event, if it can be converted to OrderBook and processed (before delivering event to Strategy)
-            if self._order_book_converter.can_convert(next_event):
-                order_books = self._order_book_converter.convert_to_order_books(next_event)
+            if self._event_to_order_book_converter.can_convert(next_event):
+                order_books = self._event_to_order_book_converter.convert_to_order_books(next_event)
 
                 # Filter and process OrderBooks using the engine's last processed event time as the floor
                 for order_book in order_books:
