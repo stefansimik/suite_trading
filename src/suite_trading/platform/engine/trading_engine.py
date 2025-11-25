@@ -554,9 +554,6 @@ class TradingEngine:
             strategy_name = self._get_strategy_name(strategy)
 
             next_event = event_feed.pop()
-            if next_event is None:
-                # Event disappeared between peek() and pop(); continue to next iteration.
-                continue
 
             # Check event, if it can be converted to OrderBook and processed (before delivering event to Strategy)
             if self._event_to_order_book_converter.can_convert(next_event):
