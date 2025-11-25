@@ -151,11 +151,11 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
         # Initial order-state transitions:
         # INITIALIZED -> PENDING_SUBMIT
-        self._change_order_state_and_notify(order, OrderAction.SUBMIT)
+        self._apply_order_action(order, OrderAction.SUBMIT)
         # PENDING_SUBMIT -> SUBMITTED
-        self._change_order_state_and_notify(order, OrderAction.ACCEPT)
+        self._apply_order_action(order, OrderAction.ACCEPT)
         # SUBMITTED → State WORKING
-        self._change_order_state_and_notify(order, OrderAction.ACCEPT)
+        self._apply_order_action(order, OrderAction.ACCEPT)
 
         # Try to immediately match the new order against the latest broker OrderBook snapshot for its instrument.
         # This mirrors real broker behavior where new orders are evaluated against the current book without waiting
@@ -186,9 +186,9 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             return
 
         # Transition to PENDING_CANCEL
-        self._change_order_state_and_notify(tracked, OrderAction.CANCEL)
+        self._apply_order_action(tracked, OrderAction.CANCEL)
         # Transition to CANCELLED
-        self._change_order_state_and_notify(tracked, OrderAction.ACCEPT)
+        self._apply_order_action(tracked, OrderAction.ACCEPT)
 
     def modify_order(self, order: Order) -> None:
         """Implements: Broker.modify_order
@@ -217,8 +217,8 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             raise ValueError(f"Cannot call `modify_order` because $instrument changed from '{tracked.instrument}' to '{order.instrument}' for Order $id ('{order.id}')")
 
         # Transitions: UPDATE → ACCEPT
-        self._change_order_state_and_notify(tracked, OrderAction.UPDATE)
-        self._change_order_state_and_notify(tracked, OrderAction.ACCEPT)
+        self._apply_order_action(tracked, OrderAction.UPDATE)
+        self._apply_order_action(tracked, OrderAction.ACCEPT)
 
     def list_active_orders(self) -> list[Order]:
         """Implements: `Broker.list_active_orders`."""
@@ -461,31 +461,29 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         if self._execution_callback is not None:
             self._execution_callback(execution)
 
-        self._notify_and_cleanup_order(order)
+        self._process_order_update(order)
 
     # Order state transitions and publishing
-    def _notify_and_cleanup_order(self, order: Order) -> None:
+    def _process_order_update(self, order: Order) -> None:
         """Notify listeners of order update and clean up if terminal."""
-        # Check: ensure callback was provided before invoking to avoid calling None
-        order_updated_callback = self._order_updated_callback
-        if order_updated_callback is not None:
-            order_updated_callback(order)
+        # Invoke callback
+        self._order_updated_callback(order)
 
         # CLEANUP: If order is terminal, remove it from internal storage
         if order.state_category == OrderStateCategory.TERMINAL:
             self._orders_by_id.pop(order.id, None)
 
-    def _change_order_state_and_notify(self, order: Order, action: OrderAction) -> None:
+    def _apply_order_action(self, order: Order, action: OrderAction) -> None:
         """Apply $action to $order and publish `on_order_updated` if state changed.
 
         This centralizes per-transition publishing so callers remain simple.
         """
         previous_state = order.state
-        order.change_state(action)
+        order.change_state(action)  # Transition
         new_state = order.state
-        # TODO: check, if multiple partial fills are also notified. Strategy needs to be notified, on all partial fills
+
         if new_state != previous_state:
-            self._notify_and_cleanup_order(order)
+            self._process_order_update(order)
 
     # Prices & positions
     def _record_execution_and_update_position(self, execution: Execution) -> None:
@@ -673,7 +671,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         req_init = required_initial_margin_amount if required_initial_margin_amount is not None else commission_amount.__class__(Decimal("0"), commission_amount.currency)
         logger.error(f"Reject FillSlice for Order '{order.id}': required_initial={req_init}, commission={commission_amount}, maintenance_release={maintenance_margin_amount_released_by_trade}, net_commission_cash_out={net_commission_cash_out_after_release}, total_required_now={total_amount_required_now_to_execute_slice}, available_now={available_money_now}, best_bid={best_bid}, best_ask={best_ask}, qty={fill_slice.quantity}, price={fill_slice.price}, ts={timestamp}")
 
-        self._change_order_state_and_notify(order, OrderAction.CANCEL)
-        self._change_order_state_and_notify(order, OrderAction.ACCEPT)
+        self._apply_order_action(order, OrderAction.CANCEL)
+        self._apply_order_action(order, OrderAction.ACCEPT)
 
     # endregion
