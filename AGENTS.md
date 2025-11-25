@@ -10,7 +10,6 @@
 - **KISS (Keep It Simple, Stupid):** Simplest working solution
 - **YAGNI (You Aren't Gonna Need It):** Implement only when actively required
 - **DRY (Don't Repeat Yourself):** No duplication of information, logic, or business rules
-- **Fail Fast:** Report errors immediately upon detection
 - **Intuitive Domain Model:** Keep objects simple; names/flows match trading mental model
 - **Single Responsibility:** Each class has one distinct purpose
 - **Separation of Concerns:** Divide responsibilities into distinct sections
@@ -20,6 +19,12 @@
 ## 1.2. Development Mode
 **Breaking changes allowed** during initial development. Backward compatibility is out of scope.
 Remove or redesign anything to achieve optimal design.
+
+### 1.2.1. Breaking Changes Policy (No Shims)
+- We intentionally allow breaking API and module changes at any time
+- Do not add deprecation shims, re‑exports, aliases, or compatibility layers.
+- When relocating/renaming modules or classes, update all references in the codebase and documentation in the same change.
+- Leave clear error messages in truly unavoidable stubs only when removal is technically impossible in the tooling; stubs must raise ImportError with a pointer to the new path.
 
 ---
 
