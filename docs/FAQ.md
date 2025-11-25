@@ -13,8 +13,8 @@ reliable patterns.
 
 - You build `Strategy`(ies) that react to `Event`(s).
 - You plug `EventFeed`(s) into a `Strategy`. A feed is any stream of events / data (bars, ticks,  time ticks, news, your own domain events).
-- The `TradingEngine` runs all strategies. It ensures events are distributed  in chronological order
-  across all feeds added to  each strategy.
+- The `TradingEngine` runs all strategies. It ensures events are distributed in chronological order
+  across all strategies and their feeds using one shared engine timeline.
 - A strategy can add or remove EventFeed(s) at any time.
 
 The one thing to really learn: `EventFeed`. This is the main and generic source of external data (bars, ticks, news, ...).
@@ -79,15 +79,15 @@ Note on listeners and invocation order
 - Error handling: listener exceptions are caught and logged; the engine keeps running.
 
 Here’s where the magic happens — the `TradingEngine` automatically synchronizes ALL your
-added `EventFeed`(s) per `Strategy`:
+added `EventFeed`(s) across all RUNNING strategies on a single shared timeline:
 
 1) Chronological order
-   The `TradingEngine` looks across all feeds of a strategy, finds the oldest available
-   event, and delivers it. You always process events in strict chronological order.
+   The `TradingEngine` looks across all strategies and their feeds, finds the globally oldest
+   available event, and delivers it. You always process events in strict chronological order.
 
-2) Independent timelines
-   Each `Strategy` has its own timeline (can run at a different time). This lets you run
-   historical backtests and live strategies at once, side by side.
+2) Single shared engine timeline
+   All strategies share one simulated "now" coordinated by the engine. You can still run
+   historical backtests and live strategies at once; their events interleave on the same timeline.
 
 3) Automatic cleanup and stop
    When all EventFeed(s) of a particular `Strategy` are finished (they have method `is_finished()`), they’re cleaned up automatically and
