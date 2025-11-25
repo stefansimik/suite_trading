@@ -86,7 +86,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
         # ORDERS, EXECUTIONS, POSITIONS for this simulated account instance
         self._orders_by_id: dict[str, Order] = {}
-        self._executions: list[Execution] = []
+        self._execution_history: list[Execution] = []  # Track executions per Broker (account scope); allows implementing volume-tiered fees
         self._positions_by_instrument: dict[Instrument, Position] = {}
 
         # Callbacks (where this broker should propagate executions and orders-changes?)
@@ -412,7 +412,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             added_exposure_quantity_from_trade=added_exposure_quantity_from_trade,
             timestamp=timestamp,
             order_book=order_book,
-            previous_executions=tuple(self._executions),
+            previous_executions=tuple(self._execution_history),
         )
 
         # Check: ensure we can fund initial margin and net commission cash out after release
@@ -442,7 +442,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
         # STORE EXECUTION AND UPDATE POSITION
         execution = order.add_execution(quantity=fill_slice.quantity, price=fill_slice.price, timestamp=timestamp, commission=commission_amount)
-        self._record_execution_and_update_position(execution)
+        self._append_execution_to_history_and_update_position(execution)
 
         # SWITCH INITIAL -> MAINTENANCE MARGIN
         # Unblock initial margin
@@ -486,11 +486,12 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             self._process_order_update(order)
 
     # Prices & positions
-    def _record_execution_and_update_position(self, execution: Execution) -> None:
-        """Record an execution and update the corresponding position.
+    def _append_execution_to_history_and_update_position(self, execution: Execution) -> None:
+        """Append $execution to execution history and update Position.
 
-        Records $execution to the execution history, then updates the per-instrument Position
-        to reflect the new quantity and average price.
+        Appends the provided $execution to the broker-maintained execution history (account scope),
+        not to the `Order` object, then updates the per-instrument Position to reflect the new
+        quantity and average price.
         """
         order = execution.order
         instrument = order.instrument
@@ -499,7 +500,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         signed_qty: Decimal = trade_qty if order.is_buy else -trade_qty
 
         # Record execution to history
-        self._executions.append(execution)
+        self._execution_history.append(execution)
 
         # Update position for this instrument
         previous_position: Position | None = self._positions_by_instrument.get(instrument)
@@ -532,7 +533,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
                 last_update=execution.timestamp,
             )
 
-        logger.debug(f"Recorded execution and updated position for Broker (class {self.__class__.__name__}) for Instrument '{instrument}': prev_qty={previous_quantity}, new_qty={new_quantity}, trade_price={trade_price}")
+        logger.debug(f"Appended execution to history and updated Position for Instrument '{instrument}' (class {self.__class__.__name__}): prev_qty={previous_quantity}, new_qty={new_quantity}, trade_price={trade_price}")
 
     # Model builders (defaults)
     def _build_default_market_depth_model(self) -> MarketDepthModel:
