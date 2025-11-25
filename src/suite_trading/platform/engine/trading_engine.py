@@ -555,8 +555,9 @@ class TradingEngine:
 
             next_event = event_feed.pop()
 
-            # Check event, if it can be converted to OrderBook and processed (before delivering event to Strategy)
-            if self._event_to_order_book_converter.can_convert(next_event):
+            # If we have some brokers of type 'OrderBookDrivenBroker' -> we can convert some events to OrderBook for order-price matching
+            order_book_driven_brokers = self._get_order_book_driven_brokers()
+            if order_book_driven_brokers and self._event_to_order_book_converter.can_convert(next_event):
                 order_books = self._event_to_order_book_converter.convert_to_order_books(next_event)
 
                 # Filter and process OrderBooks using the engine's last processed event time as the floor
@@ -570,7 +571,7 @@ class TradingEngine:
                     logger.debug(f"Processing OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
 
                     # Route to brokers implementing OrderBookDrivenBroker for order-price matching
-                    for broker in self._get_order_book_driven_brokers():
+                    for broker in order_book_driven_brokers:
                         broker.process_order_book(order_book)
 
             # Update last event time (global engine time)
