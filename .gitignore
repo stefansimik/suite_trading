@@ -15,3 +15,8 @@ dist/
 
 # Logs
 *.log
+/res/cache/
+/res/data/
+
+# prevent commit the api key
+/src/suite_trading/utils/dataprovider/fmp/.env
