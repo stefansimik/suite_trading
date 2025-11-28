@@ -377,8 +377,10 @@ class MarketOrder(Order):
 class LimitOrder(Order):
     """Limit order that executes only at a specified price or better.
 
-    Limit orders require a limit_price and will only execute if the market
-    price reaches the specified limit price or better.
+    Limit orders require a $limit_price and will only execute if the market price reaches the specified price or better.
+
+    Note:
+        Prices are snapped via `Instrument.snap_price` and may be negative for instruments/venues that allow trading at or below zero (see guideline 7.1).
 
     Properties:
         limit_price (Decimal): The limit price for the order (read-only).
@@ -427,16 +429,14 @@ class LimitOrder(Order):
         # Call parent validation first
         super()._validate()
 
-        # Validate limit_price is positive
-        if self.limit_price <= 0:
-            raise ValueError(f"$limit_price must be positive, but provided value is: {self.limit_price}")
-
 
 class StopOrder(Order):
     """Stop order that becomes a market order when the stop price is reached.
 
-    Stop orders require a stop_price and will trigger a market order
-    when the market price reaches the specified stop price.
+    Stop orders require a $stop_price and will trigger a market order when the market price reaches the specified stop price.
+
+    Note:
+        Prices are snapped via `Instrument.snap_price` and may be negative where the market supports them (see guideline 7.1).
 
     Properties:
         stop_price (Decimal): The stop price for the order (read-only).
@@ -485,16 +485,14 @@ class StopOrder(Order):
         # Call parent validation first
         super()._validate()
 
-        # Validate stop_price is positive
-        if self.stop_price <= 0:
-            raise ValueError(f"$stop_price must be positive, but provided value is: {self.stop_price}")
-
 
 class StopLimitOrder(Order):
     """Stop-limit order that becomes a limit order when the stop price is reached.
 
-    Stop-limit orders require both a stop_price and limit_price. When the market
-    price reaches the stop price, the order becomes a limit order at the limit price.
+    Stop-limit orders require both a $stop_price and $limit_price. When the market price reaches the stop price, the order becomes a limit order at the limit price.
+
+    Note:
+        Prices are snapped via `Instrument.snap_price` and may be negative where the instrument/venue allows trading at or below zero (see guideline 7.1).
 
     Properties:
         stop_price (Decimal): The stop price that triggers the order (read-only).
@@ -556,12 +554,11 @@ class StopLimitOrder(Order):
         # Call parent validation first
         super()._validate()
 
-        # Validate both prices are positive
-        if self.stop_price <= 0:
-            raise ValueError(f"$stop_price must be positive, but provided value is: {self.stop_price}")
-
-        if self.limit_price <= 0:
-            raise ValueError(f"$limit_price must be positive, but provided value is: {self.limit_price}")
+        # Check: enforce order-direction relationship between $stop_price and $limit_price for StopLimitOrder
+        if self.is_buy and self.limit_price < self.stop_price:
+            raise ValueError(f"Cannot call `_validate` because for BUY StopLimitOrder $limit_price ({self.limit_price}) < $stop_price ({self.stop_price}). Use $limit_price >= $stop_price or change $side")
+        if self.is_sell and self.limit_price > self.stop_price:
+            raise ValueError(f"Cannot call `_validate` because for SELL StopLimitOrder $limit_price ({self.limit_price}) > $stop_price ({self.stop_price}). Use $limit_price <= $stop_price or change $side")
 
 
 # endregion
