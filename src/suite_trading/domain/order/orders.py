@@ -40,6 +40,10 @@ class Order:
         state (OrderState): Current state of the order from the internal state machine.
     """
 
+    # INITIAL STATE (SUBCLASS OVERRIDABLE)
+    # Subclasses set INITIAL_STATE to change their starting lifecycle state.
+    INITIAL_STATE: OrderState = OrderState.INITIALIZED
+
     def __init__(
         self,
         instrument: Instrument,
@@ -71,8 +75,8 @@ class Order:
         # Execution tracking (single source of truth)
         self._executions: list[Execution] = []  # Chronological by append order
 
-        # Internal state
-        self._state_machine: StateMachine = create_order_state_machine()
+        # Internal state — created exactly once based on subclass-declared INITIAL_STATE
+        self._state_machine: StateMachine = create_order_state_machine(initial_state=self.__class__.INITIAL_STATE)
 
         # Validation
         self._validate()
@@ -442,6 +446,9 @@ class StopOrder(Order):
         stop_price (Decimal): The stop price for the order (read-only).
     """
 
+    # Start on hold until the trigger fires (pre-live)
+    INITIAL_STATE: OrderState = OrderState.TRIGGER_PENDING
+
     def __init__(
         self,
         instrument: Instrument,
@@ -498,6 +505,9 @@ class StopLimitOrder(Order):
         stop_price (Decimal): The stop price that triggers the order (read-only).
         limit_price (Decimal): The limit price for the order once triggered (read-only).
     """
+
+    # Start on hold until the trigger fires (pre-live)
+    INITIAL_STATE: OrderState = OrderState.TRIGGER_PENDING
 
     def __init__(
         self,
