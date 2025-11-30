@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Callable
+from enum import Enum
+import logging
 
 from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
 from suite_trading.domain.order.orders import (
@@ -12,8 +14,66 @@ from suite_trading.domain.order.orders import (
     StopLimitOrder,
 )
 
+logger = logging.getLogger(__name__)
+
 
 # region Main
+
+
+class OrderAcceptanceDecision(Enum):
+    """Decision for handling a newly submitted order relative to current market.
+
+    Values:
+        ACCEPT: Accept the order and make it live now.
+        REJECT: Reject the order immediately.
+        HOLD_IN_SUBMITTED: Hold in SUBMITTED state until sufficient market data arrives.
+    """
+
+    ACCEPT = "ACCEPT"
+    REJECT = "REJECT"
+    HOLD_IN_SUBMITTED = "HOLD_IN_SUBMITTED"
+
+
+def decide_order_acceptance(order: Order, order_book: OrderBook) -> OrderAcceptanceDecision:
+    """Decide whether to accept, reject, or hold a newly submitted $order.
+
+    Policy:
+    - MarketOrder: always ACCEPT (no price constraint).
+    - LimitOrder:
+        - BUY requires $limit_price <= best_ask; if best_ask is missing → HOLD_IN_SUBMITTED.
+        - SELL requires $limit_price >= best_bid; if best_bid is missing → HOLD_IN_SUBMITTED.
+        - If the constraint is violated, return REJECT.
+
+    Args:
+        order: Newly submitted order awaiting activation.
+        order_book: Current broker OrderBook snapshot for the order's instrument.
+
+    Returns:
+        OrderAcceptanceDecision indicating how the broker should proceed.
+    """
+    if isinstance(order, MarketOrder):
+        return OrderAcceptanceDecision.ACCEPT
+
+    if isinstance(order, LimitOrder):
+        # Select the reference quote: BUY checks best_ask, SELL checks best_bid
+        best_order_book_level = order_book.best_ask if order.is_buy else order_book.best_bid
+        if best_order_book_level is None:
+            return OrderAcceptanceDecision.HOLD_IN_SUBMITTED
+
+        limit_price = order.limit_price
+        reference_market_price = best_order_book_level.price
+
+        # Price constraint: BUY needs limit <= ask; SELL needs limit >= bid
+        is_limit_price_valid = (limit_price <= reference_market_price) if order.is_buy else (limit_price >= reference_market_price)
+        if not is_limit_price_valid:
+            side = "BUY" if order.is_buy else "SELL"
+            logger.warning(f"Rejecting Limit {side} Order '{order.id}' for Instrument '{order.instrument}': limit_price={limit_price}, reference market price={reference_market_price}")
+            return OrderAcceptanceDecision.REJECT
+
+        return OrderAcceptanceDecision.ACCEPT
+
+    # Defensive default for unsupported types
+    return OrderAcceptanceDecision.REJECT
 
 
 def compute_trigger_price(book: OrderBook) -> Decimal:

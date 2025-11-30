@@ -9,7 +9,7 @@ from suite_trading.platform.broker.account import Account
 from suite_trading.platform.broker.sim.sim_account import SimAccount
 from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.order.orders import Order
-from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory
+from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory, OrderState
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
@@ -24,6 +24,8 @@ from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRat
 from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
 from suite_trading.platform.broker.sim.order_matching import (
     select_simulate_fills_function_for_order,
+    decide_order_acceptance,
+    OrderAcceptanceDecision,
 )
 
 if TYPE_CHECKING:
@@ -136,7 +138,8 @@ class SimBroker(Broker, OrderBookDrivenBroker):
     def submit_order(self, order: Order) -> None:
         """Implements: Broker.submit_order
 
-        Validate and register a MARKET $order, publishing each state transition.
+        Validate and register an $order, publishing each state transition. For Limit orders,
+        perform immediate acceptance checks against the latest OrderBook when available.
         """
         # Check: broker must be connected to accept new orders
         if not self._connected:
@@ -152,17 +155,27 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         # Initial order-state transitions:
         # INITIALIZED -> PENDING_SUBMIT
         self._apply_order_action(order, OrderAction.SUBMIT)
-        # PENDING_SUBMIT -> SUBMITTED
-        self._apply_order_action(order, OrderAction.ACCEPT)
-        # SUBMITTED → State WORKING
+        # PENDING_SUBMIT -> SUBMITTED (broker accepted the submission request)
         self._apply_order_action(order, OrderAction.ACCEPT)
 
-        # Try to immediately match the new order against the latest broker OrderBook snapshot for its instrument.
-        # This mirrors real broker behavior where new orders are evaluated against the current book without waiting
-        # for another price update. If we have no OrderBook yet for this instrument, the order will be matched later
-        # when the first OrderBook arrives.
+        # Try to immediately decide acceptance using the latest OrderBook snapshot, if available.
         last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
-        if last_order_book is not None and order.state_category == OrderStateCategory.FILLABLE:
+        # If we do not yet have an OrderBook for this instrument, keep the order in SUBMITTED (hold) for now.
+        if last_order_book is None:
+            return
+
+        # Decide acceptance for the newly submitted order
+        decision = decide_order_acceptance(order, last_order_book)
+        if decision is OrderAcceptanceDecision.REJECT:
+            # SUBMITTED -> REJECTED
+            self._apply_order_action(order, OrderAction.REJECT)
+            return
+        if decision is OrderAcceptanceDecision.ACCEPT:
+            # SUBMITTED -> WORKING
+            self._apply_order_action(order, OrderAction.ACCEPT)
+
+        # If the order is fillable -> simulate fills against the last orde_book
+        if order.state_category == OrderStateCategory.FILLABLE:
             self._simulate_and_apply_fills_for_order_with_order_book(order, last_order_book)
 
     def cancel_order(self, order: Order) -> None:
@@ -301,7 +314,16 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         # Store latest broker OrderBook snapshot (already enriched)
         self._latest_order_book_by_instrument[enriched_order_book.instrument] = enriched_order_book
 
-        # Select FILLABLE orders for this instrument
+        # 1) Evaluate SUBMITTED orders for this instrument now that we have fresh market data
+        submitted_orders = [o for o in self._orders_by_id.values() if o.instrument == enriched_order_book.instrument and o.state == OrderState.SUBMITTED]
+        for order in submitted_orders:
+            decision = decide_order_acceptance(order, enriched_order_book)
+            if decision is OrderAcceptanceDecision.REJECT:
+                self._apply_order_action(order, OrderAction.REJECT)
+            elif decision is OrderAcceptanceDecision.ACCEPT:
+                self._apply_order_action(order, OrderAction.ACCEPT)
+
+        # 2) Select FILLABLE orders for this instrument (includes those just activated)
         orders_to_process = [order for order in self._orders_by_id.values() if order.instrument == enriched_order_book.instrument and order.state_category == OrderStateCategory.FILLABLE]
 
         # Process each order using shared fill simulation logic
