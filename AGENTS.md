@@ -119,6 +119,8 @@ broker.place_order(strategy_name, instrument, side, quantity, limit_price, tif)
 
 This section covers all developer-facing text: docstrings, comments, logs, and exceptions.
 
+**Language policy:** All code, docstrings, comments, logs, and exceptions must be written in English.
+
 ## 4.1. Docstrings (Public API Documentation)
 
 **Purpose:** Document public APIs for external developers.
