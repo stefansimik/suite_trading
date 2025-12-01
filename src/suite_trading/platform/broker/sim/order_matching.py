@@ -20,60 +20,54 @@ logger = logging.getLogger(__name__)
 # region Main
 
 
-class OrderAcceptanceDecision(Enum):
-    """Decision for handling a newly submitted order relative to current market.
+class CheckResult(Enum):
+    """Generic 3-state verdict for validations and eligibility checks.
 
     Values:
-        ACCEPT: Accept the order and make it live now.
-        REJECT: Reject the order immediately.
-        HOLD_IN_SUBMITTED: Hold in SUBMITTED state until sufficient market data arrives.
+        OK: The check passed.
+        NOT_OK: The check failed.
+        CANNOT_EVALUATE: The check could not be evaluated (cause-agnostic).
     """
 
-    ACCEPT = "ACCEPT"
-    REJECT = "REJECT"
-    HOLD_IN_SUBMITTED = "HOLD_IN_SUBMITTED"
+    OK = "OK"
+    NOT_OK = "NOT_OK"
+    CANNOT_EVALUATE = "CANNOT_EVALUATE"
 
 
-def decide_order_acceptance(order: Order, order_book: OrderBook) -> OrderAcceptanceDecision:
-    """Decide whether to accept, reject, or hold a newly submitted $order.
+def check_order_price_against_market(order: Order, order_book: OrderBook) -> CheckResult:
+    """Check whether $order price is eligible against the current market.
 
     Policy:
-    - MarketOrder: always ACCEPT (no price constraint).
+    - MarketOrder: OK (no price constraint).
     - LimitOrder:
-        - BUY requires $limit_price <= best_ask; if best_ask is missing → HOLD_IN_SUBMITTED.
-        - SELL requires $limit_price >= best_bid; if best_bid is missing → HOLD_IN_SUBMITTED.
-        - If the constraint is violated, return REJECT.
-
-    Args:
-        order: Newly submitted order awaiting activation.
-        order_book: Current broker OrderBook snapshot for the order's instrument.
+        - BUY: require $limit_price <= best_ask; missing best_ask → CANNOT_EVALUATE
+        - SELL: require $limit_price >= best_bid; missing best_bid → CANNOT_EVALUATE
+        - Violation → NOT_OK
 
     Returns:
-        OrderAcceptanceDecision indicating how the broker should proceed.
+        CheckResult: Static verdict only; mapping to actions is done by the Broker.
     """
     if isinstance(order, MarketOrder):
-        return OrderAcceptanceDecision.ACCEPT
+        # Market orders have no limit price to validate against quotes → always OK
+        return CheckResult.OK
 
     if isinstance(order, LimitOrder):
-        # Select the reference quote: BUY checks best_ask, SELL checks best_bid
-        best_order_book_level = order_book.best_ask if order.is_buy else order_book.best_bid
+        # Limit order is valid when BUY limit <= ask or SELL limit >= bid (reference below)
+        best_order_book_level = order_book.best_ask if order.is_buy else order_book.best_bid  # Select the reference quote
         if best_order_book_level is None:
-            return OrderAcceptanceDecision.HOLD_IN_SUBMITTED
+            # No best bid/ask available → cannot evaluate price eligibility now
+            return CheckResult.CANNOT_EVALUATE
 
         limit_price = order.limit_price
         reference_market_price = best_order_book_level.price
 
         # Price constraint: BUY needs limit <= ask; SELL needs limit >= bid
-        is_limit_price_valid = (limit_price <= reference_market_price) if order.is_buy else (limit_price >= reference_market_price)
-        if not is_limit_price_valid:
-            side = "BUY" if order.is_buy else "SELL"
-            logger.warning(f"Rejecting Limit {side} Order '{order.id}' for Instrument '{order.instrument}': limit_price={limit_price}, reference market price={reference_market_price}")
-            return OrderAcceptanceDecision.REJECT
+        is_ok = (limit_price <= reference_market_price) if order.is_buy else (limit_price >= reference_market_price)
+        # Verdict: OK when constraint holds; NOT_OK otherwise
+        return CheckResult.OK if is_ok else CheckResult.NOT_OK
 
-        return OrderAcceptanceDecision.ACCEPT
-
-    # Defensive default for unsupported types
-    return OrderAcceptanceDecision.REJECT
+    # Unsupported order type for price eligibility check → NOT_OK
+    return CheckResult.NOT_OK
 
 
 def compute_trigger_price(book: OrderBook) -> Decimal:

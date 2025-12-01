@@ -24,8 +24,8 @@ from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRat
 from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
 from suite_trading.platform.broker.sim.order_matching import (
     select_simulate_fills_function_for_order,
-    decide_order_acceptance,
-    OrderAcceptanceDecision,
+    check_order_price_against_market,
+    CheckResult,
 )
 
 if TYPE_CHECKING:
@@ -164,13 +164,14 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         if last_order_book is None:
             return
 
-        # Decide acceptance for the newly submitted order
-        decision = decide_order_acceptance(order, last_order_book)
-        if decision is OrderAcceptanceDecision.REJECT:
+        # Assess price eligibility for the newly submitted order
+        verdict = check_order_price_against_market(order, last_order_book)
+        if verdict is CheckResult.NOT_OK:
+            logger.warning(f"Rejecting Order '{order.id}' due to price ineligibility against reference market quote")
             # SUBMITTED -> REJECTED
             self._apply_order_action(order, OrderAction.REJECT)
             return
-        if decision is OrderAcceptanceDecision.ACCEPT:
+        if verdict is CheckResult.OK:
             # SUBMITTED -> WORKING
             self._apply_order_action(order, OrderAction.ACCEPT)
 
@@ -317,10 +318,11 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         # 1) Evaluate SUBMITTED orders for this instrument now that we have fresh market data
         submitted_orders = [o for o in self._orders_by_id.values() if o.instrument == enriched_order_book.instrument and o.state == OrderState.SUBMITTED]
         for order in submitted_orders:
-            decision = decide_order_acceptance(order, enriched_order_book)
-            if decision is OrderAcceptanceDecision.REJECT:
+            verdict = check_order_price_against_market(order, enriched_order_book)
+            if verdict is CheckResult.NOT_OK:
+                logger.warning(f"Rejecting Order '{order.id}' due to price ineligibility against reference market quote")
                 self._apply_order_action(order, OrderAction.REJECT)
-            elif decision is OrderAcceptanceDecision.ACCEPT:
+            elif verdict is CheckResult.OK:
                 self._apply_order_action(order, OrderAction.ACCEPT)
 
         # 2) Select FILLABLE orders for this instrument (includes those just activated)
