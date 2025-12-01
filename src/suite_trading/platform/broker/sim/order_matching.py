@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Callable
 from enum import Enum
 import logging
@@ -35,17 +34,18 @@ class CheckResult(Enum):
 
 
 def check_order_price_against_market(order: Order, order_book: OrderBook) -> CheckResult:
-    """Check whether $order price is eligible against the current market.
+    """Check if $order price can trade right now against the current market price (in form of OrderBook).
 
-    Policy:
-    - MarketOrder: OK (no price constraint).
-    - LimitOrder:
-        - BUY: require $limit_price <= best_ask; missing best_ask → CANNOT_EVALUATE
-        - SELL: require $limit_price >= best_bid; missing best_bid → CANNOT_EVALUATE
-        - Violation → NOT_OK
+    Rules:
+    - MarketOrder: always OK.
+    - LimitOrder: BUY needs $limit_price <= best_ask; SELL needs $limit_price >= best_bid. If that side is missing, return CANNOT_EVALUATE.
+
+    Args:
+        order: Order to check.
+        order_book: OrderBook snapshot to compare against.
 
     Returns:
-        CheckResult: Static verdict only; mapping to actions is done by the Broker.
+        CheckResult: OK, NOT_OK, or CANNOT_EVALUATE.
     """
     if isinstance(order, MarketOrder):
         # Market orders have no limit price to validate against quotes → always OK
@@ -70,67 +70,31 @@ def check_order_price_against_market(order: Order, order_book: OrderBook) -> Che
     return CheckResult.NOT_OK
 
 
-def compute_trigger_price(book: OrderBook) -> Decimal:
-    """Compute trigger price from OrderBook snapshot.
-
-    Policy (default):
-    - For zero-spread books (trades/bars): use the execution price (bid=ask)
-    - For quote books: use MID to avoid directional bias
-
-    Args:
-        book: OrderBook snapshot to compute trigger price from.
-
-    Returns:
-        Decimal: Trigger price for stop/stop-limit orders.
-
-    Raises:
-        ValueError: If OrderBook is empty on both sides.
-    """
-    best_bid = book.best_bid
-    best_ask = book.best_ask
-
-    # Zero-spread book (trade or bar): use execution price
-    if best_bid and best_ask and best_bid.price == best_ask.price:
-        return best_bid.price
-
-    # Quote book: use MID
-    if best_bid and best_ask:
-        return (best_bid.price + best_ask.price) / Decimal("2")
-
-    # One-sided book: use available side
-    if best_ask:
-        return best_ask.price
-    if best_bid:
-        return best_bid.price
-
-    raise ValueError(f"Cannot call `compute_trigger_price` because OrderBook is empty on both sides (instrument={book.instrument}, timestamp={book.timestamp})")
-
-
 def simulate_fills_for_market_order(order: MarketOrder, order_book: OrderBook) -> list[FillSlice]:
-    """Simulate fills for a Market order by taking opposite side best-first.
+    """Simulate fills for a Market order from the other side of the book (best price first).
 
-    Returns pre-fee fill slices (quantity and price only). Negative prices are allowed.
+    Returns fills as price/quantity pairs. Fees are not included. Negative prices are allowed.
 
     Args:
         order: MarketOrder to fill.
-        order_book: OrderBook snapshot for fill simulation.
+        order_book: OrderBook snapshot for the simulation.
 
     Returns:
-        list[FillSlice]: Pre-fee fill slices.
+        list[FillSlice]: Fills (price and quantity); fees not included.
     """
     fills = order_book.simulate_fills(order_side=order.side, target_quantity=order.unfilled_quantity)
     return fills
 
 
 def simulate_fills_for_limit_order(order: LimitOrder, order_book: OrderBook) -> list[FillSlice]:
-    """Simulate fills for a Limit order at prices equal or better than the limit.
+    """Simulate fills for a Limit order at prices equal to or better than $order.limit_price.
 
     Args:
         order: LimitOrder to fill.
         order_book: OrderBook snapshot for fill simulation.
 
     Returns:
-        list[FillSlice]: Pre-fee fill slices.
+        list[FillSlice]: Fills (price and quantity); fees not included.
     """
     if order.is_buy:
         fills = order_book.simulate_fills(order_side=order.side, target_quantity=order.unfilled_quantity, max_price=order.limit_price)
@@ -140,71 +104,77 @@ def simulate_fills_for_limit_order(order: LimitOrder, order_book: OrderBook) -> 
 
 
 def simulate_fills_for_stop_order(order: StopOrder, order_book: OrderBook) -> list[FillSlice]:
-    """Simulate fills for stop order after trigger check.
+    """Simulate fills for a Stop order with a simple, side-aware trigger.
 
-    Stop orders trigger when market moves against the position direction:
-    - Buy stops trigger when trigger price >= stop price (market rising)
-    - Sell stops trigger when trigger price <= stop price (market falling)
+    Rules:
+    - BUY triggers when ask >= $order.stop_price. SELL triggers when bid <= $order.stop_price. If that side is missing, nothing happens.
 
     Args:
-        order: StopOrder to potentially fill.
-        order_book: OrderBook snapshot for trigger and fill simulation.
+        order: StopOrder to evaluate and fill if triggered.
+        order_book: OrderBook snapshot used for the trigger and fills.
 
     Returns:
-        list[FillSlice]: Fills if triggered, empty list otherwise.
+        list[FillSlice]: Fills if triggered; empty list otherwise.
     """
-    trigger_price = compute_trigger_price(order_book)
+    best_bid = order_book.best_bid
+    best_ask = order_book.best_ask
 
-    # Check trigger condition
     if order.is_buy:
-        triggered = trigger_price >= order.stop_price
+        # BUY stop: trigger against ask side; missing ask → no trigger
+        if best_ask is None:
+            return []
+        triggered = best_ask.price >= order.stop_price
     else:
-        triggered = trigger_price <= order.stop_price
+        # SELL stop: trigger against bid side; missing bid → no trigger
+        if best_bid is None:
+            return []
+        triggered = best_bid.price <= order.stop_price
 
-    # If not triggered, return empty
     if not triggered:
         return []
 
-    # If triggered, simulate as market order
     return simulate_fills_for_market_order(order, order_book)
 
 
 def simulate_fills_for_stop_limit_order(order: StopLimitOrder, order_book: OrderBook) -> list[FillSlice]:
-    """Simulate fills for stop-limit order after trigger check.
+    """Simulate fills for a Stop‑Limit order: trigger first, then limit rules.
 
-    Stop-limit orders trigger like stop orders but fill like limit orders.
+    Rules:
+    - BUY triggers when ask >= $order.stop_price. SELL triggers when bid <= $order.stop_price. If that side is missing, nothing happens.
 
     Args:
-        order: StopLimitOrder to potentially fill.
-        order_book: OrderBook snapshot for trigger and fill simulation.
+        order: StopLimitOrder to evaluate and fill if triggered.
+        order_book: OrderBook snapshot used for the trigger and fills.
 
     Returns:
-        list[FillSlice]: Fills if triggered and limit executable, empty list otherwise.
+        list[FillSlice]: Fills if triggered and executable at the limit; empty list otherwise.
     """
-    trigger_price = compute_trigger_price(order_book)
+    best_bid = order_book.best_bid
+    best_ask = order_book.best_ask
 
-    # Check trigger condition
     if order.is_buy:
-        triggered = trigger_price >= order.stop_price
+        if best_ask is None:
+            return []
+        triggered = best_ask.price >= order.stop_price
     else:
-        triggered = trigger_price <= order.stop_price
+        if best_bid is None:
+            return []
+        triggered = best_bid.price <= order.stop_price
 
-    # If not triggered, return empty
     if not triggered:
         return []
 
-    # If triggered, simulate as limit order
     return simulate_fills_for_limit_order(order, order_book)
 
 
 def select_simulate_fills_function_for_order(order: Order) -> Callable[[Order, OrderBook], list[FillSlice]]:
-    """Return the simulate-fills function for $order or raise if unsupported.
+    """Return the fill-simulation function for $order or raise if unsupported.
 
     Args:
         order: The order to simulate.
 
     Returns:
-        A function like `simulate_fills_for_limit_order` that produces pre-fee `FillSlice` values.
+        Callable that returns `FillSlice` items (price and quantity). Fees are handled elsewhere.
 
     Raises:
         ValueError: If the order type is unsupported by the simulator.
