@@ -152,32 +152,20 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         # Track the order (submission never terminalizes in this step)
         self._orders_by_id[order.id] = order
 
-        # Initial order-state transitions:
-        # INITIALIZED -> PENDING_SUBMIT
-        self._apply_order_action(order, OrderAction.SUBMIT)
-        # PENDING_SUBMIT -> SUBMITTED (broker accepted the submission request)
-        self._apply_order_action(order, OrderAction.ACCEPT)
+        # TRANSITION ORDERS
+        self._apply_order_action(order, OrderAction.SUBMIT)  # INITIALIZED + SUBMIT -> PENDING_SUBMIT
+        self._apply_order_action(order, OrderAction.ACCEPT)  # PENDING_SUBMIT + ACCEPT -> SUBMITTED
 
-        # Try to immediately decide acceptance using the latest OrderBook snapshot, if available.
+        # GET LAST PRICE FOR INSTRUMENT
         last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
-        # If we do not yet have an OrderBook for this instrument, keep the order in SUBMITTED (hold) for now.
         if last_order_book is None:
             return
 
-        # Assess price eligibility for the newly submitted order
-        verdict = check_order_price_against_market(order, last_order_book)
-        if verdict is CheckResult.NOT_OK:
-            logger.warning(f"Rejecting Order '{order.id}' due to price ineligibility against reference market quote")
-            # SUBMITTED -> REJECTED
-            self._apply_order_action(order, OrderAction.REJECT)
-            return
-        if verdict is CheckResult.OK:
-            # SUBMITTED -> WORKING
-            self._apply_order_action(order, OrderAction.ACCEPT)
+        # Transition orders (check valid prices in order ; applies only for SUBMITTED orders)
+        self._transition_order_state_by_price_validity(order, last_order_book)  # SUBMITTED + ACCEPT|REJECT -> WORKING|TRIGGERED or REJECTED
 
-        # If the order is fillable -> simulate fills against the last orde_book
-        if order.state_category == OrderStateCategory.FILLABLE:
-            self._simulate_and_apply_fills_for_order_with_order_book(order, last_order_book)
+        # Simulate fills (applies only for FILLABLE orders)
+        self._simulate_and_apply_fills_for_order_with_order_book(order, last_order_book)
 
     def cancel_order(self, order: Order) -> None:
         """Implements: Broker.cancel_order.
@@ -315,26 +303,41 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         # Store latest broker OrderBook snapshot (already enriched)
         self._latest_order_book_by_instrument[enriched_order_book.instrument] = enriched_order_book
 
-        # 1) Evaluate SUBMITTED orders for this instrument now that we have fresh market data
-        submitted_orders = [o for o in self._orders_by_id.values() if o.instrument == enriched_order_book.instrument and o.state == OrderState.SUBMITTED]
-        for order in submitted_orders:
-            verdict = check_order_price_against_market(order, enriched_order_book)
-            if verdict is CheckResult.NOT_OK:
-                logger.warning(f"Rejecting Order '{order.id}' due to price ineligibility against reference market quote")
-                self._apply_order_action(order, OrderAction.REJECT)
-            elif verdict is CheckResult.OK:
-                self._apply_order_action(order, OrderAction.ACCEPT)
-
-        # 2) Select FILLABLE orders for this instrument (includes those just activated)
-        orders_to_process = [order for order in self._orders_by_id.values() if order.instrument == enriched_order_book.instrument and order.state_category == OrderStateCategory.FILLABLE]
-
-        # Process each order using shared fill simulation logic
-        for order in orders_to_process:
+        # Single pass per order: apply acceptance transitions, then simulate fills if fillable
+        orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument != enriched_order_book.instrument]
+        for order in orders_for_instrument:
+            # Do order-state transitions (related to if price in order is valid)
+            self._transition_order_state_by_price_validity(order, enriched_order_book)
+            # Simulate fills (if order is FILLABLE)
             self._simulate_and_apply_fills_for_order_with_order_book(order, enriched_order_book)
 
     # endregion
 
     # region Utilities
+
+    def _transition_order_state_by_price_validity(self, order: Order, order_book: OrderBook) -> None:
+        """Transition $order state by price validity using $order_book.
+
+        Applies REJECT or ACCEPT for SUBMITTED orders only. No fill simulation.
+
+        Args:
+            order: Order to evaluate and transition.
+            order_book: Enriched OrderBook snapshot for the same instrument.
+
+        Raises:
+            ValueError: If $order.instrument and $order_book.instrument differ.
+        """
+
+        # This transition is valid only for order in SUBMITTED state
+        if order.state != OrderState.SUBMITTED:
+            return
+
+        verdict = check_order_price_against_market(order, order_book)
+        if verdict is CheckResult.NOT_OK:
+            logger.warning(f"Rejecting Order '{order.id}' due to price ineligibility against current market for instrument '{order.instrument}'")
+            self._apply_order_action(order, OrderAction.REJECT)
+        elif verdict is CheckResult.OK:
+            self._apply_order_action(order, OrderAction.ACCEPT)
 
     def _simulate_and_apply_fills_for_order_with_order_book(
         self,
@@ -346,6 +349,8 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         The $order_book was already enriched by MarketDepthModel and is treated as
         the broker's current snapshot for matching, margin, and logging.
         """
+
+        # Fill simulation is valid only for order in SUBMITTED state
         if order.state_category != OrderStateCategory.FILLABLE:
             return
 
@@ -481,10 +486,11 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {execution.quantity} Order ID / Execution ID: {execution.order.id} / {execution.id}"
             self._account.pay_fee(execution.timestamp, execution.commission, fee_description)
 
-        # PUBLISH EXECUTION + UPDATED ORDER
+        # PUBLISH EXECUTION
         if self._execution_callback is not None:
             self._execution_callback(execution)
 
+        # PUBLISH ORDER-UPDATE
         self._process_order_update(order)
 
     # Order state transitions and publishing
