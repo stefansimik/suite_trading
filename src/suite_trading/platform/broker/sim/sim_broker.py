@@ -21,6 +21,8 @@ from suite_trading.platform.broker.sim.models.fee.fixed_fee import FixedFeeModel
 from suite_trading.domain.monetary.money import Money
 from suite_trading.platform.broker.sim.models.margin.protocol import MarginModel
 from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRatioMarginModel
+from suite_trading.platform.broker.sim.models.fill.protocol import FillModel
+from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
 from suite_trading.platform.broker.sim.order_matching import (
     select_simulate_fills_function_for_order,
@@ -69,14 +71,19 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         depth_model: MarketDepthModel | None = None,
         margin_model: MarginModel | None = None,
         fee_model: FeeModel | None = None,
+        fill_model: FillModel | None = None,
     ) -> None:
         """Create a simulation broker.
 
         Args:
             depth_model: MarketDepthModel used for matching. If None, a default model is built by
                 `_build_default_market_depth_model()`.
+            margin_model: MarginModel used for margin calculations. If None, defaults to zero margin
+                via `_build_default_margin_model()`.
             fee_model: FeeModel used to compute commissions. If None, defaults to zero per-unit
                 commission via `_build_default_fee_model()`.
+            fill_model: FillModel used for fill simulation. If None, defaults to deterministic
+                on-touch fills via `_build_default_fill_model()`.
         """
         # CONNECTION
         self._connected: bool = False
@@ -85,6 +92,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         self._depth_model: MarketDepthModel = depth_model or self._build_default_market_depth_model()
         self._margin_model: MarginModel = margin_model or self._build_default_margin_model()
         self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
+        self._fill_model: FillModel = fill_model or self._build_default_fill_model()
 
         # ORDERS, EXECUTIONS, POSITIONS for this simulated account instance
         self._orders_by_id: dict[str, Order] = {}
@@ -304,7 +312,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         self._latest_order_book_by_instrument[enriched_order_book.instrument] = enriched_order_book
 
         # Single pass per order: apply acceptance transitions, then simulate fills if fillable
-        orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument != enriched_order_book.instrument]
+        orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument == enriched_order_book.instrument]
         for order in orders_for_instrument:
             # Do order-state transitions (related to if price in order is valid)
             self._transition_order_state_by_price_validity(order, enriched_order_book)
@@ -350,16 +358,21 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         the broker's current snapshot for matching, margin, and logging.
         """
 
-        # Fill simulation is valid only for order in SUBMITTED state
+        # Fill simulation is valid only for order in FILLABLE state
         if order.state_category != OrderStateCategory.FILLABLE:
             return
 
+        # Get proposed fills from order-type matching logic
         simulate_fill_slices_function = select_simulate_fills_function_for_order(order)
-        fill_slices: list[FillSlice] = simulate_fill_slices_function(order, order_book)
-        if not fill_slices:
+        proposed_fill_slices: list[FillSlice] = simulate_fill_slices_function(order, order_book)
+
+        # Apply FillModel policy to filter/modify fills
+        actual_fill_slices: list[FillSlice] = self._fill_model.apply_fill_policy(order, order_book, proposed_fill_slices)
+
+        if not actual_fill_slices:
             return
 
-        for fill_slice in fill_slices:
+        for fill_slice in actual_fill_slices:
             self._process_fill_slice(order, fill_slice, order_book)
             # Stop if the order was terminalized by this fill-slice (e.g., order could be canceled on margin-call)
             if order.state_category == OrderStateCategory.TERMINAL:
@@ -589,6 +602,14 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             A MarginModel instance with zero ratios to keep behavior stable unless configured.
         """
         return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"))
+
+    def _build_default_fill_model(self) -> FillModel:
+        """Build the default FillModel used by this broker instance.
+
+        Returns:
+            A FillModel instance with realistic slippage and fill probability distributions.
+        """
+        return DistributionFillModel()
 
     # Margin & funds
     def _compute_additional_exposure_quantity(
