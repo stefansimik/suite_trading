@@ -76,6 +76,8 @@ class OrderBook:
     __slots__ = ("_instrument", "_timestamp", "_bids", "_asks")
 
     # Enable or disable validation for all instances of OrderBook.
+    # Disabled by default because a full validation pass over all book levels is relatively expensive.
+    # Enable it explicitly, when wiring new data sources or debugging to catch bad shapes, non-finite values, or incorrect sorting early.
     VALIDATE: bool = False
 
     # region Init
