@@ -120,16 +120,26 @@ class OrderBook:
         min_price: Decimal | None = None,
         max_price: Decimal | None = None,
     ) -> list[FillSlice]:
-        """Simulate fills by taking liquidity from this order book.
+        """Simulate deterministic fills by walking the opposite side of this book.
 
-        Takes the opposite side, best-first, until $target_quantity is reached or depth runs out.
-        Negative prices are allowed.
+        This is the default, purely deterministic matching model. It assumes that any visible resting
+        volume at prices within the [$min_price, $max_price] band is immediately executable and creates
+        `FillSlice` entries for the levels that would be hit if the order trades through that price range.
+
+        The function only walks the current snapshot and does not model queue position, latency, hidden
+        liquidity, or randomization. Callers that need more advanced behavior should apply their own
+        logic on top of the returned fill slices.
+
+        Takes the opposite side, best-first, until $target_quantity is reached or there is no more
+        eligible depth. Negative prices are allowed.
 
         Args:
             order_side: BUY consumes asks; SELL consumes bids.
             target_quantity: Total quantity to fill.
-            min_price: Optional floor price on the chosen side.
-            max_price: Optional ceiling price on the chosen side.
+            min_price: Optional inclusive floor price on the chosen side. If None, there is no lower
+                bound.
+            max_price: Optional inclusive ceiling price on the chosen side. If None, there is no upper
+                bound.
 
         Returns:
             List of `FillSlice(quantity, price)` (pre-fee).
