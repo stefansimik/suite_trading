@@ -4,7 +4,7 @@ from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.domain.market_data.tick.trade_tick_event import TradeTickEvent
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
-from suite_trading.domain.market_data.order_book import OrderBook
+from suite_trading.domain.market_data.order_book.order_book import OrderBook
 from suite_trading.platform.engine.models.event_to_order_book.conversion_functions import (
     bar_to_order_books,
     trade_tick_to_order_book,

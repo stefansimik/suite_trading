@@ -4,7 +4,7 @@ from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from suite_trading.domain.event import Event
-    from suite_trading.domain.market_data.order_book import OrderBook
+    from suite_trading.domain.market_data.order_book.order_book import OrderBook
 
 
 class EventToOrderBookConverter(Protocol):

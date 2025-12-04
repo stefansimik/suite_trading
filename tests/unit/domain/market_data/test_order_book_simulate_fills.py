@@ -6,7 +6,7 @@ from decimal import Decimal as D
 
 from suite_trading.domain.instrument import Instrument, AssetClass
 from suite_trading.domain.monetary.currency import Currency, CurrencyType
-from suite_trading.domain.market_data.order_book import OrderBook, BookLevel
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, BookLevel
 from suite_trading.domain.order.order_enums import OrderSide
 
 

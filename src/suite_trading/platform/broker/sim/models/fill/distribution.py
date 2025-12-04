@@ -6,9 +6,9 @@ import random
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.orders import Order
-    from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
+    from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
 
-from suite_trading.domain.market_data.order_book import FillSlice
+from suite_trading.domain.market_data.order_book.order_book import FillSlice
 
 
 class DistributionFillModel:

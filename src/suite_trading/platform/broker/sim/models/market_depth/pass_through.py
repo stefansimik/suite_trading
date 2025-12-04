@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from .protocol import MarketDepthModel
 
 if TYPE_CHECKING:
-    from suite_trading.domain.market_data.order_book import OrderBook
+    from suite_trading.domain.market_data.order_book.order_book import OrderBook
 
 
 # region Protocol MarketDepthModel

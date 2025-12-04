@@ -4,7 +4,7 @@ from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.orders import Order
-    from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
+    from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
 
 
 # region Interface

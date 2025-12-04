@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from suite_trading.domain.market_data.order_book import OrderBook
+from suite_trading.domain.market_data.order_book.order_book import OrderBook
 from suite_trading.domain.monetary.money import Money
 from suite_trading.utils.notional import compute_notional_value
 

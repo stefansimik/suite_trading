@@ -2,33 +2,38 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Sequence, NamedTuple, TYPE_CHECKING
+from typing import NamedTuple, Sequence, TYPE_CHECKING
+
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.utils.datetime_utils import expect_utc, format_dt
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
 
+# Justification: Shared order book price level shape reused across broker, engine, and tests.
+
 
 class BookLevel(NamedTuple):
-    """
-    Price level with a limit $price and total resting $volume.
+    """Price level with a limit $price and total resting $volume.
 
     Attributes:
-        price (Decimal): Limit price (can be negative in some markets).
-        volume (Decimal): Total resting size at $price; expected to be >= 0.
+        price: Limit price (can be negative in some markets).
+        volume: Total resting size at $price; expected to be >= 0.
     """
 
     price: Decimal
     volume: Decimal
 
 
+# Justification: Represent execution slices reused between broker, order matching, and tests.
+
+
 class FillSlice(NamedTuple):
     """Represents a pre-fee fill slice: how much filled and at what price.
 
-    This is intentionally an "execution-like" piece of information (quantity and price only)
-    without details such as commission, instrument, ... It is used during matching
-    to describe fills before fees/margins/accounting are applied by the broker.
+    This is intentionally an execution-like piece of information with only $quantity and $price.
+    It is used during matching to describe fills before fees, margins, or accounting are applied
+    by the broker.
     """
 
     quantity: Decimal
@@ -36,64 +41,36 @@ class FillSlice(NamedTuple):
 
 
 class OrderBook:
-    """
-    Read-only snapshot of the limit order book for one Instrument.
+    """Read-only snapshot of the limit order book for one Instrument.
 
     Ordering:
-    - Pass bids with the highest price first.
-    - Pass asks with the lowest price first.
-    - The class does not reorder data.
+        - Pass bids with the highest price first.
+        - Pass asks with the lowest price first.
+        - The class does not reorder data.
 
     Validation (optional):
-    - If OrderBook.VALIDATE is True, `__init__` runs `_validate()` and raises ValueError on the
-      first problem: wrong shape or types, non-finite numbers, negative $volume, or bad sorting.
-    - By default, VALIDATE is False, so no checks are performed.
+        - If $OrderBook.VALIDATE is True, `__init__` runs `_validate()` and raises ValueError on
+          the first problem: wrong shape or types, non-finite numbers, negative $volume, or bad
+          sorting.
+        - By default, $VALIDATE is False, so no checks are performed.
 
     Args:
-        instrument (Instrument): Instrument this OrderBook belongs to.
-        timestamp (datetime): Timestamp of this OrderBook snapshot (must be timezone-aware UTC).
-        bids (Sequence[BookLevel]): Bid levels, best-first (highest price first).
-        asks (Sequence[BookLevel]): Ask levels, best-first (lowest price first).
+        instrument: Instrument this OrderBook belongs to.
+        timestamp: Timestamp of this OrderBook snapshot (must be timezone-aware UTC).
+        bids: Bid levels, best-first (highest price first).
+        asks: Ask levels, best-first (lowest price first).
 
     Properties:
-        bids (tuple[BookLevel, ...]): Bid ladder as immutable tuple, best-first.
-        asks (tuple[BookLevel, ...]): Ask ladder as immutable tuple, best-first.
-        best_bid (BookLevel | None): First bid level or None if empty.
-        best_ask (BookLevel | None): First ask level or None if empty.
-        spread_as_price (Decimal | None): Price delta (best_ask - best_bid), or None if one side
-            is missing.
-        spread_in_ticks (int | None): Spread in tick units (price_increment), or None if one side
-            is missing.
-        is_empty (bool): True if both sides are empty.
+        bids: Bid ladder as immutable tuple, best-first.
+        asks: Ask ladder as immutable tuple, best-first.
+        best_bid: First bid level or None if empty.
+        best_ask: First ask level or None if empty.
+        spread_as_price: Price delta (best_ask - best_bid), or None if one side is missing.
+        spread_in_ticks: Spread in tick units (price_increment), or None if one side is missing.
+        is_empty: True if both sides are empty.
 
     Raises:
-        ValueError: When `VALIDATE` is True and inputs fail validation.
-
-    Examples:
-        # EUR/USD futures (CME 6E) quoted in USD per EUR. $volume is number of contracts.
-        >>> from decimal import Decimal
-        >>> instr = ...  # Instrument for CME Euro FX (6E)
-        >>> order_book = OrderBook(
-        ...     instrument=instr,
-        ...     bids=[
-        ...         BookLevel(Decimal("1.09250"), Decimal("25")),  # 25 contracts @ 1.09250
-        ...         BookLevel(Decimal("1.09245"), Decimal("12")),
-        ...     ],
-        ...     asks=[
-        ...         BookLevel(Decimal("1.09255"), Decimal("18")),  # 18 contracts @ 1.09255
-        ...         BookLevel(Decimal("1.09260"), Decimal("10")),
-        ...     ],
-        ... )
-        >>> order_book.best_bid
-        BookLevel(price=Decimal('1.09250'), volume=Decimal('25'))
-        >>> order_book.best_ask
-        BookLevel(price=Decimal('1.09255'), volume=Decimal('18'))
-        >>> order_book.spread_as_price
-        Decimal('0.00005')
-        >>> instr.price_increment
-        Decimal('0.00005')
-        >>> order_book.spread_in_ticks
-        1
+        ValueError: When $VALIDATE is True and inputs fail validation.
     """
 
     __slots__ = ("_instrument", "_timestamp", "_bids", "_asks")
@@ -117,7 +94,7 @@ class OrderBook:
         self._bids: tuple[BookLevel, ...] = tuple(bids)
         self._asks: tuple[BookLevel, ...] = tuple(asks)
 
-        # Optionally validate inputs (disabled by default for speed)
+        # Optionally validate inputs (disabled by default for speed).
         if self.__class__.VALIDATE:
             self._validate()
 
@@ -224,7 +201,7 @@ class OrderBook:
 
     @property
     def spread_in_ticks(self) -> int | None:
-        """Return spread in whole ticks (Instrument.price_increment units), or `None` if missing side."""
+        """Return spread in whole ticks or `None` if a side is missing."""
         spread = self.spread_as_price
         if spread is None:
             return None
@@ -243,7 +220,7 @@ class OrderBook:
         """Validate $bids and $asks shape, types, finiteness, non-negative volume, and ordering.
 
         This function assumes inputs are already in the expected format and does not coerce
-        values. It raises `ValueError` with clear messages on the first violation found.
+        values. It raises ValueError with clear messages on the first violation found.
         """
         for side_name, levels, descending in (
             ("bids", self._bids, True),
@@ -277,6 +254,7 @@ class OrderBook:
                         raise ValueError(f"Cannot call `OrderBook._validate` because ${side_name} are not sorted best-first at index {i - 1}->{i}: price[{i - 1}]='{prev_price}' < price[{i}]='{price}'. Provide ${side_name} sorted with highest price first.")
                     if not descending and price < prev_price:
                         raise ValueError(f"Cannot call `OrderBook._validate` because ${side_name} are not sorted best-first at index {i - 1}->{i}: price[{i - 1}]='{prev_price}' > price[{i}]='{price}'. Provide ${side_name} sorted with lowest price first.")
+
                 prev_price = price
 
     # endregion
@@ -290,7 +268,7 @@ class OrderBook:
             other: The other object to compare with.
 
         Returns:
-            bool: True if OrderBooks are equal, False otherwise.
+            True if OrderBooks are equal, False otherwise.
         """
         if not isinstance(other, OrderBook):
             return False
@@ -302,15 +280,13 @@ class OrderBook:
         This allows OrderBook objects to be used as dictionary keys.
 
         Returns:
-            int: Hash value based on all attributes.
+            Hash value based on all attributes.
         """
         return hash((self.instrument, self.timestamp, self.bids, self.asks))
 
     def __str__(self) -> str:
         best_bid_price = self.best_bid.price if self.best_bid else None
         best_ask_price = self.best_ask.price if self.best_ask else None
-        return f"{self.__class__.__name__}(instrument={self._instrument}, timestamp={format_dt(self.timestamp)}, best_bid={best_bid_price}, best_ask={best_ask_price}, bid_levels={len(self._bids)}, ask_levels={len(self._asks)})"
-
-    __repr__ = __str__
+        return f"{self.__class__.__name__}(instrument={self.instrument}, best_bid={best_bid_price}, best_ask={best_ask_price}, timestamp={format_dt(self.timestamp)})"
 
     # endregion

@@ -6,7 +6,7 @@ from decimal import Decimal
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.tick.trade_tick import TradeTick
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
-from suite_trading.domain.market_data.order_book import OrderBook, BookLevel
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, BookLevel
 
 
 def bar_to_order_books(bar: Bar) -> list[OrderBook]:

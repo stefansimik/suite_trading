@@ -4,7 +4,7 @@ from typing import Callable
 from enum import Enum
 import logging
 
-from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
 from suite_trading.domain.order.orders import (
     Order,
     MarketOrder,

@@ -8,7 +8,7 @@ import pytest
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.domain.order.orders import MarketOrder, LimitOrder, StopOrder, StopLimitOrder
 from suite_trading.domain.order.order_enums import OrderSide
-from suite_trading.domain.market_data.order_book import OrderBook, FillSlice, BookLevel
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice, BookLevel
 from suite_trading.domain.instrument import Instrument, AssetClass
 from suite_trading.domain.monetary.currency import Currency, CurrencyType
 

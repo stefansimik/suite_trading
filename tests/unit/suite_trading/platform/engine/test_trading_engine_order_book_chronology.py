@@ -16,7 +16,7 @@ from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.market_data.order_book import OrderBook
+from suite_trading.domain.market_data.order_book.order_book import OrderBook
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.domain.order.orders import Order
 

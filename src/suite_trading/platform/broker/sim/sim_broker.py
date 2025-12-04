@@ -23,7 +23,7 @@ from suite_trading.platform.broker.sim.models.margin.protocol import MarginModel
 from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRatioMarginModel
 from suite_trading.platform.broker.sim.models.fill.protocol import FillModel
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
-from suite_trading.domain.market_data.order_book import OrderBook, FillSlice
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
 from suite_trading.platform.broker.sim.order_matching import (
     select_simulate_fills_function_for_order,
     check_order_price_against_market,

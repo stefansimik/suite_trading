@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from suite_trading.domain.monetary.money import Money
-from suite_trading.domain.market_data.order_book import OrderBook
+from suite_trading.domain.market_data.order_book.order_book import OrderBook
 
 
 class MarginModel(Protocol):
