@@ -64,12 +64,10 @@ def test_buy_limit_with_two_ask_levels_partial_fill() -> None:
 
     # Arrange: engine + SimBroker (deterministic on-touch fills) + strategy
     engine = TradingEngine()
-    # TODO: we should remove this, after we use some default deterministic fill model in SimBroker
     fill_model = DistributionFillModel(limit_on_touch_fill_probability=Decimal("1"), rng_seed=42)
     broker = SimBroker(fill_model=fill_model)
     engine.add_broker("sim_broker", broker)
 
-    # OrderBook snapshot: asks at 101x5 and 102x5; bid at 99x10 to satisfy margin model while focusing on asks
     instrument = TST.instrument.create_equity_aapl()
     order_book = TST.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
     strategy_name = "limit_order_two_levels"
@@ -106,7 +104,6 @@ def test_buy_limit_with_three_ask_levels_rejected_by_price() -> None:
 
     # Arrange: engine + SimBroker (deterministic on-touch fills) + strategy
     engine = TradingEngine()
-    # TODO: we should remove this, after we use some default deterministic fill model in SimBroker
     fill_model = DistributionFillModel(limit_on_touch_fill_probability=Decimal("1"), rng_seed=42)
     broker = SimBroker(fill_model=fill_model)
     engine.add_broker("sim_broker", broker)
