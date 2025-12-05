@@ -17,11 +17,11 @@ class DistributionFillModel:
     Applies two distinct behaviors based on order type:
 
     1. **Slippage distribution for market-like orders** (MarketOrder, StopOrder):
-       - Each fill slice samples independently from a distribution over slippage amounts
-       - Negative slippage = favorable price (better for trader)
-       - Zero slippage = no price change
-       - Positive slippage = unfavorable price (worse for trader)
-       - Simulates market impact, bid-ask spread crossing, and execution costs
+       - Each fill slice samples independently from a distribution over slippage amounts.
+       - Negative slippage = favorable price (better for trader).
+       - Zero slippage = no price change.
+       - Positive slippage = unfavorable price (worse for trader).
+       - Simulates market impact, bid-ask spread crossing, and execution costs.
 
        You pass a small dictionary that maps a slippage amount in ticks (such as -1, 0, 1)
        to a Decimal weight. In typical use, these weights add up to 1.0 (100%) so you can
@@ -44,21 +44,39 @@ class DistributionFillModel:
     where different portions of the same order can have different outcomes.
 
     Examples:
-        Simple configuration that customizes both distributions:
+        Realistic stochastic configuration for production backtests:
 
-        >>> from decimal import Decimal
-        >>> from suite_trading.platform.broker.sim.sim_broker import SimBroker
-        >>>
-        >>> fill_model = DistributionFillModel(
-        ...     market_slippage_distribution={
-        ...         0: Decimal("0.50"),   # 50% of slices fill at the quoted price
-        ...         1: Decimal("0.40"),   # 40% of slices slip one tick in an unfavorable direction
-        ...         -1: Decimal("0.10"),  # 10% of slices get one tick better than quoted
-        ...     },
-        ...     limit_on_touch_fill_probability=Decimal("0.30"),  # 30% chance to fill when price touches the limit
-        ...     rng_seed=42,
-        ... )
-        >>> broker = SimBroker(fill_model=fill_model)
+            from decimal import Decimal
+
+            from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
+            from suite_trading.platform.broker.sim.sim_broker import SimBroker
+
+            realistic_fill_model = DistributionFillModel(
+                market_slippage_distribution={
+                    0: Decimal("0.50"),   # 50% of slices fill at the quoted price
+                    1: Decimal("0.40"),   # 40% of slices slip one tick in an unfavorable direction
+                    -1: Decimal("0.10"),  # 10% of slices get one tick better than quoted
+                },
+                limit_on_touch_fill_probability=Decimal("0.30"),  # 30% chance to fill when price touches the limit
+                rng_seed=42,
+            )
+
+            broker = SimBroker(fill_model=realistic_fill_model)
+
+        Deterministic pessimistic configuration for tests:
+
+            from decimal import Decimal
+
+            from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
+            from suite_trading.platform.broker.sim.sim_broker import SimBroker
+
+            deterministic_test_fill_model = DistributionFillModel(
+                market_slippage_distribution={1: Decimal("1.0")},  # always 1 tick of adverse slippage
+                limit_on_touch_fill_probability=Decimal("0"),      # never fill pure on-touch limit slices
+                rng_seed=None,                                      # RNG is not used for this configuration
+            )
+
+            test_broker = SimBroker(fill_model=deterministic_test_fill_model)
     """
 
     # region Init
@@ -167,7 +185,25 @@ class DistributionFillModel:
         return slipped_fills
 
     def _apply_limit_fill_logic(self, order: Order, fill_slices: list[FillSlice], order_book: OrderBook) -> list[FillSlice]:
-        """Apply on-touch probability logic to limit-like orders, sampling per slice."""
+        """Apply on-touch behavior for limit-like orders.
+
+        Behavior is split into clear cases:
+
+        * Slices at prices better than the order limit always fill. There is no randomness
+          for these slices.
+        * When a slice is exactly at the limit price (on-touch) and
+          $limit_on_touch_fill_probability is 0, the slice never fills. The random
+          generator is not used in this case.
+        * When a slice is exactly at the limit price (on-touch) and
+          $limit_on_touch_fill_probability is 1, the slice always fills. The random
+          generator is not used in this case either.
+        * For on-touch slices with a probability strictly between 0 and 1, a random value
+          is drawn and compared to $limit_on_touch_fill_probability to decide if the slice
+          fills.
+
+        This makes the model fully deterministic for the special values 0 and 1, while
+        still allowing probabilistic behavior for intermediate values.
+        """
         if not fill_slices:
             return []
 
@@ -176,17 +212,23 @@ class DistributionFillModel:
 
         accepted_fills: list[FillSlice] = []
         for fill_slice in fill_slices:
-            # This condition represents the lucky fill of a limit-on-touch situation at the limit price
             is_fill_slice_at_limit_price = fill_slice.price == limit_price
 
             if not is_fill_slice_at_limit_price:
-                # CROSS / INSIDE-MARKET SLICE
-                # Market is strictly better than the limit – assume 100% sure fill
+                # Price is strictly better than the limit: always fill this slice
                 accepted_fills.append(fill_slice)
                 continue
 
-            # ON-TOUCH SLICE (price == limit)
-            # Apply Bernoulli trial with configured probability
+            # Price is exactly at the limit (on-touch)
+            if limit_on_touch_probability == Decimal("0"):
+                # Fully pessimistic: never fill pure on-touch slices
+                continue
+            if limit_on_touch_probability == Decimal("1"):
+                # Fully optimistic: always fill pure on-touch slices
+                accepted_fills.append(fill_slice)
+                continue
+
+            # Probability is strictly between 0 and 1: use randomness per slice
             random_value = Decimal(str(self._rng.random()))
             if random_value <= limit_on_touch_probability:
                 accepted_fills.append(fill_slice)
@@ -194,11 +236,29 @@ class DistributionFillModel:
         return accepted_fills
 
     def _sample_from_distribution(self, distribution: dict[int, Decimal]) -> int:
-        """Sample a slippage value from a probability distribution using a cumulative CDF."""
-        # Generate random value between 0 and 1
+        """Select a slippage value from the configured distribution.
+
+        This function has two behaviors:
+
+        * If the distribution contains exactly one key, we already know the only possible
+          result. In that case we return that key directly and do not use the random
+          generator at all.
+        * If the distribution contains several keys, we draw a random number and use it to
+          pick one of the possible slippage values based on their relative weights.
+
+        Args:
+            distribution: Mapping from slippage in ticks to non-negative weights.
+
+        Returns:
+            Chosen slippage value in ticks.
+        """
+        # Simple case: only one possible outcome, no need for randomness
+        if len(distribution) == 1:
+            return next(iter(distribution.keys()))
+
+        # General case: draw a random value and walk the cumulative weights
         random_value = Decimal(str(self._rng.random()))
 
-        # Build cumulative distribution and sample
         cumulative_probability = Decimal("0")
         for slippage_ticks, probability_weight in sorted(distribution.items(), key=lambda item: item[0]):
             cumulative_probability += probability_weight

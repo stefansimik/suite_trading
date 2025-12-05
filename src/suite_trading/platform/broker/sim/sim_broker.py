@@ -6,6 +6,7 @@ from decimal import Decimal
 import logging
 
 from suite_trading.platform.broker.account import Account
+from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.platform.broker.sim.sim_account import SimAccount
 from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.order.orders import Order
@@ -22,7 +23,6 @@ from suite_trading.domain.monetary.money import Money
 from suite_trading.platform.broker.sim.models.margin.protocol import MarginModel
 from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRatioMarginModel
 from suite_trading.platform.broker.sim.models.fill.protocol import FillModel
-from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
 from suite_trading.platform.broker.sim.order_matching import (
     select_simulate_fills_function_for_order,
@@ -607,9 +607,15 @@ class SimBroker(Broker, OrderBookDrivenBroker):
         """Build the default FillModel used by this broker instance.
 
         Returns:
-            A FillModel instance with realistic slippage and fill probability distributions.
+            A FillModel instance with deterministic, slightly pessimistic behavior that
+            applies one tick of adverse slippage to market-like orders and never fills
+            pure on-touch limit slices.
         """
-        return DistributionFillModel()
+        return DistributionFillModel(
+            market_slippage_distribution={1: Decimal("1.0")},  # 1-tick slippage with 100% chance
+            limit_on_touch_fill_probability=Decimal("0"),
+            rng_seed=None,
+        )
 
     # Margin & funds
     def _compute_additional_exposure_quantity(
