@@ -612,7 +612,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
             pure on-touch limit slices.
         """
         return DistributionFillModel(
-            market_slippage_distribution={1: Decimal("1.0")},  # 1-tick slippage with 100% chance
+            market_fill_adjustment_distribution={-1: Decimal("1.0")},  # 1-tick worse price with 100% chance
             limit_on_touch_fill_probability=Decimal("0"),
             rng_seed=None,
         )

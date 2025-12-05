@@ -27,12 +27,12 @@ def order_book(instrument):
     return OrderBook(instrument=instrument, timestamp=timestamp, bids=bids, asks=asks)
 
 
-# region Market/Stop Order Slippage Distribution Tests
+# region Market/Stop Order Fill Adjustment Distribution Tests
 
 
 def test_market_order_deterministic_zero_slippage(instrument, order_book):
-    """Deterministic distribution with zero slippage passes through unchanged."""
-    model = DistributionFillModel(market_slippage_distribution={0: Decimal("1.0")}, rng_seed=42)
+    """Deterministic distribution with zero adjustment passes through unchanged."""
+    model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
@@ -41,75 +41,75 @@ def test_market_order_deterministic_zero_slippage(instrument, order_book):
     assert actual_fills == proposed_fills
 
 
-def test_market_order_negative_slippage_buy_gets_better_price(instrument, order_book):
-    """BUY order with negative slippage gets lower (better) price."""
-    model = DistributionFillModel(market_slippage_distribution={-1: Decimal("1.0")}, rng_seed=42)
+def test_market_order_negative_adjustment_buy_gets_worse_price(instrument, order_book):
+    """BUY order with negative adjustment gets higher (worse) price."""
+    model = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: BUY with -1 tick slippage gets price reduced by 1 tick (0.0001)
+    # Check: BUY with -1 tick adjustment gets price increased by 1 tick (0.0001)
     assert len(actual_fills) == 1
-    assert actual_fills[0].price == Decimal("1.0999")
+    assert actual_fills[0].price == Decimal("1.1001")
     assert actual_fills[0].quantity == Decimal("10")
 
 
-def test_market_order_negative_slippage_sell_gets_better_price(instrument, order_book):
-    """SELL order with negative slippage gets higher (better) price."""
-    model = DistributionFillModel(market_slippage_distribution={-1: Decimal("1.0")}, rng_seed=42)
+def test_market_order_negative_adjustment_sell_gets_worse_price(instrument, order_book):
+    """SELL order with negative adjustment gets lower (worse) price."""
+    model = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.SELL, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.0995"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: SELL with -1 tick slippage gets price increased by 1 tick (0.0001)
+    # Check: SELL with -1 tick adjustment gets price decreased by 1 tick (0.0001)
     assert len(actual_fills) == 1
-    assert actual_fills[0].price == Decimal("1.0996")
+    assert actual_fills[0].price == Decimal("1.0994")
     assert actual_fills[0].quantity == Decimal("10")
 
 
-def test_market_order_positive_slippage_buy_gets_worse_price(instrument, order_book):
-    """BUY order with positive slippage gets higher (worse) price."""
-    model = DistributionFillModel(market_slippage_distribution={2: Decimal("1.0")}, rng_seed=42)
+def test_market_order_positive_adjustment_buy_gets_better_price(instrument, order_book):
+    """BUY order with positive adjustment gets lower (better) price."""
+    model = DistributionFillModel(market_fill_adjustment_distribution={2: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: BUY with +2 ticks slippage gets price increased by 2 ticks (0.0002)
+    # Check: BUY with +2 ticks adjustment gets price decreased by 2 ticks (0.0002)
     assert len(actual_fills) == 1
-    assert actual_fills[0].price == Decimal("1.1002")
+    assert actual_fills[0].price == Decimal("1.0998")
     assert actual_fills[0].quantity == Decimal("10")
 
 
-def test_market_order_positive_slippage_sell_gets_worse_price(instrument, order_book):
-    """SELL order with positive slippage gets lower (worse) price."""
-    model = DistributionFillModel(market_slippage_distribution={3: Decimal("1.0")}, rng_seed=42)
+def test_market_order_positive_adjustment_sell_gets_better_price(instrument, order_book):
+    """SELL order with positive adjustment gets higher (better) price."""
+    model = DistributionFillModel(market_fill_adjustment_distribution={3: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.SELL, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.0995"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: SELL with +3 ticks slippage gets price decreased by 3 ticks (0.0003)
+    # Check: SELL with +3 ticks adjustment gets price increased by 3 ticks (0.0003)
     assert len(actual_fills) == 1
-    assert actual_fills[0].price == Decimal("1.0992")
+    assert actual_fills[0].price == Decimal("1.0998")
     assert actual_fills[0].quantity == Decimal("10")
 
 
 def test_market_order_per_slice_independence(instrument, order_book):
-    """Multiple slices can have different slippage amounts (per-slice sampling)."""
-    # Use 50/50 distribution between -1 and +1 tick slippage
+    """Multiple slices can have different adjustment amounts (per-slice sampling)."""
+    # Use 50/50 distribution between -1 and +1 tick adjustment
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("20"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000")), FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     # Run 100 trials to verify slices don't always get same outcome
     different_outcomes_count = 0
     for trial in range(100):
-        model_trial = DistributionFillModel(market_slippage_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=trial)
+        model_trial = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=trial)
         actual_fills = model_trial.apply_fill_policy(order, order_book, proposed_fills)
 
-        # Check if slices got different slippage
+        # Check if slices got different adjustments
         if actual_fills[0].price != actual_fills[1].price:
             different_outcomes_count += 1
 
@@ -117,22 +117,22 @@ def test_market_order_per_slice_independence(instrument, order_book):
     assert different_outcomes_count > 0
 
 
-def test_stop_order_uses_slippage_distribution(instrument, order_book):
-    """StopOrder triggers slippage distribution (same as MarketOrder)."""
-    model = DistributionFillModel(market_slippage_distribution={1: Decimal("1.0")}, rng_seed=42)
+def test_stop_order_uses_fill_adjustment_distribution(instrument, order_book):
+    """StopOrder triggers fill adjustment distribution (same as MarketOrder)."""
+    model = DistributionFillModel(market_fill_adjustment_distribution={1: Decimal("1.0")}, rng_seed=42)
     order = StopOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), stop_price=Decimal("1.1005"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: StopOrder gets slippage applied
+    # Check: StopOrder gets fill adjustment applied
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.1001")
 
 
 def test_market_order_default_distribution_when_none(instrument, order_book):
     """Default distribution used when None provided."""
-    model = DistributionFillModel(market_slippage_distribution=None, rng_seed=42)
+    model = DistributionFillModel(market_fill_adjustment_distribution=None, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
@@ -238,8 +238,8 @@ def test_limit_order_default_on_touch_probability_when_none(instrument, order_bo
 
 def test_reproducibility_same_seed_identical_sequences(instrument, order_book):
     """Same seed produces identical results across multiple calls."""
-    model1 = DistributionFillModel(market_slippage_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=999)
-    model2 = DistributionFillModel(market_slippage_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=999)
+    model1 = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=999)
+    model2 = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=999)
 
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
@@ -259,8 +259,8 @@ def test_reproducibility_same_seed_identical_sequences(instrument, order_book):
 
 def test_reproducibility_different_seeds_different_sequences(instrument, order_book):
     """Different seeds produce different results."""
-    model1 = DistributionFillModel(market_slippage_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=100)
-    model2 = DistributionFillModel(market_slippage_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=200)
+    model1 = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=100)
+    model2 = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=200)
 
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
@@ -296,7 +296,7 @@ def test_empty_fill_slices_returns_empty(instrument, order_book):
 
 def test_single_slice_processed_correctly(instrument, order_book):
     """Single fill slice processed correctly."""
-    model = DistributionFillModel(market_slippage_distribution={0: Decimal("1.0")}, rng_seed=42)
+    model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
@@ -308,7 +308,7 @@ def test_single_slice_processed_correctly(instrument, order_book):
 
 def test_multiple_slices_processed_correctly(instrument, order_book):
     """Multiple fill slices processed correctly."""
-    model = DistributionFillModel(market_slippage_distribution={0: Decimal("1.0")}, rng_seed=42)
+    model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("30"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000")), FillSlice(quantity=Decimal("10"), price=Decimal("1.1001")), FillSlice(quantity=Decimal("10"), price=Decimal("1.1002"))]
 

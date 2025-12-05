@@ -16,14 +16,14 @@ class DistributionFillModel:
 
     Applies two distinct behaviors based on order type:
 
-    1. **Slippage distribution for market-like orders** (MarketOrder, StopOrder):
-       - Each fill slice samples independently from a distribution over slippage amounts.
-       - Negative slippage = favorable price (better for trader).
-       - Zero slippage = no price change.
-       - Positive slippage = unfavorable price (worse for trader).
-       - Simulates market impact, bid-ask spread crossing, and execution costs.
+    1. **Fill adjustment distribution for market-like orders** (MarketOrder, StopOrder):
+       - Each fill slice samples independently from a distribution over fill adjustments.
+       - Positive adjustment = favorable price (better for trader).
+       - Zero adjustment = no price change.
+       - Negative adjustment = unfavorable price (worse for trader).
+       - This is a convenient way to model slippage as a random price adjustment.
 
-       You pass a small dictionary that maps a slippage amount in ticks (such as -1, 0, 1)
+       You pass a small dictionary that maps a fill adjustment in ticks (such as -1, 0, 1)
        to a Decimal weight. In typical use, these weights add up to 1.0 (100%) so you can
        read them as probabilities, but they can also be any non-negative weights. The
        sampler effectively normalizes them under the hood and, if they do not sum exactly
@@ -52,10 +52,10 @@ class DistributionFillModel:
             from suite_trading.platform.broker.sim.sim_broker import SimBroker
 
             realistic_fill_model = DistributionFillModel(
-                market_slippage_distribution={
-                    0: Decimal("0.50"),   # 50% of slices fill at the quoted price
-                    1: Decimal("0.40"),   # 40% of slices slip one tick in an unfavorable direction
-                    -1: Decimal("0.10"),  # 10% of slices get one tick better than quoted
+                market_fill_adjustment_distribution={
+                    0: Decimal("0.50"),   # 50% chance of no adjustment in ticks
+                    -1: Decimal("0.40"),  # 40% of slices get 1 tick worse than the base price
+                    1: Decimal("0.10"),   # 10% of slices get 1 tick better than the base price
                 },
                 limit_on_touch_fill_probability=Decimal("0.30"),  # 30% chance to fill when price touches the limit
                 rng_seed=42,
@@ -71,7 +71,7 @@ class DistributionFillModel:
             from suite_trading.platform.broker.sim.sim_broker import SimBroker
 
             deterministic_test_fill_model = DistributionFillModel(
-                market_slippage_distribution={1: Decimal("1.0")},  # always 1 tick of adverse slippage
+                market_fill_adjustment_distribution={-1: Decimal("1.0")},  # always 1 tick worse than the base price
                 limit_on_touch_fill_probability=Decimal("0"),      # never fill pure on-touch limit slices
                 rng_seed=None,                                      # RNG is not used for this configuration
             )
@@ -83,21 +83,22 @@ class DistributionFillModel:
 
     def __init__(
         self,
-        market_slippage_distribution: dict[int, Decimal] | None = None,
+        market_fill_adjustment_distribution: dict[int, Decimal] | None = None,
         limit_on_touch_fill_probability: Decimal | None = None,
         rng_seed: int | None = None,
     ):
         """Initialize distribution fill model.
 
         Args:
-            market_slippage_distribution: Mapping from slippage in ticks to Decimal weights
-                for Market and Stop orders. Keys are ticks (negative = favorable, zero =
-                none, positive = unfavorable). In typical use, these weights add up to 1.0
-                (100%) so you can read them as probabilities, but they can also be any
-                non-negative weights. The sampler normalizes them internally and the last
-                outcome absorbs any leftover probability from rounding. Sampled
-                independently per fill slice. If None, uses a realistic default with mostly
-                unfavorable slippage.
+            market_fill_adjustment_distribution: Mapping from fill adjustment in ticks to
+                Decimal weights for Market and Stop orders. Keys are ticks where positive
+                values improve the fill price, zero leaves it unchanged, and negative
+                values make the fill price worse for the trader. In typical use, these
+                weights add up to 1.0 (100%) so you can read them as probabilities, but
+                they can also be any non-negative weights. The sampler normalizes them
+                internally and the last outcome absorbs any leftover probability from
+                rounding. Sampled independently per fill slice. If None, uses a realistic
+                default with mostly adverse (worse) adjustments.
             limit_on_touch_fill_probability: Probability that a Limit or Stop-Limit order
                 slice filling exactly at the order's limit price will actually execute.
                 Value must be between 0 and 1 inclusive. A value of 0 means on-touch slices
@@ -107,11 +108,11 @@ class DistributionFillModel:
             rng_seed: Random seed for reproducible backtests. If None, uses system randomness.
         """
         # Use realistic defaults if None provided
-        if market_slippage_distribution is None:
-            market_slippage_distribution = {
-                0: Decimal("0.15"),  # 15% chance of no slippage
-                1: Decimal("0.75"),  # 75% chance of 1 tick slippage
-                2: Decimal("0.10"),  # 10% chance of 2 ticks slippage
+        if market_fill_adjustment_distribution is None:
+            market_fill_adjustment_distribution = {
+                0: Decimal("0.15"),  # 15% chance of no adjustment
+                -1: Decimal("0.75"),  # 75% chance of 1 tick worse than the base price
+                -2: Decimal("0.10"),  # 10% chance of 2 ticks worse than the base price
             }
 
         if limit_on_touch_fill_probability is None:
@@ -120,7 +121,7 @@ class DistributionFillModel:
         if limit_on_touch_fill_probability < Decimal("0") or limit_on_touch_fill_probability > Decimal("1"):
             raise ValueError(f"Cannot create `DistributionFillModel` because $limit_on_touch_fill_probability ({limit_on_touch_fill_probability}) is outside [0, 1]")
 
-        self._market_slippage_distribution = market_slippage_distribution
+        self._market_fill_adjustment_distribution = market_fill_adjustment_distribution
         self._limit_on_touch_fill_probability = limit_on_touch_fill_probability
         self._rng = random.Random(rng_seed)
 
@@ -156,7 +157,7 @@ class DistributionFillModel:
     # region Utilities
 
     def _apply_slippage(self, order: Order, fill_slices: list[FillSlice], order_book: OrderBook) -> list[FillSlice]:
-        """Apply probabilistic slippage to market-like orders, sampling per slice."""
+        """Apply probabilistic fill adjustments to market-like orders, sampling per slice."""
         if not fill_slices:
             return []
 
@@ -166,19 +167,19 @@ class DistributionFillModel:
         # Process each fill slice independently
         slipped_fills: list[FillSlice] = []
         for fill_slice in fill_slices:
-            # Sample slippage amount in ticks for this specific slice
-            slippage_ticks = self._sample_from_distribution(self._market_slippage_distribution)
+            # Sample adjustment amount in ticks for this specific slice
+            adjustment_ticks = self._sample_from_distribution(self._market_fill_adjustment_distribution)
 
-            # Compute slippage amount from tick size
-            slippage_amount = tick_size * slippage_ticks
+            # Compute adjustment amount from tick size
+            adjustment_amount = tick_size * adjustment_ticks
 
-            # Apply slippage based on order side
-            # BUY: positive slippage increases price (worse), negative decreases price (better)
-            # SELL: positive slippage decreases price (worse), negative increases price (better)
+            # Apply adjustment based on order side
+            # BUY: positive adjustment decreases price (better), negative increases price (worse)
+            # SELL: positive adjustment increases price (better), negative decreases price (worse)
             if order.is_buy:
-                slipped_price = fill_slice.price + slippage_amount
+                slipped_price = fill_slice.price - adjustment_amount
             else:
-                slipped_price = fill_slice.price - slippage_amount
+                slipped_price = fill_slice.price + adjustment_amount
 
             slipped_fills.append(FillSlice(quantity=fill_slice.quantity, price=slipped_price))
 
@@ -236,7 +237,7 @@ class DistributionFillModel:
         return accepted_fills
 
     def _sample_from_distribution(self, distribution: dict[int, Decimal]) -> int:
-        """Select a slippage value from the configured distribution.
+        """Select an adjustment value from the configured distribution.
 
         This function has two behaviors:
 
@@ -244,13 +245,13 @@ class DistributionFillModel:
           result. In that case we return that key directly and do not use the random
           generator at all.
         * If the distribution contains several keys, we draw a random number and use it to
-          pick one of the possible slippage values based on their relative weights.
+          pick one of the possible adjustment values based on their relative weights.
 
         Args:
-            distribution: Mapping from slippage in ticks to non-negative weights.
+            distribution: Mapping from fill adjustment in ticks to non-negative weights.
 
         Returns:
-            Chosen slippage value in ticks.
+            Chosen adjustment value in ticks.
         """
         # Simple case: only one possible outcome, no need for randomness
         if len(distribution) == 1:
