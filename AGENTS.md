@@ -770,11 +770,11 @@ In new tests you should:
 Preferred import pattern:
 
 ```python
-from tests.helpers.test_assistant import TEST_ASSISTANT as TA
+from tests.helpers.test_assistant import TEST_ASSISTANT as TST
 
 
 def test_example_instrument():
-    instrument = TA.instrument.create_default_instrument()
+	instrument = TST.instrument.create_default_instrument()
     # use $instrument in your test logic here
 ```
 
