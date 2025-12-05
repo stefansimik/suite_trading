@@ -2,9 +2,9 @@ from decimal import Decimal
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.instrument import Instrument, AssetClass
+from suite_trading.domain.instrument import AssetClass, Instrument
 from suite_trading.domain.monetary.currency_registry import USD
-from suite_trading.utils.data_generation.bar_generation import create_bar_type
+from tests.helpers.test_assistant import TEST_ASSISTANT as TST
 
 
 def test_bar_type_string_representation():
@@ -19,7 +19,7 @@ def test_bar_type_string_representation():
         contract_unit="EUR",
         quote_currency=USD,
     )
-    bar_type = create_bar_type(instrument=instrument, value=1, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
+    bar_type = TST.bars.create_bar_type(instrument=instrument, value=1, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
 
     assert str(bar_type) == "EURUSD@FOREX::1-MINUTE::LAST_TRADE"
     assert isinstance(bar_type.instrument, Instrument)

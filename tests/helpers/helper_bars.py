@@ -1,35 +1,45 @@
-"""Functions for generating demo bar data."""
-
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
-from decimal import Decimal
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
+from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.instrument import Instrument, AssetClass
-from suite_trading.domain.monetary.currency_registry import USD
-from suite_trading.utils.data_generation.price_patterns import zig_zag_function
 from suite_trading.utils.math import round_to_increment
-
-# DEFAULT VALUES, THAT ARE USED FOR GENERATION OF DEMO BARS
-
-DEFAULT_INSTRUMENT = Instrument(name="EURUSD", exchange="FOREX", asset_class=AssetClass.FX_SPOT, price_increment=Decimal("0.0001"), quantity_increment=Decimal("100_000"), contract_size=Decimal("100_000"), contract_unit="EUR", quote_currency=USD)
+from tests.helpers import helper_instrument
+from tests.helpers.helper_price_pattern import zig_zag_function
 
 
 def create_bar_type(
-    instrument: Instrument = DEFAULT_INSTRUMENT,
+    instrument: Instrument | None = None,
     value: int = 1,
     unit: BarUnit = BarUnit.MINUTE,
     price_type: PriceType = PriceType.LAST_TRADE,
 ) -> BarType:
+    """Create a `BarType` instance for tests.
+
+    This helper mirrors the behavior of the original `create_bar_type` from
+    the data generation package, but uses the shared test instrument factory
+    when no $instrument is provided.
+
+    Args:
+        instrument: Instrument for the bars. When None, a default EURUSD FX
+            spot instrument from `helper_instrument` is used.
+        value: Size of the bar in units of $unit.
+        unit: Time or aggregation unit for the bar.
+        price_type: Price type that the bar represents.
+
+    Returns:
+        Constructed `BarType` instance.
     """
-    Create a BarType instance with the given parameters.
-    """
-    return BarType(instrument=instrument, value=value, unit=unit, price_type=price_type)
+
+    effective_instrument = instrument or helper_instrument.create_fx_spot_eurusd()
+    result = BarType(instrument=effective_instrument, value=value, unit=unit, price_type=price_type)
+    return result
 
 
 DEFAULT_BAR_TYPE = create_bar_type()
@@ -46,24 +56,28 @@ def create_bar(
     *,
     is_partial: bool = False,
 ) -> Bar:
-    """
-    Create a single demo bar with the given parameters.
+    """Create a single demo bar for tests.
+
+    The generated bar is deterministic given the inputs and is intended for
+    use in tests and examples that need simple but realistic OHLCV data.
 
     Args:
-        bar_type: The type of bar to create
-        end_dt: The end datetime of the bar
-        close_price: The closing price of the bar
-        is_bullish: Whether the bar is an up bar (close > open) or down bar (close < open)
-        bar_body_in_ticks: Size of the bar body in ticks
-        bar_wicks_ratio: Ratio of wick size to body size (0.4 = 40% of body size)
-        volume: The trading volume during the bar period
-        is_partial: Whether the bar is partial (metadata only; does not affect equality)
+        bar_type: Type of bar to create.
+        end_dt: End datetime of the bar.
+        close_price: Closing price of the bar.
+        is_bullish: Whether the bar is an up bar (close > open) or a down bar
+            (close < open).
+        bar_body_in_ticks: Size of the bar body in ticks.
+        bar_wicks_ratio: Ratio of wick size to body size (0.4 = 40% of body
+            size).
+        volume: Trading volume during the bar period.
+        is_partial: Whether the bar is partial (metadata only; does not affect
+            equality).
 
     Returns:
-        A Bar instance with the specified properties
+        New `Bar` instance with the specified properties.
     """
 
-    # Calculate start_dt based on bar_type and end_dt
     if bar_type.unit == BarUnit.SECOND:
         start_dt = end_dt - timedelta(seconds=bar_type.value)
     elif bar_type.unit == BarUnit.MINUTE:
@@ -75,51 +89,46 @@ def create_bar(
     elif bar_type.unit == BarUnit.WEEK:
         start_dt = end_dt - timedelta(weeks=bar_type.value)
     elif bar_type.unit == BarUnit.MONTH:
-        # Approximate a month as 30 days
         start_dt = end_dt - timedelta(days=30 * bar_type.value)
     elif bar_type.unit == BarUnit.TICK:
-        # For tick-based bars, we use a small time difference
         start_dt = end_dt - timedelta(milliseconds=bar_type.value)
     elif bar_type.unit == BarUnit.VOLUME:
-        # For volume-based bars, we use a small time difference
         start_dt = end_dt - timedelta(milliseconds=bar_type.value)
     else:
-        # Default fallback for any future units
         start_dt = end_dt - timedelta(minutes=bar_type.value)
 
-    # Calculate body size in price units
     tick_size = bar_type.instrument.price_increment
     body_size = bar_body_in_ticks * tick_size
 
-    # Convert bar_wicks_ratio to Decimal if it's a string
     if isinstance(bar_wicks_ratio, str):
         bar_wicks_ratio = Decimal(bar_wicks_ratio)
 
-    # Calculate wick size in ticks based on body size and ratio
-    # Ensure bar_wicks_in_ticks is an integer by rounding the calculation
     bar_wicks_in_ticks = round(bar_body_in_ticks * bar_wicks_ratio)
-
-    # Calculate open, high, and low prices based on close price, direction, and sizes
-    # Calculate wick size in price units
     wick_size = bar_wicks_in_ticks * tick_size
 
     if is_bullish:
-        # For an up bar: open < close
         open_price = close_price - body_size
-        # High is above close, low is below open
         high_price = close_price + wick_size
         low_price = open_price - wick_size
     else:
-        # For a down bar: open > close
         open_price = close_price + body_size
-        # High is above open, low is below close
         high_price = open_price + wick_size
         low_price = close_price - wick_size
 
-    return Bar(bar_type=bar_type, start_dt=start_dt, end_dt=end_dt, open=open_price, high=high_price, low=low_price, close=close_price, volume=volume, is_partial=is_partial)
+    result = Bar(
+        bar_type=bar_type,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        open=open_price,
+        high=high_price,
+        low=low_price,
+        close=close_price,
+        volume=volume,
+        is_partial=is_partial,
+    )
+    return result
 
 
-# Create the default first bar using constants
 DEFAULT_FIRST_BAR = create_bar(is_bullish=True)
 
 
@@ -128,62 +137,61 @@ def create_bar_series(
     num_bars: int = 20,
     price_pattern_func: Callable[[int], float] = zig_zag_function,
 ) -> list[Bar]:
-    """
-    Generate a series of bars with a specified price pattern.
+    """Generate a series of demo bars with a specified price pattern for tests.
+
+    The bar body and wick proportions from $first_bar are reused for all
+    subsequent bars in the series. Close prices follow $price_pattern_func and
+    are rounded to the instrument's price increment.
 
     Args:
-        first_bar: The first bar of the series. Its bar-body and bar-wicks proportions
-            are maintained for all subsequent bars in the series.
-        num_bars: Number of bars to generate (including first bar)
-        price_pattern_func: Function that returns Y-values representing the price curve
+        first_bar: First bar of the series. Its bar-body and bar-wicks
+            proportions are maintained for all subsequent bars.
+        num_bars: Number of bars to generate (including $first_bar).
+        price_pattern_func: Function that returns Y-values representing the
+            price curve.
 
     Returns:
-        List of Bar objects in chronological order (oldest first)
+        List of `Bar` objects in chronological order (oldest first).
+
+    Raises:
+        ValueError: If $num_bars is less than 1.
     """
+
     if num_bars <= 1:
         raise ValueError(f"$num_bars must be >= 1, but provided value is: {num_bars}")
 
-    # Extract properties from the first bar
     bar_type = first_bar.bar_type
     end_dt = first_bar.end_dt
-    base_price = first_bar.close  # Use close price as base for alignment with price pattern
+    base_price = first_bar.close
     volume = first_bar.volume
     price_increment = bar_type.instrument.price_increment
 
-    # Calculate time delta using a mapping
     time_delta_mapping = {
         BarUnit.SECOND: timedelta(seconds=bar_type.value),
         BarUnit.MINUTE: timedelta(minutes=bar_type.value),
         BarUnit.HOUR: timedelta(hours=bar_type.value),
         BarUnit.DAY: timedelta(days=bar_type.value),
         BarUnit.WEEK: timedelta(weeks=bar_type.value),
-        BarUnit.MONTH: timedelta(days=30 * bar_type.value),  # Approximate a month as 30 days
+        BarUnit.MONTH: timedelta(days=30 * bar_type.value),
         BarUnit.TICK: timedelta(milliseconds=bar_type.value),
         BarUnit.VOLUME: timedelta(milliseconds=bar_type.value),
     }
     time_delta = time_delta_mapping.get(bar_type.unit, timedelta(minutes=bar_type.value))
 
-    # Start with the first bar
     bars = [first_bar]
-
-    # If num_bars is 1, just return the first bar
     if num_bars == 1:
         return bars
 
-    # Calculate wick proportions from the first bar
     body_size = abs(first_bar.close - first_bar.open)
     is_bullish = first_bar.close > first_bar.open
 
-    # Calculate wick proportions based on whether the first bar is bullish or bearish
     first_upper_wick = first_bar.high - (first_bar.close if is_bullish else first_bar.open)
     first_lower_wick = (first_bar.open if is_bullish else first_bar.close) - first_bar.low
 
-    # Calculate the proportion of wicks to body size
     upper_wick_proportion = first_upper_wick / body_size if body_size > 0 else Decimal("0")
     lower_wick_proportion = first_lower_wick / body_size if body_size > 0 else Decimal("0")
 
-    # Generate all close prices first based on the price pattern function
-    close_prices = []
+    close_prices: list[Decimal] = []
     for i in range(num_bars):
         pattern_value = Decimal(str(price_pattern_func(x=i)))
         close_price = base_price * pattern_value
@@ -191,32 +199,23 @@ def create_bar_series(
 
     current_end_dt = end_dt + time_delta
 
-    # Generate remaining bars (starting from the second bar)
     for i in range(1, num_bars):
-        # Open price of current bar is the close price of the previous bar
         open_price = close_prices[i - 1]
         close_price = close_prices[i]
 
-        # Determine if this candle is bullish (up) or bearish (down)
         is_bullish = close_price > open_price
-
-        # Calculate the current bar's body size
         current_body_size = abs(close_price - open_price)
 
-        # Calculate wick sizes based on the proportions from the first bar
         current_upper_wick = current_body_size * upper_wick_proportion
         current_lower_wick = current_body_size * lower_wick_proportion
 
-        # Calculate high and low prices based on body and proportional wicks
         high_price = (close_price if is_bullish else open_price) + current_upper_wick
         low_price = (open_price if is_bullish else close_price) - current_lower_wick
 
-        # Round prices to price increment
         open_decimal = round_to_increment(open_price, price_increment)
         high_decimal = round_to_increment(high_price, price_increment)
         low_decimal = round_to_increment(low_price, price_increment)
 
-        # Create bar
         bar = Bar(
             bar_type=bar_type,
             start_dt=current_end_dt - time_delta,
@@ -224,7 +223,7 @@ def create_bar_series(
             open=open_decimal,
             high=high_decimal,
             low=low_decimal,
-            close=close_price,  # Already rounded
+            close=close_price,
             volume=volume,
         )
 

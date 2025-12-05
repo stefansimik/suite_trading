@@ -8,11 +8,11 @@ from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
-from suite_trading.utils.data_generation.bar_generation import create_bar_series
 from suite_trading.domain.order.orders import MarketOrder, Order
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
+from tests.helpers.test_assistant import TEST_ASSISTANT as TST
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class TwoTradeDemoStrategy(Strategy):
     def on_start(self) -> None:
         logger.info(f"Started Strategy named '{self.name}'")
         # Step 0: generate 10 rising bars and wrap into BarEvent(s)
-        bars = create_bar_series(num_bars=10)
+        bars = TST.bars.create_bar_series(num_bars=10)
         prices_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
         self.add_event_feed(self._prices_feed_name, prices_feed)
 

@@ -3,9 +3,9 @@ from decimal import Decimal
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.domain.instrument import Instrument, AssetClass
+from suite_trading.domain.instrument import AssetClass, Instrument
 from suite_trading.domain.monetary.currency_registry import USD
-from suite_trading.utils.data_generation.bar_generation import create_bar_type, create_bar
+from tests.helpers.test_assistant import TEST_ASSISTANT as TST
 
 # Constants
 INSTRUMENT = Instrument(
@@ -36,11 +36,11 @@ VOLUME_DECIMAL = Decimal(str(VOLUME))
 def test_bar_construction_and_values():
     """Test that Bar can be constructed properly and its values are correctly set."""
     # Create a bar type using the utility function
-    bar_type = create_bar_type(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
+    bar_type = TST.bars.create_bar_type(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
 
     # Create a bar using the utility function with a fixed datetime
     fixed_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-    bar = create_bar(
+    bar = TST.bars.create_bar(
         bar_type=bar_type,
         end_dt=fixed_dt.replace(minute=fixed_dt.minute + BAR_VALUE),
         close_price=CLOSE_PRICE_DECIMAL,

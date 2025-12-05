@@ -10,8 +10,8 @@ from suite_trading.domain.order.orders import MarketOrder
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.domain.market_data.bar.bar_event import wrap_bars_to_events
-from suite_trading.utils.data_generation.bar_generation import create_bar_series
 from suite_trading.domain.event import Event
+from tests.helpers.test_assistant import TEST_ASSISTANT as TST
 
 
 class _KickoffEvent(Event):
@@ -33,7 +33,7 @@ class _BarsSubmitAtStartStrategy(Strategy):
 
     def on_start(self) -> None:
         # Prepare bar series but submit only when RUNNING using a kickoff event before first bar
-        self._bars = create_bar_series(num_bars=5)
+        self._bars = TST.bars.create_bar_series(num_bars=5)
         first_start = self._bars[0].start_dt
         kickoff_time = first_start - timedelta(seconds=1)
         self.add_event_feed("kick", FixedSequenceEventFeed([_KickoffEvent(kickoff_time)]))
@@ -63,7 +63,7 @@ class _BarsSubmitInsideCallbackStrategy(Strategy):
         self.executions = []
 
     def on_start(self) -> None:
-        self._bars = create_bar_series(num_bars=5)
+        self._bars = TST.bars.create_bar_series(num_bars=5)
         self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)))
 
     def on_event(self, event) -> None:
@@ -90,7 +90,7 @@ class _BarsOpenCloseReverseStrategy(Strategy):
         self.executions = []
 
     def on_start(self) -> None:
-        self._bars = create_bar_series(num_bars=5)
+        self._bars = TST.bars.create_bar_series(num_bars=5)
         self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)))
 
     def on_event(self, event) -> None:
@@ -125,7 +125,7 @@ class TestMarketOrderBarsBasic:
         assert len(s.executions) >= 1
         first_exec = s.executions[0]
         # Expect fill at OPEN of the first bar (converter emits OPEN first)
-        bars = create_bar_series(num_bars=5)
+        bars = TST.bars.create_bar_series(num_bars=5)
         assert first_exec.price == bars[0].open
         assert first_exec.timestamp == bars[0].start_dt
 
