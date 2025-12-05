@@ -19,7 +19,6 @@ from suite_trading.platform.engine.models.event_to_order_book.protocol import Ev
 from suite_trading.platform.engine.models.event_to_order_book.default_impl import DefaultEventToOrderBookConverter
 
 from suite_trading.utils.state_machine import StateMachine
-from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
 from suite_trading.utils.datetime_utils import format_dt
 
 if TYPE_CHECKING:
@@ -34,6 +33,18 @@ logger = logging.getLogger(__name__)
 class EventFeedCallbackPair(NamedTuple):
     feed: EventFeed
     callback: Callable[[Event], None]
+
+
+class StrategyBrokerPair(NamedTuple):
+    """Pairs a Strategy with a Broker for order routing.
+
+    Attributes:
+        strategy: Strategy that owns the order and receives callbacks.
+        broker: Broker that executes the order.
+    """
+
+    strategy: Strategy
+    broker: Broker
 
 
 # endregion

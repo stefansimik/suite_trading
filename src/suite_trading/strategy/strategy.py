@@ -11,7 +11,6 @@ from suite_trading.strategy.strategy_state_machine import StrategyState, Strateg
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
-    from suite_trading.platform.routing.strategy_broker_pair import StrategyBrokerPair
     from suite_trading.domain.order.execution import Execution
 
 logger = logging.getLogger(__name__)
@@ -396,18 +395,6 @@ class Strategy(ABC):
             raise RuntimeError(f"Cannot call `modify_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
         engine.modify_order(order)
-
-    def get_routing_for_order(self, order: Order) -> StrategyBrokerPair:
-        """Lookup  route (strategy, broker) for $order.
-
-        Args:
-            order: The order to look up.
-
-        Raises:
-            KeyError: If $order was not submitted via this TradingEngine.
-        """
-        engine = self._require_trading_engine()
-        return engine.get_routing_for_order(order)
 
     # endregion
 
