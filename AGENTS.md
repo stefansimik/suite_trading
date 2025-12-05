@@ -732,6 +732,31 @@ Acceptance checks:
 - Mirror package structure of code under test
 - Keep only root `tests/__init__.py` file
 
+## 9.1. Use TestAssistant class for writing tests
+
+Use the shared `TestAssistant` from `tests.helpers.test_assistant` for creating common domain objects in tests.
+
+The `TestAssistant` is a lightweight, stateless entry point that exposes small factory namespaces.
+Each call creates fresh objects, so there is no shared mutable state between tests.
+
+Currently it provides:
+- `instrument`: Helpers from `tests.helpers.helper_instrument` for creating `Instrument` fixtures (for example, defaults or instruments with specific currency or tick size).
+
+In new tests you should:
+- Import the singleton `TEST_ASSISTANT` as `TA`, and
+- Use its factories instead of manually constructing domain objects.
+
+Preferred import pattern:
+
+```python
+from tests.helpers.test_assistant import TEST_ASSISTANT as TA
+
+
+def test_example_instrument():
+    instrument = TA.instrument.create_default_instrument()
+    # use $instrument in your test logic here
+```
+
 ---
 
 # 10. Git Commit Guidelines
