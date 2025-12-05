@@ -732,7 +732,28 @@ Acceptance checks:
 - Mirror package structure of code under test
 - Keep only root `tests/__init__.py` file
 
-## 9.1. Use TestAssistant class for writing tests
+## 9.1. Choosing test location and package
+
+Place new tests based on what they exercise:
+
+- Use `tests/unit/` when the test focuses on a single component or a very small group of
+  closely related functions or classes. These tests should run fast, use simple fixtures,
+  and avoid real I/O, databases, or external services.
+- Use `tests/integration/` when the test covers multiple layers or components working
+  together (for example, broker + engine + event-feed), or when it relies on realistic
+  scenarios, external boundaries, or non-trivial I/O.
+
+In both cases, choose the most specific and representative package under `tests/` so that
+the test path mirrors the production module it covers. For example, tests for
+`suite_trading.broker.simbroker` should live in `tests/unit/broker/` or
+`tests/integration/broker/` with a file name like `test_simbroker.py`. Avoid dumping
+unrelated tests into generic modules such as `tests/unit/test_misc.py`.
+
+If in doubt, start in `tests/unit/`. Move or duplicate the scenario into
+`tests/integration/` only when it clearly spans several layers or depends on realistic
+wiring between components.
+
+## 9.2. Use TestAssistant class for writing tests
 
 Use the shared `TestAssistant` from `tests.helpers.test_assistant` for creating common domain objects in tests.
 
