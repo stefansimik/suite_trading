@@ -62,44 +62,6 @@ def create_order_book(
     return result
 
 
-def _parse_price_volume_string(raw_level: str) -> tuple[Decimal, Decimal]:
-    """Parse a single "price@volume" string into Decimal price and volume.
-
-    The expected format is "<price>@<volume>", for example "101@5". Optional
-    whitespace around the price or volume is ignored.
-
-    Args:
-        raw_level: Raw level string in "price@volume" format.
-
-    Returns:
-        Tuple of (price, volume) as `Decimal` values.
-
-    Raises:
-        ValueError: If the input does not contain a single '@' separator or if
-            price or volume cannot be parsed as `Decimal`.
-    """
-
-    # Check: ensure the level string uses the expected "price@volume" format
-    if "@" not in raw_level:
-        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') does not contain '@' separator")
-
-    price_str, volume_str = raw_level.split("@", 1)
-    price_str = price_str.strip()
-    volume_str = volume_str.strip()
-
-    # Check: ensure both price and volume parts are non-empty after stripping
-    if not price_str or not volume_str:
-        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has empty price or volume part")
-
-    try:
-        price = D(price_str)
-        volume = D(volume_str)
-    except Exception as exc:  # noqa: BLE001
-        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has invalid numeric content") from exc
-
-    return price, volume
-
-
 def create_order_book_from_strings(
     instrument: Instrument,
     bids: Iterable[str] | None = None,
@@ -171,6 +133,44 @@ def _build_book_levels(
 
     levels = tuple(BookLevel(price=D(price), volume=D(volume)) for price, volume in pairs)
     return levels
+
+
+def _parse_price_volume_string(raw_level: str) -> tuple[Decimal, Decimal]:
+    """Parse a single "price@volume" string into Decimal price and volume.
+
+    The expected format is "<price>@<volume>", for example "101@5". Optional
+    whitespace around the price or volume is ignored.
+
+    Args:
+        raw_level: Raw level string in "price@volume" format.
+
+    Returns:
+        Tuple of (price, volume) as `Decimal` values.
+
+    Raises:
+        ValueError: If the input does not contain a single '@' separator or if
+            price or volume cannot be parsed as `Decimal`.
+    """
+
+    # Check: ensure the level string uses the expected "price@volume" format
+    if "@" not in raw_level:
+        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') does not contain '@' separator")
+
+    price_str, volume_str = raw_level.split("@", 1)
+    price_str = price_str.strip()
+    volume_str = volume_str.strip()
+
+    # Check: ensure both price and volume parts are non-empty after stripping
+    if not price_str or not volume_str:
+        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has empty price or volume part")
+
+    try:
+        price = D(price_str)
+        volume = D(volume_str)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has invalid numeric content") from exc
+
+    return price, volume
 
 
 def _parse_price_volume_levels(levels: Iterable[str] | None) -> list[tuple[Decimal, Decimal]]:
