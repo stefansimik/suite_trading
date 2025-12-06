@@ -6,7 +6,7 @@ from typing import Callable
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.utils.datetime_utils import format_dt
+from suite_trading.utils.datetime_tools import format_dt
 
 
 class BarEvent(Event):

@@ -6,7 +6,7 @@ from typing import Callable
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.order_book.order_book import OrderBook
-from suite_trading.utils.datetime_utils import format_dt
+from suite_trading.utils.datetime_tools import format_dt
 
 
 class OrderBookEvent(Event):

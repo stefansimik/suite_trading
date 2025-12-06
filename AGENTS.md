@@ -445,7 +445,7 @@ return result
 
 **Always include** `self.__class__.__name__` to make object types clear.
 
-**Datetime formatting:** Use utilities from `suite_trading.utils.datetime_utils`:
+**Datetime formatting:** Use utilities from `suite_trading.utils.datetime_tools`:
 - `format_dt(dt)` for single timestamp
 - `format_range(start_dt, end_dt)` for intervals
 

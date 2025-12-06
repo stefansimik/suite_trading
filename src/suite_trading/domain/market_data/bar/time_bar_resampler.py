@@ -5,7 +5,7 @@ from typing import Callable
 
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import BarEvent
-from suite_trading.utils.datetime_utils import require_utc
+from suite_trading.utils.datetime_tools import require_utc
 from suite_trading.utils.math import ceil_to_multiple
 from suite_trading.domain.market_data.bar.new_bar_event_accumulator import NewBarEventAccumulator
 

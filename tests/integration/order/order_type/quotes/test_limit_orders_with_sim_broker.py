@@ -18,7 +18,7 @@ from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEven
 
 from suite_trading.domain.instrument import Instrument, AssetClass
 from suite_trading.domain.monetary.currency_registry import USD
-from suite_trading.utils.datetime_utils import make_utc
+from suite_trading.utils.datetime_tools import make_utc
 
 
 class _LimitOrderTestStrategy(Strategy):

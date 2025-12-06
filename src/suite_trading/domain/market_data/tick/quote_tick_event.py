@@ -4,7 +4,7 @@ from datetime import datetime
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
-from suite_trading.utils.datetime_utils import format_dt
+from suite_trading.utils.datetime_tools import format_dt
 
 
 class QuoteTickEvent(Event):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from suite_trading.utils.datetime_utils import expect_utc
+from suite_trading.utils.datetime_tools import expect_utc
 
 
 class Event:

@@ -7,7 +7,7 @@ import logging
 
 from suite_trading.domain.event import Event
 from suite_trading.platform.event_feed.event_feed import EventFeed  # noqa: F401 (protocol reference)
-from suite_trading.utils.datetime_utils import require_utc
+from suite_trading.utils.datetime_tools import require_utc
 
 
 logger = logging.getLogger(__name__)

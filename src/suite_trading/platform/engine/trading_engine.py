@@ -19,7 +19,7 @@ from suite_trading.platform.engine.models.event_to_order_book.protocol import Ev
 from suite_trading.platform.engine.models.event_to_order_book.default_impl import DefaultEventToOrderBookConverter
 
 from suite_trading.utils.state_machine import StateMachine
-from suite_trading.utils.datetime_utils import format_dt
+from suite_trading.utils.datetime_tools import format_dt
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution

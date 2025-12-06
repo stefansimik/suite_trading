@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import NamedTuple, Sequence, TYPE_CHECKING
 
 from suite_trading.domain.order.order_enums import OrderSide
-from suite_trading.utils.datetime_utils import expect_utc, format_dt
+from suite_trading.utils.datetime_tools import expect_utc, format_dt
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument

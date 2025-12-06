@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.monetary.money import Money
-from suite_trading.utils.datetime_utils import format_dt
+from suite_trading.utils.datetime_tools import format_dt
 
 
 class Execution:

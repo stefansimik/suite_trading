@@ -8,7 +8,7 @@ import logging
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
-from suite_trading.utils.datetime_utils import require_utc
+from suite_trading.utils.datetime_tools import require_utc
 from suite_trading.domain.market_data.bar.time_bar_resampler import TimeBarResampler
 
 
