@@ -38,7 +38,7 @@ from datetime import timedelta
 from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
-from suite_trading.utils.data_generation.bar_generation import create_bar_series
+from suite_trading.utils.data_generation.factory_bar import create_bar_series
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.platform.event_feed.periodic_time_event_feed import FixedIntervalEventFeed
 from suite_trading.strategy.strategy import Strategy
@@ -110,7 +110,7 @@ from suite_trading.platform.broker.sim.sim_broker import SimBroker
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.platform.event_feed.periodic_time_event_feed import FixedIntervalEventFeed
-from suite_trading.utils.data_generation.bar_generation import create_bar_series
+from suite_trading.utils.data_generation.factory_bar import create_bar_series
 from suite_trading.strategy.strategy import Strategy
 
 

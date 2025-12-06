@@ -37,8 +37,8 @@ def create_order_book(
     Examples:
         Create a simple book with one bid and one ask level::
 
-            from suite_trading.utils.data_generation.order_book_generation import create_order_book
-            from suite_trading.utils.data_generation.instrument_factory import create_equity_aapl
+            from suite_trading.utils.data_generation.factory_order_book import create_order_book
+            from suite_trading.utils.data_generation.factory_instrument import create_equity_aapl
 
             instrument = create_equity_aapl()
             book = create_order_book(
@@ -133,8 +133,8 @@ def create_order_book_from_strings(
     Examples:
         Build an `OrderBook` using compact string levels::
 
-            from suite_trading.utils.data_generation.order_book_generation import create_order_book_from_strings
-            from suite_trading.utils.data_generation.instrument_factory import create_equity_aapl
+            from suite_trading.utils.data_generation.factory_order_book import create_order_book_from_strings
+            from suite_trading.utils.data_generation.factory_instrument import create_equity_aapl
 
             instrument = create_equity_aapl()
             book = create_order_book_from_strings(

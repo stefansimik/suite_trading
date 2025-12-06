@@ -9,7 +9,7 @@ from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
-from suite_trading.utils.data_generation import instrument_factory
+from suite_trading.utils.data_generation import factory_instrument
 from suite_trading.utils.data_generation.price_patterns import zig_zag_function
 from suite_trading.utils.math import round_to_increment
 
@@ -23,7 +23,7 @@ def create_bar_type(
     """Create a `BarType` instance for demos and tests.
 
     When no $instrument is provided, a default EURUSD FX spot instrument from
-    `instrument_factory` is used.
+        `factory_instrument` is used.
 
     Args:
         instrument: Instrument for the bars. When None, a default EURUSD FX
@@ -38,12 +38,12 @@ def create_bar_type(
     Examples:
         Create a 1-minute last trade bar type for EURUSD::
 
-            from suite_trading.utils.data_generation.bar_generation import create_bar_type
+            from suite_trading.utils.data_generation.factory_bar import create_bar_type
 
             bar_type = create_bar_type()
     """
 
-    effective_instrument = instrument or instrument_factory.create_fx_spot_eurusd()
+    effective_instrument = instrument or factory_instrument.create_fx_spot_eurusd()
     result = BarType(instrument=effective_instrument, value=value, unit=unit, price_type=price_type)
     return result
 
@@ -165,7 +165,7 @@ def create_bar_series(
     Examples:
         Create a short series of demo bars::
 
-            from suite_trading.utils.data_generation.bar_generation import DEFAULT_FIRST_BAR, create_bar_series
+            from suite_trading.utils.data_generation.factory_bar import DEFAULT_FIRST_BAR, create_bar_series
 
             bars = create_bar_series(first_bar=DEFAULT_FIRST_BAR, num_bars=10)
             # bars[0] is DEFAULT_FIRST_BAR

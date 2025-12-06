@@ -3,7 +3,7 @@ from __future__ import annotations
 # Justification: Provide a single, discoverable entry point for data generation
 # helpers used across tests, examples, and quick-start notebooks.
 
-from suite_trading.utils.data_generation import bar_generation, instrument_factory, order_book_generation, price_patterns
+from suite_trading.utils.data_generation import factory_bar, factory_instrument, factory_order_book, price_patterns
 
 
 class DataGenerationAssistant:
@@ -27,9 +27,9 @@ class DataGenerationAssistant:
     # region Init
 
     def __init__(self) -> None:
-        self.instrument = instrument_factory
-        self.order_book = order_book_generation
-        self.bars = bar_generation
+        self.instrument = factory_instrument
+        self.order_book = factory_order_book
+        self.bars = factory_bar
         self.price_pattern = price_patterns
 
     # endregion

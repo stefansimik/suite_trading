@@ -19,7 +19,7 @@ def create_future_6e() -> Instrument:
     Examples:
         Create a Euro FX future instrument for use in a demo::
 
-            from suite_trading.utils.data_generation.instrument_factory import create_future_6e
+            from suite_trading.utils.data_generation.factory_instrument import create_future_6e
 
             instrument = create_future_6e()
             # use $instrument in your backtest or demo strategy
@@ -50,7 +50,7 @@ def create_fx_spot_eurusd() -> Instrument:
     Examples:
         Create a EURUSD instrument and use it in a bar generator::
 
-            from suite_trading.utils.data_generation.instrument_factory import create_fx_spot_eurusd
+            from suite_trading.utils.data_generation.factory_instrument import create_fx_spot_eurusd
 
             instrument = create_fx_spot_eurusd()
             # pass $instrument to your bar or order book helpers
@@ -78,7 +78,7 @@ def create_future_cl() -> Instrument:
     Examples:
         Build a CL future instrument for use in order book fixtures::
 
-            from suite_trading.utils.data_generation.instrument_factory import create_future_cl
+            from suite_trading.utils.data_generation.factory_instrument import create_future_cl
 
             instrument = create_future_cl()
     """
@@ -105,7 +105,7 @@ def create_equity_aapl() -> Instrument:
     Examples:
         Create an AAPL equity instrument for a simple equity strategy::
 
-            from suite_trading.utils.data_generation.instrument_factory import create_equity_aapl
+            from suite_trading.utils.data_generation.factory_instrument import create_equity_aapl
 
             instrument = create_equity_aapl()
     """
@@ -132,7 +132,7 @@ def create_commodity_spot_xauusd() -> Instrument:
     Examples:
         Create an XAUUSD spot instrument::
 
-            from suite_trading.utils.data_generation.instrument_factory import create_commodity_spot_xauusd
+            from suite_trading.utils.data_generation.factory_instrument import create_commodity_spot_xauusd
 
             instrument = create_commodity_spot_xauusd()
     """
@@ -160,7 +160,7 @@ def create_future_es() -> Instrument:
     Examples:
         Create an ES instrument and use it in bar generation::
 
-            from suite_trading.utils.data_generation.instrument_factory import create_future_es
+            from suite_trading.utils.data_generation.factory_instrument import create_future_es
 
             instrument = create_future_es()
     """
