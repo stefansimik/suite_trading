@@ -12,7 +12,7 @@ from suite_trading.platform.broker.sim.sim_broker import SimBroker
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.strategy.strategy import Strategy
-from tests.helpers.test_assistant import TEST_ASSISTANT as TST
+from suite_trading.utils.data_generation.assistant import DGA
 
 
 class SingleLimitOrderOrderBookStrategy(Strategy):
@@ -68,8 +68,8 @@ def test_buy_limit_with_two_ask_levels_partial_fill() -> None:
     broker = SimBroker(fill_model=fill_model)
     engine.add_broker("sim_broker", broker)
 
-    instrument = TST.instrument.create_equity_aapl()
-    order_book = TST.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
+    instrument = DGA.instrument.create_equity_aapl()
+    order_book = DGA.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
     strategy_name = "limit_order_two_levels"
     strategy = SingleLimitOrderOrderBookStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
     engine.add_strategy(strategy)
@@ -109,8 +109,8 @@ def test_buy_limit_with_three_ask_levels_rejected_by_price() -> None:
     engine.add_broker("sim_broker", broker)
 
     # OrderBook snapshot: asks at 100x3, 101x5, 102x5; bid at 99x10 to satisfy margin model while focusing on asks
-    instrument = TST.instrument.create_equity_aapl()
-    order_book = TST.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["100@3", "101@5", "102@5"])
+    instrument = DGA.instrument.create_equity_aapl()
+    order_book = DGA.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["100@3", "101@5", "102@5"])
     strategy_name = "limit_order_three_levels"
     strategy = SingleLimitOrderOrderBookStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
     engine.add_strategy(strategy)

@@ -14,7 +14,7 @@ from suite_trading.platform.event_feed.time_bar_aggregation_event_feed import (
     TimeBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
-from tests.helpers.test_assistant import TEST_ASSISTANT as TST
+from suite_trading.utils.data_generation.assistant import DGA
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +73,9 @@ def build_feed_from_minute_ends(
     Returns:
         FixedSequenceEventFeed of BarEvent(s) in the exact provided order.
     """
-    bt = TST.bars.create_bar_type(value=unit_minutes, unit=BarUnit.MINUTE)
+    bt = DGA.bars.create_bar_type(value=unit_minutes, unit=BarUnit.MINUTE)
     bars = [
-        TST.bars.create_bar(
+        DGA.bars.create_bar(
             bar_type=bt,
             end_dt=base_day.replace(hour=0, minute=m, second=0, microsecond=0),
         )

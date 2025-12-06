@@ -6,7 +6,7 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.platform.event_feed.periodic_time_event_feed import FixedIntervalEventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.engine.trading_engine import TradingEngine
-from tests.helpers.test_assistant import TEST_ASSISTANT as TST
+from suite_trading.utils.data_generation.assistant import DGA
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class DemoStrategy(Strategy):
         logger.debug("Strategy starting...")
 
         # Add data to strategy: 1-minute bars (demo data)
-        bars_feed: EventFeed = FixedSequenceEventFeed(wrap_bars_to_events(TST.bars.create_bar_series(num_bars=20)))
+        bars_feed: EventFeed = FixedSequenceEventFeed(wrap_bars_to_events(DGA.bars.create_bar_series(num_bars=20)))
         self.add_event_feed("bars_feed", bars_feed)
 
         # Add data to strategy: Time notifications each 10 seconds

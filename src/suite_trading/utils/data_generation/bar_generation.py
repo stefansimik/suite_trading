@@ -9,9 +9,9 @@ from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
+from suite_trading.utils.data_generation import instrument_factory
+from suite_trading.utils.data_generation.price_patterns import zig_zag_function
 from suite_trading.utils.math import round_to_increment
-from tests.helpers import helper_instrument
-from tests.helpers.helper_price_pattern import zig_zag_function
 
 
 def create_bar_type(
@@ -20,24 +20,30 @@ def create_bar_type(
     unit: BarUnit = BarUnit.MINUTE,
     price_type: PriceType = PriceType.LAST_TRADE,
 ) -> BarType:
-    """Create a `BarType` instance for tests.
+    """Create a `BarType` instance for demos and tests.
 
-    This helper mirrors the behavior of the original `create_bar_type` from
-    the data generation package, but uses the shared test instrument factory
-    when no $instrument is provided.
+    When no $instrument is provided, a default EURUSD FX spot instrument from
+    `instrument_factory` is used.
 
     Args:
         instrument: Instrument for the bars. When None, a default EURUSD FX
-            spot instrument from `helper_instrument` is used.
+            spot instrument is used.
         value: Size of the bar in units of $unit.
         unit: Time or aggregation unit for the bar.
         price_type: Price type that the bar represents.
 
     Returns:
         Constructed `BarType` instance.
+
+    Examples:
+        Create a 1-minute last trade bar type for EURUSD::
+
+            from suite_trading.utils.data_generation.bar_generation import create_bar_type
+
+            bar_type = create_bar_type()
     """
 
-    effective_instrument = instrument or helper_instrument.create_fx_spot_eurusd()
+    effective_instrument = instrument or instrument_factory.create_fx_spot_eurusd()
     result = BarType(instrument=effective_instrument, value=value, unit=unit, price_type=price_type)
     return result
 
@@ -56,10 +62,10 @@ def create_bar(
     *,
     is_partial: bool = False,
 ) -> Bar:
-    """Create a single demo bar for tests.
+    """Create a single demo bar for demos and tests.
 
-    The generated bar is deterministic given the inputs and is intended for
-    use in tests and examples that need simple but realistic OHLCV data.
+    The generated bar is deterministic given the inputs and is intended for use
+    in tests and examples that need simple but realistic OHLCV data.
 
     Args:
         bar_type: Type of bar to create.
@@ -137,7 +143,7 @@ def create_bar_series(
     num_bars: int = 20,
     price_pattern_func: Callable[[int], float] = zig_zag_function,
 ) -> list[Bar]:
-    """Generate a series of demo bars with a specified price pattern for tests.
+    """Generate a series of demo bars with a specified price pattern.
 
     The bar body and wick proportions from $first_bar are reused for all
     subsequent bars in the series. Close prices follow $price_pattern_func and
@@ -155,6 +161,14 @@ def create_bar_series(
 
     Raises:
         ValueError: If $num_bars is less than 1.
+
+    Examples:
+        Create a short series of demo bars::
+
+            from suite_trading.utils.data_generation.bar_generation import DEFAULT_FIRST_BAR, create_bar_series
+
+            bars = create_bar_series(first_bar=DEFAULT_FIRST_BAR, num_bars=10)
+            # bars[0] is DEFAULT_FIRST_BAR
     """
 
     if num_bars <= 1:

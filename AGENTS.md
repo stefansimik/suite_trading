@@ -753,28 +753,37 @@ If in doubt, start in `tests/unit/`. Move or duplicate the scenario into
 `tests/integration/` only when it clearly spans several layers or depends on realistic
 wiring between components.
 
-## 9.2. Use TestAssistant class for writing tests
+## 9.2. Use DataGenerationAssistant (`DGA`) for test data
 
-Use the shared `TestAssistant` from `tests.helpers.test_assistant` for creating common domain objects in tests.
+Use the shared `DataGenerationAssistant` (`DGA`) from
+`suite_trading.utils.data_generation.assistant` for creating common domain objects
+in tests and examples.
 
-The `TestAssistant` is a lightweight, stateless entry point that exposes small factory namespaces.
-Each call creates fresh objects, so there is no shared mutable state between tests.
+The `DataGenerationAssistant` is a lightweight, stateless entry point that
+exposes small factory namespaces. Each call creates fresh objects, so there is
+no shared mutable state between tests.
 
 Currently it provides:
-- `instrument`: Helpers from `tests.helpers.helper_instrument` for creating `Instrument` fixtures (for example, defaults or instruments with specific currency or tick size).
+- `instrument`: Helpers for creating `Instrument` fixtures (for example,
+  realistic futures, FX, or equity instruments).
+- `bars`: Helpers for creating single bars and bar series.
+- `order_book`: Helpers for creating simple `OrderBook` snapshots from
+  numeric tuples or "price@volume" strings.
+- `price_pattern`: Helpers for scalar price patterns (linear, sine wave,
+  zig-zag).
 
 In new tests you should:
-- Import the singleton `TEST_ASSISTANT` as `TA`, and
+- Import `DGA` once, and
 - Use its factories instead of manually constructing domain objects.
 
 Preferred import pattern:
 
 ```python
-from tests.helpers.test_assistant import TEST_ASSISTANT as TST
+from suite_trading.utils.data_generation.assistant import DGA
 
 
 def test_example_instrument():
-	instrument = TST.instrument.create_default_instrument()
+    instrument = DGA.instrument.create_future_es()
     # use $instrument in your test logic here
 ```
 

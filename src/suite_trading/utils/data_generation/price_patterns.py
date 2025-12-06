@@ -8,24 +8,26 @@ def linear_function(
     start_price: float = 1.0,
     trend_rate: float = 0.005,
 ) -> float:
-    """Generate a value following a linear trend pattern for tests.
+    """Generate a value following a linear trend pattern.
 
-    This helper is used to build simple synthetic price curves in tests and
-    examples. It implements the same calculation as the original
-    `linear_function` from the data generation package.
-
-    The value is calculated using the linear equation::
-
-        y = start_price + (start_price * trend_rate) * x
+    This helper is used to build simple price curves in tests and examples. It
+    matches the behavior of the historical `linear_function` helper.
 
     Args:
         x: Position in the sequence (x-value in the linear equation).
         start_price: Starting price value (price when x = 0).
-        trend_rate: Percentage rate of change per unit $x (positive = upward
-            trend, negative = downward trend).
+        trend_rate: Percentage rate of change per unit $x.
 
     Returns:
         Float value representing the price at the given position.
+
+    Examples:
+        Generate a few values along a linear trend::
+
+            from suite_trading.utils.data_generation.price_patterns import linear_function
+
+            prices = [linear_function(x) for x in range(3)]
+            # prices == [1.0, 1.005, 1.01]
     """
 
     result = start_price + (start_price * trend_rate) * x
@@ -38,15 +40,10 @@ def sine_wave_function(
     amplitude: float = 0.01,
     frequency: float = 0.1,
 ) -> float:
-    """Generate a value following a sine wave pattern for tests.
+    """Generate a value following a sine wave pattern.
 
-    This helper is used to build oscillating synthetic price curves in tests
-    and examples. It implements the same calculation as the original
-    `sine_wave_function` from the data generation package.
-
-    The value is calculated using the equation::
-
-        y = start_price * (1 + amplitude * sin(frequency * x))
+    This helper is used to build oscillating price curves in tests and
+    examples.
 
     Args:
         x: Position in the sequence (x-value in the sine equation).
@@ -58,6 +55,15 @@ def sine_wave_function(
 
     Returns:
         Float value representing the price at the given position.
+
+    Examples:
+        Generate a small sine wave around 1.0::
+
+            from math import pi
+            from suite_trading.utils.data_generation.price_patterns import sine_wave_function
+
+            value = sine_wave_function(pi / (2 * 0.1))
+            # value is approximately 1.01
     """
 
     result = start_price * (1 + amplitude * math.sin(frequency * x))
@@ -72,11 +78,7 @@ def zig_zag_function(
     steps_up: int = 6,
     steps_down: int = 3,
 ) -> float:
-    """Generate a value in a zig-zag sequence for tests.
-
-    This helper mirrors the behavior of the original `zig_zag_function` from
-    the data generation package, but is colocated with other synthetic data
-    utilities for tests.
+    """Generate a value in a zig-zag sequence.
 
     The implementation uses a direct mathematical calculation that is
     efficient even for large values of $x.
@@ -94,6 +96,14 @@ def zig_zag_function(
 
     Returns:
         Float value representing the price at the given step.
+
+    Examples:
+        Generate a few points from a zig-zag pattern::
+
+            from suite_trading.utils.data_generation.price_patterns import zig_zag_function
+
+            values = [zig_zag_function(x) for x in range(4)]
+            # values[0] is the starting price
     """
 
     if x == 0:
