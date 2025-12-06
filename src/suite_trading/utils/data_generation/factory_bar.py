@@ -48,11 +48,8 @@ def create_bar_type(
     return result
 
 
-DEFAULT_BAR_TYPE = create_bar_type()
-
-
 def create_bar(
-    bar_type: BarType = DEFAULT_BAR_TYPE,
+    bar_type: BarType | None = None,
     end_dt: datetime = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc),
     close_price: Decimal = Decimal("1.1000"),
     is_bullish: bool = True,
@@ -68,7 +65,8 @@ def create_bar(
     in tests and examples that need simple but realistic OHLCV data.
 
     Args:
-        bar_type: Type of bar to create.
+        bar_type: Type of bar to create. When None, a default `BarType` is
+            created with `create_bar_type`.
         end_dt: End datetime of the bar.
         close_price: Closing price of the bar.
         is_bullish: Whether the bar is an up bar (close > open) or a down bar
@@ -84,26 +82,28 @@ def create_bar(
         New `Bar` instance with the specified properties.
     """
 
-    if bar_type.unit == BarUnit.SECOND:
-        start_dt = end_dt - timedelta(seconds=bar_type.value)
-    elif bar_type.unit == BarUnit.MINUTE:
-        start_dt = end_dt - timedelta(minutes=bar_type.value)
-    elif bar_type.unit == BarUnit.HOUR:
-        start_dt = end_dt - timedelta(hours=bar_type.value)
-    elif bar_type.unit == BarUnit.DAY:
-        start_dt = end_dt - timedelta(days=bar_type.value)
-    elif bar_type.unit == BarUnit.WEEK:
-        start_dt = end_dt - timedelta(weeks=bar_type.value)
-    elif bar_type.unit == BarUnit.MONTH:
-        start_dt = end_dt - timedelta(days=30 * bar_type.value)
-    elif bar_type.unit == BarUnit.TICK:
-        start_dt = end_dt - timedelta(milliseconds=bar_type.value)
-    elif bar_type.unit == BarUnit.VOLUME:
-        start_dt = end_dt - timedelta(milliseconds=bar_type.value)
-    else:
-        start_dt = end_dt - timedelta(minutes=bar_type.value)
+    effective_bar_type = bar_type or create_bar_type()
 
-    tick_size = bar_type.instrument.price_increment
+    if effective_bar_type.unit == BarUnit.SECOND:
+        start_dt = end_dt - timedelta(seconds=effective_bar_type.value)
+    elif effective_bar_type.unit == BarUnit.MINUTE:
+        start_dt = end_dt - timedelta(minutes=effective_bar_type.value)
+    elif effective_bar_type.unit == BarUnit.HOUR:
+        start_dt = end_dt - timedelta(hours=effective_bar_type.value)
+    elif effective_bar_type.unit == BarUnit.DAY:
+        start_dt = end_dt - timedelta(days=effective_bar_type.value)
+    elif effective_bar_type.unit == BarUnit.WEEK:
+        start_dt = end_dt - timedelta(weeks=effective_bar_type.value)
+    elif effective_bar_type.unit == BarUnit.MONTH:
+        start_dt = end_dt - timedelta(days=30 * effective_bar_type.value)
+    elif effective_bar_type.unit == BarUnit.TICK:
+        start_dt = end_dt - timedelta(milliseconds=effective_bar_type.value)
+    elif effective_bar_type.unit == BarUnit.VOLUME:
+        start_dt = end_dt - timedelta(milliseconds=effective_bar_type.value)
+    else:
+        start_dt = end_dt - timedelta(minutes=effective_bar_type.value)
+
+    tick_size = effective_bar_type.instrument.price_increment
     body_size = bar_body_in_ticks * tick_size
 
     if isinstance(bar_wicks_ratio, str):
@@ -122,7 +122,7 @@ def create_bar(
         low_price = close_price - wick_size
 
     result = Bar(
-        bar_type=bar_type,
+        bar_type=effective_bar_type,
         start_dt=start_dt,
         end_dt=end_dt,
         open=open_price,
@@ -135,11 +135,8 @@ def create_bar(
     return result
 
 
-DEFAULT_FIRST_BAR = create_bar(is_bullish=True)
-
-
 def create_bar_series(
-    first_bar: Bar = DEFAULT_FIRST_BAR,
+    first_bar: Bar | None = None,
     num_bars: int = 20,
     price_pattern_func: Callable[[int], float] = zig_zag_function,
 ) -> list[Bar]:
@@ -151,7 +148,8 @@ def create_bar_series(
 
     Args:
         first_bar: First bar of the series. Its bar-body and bar-wicks
-            proportions are maintained for all subsequent bars.
+            proportions are maintained for all subsequent bars. If None, a
+            default bar is created with `create_bar`.
         num_bars: Number of bars to generate (including $first_bar).
         price_pattern_func: Function that returns Y-values representing the
             price curve.
@@ -165,14 +163,18 @@ def create_bar_series(
     Examples:
         Create a short series of demo bars::
 
-            from suite_trading.utils.data_generation.factory_bar import DEFAULT_FIRST_BAR, create_bar_series
+            from suite_trading.utils.data_generation.factory_bar import create_bar, create_bar_series
 
-            bars = create_bar_series(first_bar=DEFAULT_FIRST_BAR, num_bars=10)
-            # bars[0] is DEFAULT_FIRST_BAR
+            first_bar = create_bar()
+            bars = create_bar_series(first_bar=first_bar, num_bars=10)
+            # bars[0] is $first_bar
     """
 
     if num_bars <= 1:
         raise ValueError(f"$num_bars must be >= 1, but provided value is: {num_bars}")
+
+    if first_bar is None:
+        first_bar = create_bar()
 
     bar_type = first_bar.bar_type
     end_dt = first_bar.end_dt
