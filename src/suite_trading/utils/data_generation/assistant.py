@@ -33,7 +33,7 @@ class DataGenerationAssistant:
     # endregion
 
 
-# Singleton entry point for library users and tests. This object itself carries
-# no mutable domain state; it only exposes factory namespaces, so it is safe to
-# share.
+# Shared data-generation assistant for library users, tests, examples, and quick-start guides.
+# This object is stateless and holds no mutable domain data; it only exposes factory namespaces,
+# so it is safe to reuse wherever ready-made market data is needed.
 DGA = DataGenerationAssistant()
