@@ -24,14 +24,13 @@ def create_order_book(
     and volumes can be provided as Decimal, string, or int and will be
     converted to Decimal and rounded to the instrument price increment.
 
-    When no $instrument is provided, a default EURUSD FX spot instrument from
-    `factory_instrument` is used. Bids and asks must be provided in best-first
-    order (highest bid first, lowest ask first), because this is how most
-    `OrderBook` code expects them.
+    When both $bids and $asks are None, a small default book is created with a
+    few levels on each side around a central price. Bids and asks must be
+    provided in best-first order (highest bid first, lowest ask first),
+    because this is how most `OrderBook` code expects them.
 
     Args:
-        instrument: Instrument for the `OrderBook`. When None, a default
-            EURUSD FX spot instrument is used.
+        instrument: Instrument for the `OrderBook`.
         bids: Optional list of (price, volume) pairs for bid side.
         asks: Optional list of (price, volume) pairs for ask side.
         timestamp: Optional UTC timestamp. If not provided, a fixed default
@@ -48,11 +47,26 @@ def create_order_book(
             book = create_order_book(bids=[("1.0999", "1_000_000")], asks=[("1.1001", "1_000_000")])
     """
 
-    effective_instrument = instrument or factory_instrument.create_fx_spot_eurusd()
+    effective_instrument = instrument or factory_instrument.create_equity_aapl()
     price_increment = effective_instrument.price_increment
 
-    bid_levels = _build_book_levels(bids or [], price_increment)
-    ask_levels = _build_book_levels(asks or [], price_increment)
+    if bids is None and asks is None:
+        bids_pairs: list[tuple[Decimal, Decimal]] = [
+            (Decimal("99.99"), Decimal("10")),
+            (Decimal("99.98"), Decimal("10")),
+            (Decimal("99.97"), Decimal("10")),
+        ]
+        asks_pairs: list[tuple[Decimal, Decimal]] = [
+            (Decimal("100.01"), Decimal("10")),
+            (Decimal("100.02"), Decimal("10")),
+            (Decimal("100.03"), Decimal("10")),
+        ]
+    else:
+        bids_pairs = [(Decimal(str(price)), Decimal(str(volume))) for price, volume in (bids or [])]
+        asks_pairs = [(Decimal(str(price)), Decimal(str(volume))) for price, volume in (asks or [])]
+
+    bid_levels = _build_book_levels(bids_pairs, price_increment)
+    ask_levels = _build_book_levels(asks_pairs, price_increment)
 
     effective_timestamp = timestamp or datetime(2024, 1, 1, tzinfo=timezone.utc)
 
@@ -117,21 +131,21 @@ def create_order_book_series(
     time_step: timedelta = timedelta(seconds=1),
     price_pattern_func: Callable[[int], float] = zig_zag_function,
 ) -> list[OrderBook]:
-    """Generate a series of demo order books with a mid-price pattern.
+    """Generate a series of demo order books along a price pattern.
 
     The shape of the order book (relative price offsets and volumes of all
     levels) is taken from $first_book and reused for all subsequent books in
-    the series. Mid prices follow $price_pattern_func applied to the
-    first-book mid price and are rounded to the instrument price increment.
+    the series. A single central price is moved according to
+    $price_pattern_func, and all bid/ask levels are shifted around it and
+    rounded to the instrument price increment.
 
     Args:
         first_book: First order book in the series. If None, a default book is
-            created with `create_order_book` using one bid and one ask level
-            around a mid price.
+            created with `create_order_book`.
         num_books: Number of books to generate (including $first_book).
         time_step: Time distance between successive books.
-        price_pattern_func: Function that returns Y-values for the mid-price
-            curve. Values are multiplied by the initial mid price.
+        price_pattern_func: Function that controls how the central price of
+            the book is moved over time.
 
     Returns:
         List of `OrderBook` objects in chronological order (oldest first).

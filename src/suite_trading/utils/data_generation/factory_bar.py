@@ -22,12 +22,8 @@ def create_bar_type(
 ) -> BarType:
     """Create a `BarType` instance for demos and tests.
 
-    When no $instrument is provided, a default EURUSD FX spot instrument from
-        `factory_instrument` is used.
-
     Args:
-        instrument: Instrument for the bars. When None, a default EURUSD FX
-            spot instrument is used.
+        instrument: Instrument for the bars.
         value: Size of the bar in units of $unit.
         unit: Time or aggregation unit for the bar.
         price_type: Price type that the bar represents.
@@ -36,14 +32,14 @@ def create_bar_type(
         Constructed `BarType` instance.
 
     Examples:
-        Create a 1-minute last trade bar type for EURUSD::
+        Create a 1-minute last trade bar type::
 
             from suite_trading.utils.data_generation.factory_bar import create_bar_type
 
             bar_type = create_bar_type()
     """
 
-    effective_instrument = instrument or factory_instrument.create_fx_spot_eurusd()
+    effective_instrument = instrument or factory_instrument.create_equity_aapl()
     result = BarType(instrument=effective_instrument, value=value, unit=unit, price_type=price_type)
     return result
 
@@ -51,18 +47,20 @@ def create_bar_type(
 def create_bar(
     bar_type: BarType | None = None,
     end_dt: datetime = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc),
-    close_price: Decimal = Decimal("1.1000"),
+    close_price: Decimal = Decimal("100.00"),
     is_bullish: bool = True,
     bar_body_in_ticks: int = 20,
     bar_wicks_ratio: Decimal | str = Decimal("0.4"),
-    volume: Decimal = Decimal("100_000_000"),
+    volume: Decimal | None = None,
     *,
     is_partial: bool = False,
 ) -> Bar:
-    """Create a single demo bar for demos and tests.
+    """Create a single demo bar for tests and examples.
 
-    The generated bar is deterministic given the inputs and is intended for use
-    in tests and examples that need simple but realistic OHLCV data.
+    The generated bar is intended for use in tests and examples that need
+    simple but realistic OHLCV data. When $volume is not provided, a small
+    default is derived from the bar unit. For volume bars, the bar volume is
+    taken directly from $bar_type.value.
 
     Args:
         bar_type: Type of bar to create. When None, a default `BarType` is
@@ -74,7 +72,8 @@ def create_bar(
         bar_body_in_ticks: Size of the bar body in ticks.
         bar_wicks_ratio: Ratio of wick size to body size (0.4 = 40% of body
             size).
-        volume: Trading volume during the bar period.
+        volume: Trading volume during the bar period. When None, a default is
+            computed from the bar unit.
         is_partial: Whether the bar is partial (metadata only; does not affect
             equality).
 
@@ -83,6 +82,25 @@ def create_bar(
     """
 
     effective_bar_type = bar_type or create_bar_type()
+
+    if volume is None:
+        unit = effective_bar_type.unit
+        value = effective_bar_type.value
+
+        if unit == BarUnit.VOLUME:
+            volume = Decimal(value)
+        else:
+            shares_per_unit = {
+                BarUnit.SECOND: Decimal("10"),
+                BarUnit.MINUTE: Decimal("100"),
+                BarUnit.HOUR: Decimal("1000"),
+                BarUnit.DAY: Decimal("5000"),
+                BarUnit.WEEK: Decimal("25000"),
+                BarUnit.MONTH: Decimal("100000"),
+                BarUnit.TICK: Decimal("10"),
+            }
+            per_unit = shares_per_unit.get(unit, Decimal("100"))
+            volume = per_unit * Decimal(value)
 
     if effective_bar_type.unit == BarUnit.SECOND:
         start_dt = end_dt - timedelta(seconds=effective_bar_type.value)
@@ -142,14 +160,14 @@ def create_bar_series(
 ) -> list[Bar]:
     """Generate a series of demo bars with a specified price pattern.
 
-    The bar body and wick proportions from $first_bar are reused for all
-    subsequent bars in the series. Close prices follow $price_pattern_func and
-    are rounded to the instrument's price increment.
+    The first bar defines the $bar_type, $volume, and bar-body and bar-wick
+    proportions for the whole series. All generated bars keep these
+    properties, while their close prices follow $price_pattern_func and are
+    rounded to the instrument's price increment.
 
     Args:
-        first_bar: First bar of the series. Its bar-body and bar-wicks
-            proportions are maintained for all subsequent bars. If None, a
-            default bar is created with `create_bar`.
+        first_bar: First bar of the series. If None, a default bar is created
+            with `create_bar`.
         num_bars: Number of bars to generate (including $first_bar).
         price_pattern_func: Function that returns Y-values representing the
             price curve.

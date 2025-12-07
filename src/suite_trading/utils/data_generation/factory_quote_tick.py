@@ -14,45 +14,39 @@ from suite_trading.utils.math import round_to_increment
 def create_quote_tick(
     instrument: Instrument | None = None,
     timestamp: datetime = datetime(2025, 1, 2, 0, 0, 0, tzinfo=timezone.utc),
-    mid_price: Decimal = Decimal("1.1000"),
-    spread_in_ticks: int = 2,
-    bid_volume: Decimal = Decimal("1_000_000"),
-    ask_volume: Decimal = Decimal("1_000_000"),
+    bid_price: Decimal = Decimal("99.99"),
+    ask_price: Decimal = Decimal("100.01"),
+    bid_volume: Decimal = Decimal("10"),
+    ask_volume: Decimal = Decimal("10"),
 ) -> QuoteTick:
-    """Create a single demo quote tick (bid/ask) for demos and tests.
+    """Create a small synthetic quote tick (bid/ask) for demos and tests.
 
-    Prices are derived from $mid_price and $spread_in_ticks, and then rounded
-    to the instrument price increment. When no $instrument is provided, a
-    default EURUSD FX spot instrument from `factory_instrument` is used.
+    The helper returns a simple two-sided quote with a tight spread and
+    shallow depth, suitable for partial-fill simulations. It is intended for
+    generated test data rather than for real market feeds.
 
     Args:
-        instrument: Instrument for the quote. When None, a default EURUSD
-            FX spot instrument is created with
-            `factory_instrument.create_fx_spot_eurusd`.
-        timestamp: UTC timestamp of the quote tick.
-        mid_price: Mid price around which bid and ask prices are built.
-        spread_in_ticks: Total bid/ask spread expressed in ticks.
+        instrument: Instrument for the quote.
+        timestamp: Timestamp of the quote snapshot.
+        bid_price: Best bid price.
+        ask_price: Best ask price.
         bid_volume: Volume available at the bid.
         ask_volume: Volume available at the ask.
 
     Returns:
-        New `QuoteTick` instance with bid and ask around $mid_price.
+        A synthetic `QuoteTick` instance with one bid and one ask level.
     """
 
-    effective_instrument = instrument or factory_instrument.create_fx_spot_eurusd()
+    effective_instrument = instrument or factory_instrument.create_equity_aapl()
     tick_size = effective_instrument.price_increment
 
-    half_spread = (spread_in_ticks * tick_size) / 2
-    bid_price_raw = mid_price - half_spread
-    ask_price_raw = mid_price + half_spread
-
-    bid_price = round_to_increment(bid_price_raw, tick_size)
-    ask_price = round_to_increment(ask_price_raw, tick_size)
+    bid_price_rounded = round_to_increment(bid_price, tick_size)
+    ask_price_rounded = round_to_increment(ask_price, tick_size)
 
     result = QuoteTick(
         instrument=effective_instrument,
-        bid_price=bid_price,
-        ask_price=ask_price,
+        bid_price=bid_price_rounded,
+        ask_price=ask_price_rounded,
         bid_volume=bid_volume,
         ask_volume=ask_volume,
         timestamp=timestamp,
@@ -66,19 +60,20 @@ def create_quote_tick_series(
     time_step: timedelta = timedelta(seconds=1),
     price_pattern_func: Callable[[int], float] = zig_zag_function,
 ) -> list[QuoteTick]:
-    """Generate a series of demo quote ticks with a mid-price pattern.
+    """Generate a series of synthetic quotes along a price pattern.
 
-    The bid/ask spread and volumes from $first_tick are reused for all
-    subsequent ticks. Mid prices follow $price_pattern_func applied to the
-    first tick mid price and are rounded to the instrument price increment.
+    The first quote defines the $instrument, the bid/ask gap, and the
+    volumes at each side. All generated quotes keep the same spread and
+    volumes, while the whole quote is shifted up and down according to
+    $price_pattern_func.
 
     Args:
         first_tick: First quote tick in the series. If None, a default
-            quote tick is created with `create_quote_tick`.
+            synthetic quote tick is created with `create_quote_tick`.
         num_ticks: Number of ticks to generate (including $first_tick).
         time_step: Time distance between successive ticks.
-        price_pattern_func: Function that returns Y-values for the mid-price
-            curve. Values are multiplied by the initial mid price.
+        price_pattern_func: Function that controls how the quote is moved
+            over time.
 
     Returns:
         List of `QuoteTick` objects in chronological order (oldest first).
@@ -98,7 +93,7 @@ def create_quote_tick_series(
 
     bid = first_tick.bid_price
     ask = first_tick.ask_price
-    mid_price = (bid + ask) / 2
+    center_price = (bid + ask) / 2
     spread = ask - bid
 
     bid_volume = first_tick.bid_volume
@@ -108,20 +103,20 @@ def create_quote_tick_series(
     if num_ticks == 1:
         return quotes
 
-    mid_prices: list[Decimal] = []
+    center_prices: list[Decimal] = []
     for i in range(num_ticks):
         pattern_value = Decimal(str(price_pattern_func(i)))
-        raw_mid = mid_price * pattern_value
-        mid_prices.append(round_to_increment(raw_mid, price_increment))
+        raw_center = center_price * pattern_value
+        center_prices.append(round_to_increment(raw_center, price_increment))
 
     current_timestamp = first_tick.timestamp + time_step
 
     for i in range(1, num_ticks):
-        mid_i = mid_prices[i]
+        center_i = center_prices[i]
         half_spread = spread / 2
 
-        bid_price_raw = mid_i - half_spread
-        ask_price_raw = mid_i + half_spread
+        bid_price_raw = center_i - half_spread
+        ask_price_raw = center_i + half_spread
 
         bid_price = round_to_increment(bid_price_raw, price_increment)
         ask_price = round_to_increment(ask_price_raw, price_increment)

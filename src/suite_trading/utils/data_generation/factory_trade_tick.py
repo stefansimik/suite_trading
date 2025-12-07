@@ -14,27 +14,27 @@ from suite_trading.utils.math import round_to_increment
 def create_trade_tick(
     instrument: Instrument | None = None,
     timestamp: datetime = datetime(2025, 1, 2, 0, 0, 0, tzinfo=timezone.utc),
-    price: Decimal = Decimal("1.1000"),
-    volume: Decimal = Decimal("1_000_000"),
+    price: Decimal = Decimal("100.00"),
+    volume: Decimal = Decimal("10"),
 ) -> TradeTick:
-    """Create a single demo trade tick for demos and tests.
+    """Create a small synthetic trade tick for demos and tests.
 
-    When no $instrument is provided, a default EURUSD FX spot instrument from
-    `factory_instrument` is used. The function is deterministic given the
-    arguments so that tests remain stable.
+    This helper produces simple equity-style ticks with tiny volumes so that
+    partial fills are easy to model in tests. The tick returned here works as
+    a natural first element for `create_trade_tick_series`, which reuses its
+    $instrument and $volume.
 
     Args:
-        instrument: Instrument for the tick. When None, a default EURUSD FX
-            spot instrument is created with `factory_instrument.create_fx_spot_eurusd`.
-        timestamp: UTC timestamp of the trade tick.
+        instrument: Instrument for the tick.
+        timestamp: Timestamp of the trade event.
         price: Trade price. It is rounded to the instrument price increment.
         volume: Traded volume for this tick.
 
     Returns:
-        New `TradeTick` instance with the specified properties.
+        A synthetic `TradeTick` instance for use in tests and examples.
     """
 
-    effective_instrument = instrument or factory_instrument.create_fx_spot_eurusd()
+    effective_instrument = instrument or factory_instrument.create_equity_aapl()
     price_rounded = round_to_increment(price, effective_instrument.price_increment)
 
     result = TradeTick(instrument=effective_instrument, price=price_rounded, volume=volume, timestamp=timestamp)
