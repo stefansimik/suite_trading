@@ -15,7 +15,7 @@ from suite_trading.strategy.strategy import Strategy
 from suite_trading.utils.data_generation.assistant import DGA
 
 
-class SingleLimitOrderOrderBookStrategy(Strategy):
+class SimgleLimitOrderStrategy(Strategy):
     """Strategy that submits a single BUY Limit order on first OrderBookEvent.
 
     The strategy attaches an OrderBook-based event-feed on start. When the first
@@ -51,7 +51,7 @@ class SingleLimitOrderOrderBookStrategy(Strategy):
                 self.submit_order(order, self._broker)
 
 
-def test_buy_limit_with_two_ask_levels_partial_fill() -> None:
+def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_enabled() -> None:
     """Scenario 1: BUY Limit at 101 against asks at 101x5 and 102x5.
 
     OrderBook asks:
@@ -71,7 +71,7 @@ def test_buy_limit_with_two_ask_levels_partial_fill() -> None:
     instrument = DGA.instrument.create_equity_aapl()
     order_book = DGA.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
     strategy_name = "limit_order_two_levels"
-    strategy = SingleLimitOrderOrderBookStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
+    strategy = SimgleLimitOrderStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
     engine.add_strategy(strategy)
 
     # Act
@@ -87,6 +87,41 @@ def test_buy_limit_with_two_ask_levels_partial_fill() -> None:
     position = broker.get_position(order_book.instrument)
     assert position is not None
     assert position.quantity == Decimal("5")
+
+
+def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_disabled() -> None:
+    """Scenario 1b: BUY Limit at 101 against asks at 101x5 and 102x5.
+
+    OrderBook asks:
+    - Level 2: price=102, volume=5
+    - Level 1: price=101, volume=5
+
+    With on-touch fills disabled (probability=0), we expect no fills at all,
+    even though the Limit price equals the best ask.
+    """
+
+    # Arrange: engine + SimBroker (no on-touch fills) + strategy
+    engine = TradingEngine()
+    fill_model = DistributionFillModel(limit_on_touch_fill_probability=Decimal("0"), rng_seed=42)
+    broker = SimBroker(fill_model=fill_model)
+    engine.add_broker("sim_broker", broker)
+
+    instrument = DGA.instrument.create_equity_aapl()
+    order_book = DGA.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
+    strategy_name = "limit_order_two_levels_on_touch_disabled"
+    strategy = SimgleLimitOrderStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
+    engine.add_strategy(strategy)
+
+    # Act
+    engine.start()
+
+    # Assert: no executions because on-touch fills are disabled
+    executions = engine.list_executions_for_strategy(strategy_name)
+    assert len(executions) == 0
+
+    # Position should remain flat on the instrument
+    position = broker.get_position(order_book.instrument)
+    assert position is None or position.quantity == Decimal("0")
 
 
 def test_buy_limit_with_three_ask_levels_rejected_by_price() -> None:
@@ -112,7 +147,7 @@ def test_buy_limit_with_three_ask_levels_rejected_by_price() -> None:
     instrument = DGA.instrument.create_equity_aapl()
     order_book = DGA.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["100@3", "101@5", "102@5"])
     strategy_name = "limit_order_three_levels"
-    strategy = SingleLimitOrderOrderBookStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
+    strategy = SimgleLimitOrderStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
     engine.add_strategy(strategy)
 
     # Act
