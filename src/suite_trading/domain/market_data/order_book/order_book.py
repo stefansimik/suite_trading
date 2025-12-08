@@ -144,29 +144,41 @@ class OrderBook:
         Returns:
             List of `FillSlice(quantity, price)` (pre-fee).
         """
-        price_levels = self._asks if order_side == OrderSide.BUY else self._bids
-        if not price_levels or target_quantity <= 0:
+        # Choose (asks | bids) based on $order_side
+        order_book_levels = self._asks if order_side == OrderSide.BUY else self._bids
+
+        # Return early if there is no depth or nothing to fill
+        if not order_book_levels or target_quantity <= 0:
             return []
 
-        def _eligible(level: BookLevel) -> bool:
-            if min_price is not None and level.price < min_price:
+        def is_price_level_within_limits(price_level: BookLevel) -> bool:
+            if min_price is not None and price_level.price < min_price:
                 return False
-            if max_price is not None and level.price > max_price:
+            if max_price is not None and price_level.price > max_price:
                 return False
             return True
 
-        remaining = target_quantity
-        result: list[FillSlice] = []
+        # 2 variables updated in the loop below
+        remaining_quantity = target_quantity  # Track how much quantity still needs to be filled
+        result: list[FillSlice] = []  # Collect all simulated fill slices here
 
-        for level in price_levels:
-            if remaining <= 0:
+        # Iterate over prices order-book prices from best to worst
+        for price_level in order_book_levels:
+            # Stop once we have filled the full $target_quantity
+            if remaining_quantity <= 0:
                 break
-            if not _eligible(level):
+
+            if not is_price_level_within_limits(price_level):
                 continue
-            take = level.volume if level.volume <= remaining else remaining
-            if take > 0:
-                result.append(FillSlice(quantity=take, price=level.price))
-                remaining -= take
+
+            # Take as much as possible at this price level
+            fill_quantity = price_level.volume if price_level.volume <= remaining_quantity else remaining_quantity
+            if fill_quantity > 0:
+                # Add fill slice for this price level
+                fill_slice = FillSlice(quantity=fill_quantity, price=price_level.price)
+                result.append(fill_slice)
+                # Reduce remaining quantity by the filled amount
+                remaining_quantity -= fill_quantity
 
         return result
 
