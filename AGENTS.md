@@ -154,14 +154,44 @@ def calculate_portfolio_value(positions: list) -> Decimal:
 
 ## 4.2. Code Comments (Internal Documentation)
 
-**Purpose:** Explain "why" and "what" of complex logic for maintainers. Reduces mental load
-and makes AI-assisted refactoring safer.
+**Purpose:** Explain "why" and "what" of complex logic for maintainers. Reduces mental load and makes AI-assisted refactoring safer.
 
 ### Narrative Comments
 - Short "why/what" comment above each logical unit
 - Use domain terms and explicit states
 - Explain business logic and reasoning
 - Use simple conversational English
+
+### Inline Line Comments for Non-Trivial Code
+- Add short, direct line comments for code that is not trivial to read and requires mental processing.
+- Keep comments focused on what the next line or tiny block does, in 3–8 simple words.
+- Prefer comments that let you scan code without re-running the code logic in your head.
+- Do not explain obvious assignments or one-liners that are already simple / very easy to understand / self-explanatory.
+
+**Example:**
+
+```python
+# Choose asks or bids based on $order_side
+order_book_levels = self._asks if order_side == OrderSide.BUY else self._bids
+
+# Return early if there is no depth or nothing to fill
+if not order_book_levels or target_quantity <= 0:
+    return []
+
+for price_level in order_book_levels:
+    # Stop once we have filled the full $target_quantity
+    if remaining_quantity <= 0:
+        break
+
+    # Skip levels that are outside the price band
+    if not is_price_level_within_limits(price_level):
+        continue
+```
+
+**Acceptance checks:**
+- [ ] Non-trivial lines/blocks that need mental effort have a short inline comment
+- [ ] Comments describe what the next line or tiny block does (not restate the code)
+- [ ] Trivial, obvious assignments and one-liners have no extra comments
 
 ### Defensive Comments
 - Use **`# Check:`** prefix exclusively for validation guards
