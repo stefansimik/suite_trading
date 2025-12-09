@@ -568,28 +568,26 @@ class TradingEngine:
 
         # While any active event-feeds exist, keep processing events in global time order
         while self._any_active_event_feeds_exist():
-            next_tuple = self._find_global_feed_with_oldest_event()
+            # Find the next event feed
+            next_event_feed_tuple = self._find_event_feed_with_earliest_event()
 
             # If no Event is currently available across active feeds, we just continue.
-            # - For backtesting, all events should normally be ready.
-            # - But in live-streaming behaviour, being busy and burn cpu-cycles with polling looks like inefficient approach. We should consider some sort of push-event, that would wake the engine, when new data arrives in any event-feeds
-            if next_tuple is None:
+            if next_event_feed_tuple is None:
                 logger.debug("No next Event available across active EventFeed(s); breaking event processing loop early")
                 continue
 
-            strategy, event_feed_name, event_feed, callback = next_tuple
+            # We have Event to process; Unpack the selected feed tuple and pull the next Event to process
+            strategy, event_feed_name, event_feed, callback = next_event_feed_tuple
             strategy_name = self._get_strategy_name(strategy)
-
             next_event = event_feed.pop()
 
-            # Decide if this $next_event from this feed should drive simulated fills in OrderBook-driven broker(s)
-            registration = self._event_feeds_by_strategy[strategy][event_feed_name]
-            fill_event_filter = registration.fill_event_filter
-            use_for_fills = bool(fill_event_filter(next_event))
+            # Decide if this Event should drive simulated fills in OrderBook-driven broker(s)
+            event_feed_registration = self._event_feeds_by_strategy[strategy][event_feed_name]
+            event_should_drive_simulated_fills = event_feed_registration.fill_event_filter(next_event)
 
             # If we have some brokers of type 'OrderBookDrivenBroker' -> we can convert some events to OrderBook for order-price matching
             order_book_driven_brokers = self._get_order_book_driven_brokers()
-            if order_book_driven_brokers and use_for_fills and self._event_to_order_book_converter.can_convert(next_event):
+            if order_book_driven_brokers and event_should_drive_simulated_fills and self._event_to_order_book_converter.can_convert(next_event):
                 order_books = self._event_to_order_book_converter.convert_to_order_books(next_event)
 
                 # Filter and process OrderBooks using the engine's last processed event time as the floor
@@ -797,7 +795,7 @@ class TradingEngine:
                     return True
         return False
 
-    def _find_global_feed_with_oldest_event(self) -> tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None:
+    def _find_event_feed_with_earliest_event(self) -> tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None:
         """Return the next (Strategy, feed, callback) pair with the globally earliest Event.
 
         This scans all EventFeed(s) for strategies currently known to the engine and
