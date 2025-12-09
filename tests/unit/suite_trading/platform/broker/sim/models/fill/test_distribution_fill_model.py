@@ -127,7 +127,7 @@ def test_stop_order_uses_fill_adjustment_distribution(instrument, order_book):
 
     # Check: StopOrder gets fill adjustment applied
     assert len(actual_fills) == 1
-    assert actual_fills[0].price == Decimal("1.1001")
+    assert actual_fills[0].price == Decimal("1.0999")
 
 
 def test_market_order_default_distribution_when_none(instrument, order_book):

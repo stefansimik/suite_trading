@@ -12,10 +12,16 @@ from suite_trading.domain.order.orders import MarketOrder, Order
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
+from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.utils.data_generation.assistant import DGA
 
 
 logger = logging.getLogger(__name__)
+
+
+def _create_optimistic_sim_broker() -> SimBroker:
+    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1")}, limit_on_touch_fill_probability=Decimal("1"), rng_seed=42)
+    return SimBroker(fill_model=fill_model)
 
 
 class TwoTradeDemoStrategy(Strategy):
@@ -39,7 +45,7 @@ class TwoTradeDemoStrategy(Strategy):
         # Step 0: generate 10 rising bars and wrap into BarEvent(s)
         bars = DGA.bars.create_bar_series(num_bars=10)
         prices_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
-        self.add_event_feed(self._prices_feed_name, prices_feed)
+        self.add_event_feed(self._prices_feed_name, prices_feed, use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
         if isinstance(event, BarEvent):
@@ -74,7 +80,7 @@ class TwoTradeDemoStrategy(Strategy):
 def test_two_trade_demo_strategy_steps_0_and_1():
     # Arrange: engine + SimBroker + strategy
     engine = TradingEngine()
-    broker = SimBroker()
+    broker = _create_optimistic_sim_broker()
     engine.add_broker("sim_broker", broker)
 
     strategy = TwoTradeDemoStrategy(name="two_trade_demo_strategy", broker=broker)

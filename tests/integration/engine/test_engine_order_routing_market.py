@@ -9,9 +9,15 @@ from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
+from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
+
+
+def _create_optimistic_sim_broker() -> SimBroker:
+    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: D("1")}, limit_on_touch_fill_probability=D("1"), rng_seed=42)
+    return SimBroker(fill_model=fill_model)
 
 
 class _SubmitAndRecordStrategy(Strategy):
@@ -29,7 +35,7 @@ class _SubmitAndRecordStrategy(Strategy):
 
     def on_start(self) -> None:
         tick = QuoteTick(self._instrument, self._bid, self._ask, D("10"), D("10"), self._ts)
-        self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]))
+        self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
         if not self._submitted:
@@ -55,7 +61,7 @@ class TestEngineOrderRoutingMarket:
     def test_engine_routes_execution_back_to_originating_strategy(self):
         """Engine should route execution callback to the same Strategy that submitted the order."""
         instr = self._instrument()
-        broker = SimBroker()
+        broker = _create_optimistic_sim_broker()
         engine = TradingEngine()
         strategy = _SubmitAndRecordStrategy("s1", broker, instr, D("99"), D("101"), self._ts())
 
@@ -71,7 +77,7 @@ class TestEngineOrderRoutingMarket:
     def test_deterministic_callbacks_for_two_orders_same_time(self):
         """Two strategies submit at the same time; each must receive exactly one execution for its own order."""
         instr = self._instrument()
-        broker = SimBroker()
+        broker = _create_optimistic_sim_broker()
         engine = TradingEngine()
         s1 = _SubmitAndRecordStrategy("s1", broker, instr, D("99"), D("101"), self._ts())
         s2 = _SubmitAndRecordStrategy("s2", broker, instr, D("99"), D("101"), self._ts())

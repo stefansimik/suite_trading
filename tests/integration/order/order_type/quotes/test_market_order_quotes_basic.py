@@ -5,6 +5,7 @@ from decimal import Decimal as D
 
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
+from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.domain.order.orders import MarketOrder
 from suite_trading.domain.order.order_enums import OrderSide
@@ -20,6 +21,11 @@ def _make_instr() -> Instrument:
     return Instrument(name="TEST", exchange="XTST", asset_class=AssetClass.FX_SPOT, price_increment=D("0.0001"), quantity_increment=D("100000"), contract_size=D("100000"), contract_unit="EUR", quote_currency=USD)
 
 
+def _create_optimistic_sim_broker() -> SimBroker:
+    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: D("1")}, limit_on_touch_fill_probability=D("1"), rng_seed=42)
+    return SimBroker(fill_model=fill_model)
+
+
 class _QuotesSubmitInCallbackStrategy(Strategy):
     """Submits BUY and SELL inside first tick callback (fills at ask/bid)."""
 
@@ -33,7 +39,7 @@ class _QuotesSubmitInCallbackStrategy(Strategy):
         instr = _make_instr()
         t0 = datetime(2025, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
         ticks = [QuoteTickEvent(QuoteTick(instr, D("1.0000"), D("1.0001"), D("5"), D("5"), t0), t0)]
-        self.add_event_feed("quotes", FixedSequenceEventFeed(ticks))
+        self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
         if not self._submitted:
@@ -82,7 +88,7 @@ class _QuotesSubmitBeforeTicksStrategy(Strategy):
             self.remove_event_feed("kick")
 
             ticks = [QuoteTickEvent(QuoteTick(instr, D("1.0000"), D("1.0001"), D("5"), D("5"), t0), t0)]
-            self.add_event_feed("quotes", FixedSequenceEventFeed(ticks))
+            self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
     def on_execution(self, execution) -> None:
         self.executions.append(execution)
@@ -120,7 +126,7 @@ class _QuotesPartialAcrossTicksStrategy(Strategy):
                 QuoteTickEvent(QuoteTick(instr, D("1.0000"), D("1.0001"), D("5"), D("1"), t0), t0),
                 QuoteTickEvent(QuoteTick(instr, D("1.0000"), D("1.0002"), D("5"), D("1"), t1), t1),
             ]
-            self.add_event_feed("quotes", FixedSequenceEventFeed(ticks))
+            self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
     def on_execution(self, execution) -> None:
         self.executions.append(execution)
@@ -132,7 +138,7 @@ class TestMarketOrderQuotesBasic:
     def test_buy_hits_ask_sell_hits_bid_immediately(self):
         """Submitting BUY and SELL on the same quote tick should fill at ask and bid respectively, immediately."""
         engine = TradingEngine()
-        broker = SimBroker()
+        broker = _create_optimistic_sim_broker()
         engine.add_broker("sim", broker)
         s = _QuotesSubmitInCallbackStrategy("quotes_cb", broker)
         engine.add_strategy(s)
@@ -148,7 +154,7 @@ class TestMarketOrderQuotesBasic:
     def test_submit_before_any_quote_fills_on_first_quote(self):
         """Submitting before any quotes exist should fill on the first quote's ask when it arrives."""
         engine = TradingEngine()
-        broker = SimBroker()
+        broker = _create_optimistic_sim_broker()
         engine.add_broker("sim", broker)
         s = _QuotesSubmitBeforeTicksStrategy("quotes_before", broker)
         engine.add_strategy(s)
@@ -161,7 +167,7 @@ class TestMarketOrderQuotesBasic:
     def test_partial_fill_across_successive_quote_ticks(self):
         """BUY 2 with only 1 available per tick should fill 1 on the first tick and 1 on the next at its ask."""
         engine = TradingEngine()
-        broker = SimBroker()
+        broker = _create_optimistic_sim_broker()
         engine.add_broker("sim", broker)
         s = _QuotesPartialAcrossTicksStrategy("quotes_partial", broker)
         engine.add_strategy(s)

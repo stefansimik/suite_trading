@@ -139,14 +139,16 @@ def test_order_book_chronology_with_mixed_tick_and_bar_feeds():
     bar_type = BarType(instrument, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
     bar1 = BarEvent(Bar(bar_type, dt(9, 0, 0), dt(9, 1, 0), Decimal("100.0"), Decimal("102.0"), Decimal("99.0"), Decimal("99.0")), dt(9, 1, 0), is_historical=True)
 
-    # Create event feeds (tick feed added first, then bar feed)
+    # Create event feeds (tick feed added first, then bar feed). Both feeds
+    # should drive OrderBook generation, so we enable simulated fills.
     tick_feed = FixedSequenceEventFeed([tick1, tick2, tick3, tick4, tick5])
     bar_feed = FixedSequenceEventFeed([bar1])
 
-    # Add feeds to strategy during on_start
+    # Add feeds to strategy during on_start and opt in for simulated fills so the
+    # TradingEngine converts these events to OrderBook snapshot(s).
     def on_start_override():
-        strategy.add_event_feed("tick_feed", tick_feed)
-        strategy.add_event_feed("bar_feed", bar_feed)
+        strategy.add_event_feed("tick_feed", tick_feed, use_for_simulated_fills=True)
+        strategy.add_event_feed("bar_feed", bar_feed, use_for_simulated_fills=True)
 
     strategy.on_start = on_start_override
 
@@ -238,12 +240,14 @@ def test_order_book_chronology_with_delayed_bars():
     bar1 = BarEvent(Bar(bar_type, dt(9, 0, 0), dt(9, 1, 0), Decimal("100.0"), Decimal("102.0"), Decimal("100.0"), Decimal("101.0")), dt(9, 1, 0), is_historical=True)
     bar2 = BarEvent(Bar(bar_type, dt(9, 1, 0), dt(9, 2, 0), Decimal("101.0"), Decimal("101.0"), Decimal("98.0"), Decimal("98.0")), dt(9, 2, 0), is_historical=True)
 
-    # Create event feeds: ticks 1-7, then bar1, then ticks 8-13, then bar2
+    # Create event feeds: ticks 1-7, then bar1, then ticks 8-13, then bar2. The
+    # combined feed must drive OrderBook generation, so we enable simulated fills.
     tick_feed = FixedSequenceEventFeed(ticks[:7] + [bar1] + ticks[7:] + [bar2])
 
-    # Add feed to strategy during on_start
+    # Add feed to strategy during on_start and opt in for simulated fills so the
+    # TradingEngine converts these events to OrderBook snapshot(s).
     def on_start_override():
-        strategy.add_event_feed("tick_feed", tick_feed)
+        strategy.add_event_feed("tick_feed", tick_feed, use_for_simulated_fills=True)
 
     strategy.on_start = on_start_override
 

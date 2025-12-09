@@ -38,7 +38,7 @@ class SimgleLimitOrderStrategy(Strategy):
     def on_start(self) -> None:
         # Attach a FixedSequenceEventFeed that emits the provided OrderBook snapshot(s)
         feed = FixedSequenceEventFeed(wrap_order_books_to_events(self._order_books))
-        self.add_event_feed(self._feed_name, feed)
+        self.add_event_feed(self._feed_name, feed, use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:  # type: ignore[override]
         if isinstance(event, OrderBookEvent):

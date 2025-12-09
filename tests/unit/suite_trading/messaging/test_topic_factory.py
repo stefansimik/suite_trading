@@ -13,7 +13,7 @@ def test_topic_protocol_create_topic_for_bar():
     topic = TopicFactory.create_topic_for_bar(bar_type)
 
     # Verify the topic name
-    assert topic == "bar::eurusd@forex::5-minute::last"
+    assert topic == "bar::aapl@nasdaq::5-minute::last"
 
 
 def test_message_bus_publish_bar_event():

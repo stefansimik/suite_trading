@@ -5,6 +5,7 @@ from typing import Callable
 
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
+from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.platform.engine.models.event_to_order_book.default_impl import DefaultEventToOrderBookConverter
@@ -40,7 +41,7 @@ class _LimitOrderTestStrategy(Strategy):
 
     def on_start(self) -> None:
         feed = FixedSequenceEventFeed(self._quote_tick_events)
-        self.add_event_feed(self._feed_name, feed)
+        self.add_event_feed(self._feed_name, feed, use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
         # Check: submit exactly once on the first QuoteTickEvent; use reference presence as the guard
@@ -68,10 +69,15 @@ def _create_quote_tick_event(instrument: Instrument, *, bid: str, ask: str, bid_
     return QuoteTickEvent(tick, ts)
 
 
+def _create_sim_broker_with_deterministic_fill_model() -> SimBroker:
+    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1")}, limit_on_touch_fill_probability=Decimal("1"), rng_seed=42)
+    return SimBroker(fill_model=fill_model)
+
+
 def test_limit_rejected_bad_price() -> None:
     # Arrange: engine + broker + converter
     engine = TradingEngine()
-    broker = SimBroker()
+    broker = _create_sim_broker_with_deterministic_fill_model()
     engine.add_broker("sim", broker)
     engine.set_order_book_converter(DefaultEventToOrderBookConverter())
 
@@ -100,7 +106,7 @@ def test_limit_rejected_bad_price() -> None:
 def test_limit_instant_fill_touch() -> None:
     # Arrange
     engine = TradingEngine()
-    broker = SimBroker()
+    broker = _create_sim_broker_with_deterministic_fill_model()
     engine.add_broker("sim", broker)
     engine.set_order_book_converter(DefaultEventToOrderBookConverter())
 
@@ -128,7 +134,7 @@ def test_limit_instant_fill_touch() -> None:
 def test_limit_multiple_partial_fills() -> None:
     # Arrange
     engine = TradingEngine()
-    broker = SimBroker()
+    broker = _create_sim_broker_with_deterministic_fill_model()
     engine.add_broker("sim", broker)
     engine.set_order_book_converter(DefaultEventToOrderBookConverter())
 

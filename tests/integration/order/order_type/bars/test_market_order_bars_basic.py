@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
+from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.domain.order.orders import MarketOrder
 from suite_trading.domain.order.order_enums import OrderSide
@@ -12,6 +13,11 @@ from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSeq
 from suite_trading.domain.market_data.bar.bar_event import wrap_bars_to_events
 from suite_trading.domain.event import Event
 from suite_trading.utils.data_generation.assistant import DGA
+
+
+def _create_optimistic_sim_broker() -> SimBroker:
+    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: D("1")}, limit_on_touch_fill_probability=D("1"), rng_seed=42)
+    return SimBroker(fill_model=fill_model)
 
 
 class _KickoffEvent(Event):
@@ -47,7 +53,7 @@ class _BarsSubmitAtStartStrategy(Strategy):
             self.submit_order(order, self._broker)
             self._submitted = True
             self.remove_event_feed("kick")
-            self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)))
+            self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
 
     def on_execution(self, execution) -> None:
         self.executions.append(execution)
@@ -64,7 +70,7 @@ class _BarsSubmitInsideCallbackStrategy(Strategy):
 
     def on_start(self) -> None:
         self._bars = DGA.bars.create_bar_series(num_bars=5)
-        self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)))
+        self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
         if not self._submitted:
@@ -91,7 +97,7 @@ class _BarsOpenCloseReverseStrategy(Strategy):
 
     def on_start(self) -> None:
         self._bars = DGA.bars.create_bar_series(num_bars=5)
-        self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)))
+        self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
         self._count += 1
@@ -115,7 +121,7 @@ class TestMarketOrderBarsBasic:
     def test_submit_before_first_bar_fills_on_open(self):
         """Submitting at start (no order-books yet) should fill on the first OPEN snapshot produced from bar 1."""
         engine = TradingEngine()
-        broker = SimBroker()
+        broker = _create_optimistic_sim_broker()
         engine.add_broker("sim", broker)
         s = _BarsSubmitAtStartStrategy("bars_start", broker)
         engine.add_strategy(s)
@@ -132,7 +138,7 @@ class TestMarketOrderBarsBasic:
     def test_submit_inside_first_bar_callback_fills_at_close(self):
         """Submit inside first BarEvent callback; engine processes OHLC before callback, so fill uses that bar's CLOSE."""
         engine = TradingEngine()
-        broker = SimBroker()
+        broker = _create_optimistic_sim_broker()
         engine.add_broker("sim", broker)
         s = _BarsSubmitInsideCallbackStrategy("bars_in_cb", broker)
         engine.add_strategy(s)
@@ -149,7 +155,7 @@ class TestMarketOrderBarsBasic:
         """Open 1 on bar 1, then either close (SELL 1) or reverse (SELL 2); verify final position state for both flows."""
         # Close path
         engine = TradingEngine()
-        broker = SimBroker()
+        broker = _create_optimistic_sim_broker()
         engine.add_broker("sim", broker)
         s_close = _BarsOpenCloseReverseStrategy("bars_close", broker, mode="close")
         engine.add_strategy(s_close)
@@ -160,7 +166,7 @@ class TestMarketOrderBarsBasic:
 
         # Reverse path
         engine2 = TradingEngine()
-        broker2 = SimBroker()
+        broker2 = _create_optimistic_sim_broker()
         engine2.add_broker("sim2", broker2)
         s_rev = _BarsOpenCloseReverseStrategy("bars_reverse", broker2, mode="reverse")
         engine2.add_strategy(s_rev)
