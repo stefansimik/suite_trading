@@ -30,11 +30,6 @@ logger = logging.getLogger(__name__)
 # region Helper classes
 
 
-class EventFeedCallbackPair(NamedTuple):
-    feed: EventFeed
-    callback: Callable[[Event], None]
-
-
 class StrategyBrokerPair(NamedTuple):
     """Pairs a Strategy with a Broker for order routing.
 
@@ -45,6 +40,22 @@ class StrategyBrokerPair(NamedTuple):
 
     strategy: Strategy
     broker: Broker
+
+
+class EventFeedRegistration(NamedTuple):
+    """Internal registration record for a Strategy's EventFeed.
+
+    Attributes:
+        feed: The EventFeed instance managed by the engine.
+        callback: Strategy callback that receives each Event from this feed.
+        fill_event_filter: Callable that decides which Event(s) from this feed
+            should drive simulated fills in OrderBook-driven broker(s). Returns
+            True to enable fill processing for the Event, False to skip it.
+    """
+
+    feed: EventFeed
+    callback: Callable[[Event], None]
+    fill_event_filter: Callable[[Event], bool]
 
 
 # endregion
@@ -83,7 +94,7 @@ class TradingEngine:
 
         # EventFeedProviders & EventFeeds
         self._event_feed_providers_by_name_bidict: bidict[str, EventFeedProvider] = bidict()
-        self._event_feeds_by_strategy: dict[Strategy, dict[str, EventFeedCallbackPair]] = {}
+        self._event_feeds_by_strategy: dict[Strategy, dict[str, EventFeedRegistration]] = {}
 
         # Orders
         self._routing_by_order: dict[Order, StrategyBrokerPair] = {}
@@ -538,6 +549,11 @@ class TradingEngine:
           via its callback.
         - Repeats until all EventFeed(s) report finished.
 
+        Some EventFeed(s) may be configured via `use_for_simulated_fills` to drive
+        simulated fills in OrderBook-driven broker(s). The engine applies a
+        per-feed `fill_event_filter` to each Event before converting it to
+        OrderBook snapshot(s) for brokers.
+
         The engine stops automatically when all EventFeed(s) for all strategies are
         finished.
 
@@ -566,9 +582,14 @@ class TradingEngine:
 
             next_event = event_feed.pop()
 
+            # Decide if this $next_event from this feed should drive simulated fills in OrderBook-driven broker(s)
+            registration = self._event_feeds_by_strategy[strategy][event_feed_name]
+            fill_event_filter = registration.fill_event_filter
+            use_for_fills = bool(fill_event_filter(next_event))
+
             # If we have some brokers of type 'OrderBookDrivenBroker' -> we can convert some events to OrderBook for order-price matching
             order_book_driven_brokers = self._get_order_book_driven_brokers()
-            if order_book_driven_brokers and self._event_to_order_book_converter.can_convert(next_event):
+            if order_book_driven_brokers and use_for_fills and self._event_to_order_book_converter.can_convert(next_event):
                 order_books = self._event_to_order_book_converter.convert_to_order_books(next_event)
 
                 # Filter and process OrderBooks using the engine's last processed event time as the floor
@@ -637,6 +658,8 @@ class TradingEngine:
         feed_name: str,
         event_feed: EventFeed,
         callback: Callable,
+        *,
+        use_for_simulated_fills: bool | Callable[[Event], bool] = False,
     ) -> None:
         """Attach an EventFeed to a Strategy and register metadata.
 
@@ -652,6 +675,11 @@ class TradingEngine:
             feed_name: Unique name for this EventFeed within the Strategy.
             event_feed: The EventFeed instance to manage.
             callback: Function to call when events are received.
+            use_for_simulated_fills: Controls if and how this EventFeed is used to
+                drive simulated fills in OrderBook-driven broker(s). Use False
+                (default) to never drive simulated fills, True to use all events,
+                or provide a Callable[[Event], bool] that returns True only for
+                Event(s) that should drive simulated fills.
 
         Raises:
             ValueError: If $strategy is not added to this TradingEngine or $feed_name is duplicate.
@@ -665,13 +693,28 @@ class TradingEngine:
         if feed_name in event_feeds_by_name_dict:
             raise ValueError("Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name ('{feed_name}') is already used for this strategy. Choose a different name.")
 
+        def _block_all_events_for_simulated_fills(_event: Event) -> bool:
+            return False
+
+        def _pass_all_events_for_simulated_fills(_event: Event) -> bool:
+            return True
+
+        # Normalize $use_for_simulated_fills to a callable so the event loop always works with a simple bool decision per Event
+        if use_for_simulated_fills is False:
+            fill_event_filter = _block_all_events_for_simulated_fills
+        elif use_for_simulated_fills is True:
+            fill_event_filter = _pass_all_events_for_simulated_fills
+        else:
+            fill_event_filter = use_for_simulated_fills
+
         # Timeline filtering if the engine already processed events (shared global time)
         last_event_time = self._last_event_time
         if last_event_time is not None:
             event_feed.remove_events_before(last_event_time)
 
         # Register locally
-        event_feeds_by_name_dict[feed_name] = EventFeedCallbackPair(event_feed, callback)
+        registration = EventFeedRegistration(feed=event_feed, callback=callback, fill_event_filter=fill_event_filter)
+        event_feeds_by_name_dict[feed_name] = registration
         strategy_name = self._get_strategy_name(strategy)
         logger.info(f"Added EventFeed named '{feed_name}' to Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
 
@@ -688,15 +731,15 @@ class TradingEngine:
         strategy_name = self._get_strategy_name(strategy)
 
         # Handle case where feed doesn't exist
-        feed_callback_tuple = self._event_feeds_by_strategy[strategy].get(feed_name, None)
-        feed_does_not_exist = feed_callback_tuple is None
+        registration = self._event_feeds_by_strategy[strategy].get(feed_name)
+        feed_does_not_exist = registration is None
         if feed_does_not_exist:
             logger.warning(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) cannot be removed, as there is no such EventFeed")
             return
 
         try:
             # Close the feed
-            feed_to_close = feed_callback_tuple.feed
+            feed_to_close = registration.feed
             feed_to_close.close()
         except Exception as e:
             # Just log error, there is no way how to fix this
@@ -773,8 +816,9 @@ class TradingEngine:
             if strategy.state != StrategyState.RUNNING:
                 continue
 
-            for event_feed_name, feed_callback_pair in event_feeds_by_name_dict.items():
-                event_feed, callback = feed_callback_pair
+            for event_feed_name, registration in event_feeds_by_name_dict.items():
+                event_feed = registration.feed
+                callback = registration.callback
                 peeked_event = event_feed.peek()
                 if peeked_event is None:
                     continue
@@ -790,8 +834,9 @@ class TradingEngine:
 
         # Close all feeds for this Strategy
         event_feeds_by_name_dict = self._event_feeds_by_strategy[strategy]
-        for name, (feed, _) in list(event_feeds_by_name_dict.items()):
+        for name, registration in list(event_feeds_by_name_dict.items()):
             try:
+                feed = registration.feed
                 feed.close()
             except Exception as e:
                 logger.error(f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")

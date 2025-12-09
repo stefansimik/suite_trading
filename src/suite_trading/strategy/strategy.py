@@ -204,6 +204,8 @@ class Strategy(ABC):
         feed_name: str,
         event_feed: EventFeed,
         callback: Callable | None = None,
+        *,
+        use_for_simulated_fills: bool | Callable[[Event], bool] = False,
     ) -> None:
         """Attach an EventFeed to this Strategy.
 
@@ -226,6 +228,11 @@ class Strategy(ABC):
             callback (Optional[Callable]): Optional event handler. If None, uses `self.on_event`.
                 If you explicitly do not need to notify your Strategy, you can use
                 `callback = lambda e: None`.
+            use_for_simulated_fills: Controls if and how this EventFeed is used to drive
+                simulated fills in OrderBook-driven broker(s). Use False (default) to
+                never drive simulated fills, True to use all events, or provide a
+                Callable[[Event], bool] that returns True only for Event(s) that should
+                drive simulated fills.
 
         Raises:
             RuntimeError: If $_trading_engine is None or $state does not allow adding feeds.
@@ -248,6 +255,7 @@ class Strategy(ABC):
             feed_name=feed_name,
             event_feed=event_feed,
             callback=callback,
+            use_for_simulated_fills=use_for_simulated_fills,
         )
 
     def remove_event_feed(self, feed_name: str) -> None:
