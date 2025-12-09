@@ -8,7 +8,7 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import OrderBookDrivenBroker
+from suite_trading.platform.broker.capabilities import OrderBookSimulatedBroker
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.order.order_state import OrderStateCategory
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
@@ -49,7 +49,8 @@ class EventFeedRegistration(NamedTuple):
         feed: The EventFeed instance managed by the engine.
         callback: Strategy callback that receives each Event from this feed.
         fill_event_filter: Callable that decides which Event(s) from this feed
-            should drive simulated fills in OrderBook-driven broker(s). Returns
+            should drive simulated fills in brokers that consume OrderBook snapshots
+            for simulated fills (OrderBook-simulated brokers). Returns
             True to enable fill processing for the Event, False to skip it.
     """
 
@@ -127,7 +128,8 @@ class TradingEngine:
         """Replace the Event→OrderBook converter used by the engine.
 
         This lets you customize how market‑data $event(s) are converted to OrderBook
-        snapshot(s) before they are sent to OrderBook‑driven broker(s).
+        snapshot(s) before they are sent to brokers that consume OrderBook snapshots
+        for simulated fills (OrderBook-simulated brokers).
 
         Args:
             converter: Implementation of `EventToOrderBookConverter` to install.
@@ -545,14 +547,16 @@ class TradingEngine:
         - At each step, finds the earliest available Event using the Event ordering
           (`dt_event`, then `dt_received`).
         - Pops that Event from its feed, routes any derived OrderBook snapshots to
-          OrderBook-driven brokers, then delivers the Event to the owning Strategy
-          via its callback.
+          brokers that consume OrderBook snapshots for simulated fills
+          (OrderBook-simulated brokers), then delivers the Event to the owning
+          Strategy via its callback.
         - Repeats until all EventFeed(s) report finished.
 
         Some EventFeed(s) may be configured via `use_for_simulated_fills` to drive
-        simulated fills in OrderBook-driven broker(s). The engine applies a
-        per-feed `fill_event_filter` to each Event before converting it to
-        OrderBook snapshot(s) for brokers.
+        simulated fills in brokers that consume OrderBook snapshots for simulated
+        fills (OrderBook-simulated brokers). The engine applies a per-feed
+        `fill_event_filter` to each Event before converting it to OrderBook
+        snapshot(s) for brokers.
 
         The engine stops automatically when all EventFeed(s) for all strategies are
         finished.
@@ -581,13 +585,13 @@ class TradingEngine:
             strategy_name = self._get_strategy_name(strategy)
             next_event = event_feed.pop()
 
-            # Decide if this Event should drive simulated fills in OrderBook-driven broker(s)
+            # Decide if this Event should drive simulated fills in brokers that consume OrderBook snapshots for simulated fills
             event_feed_registration = self._event_feeds_by_strategy[strategy][event_feed_name]
             event_should_drive_simulated_fills = event_feed_registration.fill_event_filter(next_event)
 
-            # If we have some brokers of type 'OrderBookDrivenBroker' -> we can convert some events to OrderBook for order-price matching
-            order_book_driven_brokers = self._get_order_book_driven_brokers()
-            if order_book_driven_brokers and event_should_drive_simulated_fills and self._event_to_order_book_converter.can_convert(next_event):
+            # If we have some brokers of type 'OrderBookSimulatedBroker' -> we can convert some events to OrderBook for order-price matching
+            order_book_simulated_brokers = self._get_order_book_simulated_brokers()
+            if order_book_simulated_brokers and event_should_drive_simulated_fills and self._event_to_order_book_converter.can_convert(next_event):
                 order_books = self._event_to_order_book_converter.convert_to_order_books(next_event)
 
                 # Filter and process OrderBooks using the engine's last processed event time as the floor
@@ -600,8 +604,8 @@ class TradingEngine:
                     # Process OrderBook with valid timestamp
                     logger.debug(f"Processing OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
 
-                    # Route to brokers implementing OrderBookDrivenBroker for order-price matching
-                    for broker in order_book_driven_brokers:
+                    # Route to brokers implementing OrderBookSimulatedBroker for order-price matching
+                    for broker in order_book_simulated_brokers:
                         broker.process_order_book(order_book)
 
             # Update last event time (global engine time)
@@ -674,7 +678,8 @@ class TradingEngine:
             event_feed: The EventFeed instance to manage.
             callback: Function to call when events are received.
             use_for_simulated_fills: Controls if and how this EventFeed is used to
-                drive simulated fills in OrderBook-driven broker(s). Use False
+                drive simulated fills in brokers that consume OrderBook snapshots
+                for simulated fills (OrderBook-simulated brokers). Use False
                 (default) to never drive simulated fills, True to use all events,
                 or provide a Callable[[Event], bool] that returns True only for
                 Event(s) that should drive simulated fills.
@@ -769,13 +774,14 @@ class TradingEngine:
         except KeyError:
             raise KeyError(f"Cannot call `_get_event_feed_provider_name` because $provider (class {provider.__class__.__name__}) is not registered in this TradingEngine")
 
-    def _get_order_book_driven_brokers(self) -> list[OrderBookDrivenBroker]:
-        """Return brokers that consume OrderBook updates for simulated matching.
+    def _get_order_book_simulated_brokers(self) -> list[OrderBookSimulatedBroker]:
+        """Return brokers that consume OrderBook snapshots for simulated fills.
 
         Returns:
-            list[OrderBookDrivenBroker]: Brokers that require OrderBook updates.
+            list[OrderBookSimulatedBroker]: Brokers that require OrderBook snapshots
+            to drive simulated order-price matching and fills.
         """
-        return [b for b in self._brokers_by_name_bidict.values() if isinstance(b, OrderBookDrivenBroker)]
+        return [b for b in self._brokers_by_name_bidict.values() if isinstance(b, OrderBookSimulatedBroker)]
 
     # endregion
 

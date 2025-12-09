@@ -14,7 +14,7 @@ from suite_trading.domain.order.order_state import OrderAction, OrderStateCatego
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import OrderBookDrivenBroker
+from suite_trading.platform.broker.capabilities import OrderBookSimulatedBroker
 from suite_trading.platform.broker.sim.models.market_depth.protocol import MarketDepthModel
 from suite_trading.platform.broker.sim.models.market_depth.pass_through import PassThroughMarketDepthModel
 from suite_trading.platform.broker.sim.models.fee.protocol import FeeModel
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SimBroker(Broker, OrderBookDrivenBroker):
+class SimBroker(Broker, OrderBookSimulatedBroker):
     """Simulated broker for backtesting and paper trading.
 
     This class implements the single-account `Broker` protocol using simulated
@@ -60,7 +60,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
       for isolated results while still sharing the engine's global simulated time.
 
     Public API is grouped under `Protocol Broker` and `Protocol
-    OrderBookDrivenBroker` regions; other methods are under `Utilities`.
+    OrderBookSimulatedBroker` regions; other methods are under `Utilities`.
     """
 
     # region Init
@@ -286,7 +286,7 @@ class SimBroker(Broker, OrderBookDrivenBroker):
 
     # endregion
 
-    # region Protocol OrderBookDrivenBroker
+    # region Protocol OrderBookSimulatedBroker
 
     def process_order_book(self, order_book: OrderBook) -> None:
         """Process an OrderBook snapshot for order matching and margin.

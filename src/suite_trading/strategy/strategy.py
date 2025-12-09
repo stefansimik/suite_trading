@@ -229,10 +229,10 @@ class Strategy(ABC):
                 If you explicitly do not need to notify your Strategy, you can use
                 `callback = lambda e: None`.
             use_for_simulated_fills: Controls if and how this EventFeed is used to drive
-                simulated fills in OrderBook-driven broker(s). Use False (default) to
-                never drive simulated fills, True to use all events, or provide a
-                Callable[[Event], bool] that returns True only for Event(s) that should
-                drive simulated fills.
+                simulated fills in brokers that consume OrderBook snapshots for simulated
+                fills (OrderBook-simulated brokers). Use False (default) to never drive
+                simulated fills, True to use all events, or provide a Callable[[Event], bool]
+                that returns True only for Event(s) that should drive simulated fills.
 
         Raises:
             RuntimeError: If $_trading_engine is None or $state does not allow adding feeds.
