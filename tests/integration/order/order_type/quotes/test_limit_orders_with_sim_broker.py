@@ -74,7 +74,7 @@ def _create_sim_broker_with_deterministic_fill_model() -> SimBroker:
     return SimBroker(fill_model=fill_model)
 
 
-def test_limit_rejected_bad_price() -> None:
+def test_limit_buy_crossing_best_ask_fills_immediately() -> None:
     # Arrange: engine + broker + converter
     engine = TradingEngine()
     broker = _create_sim_broker_with_deterministic_fill_model()
@@ -82,7 +82,7 @@ def test_limit_rejected_bad_price() -> None:
     engine.set_order_book_converter(DefaultEventToOrderBookConverter())
 
     instrument = _create_us_equity_instrument()
-    # One quote where best ask is 100.00; BUY limit with price above ask is rejected by SimBroker policy
+    # One quote where best ask is 100.00; BUY limit with price above ask is marketable and should fill immediately
     quote_tick_events = [_create_quote_tick_event(instrument, bid="99.97", ask="100.00", bid_volume="5", ask_volume="5", timestamp_index=0)]
 
     def create_limit_order(_: QuoteTickEvent) -> Order:
@@ -94,13 +94,15 @@ def test_limit_rejected_bad_price() -> None:
     # Act
     engine.start()
 
-    # Assert: order is explicitly REJECTED (terminal), no active orders and no executions
+    # Assert: marketable limit order fills immediately and becomes terminal
     assert len(broker.list_active_orders()) == 0
     executions = engine.list_executions_for_strategy("limit_reject")
-    assert len(executions) == 0
+    assert len(executions) == 1
+    assert executions[0].order.is_fully_filled
+    assert executions[0].price == Decimal("100.00")
     submitted_order = limit_order_strategy.submitted_order
     assert submitted_order is not None
-    assert submitted_order.state == OrderState.REJECTED
+    assert submitted_order.state == OrderState.FILLED
 
 
 def test_limit_instant_fill_touch() -> None:

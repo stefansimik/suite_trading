@@ -446,8 +446,8 @@ class StopOrder(Order):
         stop_price (Decimal): The stop price for the order (read-only).
     """
 
-    # Start on hold until the trigger fires (pre-live)
-    INITIAL_STATE: OrderState = OrderState.TRIGGER_PENDING
+    # Client-side orders start as local objects and become trigger-pending only after broker arming.
+    INITIAL_STATE: OrderState = OrderState.INITIALIZED
 
     def __init__(
         self,
@@ -506,8 +506,8 @@ class StopLimitOrder(Order):
         limit_price (Decimal): The limit price for the order once triggered (read-only).
     """
 
-    # Start on hold until the trigger fires (pre-live)
-    INITIAL_STATE: OrderState = OrderState.TRIGGER_PENDING
+    # Client-side orders start as local objects and become trigger-pending only after broker arming.
+    INITIAL_STATE: OrderState = OrderState.INITIALIZED
 
     def __init__(
         self,

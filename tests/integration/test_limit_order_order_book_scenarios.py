@@ -124,7 +124,7 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_disabled() -> None:
     assert position is None or position.quantity == Decimal("0")
 
 
-def test_buy_limit_with_three_ask_levels_rejected_by_price() -> None:
+def test_buy_limit_with_three_ask_levels_partial_fill_up_to_limit_price() -> None:
     """Scenario 2: BUY Limit at 101 against asks at 100x3, 101x5 and 102x5.
 
     OrderBook asks:
@@ -132,9 +132,8 @@ def test_buy_limit_with_three_ask_levels_rejected_by_price() -> None:
     - Level 2: price=101, volume=5
     - Level 1: price=100, volume=3
 
-    With the current price-eligibility rule (BUY limit must be <= best_ask),
-    this order is rejected because $limit_price (101) is above $best_ask (100).
-    This test ensures the rejection scenario is easy to reproduce and debug.
+    This order should fill up to $limit_price (101): 3 units at 100 and 5 units at 101.
+    The remaining 2 units stay unfilled because the next ask level is 102.
     """
 
     # Arrange: engine + SimBroker (deterministic on-touch fills) + strategy
@@ -153,10 +152,19 @@ def test_buy_limit_with_three_ask_levels_rejected_by_price() -> None:
     # Act
     engine.start()
 
-    # Assert: no executions and REJECTED final order state
+    # Assert: partial fills across ask levels up to $limit_price
     executions = engine.list_executions_for_strategy(strategy_name)
-    assert len(executions) == 0
+    assert len(executions) == 2
+    executed_prices = [Decimal(execution.price) for execution in executions]
+    assert executed_prices == [Decimal("100"), Decimal("101")]
+
+    total_filled_quantity = sum(Decimal(execution.quantity) for execution in executions)
+    assert total_filled_quantity == Decimal("8")
+
+    position = broker.get_position(order_book.instrument)
+    assert position is not None
+    assert position.quantity == Decimal("8")
 
     order = strategy.submitted_order
     assert order is not None
-    assert order.state == OrderState.REJECTED
+    assert order.state == OrderState.PARTIALLY_FILLED

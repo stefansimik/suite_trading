@@ -48,7 +48,6 @@ class OrderAction(Action):
             * From state `SUBMITTED` + action `ACCEPT` → leads to state `WORKING` (accepted by exchange).
             * From state `PENDING_UPDATE` + action `ACCEPT` → leads to state `WORKING` (exchange accepted the update).
             * From state `PENDING_CANCEL` + action `ACCEPT` → leads to state `CANCELLED` (exchange accepted the cancel).
-            * From state `TRIGGERED` + action `ACCEPT` → leads to state `WORKING` (broker accepts and makes it live now).
         This convention keeps the state machine small and predictable. It also makes logs and callbacks clear about who accepted what.
     """
 
@@ -68,6 +67,7 @@ class OrderAction(Action):
 
     # System actions
     EXPIRE = "EXPIRE"  # Order expired by its time-in-force
+    ARM_TRIGGER = "ARM_TRIGGER"  # Broker armed a stop condition; now waiting for trigger
     TRIGGER = "TRIGGER"  # The hold condition fired (e.g., stop or trailing)
 
     # Communication failure handling
@@ -89,6 +89,7 @@ def create_order_state_machine(initial_state: OrderState) -> StateMachine:
         (OrderState.INITIALIZED, OrderAction.SUBMIT): OrderState.PENDING_SUBMIT,
         (OrderState.PENDING_SUBMIT, OrderAction.ACCEPT): OrderState.SUBMITTED,
         (OrderState.PENDING_SUBMIT, OrderAction.DENY): OrderState.DENIED,
+        (OrderState.PENDING_SUBMIT, OrderAction.ARM_TRIGGER): OrderState.TRIGGER_PENDING,  # for Stop / StopLimit orders, that need to be triggered first
         # Submission state transitions
         (OrderState.SUBMITTED, OrderAction.ACCEPT): OrderState.WORKING,
         (OrderState.SUBMITTED, OrderAction.REJECT): OrderState.REJECTED,
@@ -121,8 +122,8 @@ def create_order_state_machine(initial_state: OrderState) -> StateMachine:
         (OrderState.PARTIALLY_FILLED, OrderAction.EXPIRE): OrderState.EXPIRED,
         # Trigger flow (explicit hold → fire → submit)
         (OrderState.TRIGGER_PENDING, OrderAction.TRIGGER): OrderState.TRIGGERED,
+        (OrderState.TRIGGER_PENDING, OrderAction.CANCEL): OrderState.CANCELLED,
         (OrderState.TRIGGERED, OrderAction.SUBMIT): OrderState.PENDING_SUBMIT,
-        (OrderState.TRIGGERED, OrderAction.ACCEPT): OrderState.WORKING,  # broker accepts and makes it live now
         (OrderState.TRIGGERED, OrderAction.REJECT): OrderState.REJECTED,
         (OrderState.TRIGGERED, OrderAction.CANCEL): OrderState.CANCELLED,
         (OrderState.TRIGGERED, OrderAction.EXPIRE): OrderState.EXPIRED,

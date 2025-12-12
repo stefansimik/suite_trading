@@ -9,7 +9,7 @@ from suite_trading.platform.broker.account import Account
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.platform.broker.sim.sim_account import SimAccount
 from suite_trading.domain.monetary.currency_registry import USD
-from suite_trading.domain.order.orders import Order
+from suite_trading.domain.order.orders import Order, StopOrder, StopLimitOrder
 from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory, OrderState
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
@@ -25,9 +25,8 @@ from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRat
 from suite_trading.platform.broker.sim.models.fill.protocol import FillModel
 from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
 from suite_trading.platform.broker.sim.order_matching import (
+    should_trigger_stop_order,
     select_simulate_fills_function_for_order,
-    check_order_price_against_market,
-    CheckResult,
 )
 
 if TYPE_CHECKING:
@@ -146,8 +145,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
     def submit_order(self, order: Order) -> None:
         """Implements: Broker.submit_order
 
-        Validate and register an $order, publishing each state transition. For Limit orders,
-        perform immediate acceptance checks against the latest OrderBook when available.
+        Validate and register an $order, publishing each state transition.
         """
         # Check: broker must be connected to accept new orders
         if not self._connected:
@@ -161,19 +159,20 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         self._orders_by_id[order.id] = order
 
         # TRANSITION ORDERS
-        self._apply_order_action(order, OrderAction.SUBMIT)  # INITIALIZED + SUBMIT -> PENDING_SUBMIT
-        self._apply_order_action(order, OrderAction.ACCEPT)  # PENDING_SUBMIT + ACCEPT -> SUBMITTED
+        self._apply_order_action(order, OrderAction.SUBMIT)  # INITIALIZED + SUBMIT = PENDING_SUBMIT
+        if isinstance(order, (StopOrder, StopLimitOrder)):
+            self._apply_order_action(order, OrderAction.ARM_TRIGGER)  # PENDING_SUBMIT + ARM_TRIGGER = TRIGGER_PENDING
+            logger.info(f"Armed stop condition for Order $id ('{order.id}') for instrument '{order.instrument}' at $stop_price ({order.stop_price})")
+        else:
+            self._apply_order_action(order, OrderAction.ACCEPT)  # PENDING_SUBMIT + ACCEPT = SUBMITTED
+            self._apply_order_action(order, OrderAction.ACCEPT)  # SUBMITTED + ACCEPT = WORKING
 
         # GET LAST PRICE FOR INSTRUMENT
         last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
         if last_order_book is None:
             return
 
-        # Transition orders (check valid prices in order ; applies only for SUBMITTED orders)
-        self._transition_order_state_by_price_validity(order, last_order_book)  # SUBMITTED + ACCEPT|REJECT -> WORKING|TRIGGERED or REJECTED
-
-        # Simulate fills (applies only for FILLABLE orders)
-        self._simulate_and_apply_fills_for_order_with_order_book(order, last_order_book)
+        self._process_single_order_with_order_book(order, last_order_book)
 
     def cancel_order(self, order: Order) -> None:
         """Implements: Broker.cancel_order.
@@ -195,10 +194,9 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
             logger.warning(f"Bad logic: Ignoring `cancel_order` for terminal Order $id ('{order.id}') with $state_category ({tracked.state_category.name})")
             return
 
-        # Transition to PENDING_CANCEL
         self._apply_order_action(tracked, OrderAction.CANCEL)
-        # Transition to CANCELLED
-        self._apply_order_action(tracked, OrderAction.ACCEPT)
+        if tracked.state == OrderState.PENDING_CANCEL:
+            self._apply_order_action(tracked, OrderAction.ACCEPT)  # PENDING_CANCEL + ACCEPT = CANCELLED
 
     def modify_order(self, order: Order) -> None:
         """Implements: Broker.modify_order
@@ -311,41 +309,45 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         # Store latest broker OrderBook snapshot (already enriched)
         self._latest_order_book_by_instrument[enriched_order_book.instrument] = enriched_order_book
 
-        # Single pass per order: apply acceptance transitions, then simulate fills if fillable
+        # Single pass per order: trigger stop-like orders, then simulate fills if fillable
         orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument == enriched_order_book.instrument]
         for order in orders_for_instrument:
-            # Do order-state transitions (related to if price in order is valid)
-            self._transition_order_state_by_price_validity(order, enriched_order_book)
-            # Simulate fills (if order is FILLABLE)
-            self._simulate_and_apply_fills_for_order_with_order_book(order, enriched_order_book)
+            self._process_single_order_with_order_book(order, enriched_order_book)
 
     # endregion
 
     # region Utilities
 
-    def _transition_order_state_by_price_validity(self, order: Order, order_book: OrderBook) -> None:
-        """Transition $order state by price validity using $order_book.
+    def _process_single_order_with_order_book(self, order: Order, order_book: OrderBook) -> None:
+        """Apply the per-order pipeline for a single OrderBook tick.
 
-        Applies REJECT or ACCEPT for SUBMITTED orders only. No fill simulation.
+        Pipeline:
+            1) If the order is waiting on a stop condition (TRIGGER_PENDING), evaluate trigger and, if met,
+               run the full submission chain to make the order WORKING.
+            2) If the order is fillable, simulate fills and apply them.
 
         Args:
-            order: Order to evaluate and transition.
+            order: Order to process.
             order_book: Enriched OrderBook snapshot for the same instrument.
-
-        Raises:
-            ValueError: If $order.instrument and $order_book.instrument differ.
         """
+        # Check: avoid cross-instrument processing bugs
+        if order.instrument != order_book.instrument:
+            raise ValueError(f"Cannot call `_process_single_order_with_order_book` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
-        # This transition is valid only for order in SUBMITTED state
-        if order.state != OrderState.SUBMITTED:
-            return
+        if order.state == OrderState.TRIGGER_PENDING:
+            # Check: TRIGGER_PENDING is valid only for stop-like orders
+            if not isinstance(order, (StopOrder, StopLimitOrder)):
+                raise ValueError(f"Cannot call `_process_single_order_with_order_book` because $order.state is TRIGGER_PENDING, which is valid only for StopOrder and StopLimitOrder (got '{order.__class__.__name__}', $id='{order.id}')")
 
-        verdict = check_order_price_against_market(order, order_book)
-        if verdict is CheckResult.NOT_OK:
-            logger.warning(f"Rejecting Order '{order.id}' due to price ineligibility against current market for instrument '{order.instrument}'")
-            self._apply_order_action(order, OrderAction.REJECT)
-        elif verdict is CheckResult.OK:
-            self._apply_order_action(order, OrderAction.ACCEPT)
+            should_trigger_stop = should_trigger_stop_order(order, order_book)
+            if should_trigger_stop:
+                logger.info(f"Stop condition triggered for Order $id ('{order.id}') for instrument '{order.instrument}'")
+                self._apply_order_action(order, OrderAction.TRIGGER)  # TRIGGER_PENDING + TRIGGER = TRIGGERED
+                self._apply_order_action(order, OrderAction.SUBMIT)  # TRIGGERED + SUBMIT = PENDING_SUBMIT
+                self._apply_order_action(order, OrderAction.ACCEPT)  # PENDING_SUBMIT + ACCEPT = SUBMITTED
+                self._apply_order_action(order, OrderAction.ACCEPT)  # SUBMITTED + ACCEPT = WORKING
+
+        self._simulate_and_apply_fills_for_order_with_order_book(order, order_book)
 
     def _simulate_and_apply_fills_for_order_with_order_book(
         self,
