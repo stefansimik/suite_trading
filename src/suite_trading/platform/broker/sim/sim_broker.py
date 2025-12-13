@@ -179,12 +179,10 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
             self._apply_order_action(order, OrderAction.ACCEPT)  # PENDING_SUBMIT + ACCEPT = SUBMITTED
             self._apply_order_action(order, OrderAction.ACCEPT)  # SUBMITTED + ACCEPT = WORKING
 
-        # GET LAST PRICE FOR INSTRUMENT
+        # Match order with last order-book
         last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
-        if last_order_book is None:
-            return
-
-        self._process_single_order_with_order_book(order, last_order_book)
+        if last_order_book is not None:
+            self._process_single_order_with_order_book(order, last_order_book)
 
     def cancel_order(self, order: Order) -> None:
         """Implements: Broker.cancel_order.
