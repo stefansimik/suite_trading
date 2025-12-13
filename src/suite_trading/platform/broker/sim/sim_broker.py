@@ -29,6 +29,7 @@ from suite_trading.platform.broker.sim.order_matching import (
     should_trigger_stop_order,
     select_simulate_fills_function_for_order,
 )
+from suite_trading.utils.datetime_tools import format_dt
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
@@ -320,6 +321,13 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         Args:
             order_book: OrderBook snapshot to process.
         """
+        # Check: ensure engine set broker time before processing this snapshot
+        if self._current_dt is None:
+            raise ValueError(f"Cannot call `process_order_book` because $current_dt is None. TradingEngine must call `set_current_dt(order_book.timestamp)` immediately before calling `process_order_book` (got $order_book.timestamp={format_dt(order_book.timestamp)})")
+        # Check: ensure broker time matches the snapshot time exactly
+        if self._current_dt != order_book.timestamp:
+            raise ValueError(f"Cannot call `process_order_book` because $current_dt ({format_dt(self._current_dt)}) does not match $order_book.timestamp ({format_dt(order_book.timestamp)}). TradingEngine must call `set_current_dt(order_book.timestamp)` immediately before calling `process_order_book`")
+
         # Enrich with depth model and treat the result as the broker's current OrderBook snapshot
         enriched_order_book = self._depth_model.enrich_order_book(order_book)
 
