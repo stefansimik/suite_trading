@@ -37,6 +37,7 @@ class Order:
         side (OrderSide): Whether this is a BUY or SELL order (read-only).
         quantity (Decimal): The quantity to trade (read-only).
         time_in_force (TimeInForce): How long the order remains active (read-only).
+        good_till_dt (datetime | None): Expiry datetime for GTD orders, or None for non-GTD orders (read-only).
         state (OrderState): Current state of the order from the internal state machine.
     """
 
@@ -51,6 +52,7 @@ class Order:
         quantity: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
+        good_till_dt: datetime | None = None,
     ):
         """Initialize a new Order.
 
@@ -60,6 +62,7 @@ class Order:
             quantity (Decimal): The quantity to trade.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+            good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
         """
         # Order identification (private attributes with public properties)
         self._id = str(id) if id is not None else str(get_next_id())
@@ -71,6 +74,7 @@ class Order:
 
         # Execution details (private attributes with public properties)
         self._time_in_force = time_in_force
+        self._good_till_dt = good_till_dt
         self._submitted_dt: datetime | None = None
 
         # Execution tracking (single source of truth)
@@ -215,6 +219,17 @@ class Order:
         return self._time_in_force
 
     @property
+    def good_till_dt(self) -> datetime | None:
+        """Timestamp after which a GTD Order expires.
+
+        This is meaningful only when $time_in_force is `TimeInForce.GTD`.
+
+        Returns:
+            datetime | None: The good-till datetime, or None.
+        """
+        return self._good_till_dt
+
+    @property
     def submitted_dt(self) -> datetime | None:
         """Timestamp when the Broker started tracking this Order.
 
@@ -340,11 +355,19 @@ class Order:
         """Validate intrinsic order inputs at construction time.
 
         Raises:
-            ValueError: If $quantity <= 0.
+            ValueError: If $quantity <= 0 or if `$time_in_force` and `$good_till_dt` are inconsistent.
         """
         # Check: positive order quantity
         if self.quantity <= 0:
             raise ValueError(f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive")
+
+        # Check: GTD must define $good_till_dt
+        if self.time_in_force is TimeInForce.GTD and self.good_till_dt is None:
+            raise ValueError("Cannot call `_validate` because $time_in_force is GTD but $good_till_dt is None")
+
+        # Check: only GTD can define $good_till_dt
+        if self.time_in_force is not TimeInForce.GTD and self.good_till_dt is not None:
+            raise ValueError(f"Cannot call `_validate` because $time_in_force is {self.time_in_force} but $good_till_dt ({self.good_till_dt}) is not None")
 
     # endregion
 
@@ -394,6 +417,7 @@ class MarketOrder(Order):
         quantity: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
+        good_till_dt: datetime | None = None,
     ):
         """Initialize a new MarketOrder.
 
@@ -403,8 +427,9 @@ class MarketOrder(Order):
             quantity (Decimal): The quantity to trade.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+            good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
         """
-        super().__init__(instrument, side, quantity, id, time_in_force)
+        super().__init__(instrument, side, quantity, id, time_in_force, good_till_dt)
 
 
 class LimitOrder(Order):
@@ -427,6 +452,7 @@ class LimitOrder(Order):
         limit_price: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
+        good_till_dt: datetime | None = None,
     ):
         """Initialize a new LimitOrder.
 
@@ -437,12 +463,13 @@ class LimitOrder(Order):
             limit_price (Decimal): The limit price for the order.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+            good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
         """
         # Set limit price (private attribute with public property)
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force)
+        super().__init__(instrument, side, quantity, id, time_in_force, good_till_dt)
 
     @property
     def limit_price(self) -> Decimal:
@@ -486,6 +513,7 @@ class StopOrder(Order):
         stop_price: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
+        good_till_dt: datetime | None = None,
     ):
         """Initialize a new StopOrder.
 
@@ -496,12 +524,13 @@ class StopOrder(Order):
             stop_price (Decimal): The stop price for the order.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+            good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
         """
         # Set stop price (private attribute with public property)
         self._stop_price = instrument.snap_price(stop_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force)
+        super().__init__(instrument, side, quantity, id, time_in_force, good_till_dt)
 
     @property
     def stop_price(self) -> Decimal:
@@ -547,6 +576,7 @@ class StopLimitOrder(Order):
         limit_price: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
+        good_till_dt: datetime | None = None,
     ):
         """Initialize a new StopLimitOrder.
 
@@ -558,13 +588,14 @@ class StopLimitOrder(Order):
             limit_price (Decimal): The limit price for the order once triggered.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
+            good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
         """
         # Set prices (private attributes with public properties)
         self._stop_price = instrument.snap_price(stop_price)
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force)
+        super().__init__(instrument, side, quantity, id, time_in_force, good_till_dt)
 
     @property
     def stop_price(self) -> Decimal:
