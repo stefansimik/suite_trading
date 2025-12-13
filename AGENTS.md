@@ -210,9 +210,10 @@ Apply to comments, docstrings, and error messages:
 - **Functions/methods:** `` `function_name` ``
 
 **Example:**
+
 ```python
 # Collect fills since last event and net the quantity
-fills = broker.get_fills_since(self._last_event_time)
+fills = broker.get_fills_since(self._current_engine_dt)
 net_qty = sum(f.qty for f in fills)
 
 # Check: ensure we have quantity to trade before submitting order

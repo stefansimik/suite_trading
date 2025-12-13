@@ -105,6 +105,9 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         # ACCOUNT for this simulated broker instance (single logical account)
         self._account: Account = SimAccount(id="SIM")
 
+        # SIMULATED TIME (engine-injected)
+        self._current_dt: datetime | None = None
+
         # ORDER BOOK CACHE (last known OrderBook per instrument for this account)
         self._latest_order_book_by_instrument: dict[Instrument, OrderBook] = {}
 
@@ -285,6 +288,18 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
     # endregion
 
     # region Protocol OrderBookSimulatedBroker
+
+    def set_current_dt(self, dt: datetime) -> None:
+        """Set broker simulated time.
+
+        The `TradingEngine` injects `$dt` before Strategy callbacks and before routing
+        derived OrderBook snapshots so order lifecycle decisions can be deterministic
+        and independent of wall-clock time.
+
+        Args:
+            dt: Simulated time for the current engine event.
+        """
+        self._current_dt = dt
 
     def process_order_book(self, order_book: OrderBook) -> None:
         """Process an OrderBook snapshot for order matching and margin.

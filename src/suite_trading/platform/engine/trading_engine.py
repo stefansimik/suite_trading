@@ -84,8 +84,11 @@ class TradingEngine:
         # Current state
         self._engine_state_machine: StateMachine = create_engine_state_machine()
 
-        # Global time
-        self._last_event_time: datetime | None = None
+        # Current simulated time on the engine-owned global timeline.
+        self._current_engine_dt: datetime | None = None
+
+        # Tracks timestamp of the last processed OrderBook
+        self._last_processed_order_book_timestamp: datetime | None = None
 
         # Brokers
         self._brokers_by_name_bidict: bidict[str, Broker] = bidict()
@@ -573,32 +576,37 @@ class TradingEngine:
         # While any active event-feeds exist, keep processing events in global time order
         while self._any_active_event_feeds_exist():
             # Find the next event feed
-            next_event_feed_tuple = self._find_event_feed_with_earliest_event()
+            event_feed_tuple = self._find_event_feed_with_earliest_event()
 
             # If no Event is currently available across active feeds, we just continue.
-            if next_event_feed_tuple is None:
+            if event_feed_tuple is None:
                 logger.debug("No next Event available across active EventFeed(s); breaking event processing loop early")
                 continue
 
             # We have Event to process; Unpack the selected feed tuple and pull the next Event to process
-            strategy, event_feed_name, event_feed, callback = next_event_feed_tuple
+            strategy, event_feed_name, event_feed, callback = event_feed_tuple
             strategy_name = self._get_strategy_name(strategy)
-            next_event = event_feed.pop()
+            current_event = event_feed.pop()
+            current_event_dt = current_event.dt_event
+
+            # Set current time on global engine timeline
+            self._current_engine_dt = current_event_dt
+
+            # Set current time to all simulated broker
+            order_book_simulated_brokers = self._list_order_book_simulated_brokers()
+            for broker in order_book_simulated_brokers:
+                broker.set_current_dt(current_event_dt)
 
             # Decide if this Event should drive simulated fills in brokers that consume OrderBook snapshots for simulated fills
             event_feed_registration = self._event_feeds_by_strategy[strategy][event_feed_name]
-            event_should_drive_simulated_fills = event_feed_registration.fill_event_filter(next_event)
+            event_should_drive_simulated_fills = event_feed_registration.fill_event_filter(current_event)
 
-            # If we have some brokers of type 'OrderBookSimulatedBroker' -> we can convert some events to OrderBook for order-price matching
-            order_book_simulated_brokers = self._get_order_book_simulated_brokers()
-            if order_book_simulated_brokers and event_should_drive_simulated_fills and self._event_to_order_book_converter.can_convert(next_event):
-                order_books = self._event_to_order_book_converter.convert_to_order_books(next_event)
-
-                # Filter and process OrderBooks using the engine's last processed event time as the floor
+            if order_book_simulated_brokers and event_should_drive_simulated_fills and self._event_to_order_book_converter.can_convert(current_event):
+                order_books = self._event_to_order_book_converter.convert_to_order_books(current_event)
                 for order_book in order_books:
-                    # Check: OrderBook timestamp must not be earlier than engine time (allow equals during current event)
-                    if (self._last_event_time is not None) and (order_book.timestamp < self._last_event_time):
-                        logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than engine time {format_dt(self._last_event_time)}")
+                    # Check: ignore stale OrderBook snapshots (defensive)
+                    if (self._last_processed_order_book_timestamp is not None) and (order_book.timestamp < self._last_processed_order_book_timestamp):
+                        logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than last processed OrderBook timestamp {format_dt(self._last_processed_order_book_timestamp)}")
                         continue
 
                     # Process OrderBook with valid timestamp
@@ -608,14 +616,14 @@ class TradingEngine:
                     for broker in order_book_simulated_brokers:
                         broker.process_order_book(order_book)
 
-            # Update last event time (global engine time)
-            self._last_event_time = next_event.dt_event
+                    if (self._last_processed_order_book_timestamp is None) or (order_book.timestamp > self._last_processed_order_book_timestamp):
+                        self._last_processed_order_book_timestamp = order_book.timestamp
 
             # Process event in its callback (deliver to Strategy)
             try:
-                callback(next_event)
+                callback(current_event)
             except Exception as e:
-                logger.error(f"Error processing {next_event} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")
+                logger.error(f"Error processing {current_event} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")
                 # Move strategy to error state
                 strategy._state_machine.execute_action(StrategyAction.ERROR_OCCURRED)
                 # Allow strategy to handle error state (do some cleanup)
@@ -628,7 +636,7 @@ class TradingEngine:
             try:
                 for listener in event_feed.list_listeners():
                     try:
-                        listener(next_event)
+                        listener(current_event)
                     except Exception as le:
                         logger.error(f"Error in EventFeed listener for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) on EventFeed named '{event_feed_name}': {le}")
             except Exception as outer:
@@ -711,7 +719,7 @@ class TradingEngine:
             fill_event_filter = use_for_simulated_fills
 
         # Timeline filtering if the engine already processed events (shared global time)
-        last_event_time = self._last_event_time
+        last_event_time = self._current_engine_dt
         if last_event_time is not None:
             event_feed.remove_events_before(last_event_time)
 
@@ -774,14 +782,14 @@ class TradingEngine:
         except KeyError:
             raise KeyError(f"Cannot call `_get_event_feed_provider_name` because $provider (class {provider.__class__.__name__}) is not registered in this TradingEngine")
 
-    def _get_order_book_simulated_brokers(self) -> list[OrderBookSimulatedBroker]:
+    def _list_order_book_simulated_brokers(self) -> list[OrderBookSimulatedBroker]:
         """Return brokers that consume OrderBook snapshots for simulated fills.
 
         Returns:
             list[OrderBookSimulatedBroker]: Brokers that require OrderBook snapshots
             to drive simulated order-price matching and fills.
         """
-        return [b for b in self._brokers_by_name_bidict.values() if isinstance(b, OrderBookSimulatedBroker)]
+        return [broker for broker in self._brokers_by_name_bidict.values() if isinstance(broker, OrderBookSimulatedBroker)]
 
     # endregion
 
