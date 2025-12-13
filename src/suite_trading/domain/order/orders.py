@@ -71,6 +71,7 @@ class Order:
 
         # Execution details (private attributes with public properties)
         self._time_in_force = time_in_force
+        self._submitted_dt: datetime | None = None
 
         # Execution tracking (single source of truth)
         self._executions: list[Execution] = []  # Chronological by append order
@@ -214,6 +215,17 @@ class Order:
         return self._time_in_force
 
     @property
+    def submitted_dt(self) -> datetime | None:
+        """Timestamp when the Broker started tracking this Order.
+
+        This is set exactly once by the Broker when the order is accepted for tracking.
+
+        Returns:
+            datetime | None: Submission timestamp, or None if the Broker did not set it.
+        """
+        return self._submitted_dt
+
+    @property
     def state(self) -> OrderState:
         """Get the current state of the order from the state machine.
 
@@ -306,6 +318,23 @@ class Order:
     # endregion
 
     # region Utilities
+
+    def _set_submitted_dt_once(self, dt: datetime) -> None:
+        """Set `$submitted_dt` exactly once.
+
+        This is an internal method intended to be called by a Broker implementation.
+
+        Args:
+            dt: The broker timeline datetime used as submission time.
+
+        Raises:
+            ValueError: If `$submitted_dt` is already set.
+        """
+        # Check: submission time must be set only once to stay deterministic
+        if self._submitted_dt is not None:
+            raise ValueError(f"Cannot call `_set_submitted_dt_once` because $submitted_dt ({self._submitted_dt}) is already set")
+
+        self._submitted_dt = dt
 
     def _validate(self) -> None:
         """Validate intrinsic order inputs at construction time.

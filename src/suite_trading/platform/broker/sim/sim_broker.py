@@ -10,6 +10,7 @@ from suite_trading.platform.broker.sim.models.fill.distribution import Distribut
 from suite_trading.platform.broker.sim.sim_account import SimAccount
 from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.order.orders import Order, StopOrder, StopLimitOrder
+from suite_trading.domain.order.order_enums import TimeInForce
 from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory, OrderState
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.position import Position
@@ -157,6 +158,13 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         # Check: enforce unique $id among active orders
         if order.id in self._orders_by_id:
             raise ValueError(f"Cannot call `submit_order` because $id ('{order.id}') already exists")
+
+        # Check: DAY/GTD submission requires broker timeline time
+        if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and self._current_dt is None:
+            raise ValueError(f"Cannot call `submit_order` because $time_in_force ({order.time_in_force.value}) requires broker time, but $current_dt is None")
+
+        if self._current_dt is not None:
+            order._set_submitted_dt_once(self._current_dt)
 
         # Track the order (submission never terminalizes in this step)
         self._orders_by_id[order.id] = order
