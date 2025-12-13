@@ -90,10 +90,12 @@ def create_order_state_machine(initial_state: OrderState) -> StateMachine:
         (OrderState.PENDING_SUBMIT, OrderAction.ACCEPT): OrderState.SUBMITTED,
         (OrderState.PENDING_SUBMIT, OrderAction.DENY): OrderState.DENIED,
         (OrderState.PENDING_SUBMIT, OrderAction.ARM_TRIGGER): OrderState.TRIGGER_PENDING,  # for Stop / StopLimit orders, that need to be triggered first
+        (OrderState.PENDING_SUBMIT, OrderAction.EXPIRE): OrderState.EXPIRED,
         # Submission state transitions
         (OrderState.SUBMITTED, OrderAction.ACCEPT): OrderState.WORKING,
         (OrderState.SUBMITTED, OrderAction.REJECT): OrderState.REJECTED,
-        (OrderState.SUBMITTED, OrderAction.CANCEL): OrderState.CANCELLED,  # FOK/IOC not fillable
+        (OrderState.SUBMITTED, OrderAction.CANCEL): OrderState.CANCELLED,
+        (OrderState.SUBMITTED, OrderAction.EXPIRE): OrderState.EXPIRED,
         (OrderState.SUBMITTED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.SUBMITTED, OrderAction.FILL): OrderState.FILLED,
         # Active (working) order transitions
@@ -123,6 +125,7 @@ def create_order_state_machine(initial_state: OrderState) -> StateMachine:
         # Trigger flow (explicit hold → fire → submit)
         (OrderState.TRIGGER_PENDING, OrderAction.TRIGGER): OrderState.TRIGGERED,
         (OrderState.TRIGGER_PENDING, OrderAction.CANCEL): OrderState.CANCELLED,
+        (OrderState.TRIGGER_PENDING, OrderAction.EXPIRE): OrderState.EXPIRED,
         (OrderState.TRIGGERED, OrderAction.SUBMIT): OrderState.PENDING_SUBMIT,
         (OrderState.TRIGGERED, OrderAction.REJECT): OrderState.REJECTED,
         (OrderState.TRIGGERED, OrderAction.CANCEL): OrderState.CANCELLED,
