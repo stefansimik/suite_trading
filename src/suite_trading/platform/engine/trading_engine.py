@@ -592,15 +592,11 @@ class TradingEngine:
             # Set current time on global engine timeline
             self._current_engine_dt = current_event_dt
 
-            # Set current time to all simulated broker
-            order_book_simulated_brokers = self._list_order_book_simulated_brokers()
-            for broker in order_book_simulated_brokers:
-                broker.set_current_dt(current_event_dt)
-
             # Decide if this Event should drive simulated fills in brokers that consume OrderBook snapshots for simulated fills
             event_feed_registration = self._event_feeds_by_strategy[strategy][event_feed_name]
             event_should_drive_simulated_fills = event_feed_registration.fill_event_filter(current_event)
 
+            order_book_simulated_brokers = self._list_order_book_simulated_brokers()
             if order_book_simulated_brokers and event_should_drive_simulated_fills and self._event_to_order_book_converter.can_convert(current_event):
                 order_books = self._event_to_order_book_converter.convert_to_order_books(current_event)
                 for order_book in order_books:
@@ -612,12 +608,18 @@ class TradingEngine:
                     # Process OrderBook with valid timestamp
                     logger.debug(f"Processing OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
 
-                    # Route to brokers implementing OrderBookSimulatedBroker for order-price matching
+                    # Route to simulated brokers for order-price matching
                     for broker in order_book_simulated_brokers:
+                        broker.set_current_dt(order_book.timestamp)  # Move broker's time by OrderBook
                         broker.process_order_book(order_book)
 
-                    if (self._last_processed_order_book_timestamp is None) or (order_book.timestamp > self._last_processed_order_book_timestamp):
+                    should_update_last_processed_order_book_timestamp = self._last_processed_order_book_timestamp is None or order_book.timestamp > self._last_processed_order_book_timestamp
+                    if should_update_last_processed_order_book_timestamp:
                         self._last_processed_order_book_timestamp = order_book.timestamp
+
+            # Set broker time to Event time
+            for broker in order_book_simulated_brokers:
+                broker.set_current_dt(current_event_dt)
 
             # Process event in its callback (deliver to Strategy)
             try:
