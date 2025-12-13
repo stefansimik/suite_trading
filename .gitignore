@@ -18,3 +18,6 @@ dist/
 
 # AI
 /.junie
+
+# System files
+.DS_Store
