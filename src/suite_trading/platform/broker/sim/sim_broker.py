@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, TYPE_CHECKING
 from decimal import Decimal
 import logging
@@ -29,7 +29,7 @@ from suite_trading.platform.broker.sim.order_matching import (
     should_trigger_stop_order,
     select_simulate_fills_function_for_order,
 )
-from suite_trading.utils.datetime_tools import format_dt
+from suite_trading.utils.datetime_tools import format_dt, is_utc
 
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
@@ -164,6 +164,15 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and self._current_dt is None:
             raise ValueError(f"Cannot call `submit_order` because $time_in_force ({order.time_in_force.value}) requires broker time, but $current_dt is None")
 
+        if order.time_in_force is TimeInForce.GTD:
+            good_till_dt = order.good_till_dt
+            # Check: GTD orders must provide timezone-aware UTC $good_till_dt
+            if good_till_dt is None:
+                raise ValueError(f"Cannot call `submit_order` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
+            # Check: keep time-in-force comparisons deterministic in UTC
+            if not is_utc(good_till_dt):
+                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({good_till_dt}) is not timezone-aware UTC for GTD Order $id ('{order.id}')")
+
         if self._current_dt is not None:
             order._set_submitted_dt_once(self._current_dt)
 
@@ -178,6 +187,11 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         else:
             self._apply_order_action(order, OrderAction.ACCEPT)  # PENDING_SUBMIT + ACCEPT = SUBMITTED
             self._apply_order_action(order, OrderAction.ACCEPT)  # SUBMITTED + ACCEPT = WORKING
+
+        # Handle if order expired
+        if self._should_expire_order_now(order):
+            self._apply_order_action(order, OrderAction.EXPIRE)
+            return
 
         # Match order with last order-book
         last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
@@ -304,9 +318,18 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         and independent of wall-clock time.
 
         Args:
-            dt: Simulated time for the current engine event.
+            dt: Simulated time for the current engine event (timezone-aware UTC).
         """
+        # Check: broker timeline $dt must be timezone-aware UTC
+        if not is_utc(dt):
+            raise ValueError(f"Cannot call `set_current_dt` because $dt ({dt}) is not timezone-aware UTC")
+
         self._current_dt = dt
+
+        # Handle expired orders
+        for order in list(self._orders_by_id.values()):
+            if self._should_expire_order_now(order):
+                self._apply_order_action(order, OrderAction.EXPIRE)
 
     def process_order_book(self, order_book: OrderBook) -> None:
         """Process an OrderBook snapshot for order matching and margin.
@@ -363,6 +386,11 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         if order.instrument != order_book.instrument:
             raise ValueError(f"Cannot call `_process_single_order_with_order_book` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
+        # Handle if order expired
+        if self._should_expire_order_now(order):
+            self._apply_order_action(order, OrderAction.EXPIRE)
+            return
+
         if order.state == OrderState.TRIGGER_PENDING:
             # Check: TRIGGER_PENDING is valid only for stop-like orders
             if not isinstance(order, (StopOrder, StopLimitOrder)):
@@ -377,6 +405,40 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
                 self._apply_order_action(order, OrderAction.ACCEPT)  # SUBMITTED + ACCEPT = WORKING
 
         self._simulate_and_apply_fills_for_order_with_order_book(order, order_book)
+
+    def _should_expire_order_now(self, order: Order) -> bool:
+        time_in_force = order.time_in_force
+
+        # These TIF types never expire by time
+        if time_in_force in (TimeInForce.GTC, TimeInForce.IOC, TimeInForce.FOK):
+            return False
+
+        now_dt = self._current_dt
+        if now_dt is None:
+            return False
+
+        # GTD
+        if time_in_force == TimeInForce.GTD:
+            good_till_dt = order.good_till_dt
+            # Check: GTD orders must provide $good_till_dt
+            if good_till_dt is None:
+                raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
+
+            return now_dt > good_till_dt
+
+        # DAY
+        if time_in_force == TimeInForce.DAY:
+            submitted_dt = order.submitted_dt
+            # Check: DAY orders must have a $submitted_dt to define the DAY boundary
+            if submitted_dt is None:
+                raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is DAY but $submitted_dt is None for Order $id ('{order.id}')")
+
+            # TODO: DAY uses UTC midnight for now; later we should use exchange session boundaries per instrument.
+            day_after_submission = submitted_dt + timedelta(days=1)
+            expiry_dt = day_after_submission.replace(hour=0, minute=0, second=0, microsecond=0)
+            return now_dt > expiry_dt
+
+        raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force ({time_in_force.value}) is not supported")
 
     def _simulate_and_apply_fills_for_order_with_order_book(
         self,
