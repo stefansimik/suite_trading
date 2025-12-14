@@ -597,15 +597,16 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
             self._execution_callback(execution)
 
         # PUBLISH ORDER-UPDATE
-        self._process_order_update(order)
+        self._handle_order_update(order)
 
     # Order state transitions and publishing
-    def _process_order_update(self, order: Order) -> None:
+    def _handle_order_update(self, order: Order) -> None:
         """Notify listeners of order update and clean up if terminal."""
-        # Invoke callback
         self._order_updated_callback(order)
+        self._cleanup_order_if_terminal(order)
 
-        # CLEANUP: If order is terminal, remove it from internal storage
+    def _cleanup_order_if_terminal(self, order: Order) -> None:
+        """Remove $order from broker tracking if it is terminal."""
         if order.state_category == OrderStateCategory.TERMINAL:
             self._orders_by_id.pop(order.id, None)
 
@@ -619,7 +620,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         new_state = order.state
 
         if new_state != previous_state:
-            self._process_order_update(order)
+            self._handle_order_update(order)
 
     # Prices & positions
     def _append_execution_to_history_and_update_position(self, execution: Execution) -> None:
