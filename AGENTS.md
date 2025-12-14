@@ -23,15 +23,18 @@ Remove or redesign anything to achieve optimal design.
 ### 1.2.1. Breaking Changes Policy (No Shims)
 - We intentionally allow breaking API and module changes at any time
 - Do not add deprecation shims, re‑exports, aliases, or compatibility layers.
-- When relocating/renaming modules or classes, update all references in the codebase and documentation in the same change.
-- Leave clear error messages in truly unavoidable stubs only when removal is technically impossible in the tooling; stubs must raise ImportError with a pointer to the new path.
+- When relocating/renaming modules or classes, update all references in the codebase and documentation in the same
+  change.
+- Leave clear error messages in truly unavoidable stubs only when removal is technically impossible in the tooling;
+  stubs must raise ImportError with a pointer to the new path.
 
 ---
 
 # 2. Naming Conventions & API Design
 
 ## 2.1. General Naming Rules
-Names must be **descriptive, intuitive. self-documenting and with natural english phrasing**. Use Python `snake_case`. Avoid abbreviations. If possible, try to be consise, but never sacrifice clarity.
+Names must be **descriptive, intuitive, self-documenting and with natural English phrasing**.
+Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, but never sacrifice clarity.
 
 - **Functions/Methods:** Use verbs describing the action
 - **Variables/Attributes:** Use nouns describing the data
@@ -69,11 +72,13 @@ When calling functions/methods/constructors, keep simple argument lists on a sin
 
 ### One-Line Parameters Rule
 - If arguments are only simple values, keep the entire call on one line — even if >150 chars.
-- "Simple" means: names/attributes (e.g., `qty`, `order.id`), literals (`10`, `"USD"`, `True`, `None`), and simple `key=value` pairs.
+- "Simple" means: names/attributes (e.g., `qty`, `order.id`), literals (`10`, `"USD"`, `True`, `None`), and simple
+  `key=value` pairs.
 - Do not split such calls across multiple lines just for visual width.
 
 ### When to use multi-line
-- Use multi-line layout only if any argument contains complex logic: nested calls, arithmetic/boolean chains, comprehensions, lambdas, ternary expressions, or long f-strings.
+- Use multi-line layout only if any argument contains complex logic: nested calls, arithmetic/boolean chains,
+  comprehensions, lambdas, ternary expressions, or long f-strings.
 - In multi-line layout:
   - Put one argument per line.
   - Keep a trailing comma and align the closing parenthesis with the start of the call.
@@ -464,6 +469,59 @@ return result
 - [ ] Non-trivial return values are assigned to `result` before returning
 - [ ] Statements remain ≤150 chars per line where practical (see 8.3)
 
+### Workflow decomposition (Validate → Compute → Decide → Act)
+
+When implementing a complex workflow (pipeline, loop, or multi-step handler), structure it as four clear stages:
+
+- **Validate:** Cheap guards and domain invariants. Return early or raise clear errors. No state changes.
+- **Compute:** Pure, deterministic functions that derive data (signals, prices, quantities). No I/O, no broker calls, no logging.
+- **Decide:** Turn computed data into decisions (what to do next). Construct intent objects (e.g., orders to place) but avoid side effects.
+- **Act:** Perform side effects (submit/cancel orders, write files, emit logs, mutate state). Keep this stage small and explicit.
+
+**Acceptance checks:**
+- [ ] Each workflow reads top-to-bottom as: Validate → Compute → Decide → Act
+- [ ] The Compute stage is pure (no side effects, no hidden I/O)
+- [ ] Side effects happen only in Act (easy to review and test)
+
+### Workflow visualization (ASCII diagrams)
+
+For complex workflows, add a compact tree diagram that shows the call sequence and stage boundaries.
+This is mainly so we can compare the complexity of alternative approaches during refactors.
+
+- **Compute:** pure functions only (no I/O, no logging, no broker/account mutations)
+- **Act:** may have side effects (logging, broker calls, state mutation)
+
+**Template (compact):**
+
+```text
+function_name(...)
+├── [VALIDATE] validate_*()  -> cheap guards, early return / clear error
+├── [COMPUTE]  compute_*()   -> pure derivations (no side effects)
+├── [DECIDE]   decide_*()    -> build intent
+└── [ACT]      act_*()       -> side effects
+```
+
+**Example (real workflow, keep it short):**
+
+```text
+_process_fill_slice(order, fill_slice, order_book)
+├── [VALIDATE] Check instrument match
+├── [COMPUTE]
+│   ├── position_before, net_qty_after
+│   ├── affordability = compute_fill_slice_affordability(...)
+│   └── available_money_now = get_available_money(...)
+├── [DECIDE] IF not has_enough_available_money(...): handle insufficient funds
+└── [ACT]
+    ├── execution = _commit_fill_slice_execution_and_accounting(...)
+    ├── publish execution callback
+    └── _handle_order_update(order)
+```
+
+**Acceptance checks:**
+- [ ] Diagram is compact and helps compare alternative approaches during refactors
+- [ ] Compute steps are pure (no hidden I/O, no logging, no broker/account mutations)
+- [ ] Side effects are confined to Act (logging, broker calls, state mutation)
+
 ---
 
 # 5. Class Design & Structure
@@ -839,6 +897,8 @@ user in current message.
 
 When proposing changes, show per-file Before/After snippets with minimal unique context.
 Use fenced code blocks, keep lines ≤150 chars, include acceptance checks, update imports.
+
+For workflow/pipeline refactors, also include a Validate → Compute → Decide → Act ASCII diagram (see 4.5).
 
 **Template:**
 
