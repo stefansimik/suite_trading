@@ -98,7 +98,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         # ORDERS, EXECUTIONS, POSITIONS for this simulated account instance
         self._orders_by_id: dict[str, Order] = {}
         self._execution_history: list[Execution] = []  # Track executions per Broker (account scope); allows implementing volume-tiered fees
-        self._positions_by_instrument: dict[Instrument, Position] = {}
+        self._position_by_instrument: dict[Instrument, Position] = {}
 
         # Callbacks (where this broker should propagate executions and orders-changes?)
         self._execution_callback: Callable[[Execution], None] | None = None
@@ -278,7 +278,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
             flat are dropped from storage, so an empty list means no open exposure in this
             `SimBroker` instance.
         """
-        return [p for p in self._positions_by_instrument.values() if not p.is_flat]
+        return [p for p in self._position_by_instrument.values() if not p.is_flat]
 
     def get_position(self, instrument: Instrument) -> Position | None:
         """Retrieve the current Position for $instrument, or None if flat.
@@ -292,7 +292,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         Returns:
             Position | None: Current Position for $instrument, or None if no open exposure.
         """
-        return self._positions_by_instrument.get(instrument)
+        return self._position_by_instrument.get(instrument)
 
     def get_account(self) -> Account:
         """Implements: Broker.get_account
@@ -515,16 +515,16 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
             fill_slice: Single FillSlice to apply.
             order_book: Broker OrderBook snapshot used for matching and margin.
         """
+        # Some reusable variables
         instrument = order.instrument
+        timestamp = order_book.timestamp
 
         # Check: ensure $order.instrument matches $order_book.instrument for pricing and margin
         if order_book.instrument != instrument:
             raise ValueError(f"Cannot call `_process_fill_slice` because $order.instrument ('{instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
-        timestamp = order_book.timestamp
-
         # CONTEXT — read current position, compute signed impact and net quantities
-        position_before_trade = self._positions_by_instrument.get(instrument)
+        position_before_trade = self._position_by_instrument.get(instrument)
         net_position_quantity_before_trade: Decimal = position_before_trade.quantity if position_before_trade is not None else Decimal("0")
         signed_trade_quantity: Decimal = fill_slice.quantity if order.is_buy else -fill_slice.quantity
         net_position_quantity_after_trade: Decimal = net_position_quantity_before_trade + signed_trade_quantity
@@ -640,7 +640,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         self._execution_history.append(execution)
 
         # Update position for this instrument
-        previous_position: Position | None = self._positions_by_instrument.get(instrument)
+        previous_position: Position | None = self._position_by_instrument.get(instrument)
         previous_quantity: Decimal = Decimal("0") if previous_position is None else previous_position.quantity
         previous_average_price: Decimal = Decimal("0") if previous_position is None else previous_position.average_price
 
@@ -648,7 +648,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
 
         if new_quantity == 0:
             # Flat after this trade → drop stored position to keep list_open_positions() minimal
-            self._positions_by_instrument.pop(instrument, None)
+            self._position_by_instrument.pop(instrument, None)
         else:
             # Determine whether we remain on the same side (long/short) after applying the trade
             remains_on_same_side = (previous_quantity == 0) or (previous_quantity > 0 and new_quantity > 0) or (previous_quantity < 0 and new_quantity < 0)
@@ -663,7 +663,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
                 new_average_price = trade_price
 
             # Commit the new/updated Position for this instrument
-            self._positions_by_instrument[instrument] = Position(
+            self._position_by_instrument[instrument] = Position(
                 instrument=instrument,
                 quantity=new_quantity,
                 average_price=new_average_price,
