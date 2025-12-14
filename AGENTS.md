@@ -741,8 +741,19 @@ negative prices.
 ## 8.1. Regions
 Use `# region NAME` / `# endregion` to group related blocks (no tiny regions).
 
-Preferred set and order:
+Preferred baseline set and order:
 1) Init, 2) Protocol <Name>, 3) Main, 4) Properties, 5) Utilities, 6) Magic.
+
+These are **examples and a strong default**, not a hard whitelist.
+It is allowed (and sometimes preferred) to introduce additional region names when it materially improves
+scan-ability for a large class or module.
+
+When adding a custom region name:
+- The region must contain a meaningful multi-line block (no tiny regions).
+- The region name must be descriptive and domain-relevant (e.g., `Order matching`, `Account & margin`,
+  `Default model builders`).
+- Keep **public-first ordering**: public/protocol APIs must appear before helper-only regions.
+- Keep the baseline regions where they fit (Init first; Magic last).
 
 - Use `Protocol <Name>` for protocol API (see 8.5). Use `Main` only for public API not in a
   protocol. Standardize on `Utilities` (do not use "Helpers").
@@ -793,8 +804,9 @@ Acceptance checks:
 - [ ] No leftover `Main` region when a protocol name would be clearer
 
 ## 8.6. Region naming and order (concise rule)
-- Use only these regions and in this order when present:
-  1) `Init`, 2) `Protocol <Name>`, 3) `Main`, 4) `Properties`, 5) `Utilities`, 6) `Magic`.
+- Treat `Init`, `Protocol <Name>`, `Main`, `Properties`, `Utilities`, `Magic` as a preferred baseline
+  and default ordering.
+- Additional region names are allowed when justified and reasonable (see 8.1).
 - Public‑first: `Init` → `Protocol <Name>`/`Main` → the rest. See 8.4 for details.
 - If a class implements a Protocol, group those methods under `Protocol <Name>` (e.g., `Protocol
   MarginModel`). If multiple protocols, create one region per protocol.
@@ -806,7 +818,7 @@ Acceptance checks:
 Acceptance checks:
 - [ ] `Protocol <Name>` is used instead of `Main` for protocol API (8.5)
 - [ ] Public API appears before helpers (`Init` → `Protocol`/`Main`) (8.4)
-- [ ] Only the approved region names are used; order is respected; no "Helpers"
+- [ ] Region names are descriptive; the baseline order is respected; no "Helpers"
 - [ ] No empty regions; remove unused headings (8.1)
 
 ---
