@@ -750,13 +750,15 @@ scan-ability for a large class or module.
 
 When adding a custom region name:
 - The region must contain a meaningful multi-line block (no tiny regions).
-- The region name must be descriptive and domain-relevant (e.g., `Order matching`, `Account & margin`,
-  `Default model builders`).
+- The region name must be descriptive and domain-relevant (e.g., `Order matching`, `Account & margin`, `Default builders`).
+- Keep region names short and simple (ideally 1–2 words).
 - Keep **public-first ordering**: public/protocol APIs must appear before helper-only regions.
 - Keep the baseline regions where they fit (Init first; Magic last).
 
 - Use `Protocol <Name>` for protocol API (see 8.5). Use `Main` only for public API not in a
   protocol. Standardize on `Utilities` (do not use "Helpers").
+- For large classes, avoid a single giant `Utilities` region. Prefer decomposing helpers into multiple
+  regions named `Utilities - <Topic>` where `<Topic>` is short (for example, `Utilities - Orders`, `Utilities - Positions`).
 - Public‑first order (see 8.4). Remove empty regions.
 
 **Format:**
@@ -783,7 +785,7 @@ Keep all Markdown lines (including code blocks) **≤150 chars**. Break at natur
   1) Init (constructor), 2) Public API ("Main"), 3) Properties,
      4) Protected/Private helpers ("Utilities"), 5) Magic (dunder).
 - Use regions to mark these blocks: `# region Init`, `# region Main`, `# region Properties`,
-  `# region Utilities`, `# region Magic`.
+  `# region Utilities` (or `# region Utilities - <Topic>`), `# region Magic`.
 - Do not place protected/private helpers above public API unless there is a strong, documented
   reason.
 
@@ -813,6 +815,8 @@ Acceptance checks:
 - Use `Main` only for public API that is not part of any Protocol. Omit `Main` if the class is
   protocol‑only.
 - Standardize on `Utilities` for non‑public helpers; do not use "Helpers".
+- For large helper surfaces, you may split helpers across multiple regions using the `Utilities - <Topic>`
+  naming convention.
 - In modules that define a Protocol/interface, you may use a single `Interface` region.
 
 Acceptance checks:
