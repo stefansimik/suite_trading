@@ -530,8 +530,6 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         net_position_quantity_after_trade: Decimal = net_position_quantity_before_trade + signed_trade_quantity
 
         # PRE-CALCULATE MARGINS AND COMMISSION (no state changes yet)
-        added_exposure_quantity_from_trade = self._compute_additional_exposure_quantity(net_position_quantity_before=net_position_quantity_before_trade, trade_quantity=fill_slice.quantity, is_buy=order.is_buy)
-
         (
             initial_margin_amount_to_block_now,
             maintenance_margin_amount_after_trade,
@@ -544,7 +542,6 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
             fill_slice=fill_slice,
             net_position_quantity_before_trade=net_position_quantity_before_trade,
             net_position_quantity_after_trade=net_position_quantity_after_trade,
-            added_exposure_quantity_from_trade=added_exposure_quantity_from_trade,
             timestamp=timestamp,
             order_book=order_book,
             previous_executions=tuple(self._execution_history),
@@ -712,28 +709,6 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         )
 
     # Margin & funds
-    def _compute_additional_exposure_quantity(
-        self,
-        net_position_quantity_before: Decimal,
-        trade_quantity: Decimal,
-        is_buy: bool,
-    ) -> Decimal:
-        """Compute additional absolute exposure introduced by this trade quantity.
-
-        Args:
-            net_position_quantity_before: Absolute net position quantity before the trade.
-            trade_quantity: Trade quantity being applied now (positive magnitude).
-            is_buy: Whether the trade side is buy (True) or sell (False).
-
-        Returns:
-            Decimal: Zero when the trade reduces exposure or keeps it unchanged; otherwise the
-            positive increase in absolute exposure.
-        """
-        signed_trade_quantity = trade_quantity if is_buy else -trade_quantity
-        absolute_quantity_before = abs(net_position_quantity_before)
-        absolute_quantity_after = abs(net_position_quantity_before + signed_trade_quantity)
-        return max(Decimal("0"), Decimal(absolute_quantity_after - absolute_quantity_before))
-
     def _compute_affordability_and_margin_for_fill_slice(
         self,
         *,
@@ -741,7 +716,6 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         fill_slice: FillSlice,
         net_position_quantity_before_trade: Decimal,
         net_position_quantity_after_trade: Decimal,
-        added_exposure_quantity_from_trade: Decimal,
         timestamp: datetime,
         order_book: OrderBook,
         previous_executions: tuple[Execution, ...],
@@ -751,8 +725,10 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         For the given FillSlice this method:
 
         - Computes per-slice commission using the configured FeeModel.
+        - Computes $added_exposure_quantity_from_trade from $net_position_quantity_before_trade
+          and $net_position_quantity_after_trade as max(0, abs(after) - abs(before)).
         - Computes $initial_margin_amount_to_block_now only when
-          $added_exposure_quantity_from_trade is positive, using the provided
+          $added_exposure_quantity_from_trade is positive, using the configured
           MarginModel.
         - Recomputes maintenance margin before and after the trade for the full
           net position and derives the non-negative
@@ -775,6 +751,10 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
             timestamp=timestamp,
             previous_executions=previous_executions,
         )
+
+        absolute_exposure_before = abs(net_position_quantity_before_trade)
+        absolute_exposure_after = abs(net_position_quantity_after_trade)
+        added_exposure_quantity_from_trade = max(Decimal("0"), absolute_exposure_after - absolute_exposure_before)
 
         initial_margin_amount_to_block_now: Money | None = None
         if added_exposure_quantity_from_trade > 0:
