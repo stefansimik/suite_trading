@@ -495,14 +495,96 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         # Apply FillModel policy to filter/modify fills
         actual_fill_slices: list[FillSlice] = self._fill_model.apply_fill_policy(order, order_book, proposed_fill_slices)
 
+        tif = order.time_in_force
+
+        # Handle FOK order (must be all-or-nothing, so we pre-check liquidity and affordability before applying any fills)
+        if tif == TimeInForce.FOK:
+            total_fillable_qty = sum(fill_slice.quantity for fill_slice in actual_fill_slices)
+            if total_fillable_qty < order.unfilled_quantity:
+                self._apply_order_action(order, OrderAction.EXPIRE)
+                return
+
+            can_afford_all_slices = self._can_afford_all_fill_slices_for_order_with_order_book(order, actual_fill_slices, order_book)
+            if not can_afford_all_slices:
+                self._apply_order_action(order, OrderAction.EXPIRE)
+                return
+
         if not actual_fill_slices:
+            if tif == TimeInForce.IOC:
+                self._apply_order_action(order, OrderAction.EXPIRE)
             return
 
         for fill_slice in actual_fill_slices:
             self._process_fill_slice(order, fill_slice, order_book)
             # Stop if the order was terminalized by this fill-slice (e.g., order could be canceled on margin-call)
             if order.state_category == OrderStateCategory.TERMINAL:
-                break
+                return
+
+        if tif == TimeInForce.IOC and not order.is_fully_filled and order.state_category != OrderStateCategory.TERMINAL:
+            self._apply_order_action(order, OrderAction.EXPIRE)
+
+    def _can_afford_all_fill_slices_for_order_with_order_book(self, order: Order, fill_slices: list[FillSlice], order_book: OrderBook) -> bool:
+        """Return True if applying all $fill_slices would not trigger insufficient-funds cancellation.
+
+        This is a pure affordability dry-run used for strict FOK orders. It does not mutate broker state,
+        account state, or the $order.
+        """
+
+        timestamp = order_book.timestamp
+        instrument = order.instrument
+        position_before_trade = self._position_by_instrument.get(instrument)
+        net_position_quantity = position_before_trade.quantity if position_before_trade is not None else Decimal("0")
+
+        simulated_previous_executions: list[Execution] = list(self._execution_history)
+        available_money_by_currency = {currency: money for currency, money in self._account.list_available_money_by_currency()}
+
+        for i, fill_slice in enumerate(fill_slices):
+            signed_trade_quantity = fill_slice.quantity if order.is_buy else -fill_slice.quantity
+            net_position_quantity_after_trade = net_position_quantity + signed_trade_quantity
+
+            affordability = self._compute_fill_slice_affordability(
+                order=order,
+                fill_slice=fill_slice,
+                order_book=order_book,
+                timestamp=timestamp,
+                net_position_quantity_before_trade=net_position_quantity,
+                net_position_quantity_after_trade=net_position_quantity_after_trade,
+                previous_executions=tuple(simulated_previous_executions),
+            )
+
+            zero_money = affordability.commission.__class__(Decimal("0"), affordability.commission.currency)
+            commission_cash_out = affordability.commission - affordability.decrease_of_maintenance_margin
+            if commission_cash_out.value < 0:
+                commission_cash_out = zero_money
+
+            upfront_required_money = affordability.increase_of_initial_margin + commission_cash_out
+            available_before_slice = available_money_by_currency.get(upfront_required_money.currency, Money(Decimal("0"), upfront_required_money.currency))
+            if available_before_slice.value < upfront_required_money.value:
+                return False
+
+            maintenance_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity, timestamp=timestamp)
+            maintenance_after = affordability.maintenance_margin_for_new_position
+            # Check: margin and commission must share one settlement currency so Account operations are consistent
+            if maintenance_before.currency != upfront_required_money.currency or maintenance_after.currency != upfront_required_money.currency:
+                raise ValueError(f"Cannot call `_can_afford_all_fill_slices_for_order_with_order_book` because Money currency mismatch for Order $id ('{order.id}'): $upfront_required_money.currency ({upfront_required_money.currency}), $maintenance_before.currency ({maintenance_before.currency}), $maintenance_after.currency ({maintenance_after.currency})")
+
+            maintenance_delta = maintenance_after.value - maintenance_before.value
+            if maintenance_delta > 0 and available_before_slice.value < maintenance_delta:
+                return False
+
+            available_after_maintenance = Money(available_before_slice.value - maintenance_delta, upfront_required_money.currency)
+
+            if affordability.commission.value > 0 and available_after_maintenance.value < affordability.commission.value:
+                return False
+
+            available_after_fee = Money(available_after_maintenance.value - affordability.commission.value, upfront_required_money.currency)
+            available_money_by_currency[upfront_required_money.currency] = available_after_fee
+
+            simulated_execution_id = f"FOK_DRY_RUN_{order.id}_{i}"
+            simulated_previous_executions.append(Execution(order=order, quantity=fill_slice.quantity, price=fill_slice.price, timestamp=timestamp, commission=affordability.commission, id=simulated_execution_id))
+            net_position_quantity = net_position_quantity_after_trade
+
+        return True
 
     def _process_fill_slice(
         self,
@@ -678,32 +760,29 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         Returns:
             FillSliceAffordability for this slice.
         """
-        commission_amount = self._fee_model.compute_commission(
-            order=order,
-            price=fill_slice.price,
-            quantity=fill_slice.quantity,
-            timestamp=timestamp,
-            previous_executions=previous_executions,
-        )
+        # COMMISSION
+        commission_money = self._fee_model.compute_commission(order=order, price=fill_slice.price, quantity=fill_slice.quantity, timestamp=timestamp, previous_executions=previous_executions)
 
         absolute_exposure_before = abs(net_position_quantity_before_trade)
         absolute_exposure_after = abs(net_position_quantity_after_trade)
-        added_exposure_quantity_from_trade = max(Decimal("0"), absolute_exposure_after - absolute_exposure_before)
+        increase_of_exposure_quantity = max(Decimal("0"), absolute_exposure_after - absolute_exposure_before)
 
-        zero_money = commission_amount.__class__(Decimal("0"), commission_amount.currency)
-        initial_margin_to_block_now = zero_money
-        if added_exposure_quantity_from_trade > 0:
-            initial_margin_to_block_now = self._margin_model.compute_initial_margin(order_book=order_book, trade_quantity=added_exposure_quantity_from_trade, is_buy=order.is_buy, timestamp=timestamp)
+        ZERO_MONEY = Money(0, commission_money.currency)
 
-        maintenance_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity_before_trade, timestamp=timestamp)
-        maintenance_after = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity_after_trade, timestamp=timestamp)
+        # Initial margin
+        initial_margin_to_block_now = ZERO_MONEY
+        if increase_of_exposure_quantity > 0:
+            initial_margin_to_block_now = self._margin_model.compute_initial_margin(order_book=order_book, trade_quantity=increase_of_exposure_quantity, is_buy=order.is_buy, timestamp=timestamp)
 
-        maintenance_release = maintenance_before - maintenance_after
-        zero_commission_ccy = commission_amount.__class__(Decimal("0"), commission_amount.currency)
-        if maintenance_release.value < 0:
-            maintenance_release = zero_commission_ccy
+        # Maintenance margin
+        maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity_before_trade, timestamp=timestamp)
+        maintenance_margin_after = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity_after_trade, timestamp=timestamp)
 
-        result = FillSliceAffordability(commission=commission_amount, decrease_of_maintenance_margin=maintenance_release, increase_of_initial_margin=initial_margin_to_block_now, maintenance_margin_for_new_position=maintenance_after)
+        decrease_of_maintenance_margin = maintenance_margin_before - maintenance_margin_after
+        if decrease_of_maintenance_margin.value < 0:
+            decrease_of_maintenance_margin = ZERO_MONEY
+
+        result = FillSliceAffordability(commission=commission_money, decrease_of_maintenance_margin=decrease_of_maintenance_margin, increase_of_initial_margin=initial_margin_to_block_now, maintenance_margin_for_new_position=maintenance_margin_after)
         return result
 
     def _append_execution_to_history_and_update_position(self, execution: Execution) -> None:
