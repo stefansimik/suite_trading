@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, getcontext, InvalidOperation
 
 from suite_trading.domain.monetary.currency import Currency
+from suite_trading.utils.types import DecimalLike
 
 # Set high precision for financial calculations
 getcontext().prec = 28
@@ -12,13 +13,13 @@ class Money:
     """Represents a monetary amount with currency.
 
     Uses Python's Decimal for precision arithmetic.
-    Supports values between -999,999,999,999.999999999999999999 and
-    +999,999,999,999.999999999999999999
+    Supports values between -999_999_999_999_999.999999999999999999 and
+    +999_999_999_999_999.999999999999999999
     """
 
     # Value limits
-    MAX_VALUE = Decimal("999999999999.999999999999999999")
-    MIN_VALUE = Decimal("-999999999999.999999999999999999")
+    MAX_VALUE = Decimal("999_999_999_999_999.999999999999999999")
+    MIN_VALUE = Decimal("-999_999_999_999_999.999999999999999999")
 
     def __init__(self, value, currency: Currency):
         """Initialize Money with value and currency.
@@ -64,6 +65,46 @@ class Money:
     def currency(self) -> Currency:
         """Get the currency."""
         return self._currency
+
+    def clamp(self, lower: DecimalLike | None = None, upper: DecimalLike | None = None) -> Money:
+        """Return a new Money with $value clamped into [$lower, $upper].
+
+        Currency always stays the same as $self.currency.
+
+        Args:
+            lower: Optional lower bound for $value. If None, there is no lower bound.
+            upper: Optional upper bound for $value. If None, there is no upper bound.
+
+        Returns:
+            Money: New instance with value clamped into the requested range.
+
+        Raises:
+            ValueError: If both bounds are provided and $lower > $upper.
+            ValueError: If a bound cannot be converted to Decimal.
+        """
+
+        try:
+            lower_value = Decimal(str(lower)) if lower is not None else None
+        except (ValueError, TypeError, InvalidOperation) as e:
+            raise ValueError(f"Cannot call `clamp` because $lower ({lower}) cannot be converted to Decimal") from e
+
+        try:
+            upper_value = Decimal(str(upper)) if upper is not None else None
+        except (ValueError, TypeError, InvalidOperation) as e:
+            raise ValueError(f"Cannot call `clamp` because $upper ({upper}) cannot be converted to Decimal") from e
+
+        # Check: ensure the requested range is not inverted
+        if lower_value is not None and upper_value is not None and lower_value > upper_value:
+            raise ValueError(f"Cannot call `clamp` because $lower ({lower_value}) > $upper ({upper_value})")
+
+        new_value = self.value
+        if lower_value is not None:
+            new_value = max(new_value, lower_value)
+        if upper_value is not None:
+            new_value = min(new_value, upper_value)
+
+        result = self.__class__(new_value, self.currency)
+        return result
 
     def _check_same_currency(self, other: Money) -> None:
         """Check if two Money objects have the same currency.

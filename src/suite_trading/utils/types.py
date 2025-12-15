@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import TypeAlias
 
 
-def as_decimal(value: Decimal | str | int | float) -> Decimal:
+DecimalLike: TypeAlias = Decimal | str | int | float
+
+
+def as_decimal(value: DecimalLike) -> Decimal:
     """Convert supported scalar types into Decimal.
 
     This helper centralizes Decimal conversion so that tests and utilities
