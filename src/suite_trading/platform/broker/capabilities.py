@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class OrderBookSimulatedBroker(Protocol):
+class SimulatedBroker(Protocol):
     """Brokers that consume OrderBook snapshots for simulated fills.
 
     Used to distinguish simulated/paper/backtest brokers that need detailed

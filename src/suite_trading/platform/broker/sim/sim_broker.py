@@ -17,7 +17,7 @@ from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.position import Position
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import OrderBookSimulatedBroker
+from suite_trading.platform.broker.capabilities import SimulatedBroker
 from suite_trading.platform.broker.sim.models.market_depth.protocol import MarketDepthModel
 from suite_trading.platform.broker.sim.models.market_depth.pass_through import PassThroughMarketDepthModel
 from suite_trading.platform.broker.sim.models.fee.protocol import FeeModel
@@ -63,7 +63,7 @@ class FillSliceAffordability:
     maintenance_margin_for_new_position: Money
 
 
-class SimBroker(Broker, OrderBookSimulatedBroker):
+class SimBroker(Broker, SimulatedBroker):
     """Simulated broker for backtesting and paper trading.
 
     This class implements the single-account `Broker` protocol using simulated
@@ -87,7 +87,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
       for isolated results while still sharing the engine's global simulated time.
 
     Public API is grouped under `Protocol Broker` and `Protocol
-    OrderBookSimulatedBroker` regions; other methods are under `Utilities`.
+    SimulatedBroker` regions; other methods are under `Utilities`.
     """
 
     # region Init
@@ -340,7 +340,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
 
     # endregion
 
-    # region Protocol OrderBookSimulatedBroker
+    # region Protocol SimulatedBroker
 
     def set_current_dt(self, dt: datetime) -> None:
         """Set broker simulated time.

@@ -64,7 +64,6 @@ class Broker(Protocol):
 
         This method initializes the connection to the broker's API or trading system.
         For live brokers, this typically involves authentication and session setup.
-        For `SimulatedBroker`, this is a no-op that always succeeds.
 
         Raises:
             ConnectionError: If connection cannot be established due to network issues,
