@@ -364,16 +364,7 @@ class SimBroker(Broker, SimulatedBroker):
                 self._apply_order_action(order, OrderAction.EXPIRE)
 
     def process_order_book(self, order_book: OrderBook) -> None:
-        """Process an OrderBook snapshot for order matching and margin.
-
-        The incoming $order_book is enriched via the configured MarketDepthModel and the
-        resulting snapshot becomes the broker's current OrderBook used as the single
-        source of pricing truth for matching and margin. It is stored as the latest book
-        for this instrument.
-
-        Args:
-            order_book: OrderBook snapshot to process.
-        """
+        """Process OrderBook that drives order-fills and order-updates."""
         # Check: ensure engine set broker time before processing this snapshot
         if self._current_dt is None:
             raise ValueError(f"Cannot call `process_order_book` because $current_dt is None. TradingEngine must call `set_current_dt(order_book.timestamp)` immediately before calling `process_order_book` (got $order_book.timestamp={format_dt(order_book.timestamp)})")
