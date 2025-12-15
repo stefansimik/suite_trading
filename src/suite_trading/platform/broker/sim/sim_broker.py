@@ -228,7 +228,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         # Match order with last order-book
         last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
         if last_order_book is not None:
-            self._process_single_order_with_order_book(order, last_order_book)
+            self._match_order_against_order_book(order, last_order_book)
 
     def cancel_order(self, order: Order) -> None:
         """Implements: Broker.cancel_order.
@@ -396,13 +396,13 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         # Single pass per order: trigger stop-like orders, then simulate fills if fillable
         orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument == enriched_order_book.instrument]
         for order in orders_for_instrument:
-            self._process_single_order_with_order_book(order, enriched_order_book)
+            self._match_order_against_order_book(order, enriched_order_book)
 
     # endregion
 
     # region Utilities - Order simulation
 
-    def _process_single_order_with_order_book(self, order: Order, order_book: OrderBook) -> None:
+    def _match_order_against_order_book(self, order: Order, order_book: OrderBook) -> None:
         """Apply the per-order pipeline for a single OrderBook
 
         Pipeline:
