@@ -186,8 +186,10 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         if order.id in self._orders_by_id:
             raise ValueError(f"Cannot call `submit_order` because $id ('{order.id}') already exists")
 
+        current_dt = self._current_dt
+
         # Check: DAY/GTD submission requires broker timeline time
-        if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and self._current_dt is None:
+        if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and current_dt is None:
             raise ValueError(f"Cannot call `submit_order` because $time_in_force ({order.time_in_force.value}) requires broker time, but $current_dt is None")
 
         if order.time_in_force is TimeInForce.GTD:
@@ -197,10 +199,14 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
                 raise ValueError(f"Cannot call `submit_order` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
             # Check: keep time-in-force comparisons deterministic in UTC
             if not is_utc(good_till_dt):
-                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({good_till_dt}) is not timezone-aware UTC for GTD Order $id ('{order.id}')")
+                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(good_till_dt)}) is not timezone-aware UTC for GTD Order $id ('{order.id}')")
 
-        if self._current_dt is not None:
-            order._set_submitted_dt_once(self._current_dt)
+            # Check: GTD deadline must not be earlier than broker $current_dt at submission
+            if good_till_dt < current_dt:
+                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(good_till_dt)}) is earlier than broker $current_dt ({format_dt(current_dt)}) for GTD Order $id ('{order.id}')")
+
+        if current_dt is not None:
+            order._set_submitted_dt_once(current_dt)
 
         # Track the order (submission never terminalizes in this step)
         self._orders_by_id[order.id] = order
@@ -450,7 +456,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
             if good_till_dt is None:
                 raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
 
-            return now_dt > good_till_dt
+            return now_dt >= good_till_dt
 
         # DAY
         if time_in_force == TimeInForce.DAY:
@@ -460,9 +466,10 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
                 raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is DAY but $submitted_dt is None for Order $id ('{order.id}')")
 
             # TODO: DAY uses UTC midnight for now; later we should use exchange session boundaries per instrument.
+            # Note: In this SimBroker, DAY expires at the next UTC midnight after $submitted_dt.
             day_after_submission = submitted_dt + timedelta(days=1)
             expiry_dt = day_after_submission.replace(hour=0, minute=0, second=0, microsecond=0)
-            return now_dt > expiry_dt
+            return now_dt >= expiry_dt
 
         raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force ({time_in_force.value}) is not supported")
 
