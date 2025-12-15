@@ -8,7 +8,7 @@ from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.market_data.event_feed_provider import EventFeedProvider
 from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.capabilities import SimulatedBroker
+from suite_trading.platform.broker.simulated_broker_protocol import SimulatedBroker
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.order.order_state import OrderStateCategory
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
