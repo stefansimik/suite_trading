@@ -403,7 +403,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
     # region Utilities - Order simulation
 
     def _process_single_order_with_order_book(self, order: Order, order_book: OrderBook) -> None:
-        """Apply the per-order pipeline for a single OrderBook tick.
+        """Apply the per-order pipeline for a single OrderBook
 
         Pipeline:
             1) If the order is waiting on a stop condition (TRIGGER_PENDING), evaluate trigger and, if met,
@@ -552,10 +552,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
                 previous_executions=tuple(simulated_previous_executions),
             )
 
-            zero_money = affordability.commission.__class__(Decimal("0"), affordability.commission.currency)
-            commission_cash_out = affordability.commission - affordability.decrease_of_maintenance_margin
-            if commission_cash_out.value < 0:
-                commission_cash_out = zero_money
+            commission_cash_out = (affordability.commission - affordability.decrease_of_maintenance_margin).clamp(lower=0)
 
             upfront_required_money = affordability.increase_of_initial_margin + commission_cash_out
             available_before_slice = available_money_by_currency.get(upfront_required_money.currency, Money(Decimal("0"), upfront_required_money.currency))
@@ -654,10 +651,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         )
         available_money_now = self._account.get_available_money(affordability.commission.currency)
 
-        zero_money = affordability.commission.__class__(Decimal("0"), affordability.commission.currency)
-        commission_cash_out = affordability.commission - affordability.decrease_of_maintenance_margin
-        if commission_cash_out.value < 0:
-            commission_cash_out = zero_money
+        commission_cash_out = (affordability.commission - affordability.decrease_of_maintenance_margin).clamp(lower=0)
 
         upfront_required_money = affordability.increase_of_initial_margin + commission_cash_out
 
@@ -722,11 +716,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         commission_amount = affordability.commission
         required_initial_margin_amount = affordability.increase_of_initial_margin
 
-        zero_money = commission_amount.__class__(Decimal("0"), commission_amount.currency)
-
-        commission_cash_out = commission_amount - affordability.decrease_of_maintenance_margin
-        if commission_cash_out.value < 0:
-            commission_cash_out = zero_money
+        commission_cash_out = (commission_amount - affordability.decrease_of_maintenance_margin).clamp(lower=0)
 
         upfront_required_money = required_initial_margin_amount + commission_cash_out
 
@@ -778,9 +768,7 @@ class SimBroker(Broker, OrderBookSimulatedBroker):
         maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity_before_trade, timestamp=timestamp)
         maintenance_margin_after = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_quantity_after_trade, timestamp=timestamp)
 
-        decrease_of_maintenance_margin = maintenance_margin_before - maintenance_margin_after
-        if decrease_of_maintenance_margin.value < 0:
-            decrease_of_maintenance_margin = ZERO_MONEY
+        decrease_of_maintenance_margin = (maintenance_margin_before - maintenance_margin_after).clamp(lower=0)
 
         result = FillSliceAffordability(commission=commission_money, decrease_of_maintenance_margin=decrease_of_maintenance_margin, increase_of_initial_margin=initial_margin_to_block_now, maintenance_margin_for_new_position=maintenance_margin_after)
         return result
