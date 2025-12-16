@@ -18,7 +18,7 @@ from typing import Protocol, runtime_checkable, TYPE_CHECKING, Callable
 
 from suite_trading.platform.broker.account import Account
 from suite_trading.domain.order.orders import Order
-from suite_trading.domain.position import Position
+from suite_trading.platform.broker.position import Position
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.execution import Execution

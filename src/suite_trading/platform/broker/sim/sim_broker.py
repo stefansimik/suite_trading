@@ -15,7 +15,7 @@ from suite_trading.domain.order.order_enums import TimeInForce
 from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory, OrderState
 from suite_trading.domain.order.execution import Execution
 from suite_trading.domain.instrument import Instrument
-from suite_trading.domain.position import Position
+from suite_trading.platform.broker.position import Position
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.simulated_broker_protocol import SimulatedBroker
 from suite_trading.platform.broker.sim.models.market_depth.protocol import MarketDepthModel
