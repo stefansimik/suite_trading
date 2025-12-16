@@ -291,7 +291,7 @@ class Order:
                 transition is invalid. Validation and snapping are performed in `Execution`.
         """
 
-        # Check: allow fills only when $state_category is FILLABLE
+        # Precondition: allow fills only when $state_category is FILLABLE
         cat = self.state_category
         if cat is not OrderStateCategory.FILLABLE:
             raise ValueError(f"Cannot call `add_execution` because $state_category ('{cat.name}') is not FILLABLE for $state ('{self.state}')")
@@ -345,7 +345,7 @@ class Order:
         Raises:
             ValueError: If `$submitted_dt` is already set.
         """
-        # Check: submission time must be set only once to stay deterministic
+        # Precondition: submission time must be set only once to stay deterministic
         if self._submitted_dt is not None:
             raise ValueError(f"Cannot call `_set_submitted_dt_once` because $submitted_dt ({self._submitted_dt}) is already set")
 
@@ -357,15 +357,15 @@ class Order:
         Raises:
             ValueError: If $quantity <= 0 or if `$time_in_force` and `$good_till_dt` are inconsistent.
         """
-        # Check: positive order quantity
+        # Precondition: positive order quantity
         if self.quantity <= 0:
             raise ValueError(f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive")
 
-        # Check: GTD must define $good_till_dt
+        # Precondition: GTD must define $good_till_dt
         if self.time_in_force is TimeInForce.GTD and self.good_till_dt is None:
             raise ValueError("Cannot call `_validate` because $time_in_force is GTD but $good_till_dt is None")
 
-        # Check: only GTD can define $good_till_dt
+        # Precondition: only GTD can define $good_till_dt
         if self.time_in_force is not TimeInForce.GTD and self.good_till_dt is not None:
             raise ValueError(f"Cannot call `_validate` because $time_in_force is {self.time_in_force} but $good_till_dt ({self.good_till_dt}) is not None")
 
@@ -624,7 +624,7 @@ class StopLimitOrder(Order):
         # Call parent validation first
         super()._validate()
 
-        # Check: enforce order-direction relationship between $stop_price and $limit_price for StopLimitOrder
+        # Precondition: enforce order-direction relationship between $stop_price and $limit_price for StopLimitOrder
         if self.is_buy and self.limit_price < self.stop_price:
             raise ValueError(f"Cannot call `_validate` because for BUY StopLimitOrder $limit_price ({self.limit_price}) < $stop_price ({self.stop_price}). Use $limit_price >= $stop_price or change $side")
         if self.is_sell and self.limit_price > self.stop_price:

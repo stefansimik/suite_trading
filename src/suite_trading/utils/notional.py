@@ -19,7 +19,7 @@ def compute_notional_value(price: Decimal, quantity: Decimal, contract_size: Dec
     Raises:
         ValueError: If $contract_size <= 0.
     """
-    # Check: contract size must be positive to produce a valid notional scale
+    # Precondition: contract size must be positive to produce a valid notional scale
     if contract_size <= 0:
         raise ValueError(f"Cannot call `compute_notional_value` because $contract_size ({contract_size}) is not positive")
 

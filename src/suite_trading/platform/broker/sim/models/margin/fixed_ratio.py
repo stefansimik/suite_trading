@@ -29,7 +29,7 @@ class FixedRatioMarginModel(MarginModel):
         Raises:
             ValueError: If $initial_ratio or $maintenance_ratio is outside [0, 1].
         """
-        # Check: ratios in [0, 1]
+        # Precondition: ratios in [0, 1]
         if not (Decimal("0") <= initial_ratio <= Decimal("1")):
             raise ValueError(f"Cannot call `__init__` because $initial_ratio ({initial_ratio}) is out of [0, 1]")
         if not (Decimal("0") <= maintenance_ratio <= Decimal("1")):

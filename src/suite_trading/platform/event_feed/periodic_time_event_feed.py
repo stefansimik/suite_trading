@@ -95,18 +95,18 @@ class FixedIntervalEventFeed:
         end_dt: datetime | None = None,
         finish_with_feed: EventFeed | None = None,
     ) -> None:
-        # Check: $start_datetime must be timezone-aware UTC to avoid ambiguous scheduling
+        # Precondition: $start_datetime must be timezone-aware UTC to avoid ambiguous scheduling
         require_utc(start_dt)
 
-        # Check: $interval must be a timedelta to enforce an unambiguous schedule unit
+        # Precondition: $interval must be a timedelta to enforce an unambiguous schedule unit
         if not isinstance(interval, timedelta):
             raise ValueError("Cannot call `FixedIntervalEventFeed.__init__` because $interval is not timedelta.")
 
-        # Check: $interval must be > 0 to make forward progress
+        # Precondition: $interval must be > 0 to make forward progress
         if interval <= timedelta(0):
             raise ValueError("Cannot call `FixedIntervalEventFeed.__init__` because $interval is non-positive.")
 
-        # Check: $end_datetime (when provided) must be UTC and >= $start_datetime
+        # Precondition: $end_datetime (when provided) must be UTC and >= $start_datetime
         if end_dt is not None:
             require_utc(end_dt)
             if end_dt < start_dt:
@@ -210,7 +210,7 @@ class FixedIntervalEventFeed:
         Raises:
             ValueError: If $cutoff_time is not timezone-aware UTC.
         """
-        # Check: $cutoff_time must be timezone-aware UTC to preserve consistent ordering
+        # Precondition: $cutoff_time must be timezone-aware UTC to preserve consistent ordering
         require_utc(cutoff_time)
 
         if self._closed or self._finished:

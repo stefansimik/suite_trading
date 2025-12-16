@@ -32,11 +32,11 @@ class Money:
             ValueError: If value is invalid or out of range.
             TypeError: If currency is not Currency instance.
         """
-        # Check: currency must be an instance of Currency
+        # Precondition: currency must be an instance of Currency
         if not isinstance(currency, Currency):
             raise TypeError(f"$currency must be a Currency instance, but provided value is: {currency}")
 
-        # Check: value must be convertible to Decimal
+        # Precondition: value must be convertible to Decimal
         try:
             if isinstance(value, Decimal):
                 decimal_value = value
@@ -45,7 +45,7 @@ class Money:
         except (ValueError, TypeError) as e:
             raise ValueError(f"$value cannot be converted to Decimal, but provided value is: {value}") from e
 
-        # Check: value must be within allowed range
+        # Precondition: value must be within allowed range
         if decimal_value > self.MAX_VALUE:
             raise ValueError(f"$value exceeds maximum allowed value {self.MAX_VALUE}, but provided value is: {decimal_value}")
         if decimal_value < self.MIN_VALUE:
@@ -93,7 +93,7 @@ class Money:
         except (ValueError, TypeError, InvalidOperation) as e:
             raise ValueError(f"Cannot call `clamp` because $upper ({upper}) cannot be converted to Decimal") from e
 
-        # Check: ensure the requested range is not inverted
+        # Precondition: ensure the requested range is not inverted
         if lower_value is not None and upper_value is not None and lower_value > upper_value:
             raise ValueError(f"Cannot call `clamp` because $lower ({lower_value}) > $upper ({upper_value})")
 

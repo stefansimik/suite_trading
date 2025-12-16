@@ -74,7 +74,7 @@ class SimAccount(Account):
         current = self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
         new_value = current.value - amount.value
 
-        # Check: available money cannot go below zero
+        # Precondition: available money cannot go below zero
         if new_value < 0:
             raise ValueError(f"Cannot call `subtract_available_money` because resulting $available ({new_value} {currency}) would be negative")
 
@@ -96,7 +96,7 @@ class SimAccount(Account):
         Raises:
             ValueError: If $amount.value <= 0 or subtracting would make $available negative.
         """
-        # Check: $amount must be strictly positive (no zero or rebates for now)
+        # Precondition: $amount must be strictly positive (no zero or rebates for now)
         if amount.value <= 0:
             raise ValueError(f"Cannot call `pay_fee` because $amount ({amount.value} {amount.currency}) is not positive")
 
@@ -113,7 +113,7 @@ class SimAccount(Account):
     # MARGIN (PER-INSTRUMENT)
 
     def block_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None:
-        # Check: available money must be sufficient to block initial margin
+        # Precondition: available money must be sufficient to block initial margin
         if not self.has_enough_available_money(amount):
             raise ValueError(f"Cannot call `block_initial_margin_for_instrument` because $available in {amount.currency} is insufficient for $amount ({amount.value})")
 
@@ -129,7 +129,7 @@ class SimAccount(Account):
             pair = MarginRequirements(initial=Money(Decimal("0"), amount.currency), maintenance=Money(Decimal("0"), amount.currency))
         new_initial_value = pair.initial.value - amount.value
 
-        # Check: initial margin cannot become negative
+        # Precondition: initial margin cannot become negative
         if new_initial_value < 0:
             raise ValueError(f"Cannot call `unblock_initial_margin_for_instrument` because resulting initial margin would be negative for $instrument ({instrument})")
 

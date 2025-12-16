@@ -252,19 +252,19 @@ class OrderBook:
         ):
             prev_price: Decimal | None = None
             for i, level in enumerate(levels):
-                # Check: level is a BookLevel
+                # Precondition: level is a BookLevel
                 if not isinstance(level, BookLevel):
                     raise ValueError(f"Cannot call `OrderBook._validate` because ${side_name}[{i}] is not a BookLevel")
                 price = level.price
                 volume = level.volume
 
-                # Check: types are Decimal
+                # Precondition: types are Decimal
                 if not isinstance(price, Decimal):
                     raise ValueError(f"Cannot call `OrderBook._validate` because ${side_name}[{i}].price ('{price}') is not a Decimal")
                 if not isinstance(volume, Decimal):
                     raise ValueError(f"Cannot call `OrderBook._validate` because ${side_name}[{i}].volume ('{volume}') is not a Decimal")
 
-                # Check: finiteness and non-negative volume
+                # Precondition: finiteness and non-negative volume
                 if not price.is_finite():
                     raise ValueError(f"Cannot call `OrderBook._validate` because ${side_name}[{i}].price ('{price}') is not finite")
                 if not volume.is_finite():
@@ -272,7 +272,7 @@ class OrderBook:
                 if volume < 0:
                     raise ValueError(f"Cannot call `OrderBook._validate` because ${side_name}[{i}].volume ('{volume}') is negative")
 
-                # Check: sorted best-first
+                # Precondition: sorted best-first
                 if prev_price is not None:
                     if descending and price > prev_price:
                         raise ValueError(f"Cannot call `OrderBook._validate` because ${side_name} are not sorted best-first at index {i - 1}->{i}: price[{i - 1}]='{prev_price}' < price[{i}]='{price}'. Provide ${side_name} sorted with highest price first.")

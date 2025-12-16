@@ -33,7 +33,7 @@ class FixedFeeModel(FeeModel):
         timestamp: datetime,
         previous_executions: Iterable[Execution],
     ) -> Money:
-        # Check: ensure positive $quantity
+        # Precondition: ensure positive $quantity
         if quantity <= 0:
             raise ValueError(f"Cannot call `compute_commission` because $quantity ({quantity}) <= 0 for order $id ('{order.id}')")
 

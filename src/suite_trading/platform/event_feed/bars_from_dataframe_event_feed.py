@@ -56,11 +56,11 @@ class BarsFromDataFrameEventFeed:
           $source_tz is None, a ValueError is raised.
         """
 
-        # Check: $df must be a pandas DataFrame
+        # Precondition: $df must be a pandas DataFrame
         if not isinstance(df, pd.DataFrame):
             raise ValueError(f"Expected a pandas DataFrame, but received {type(df).__name__}. Please provide your data as a pandas DataFrame.")
 
-        # Check: required columns present (volume is optional)
+        # Precondition: required columns present (volume is optional)
         expected = {"start_dt", "end_dt", "open", "high", "low", "close"}
         missing = [c for c in expected if c not in df.columns]
         if missing:

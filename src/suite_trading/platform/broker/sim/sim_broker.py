@@ -240,7 +240,7 @@ class SimBroker(Broker, SimulatedBroker):
         if not self._connected:
             raise RuntimeError(f"Cannot call `cancel_order` because $connected ({self._connected}) is False")
 
-        # Check: order must be known to the broker
+        # Precondition: order must be known to the broker
         tracked = self._orders_by_id.get(order.id)
         if tracked is None:
             raise ValueError(f"Cannot call `cancel_order` because $id ('{order.id}') is not tracked")
@@ -267,7 +267,7 @@ class SimBroker(Broker, SimulatedBroker):
         if not self._connected:
             raise RuntimeError(f"Cannot call `modify_order` because $connected ({self._connected}) is False")
 
-        # Check: order must be known to the broker
+        # Precondition: order must be known to the broker
         tracked = self._orders_by_id.get(order.id)
         if tracked is None:
             raise ValueError(f"Cannot call `modify_order` because $id ('{order.id}') is not tracked")
@@ -375,7 +375,6 @@ class SimBroker(Broker, SimulatedBroker):
         # Enrich with depth model and treat the result as the broker's current OrderBook snapshot
         enriched_order_book = self._depth_model.enrich_order_book(order_book)
 
-        # Check: Skip processing if this OrderBook is identical to the last processed one.
         # This handles redundant updates (e.g., multiple bars at same time with same price).
         last_processed_book = self._latest_order_book_by_instrument.get(enriched_order_book.instrument)
         if last_processed_book == enriched_order_book:

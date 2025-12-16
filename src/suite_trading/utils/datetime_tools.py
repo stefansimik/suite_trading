@@ -223,7 +223,7 @@ def format_range(start: datetime, end: datetime) -> str:
         ValueError: If $start or $end is not timezone-aware UTC, or if $end < $start.
     """
 
-    # Check: both datetimes must be UTC + have to be chronologically ordered
+    # Precondition: both datetimes must be UTC + have to be chronologically ordered
     require_utc(start)
     require_utc(end)
     if end < start:

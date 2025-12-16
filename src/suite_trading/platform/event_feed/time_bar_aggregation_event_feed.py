@@ -40,15 +40,15 @@ class TimeBarAggregationEventFeed:
         self._emit_first_partial_bar = emit_first_partial_bar
         self._emit_later_partial_bars = emit_later_partial_bars
 
-        # Check: ensure size > 0
+        # Precondition: ensure size > 0
         if not isinstance(self._size, int) or self._size <= 0:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $size ('{self._size}') must be > 0")
 
-        # Check: unit must be SECOND/MINUTE/HOUR/DAY/WEEK/MONTH
+        # Precondition: unit must be SECOND/MINUTE/HOUR/DAY/WEEK/MONTH
         if self._unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH}:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $unit ('{self._unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, WEEK, or MONTH")
 
-        # Check: enforce size == 1 for DAY, WEEK, MONTH
+        # Precondition: enforce size == 1 for DAY, WEEK, MONTH
         if self._unit in {BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH} and self._size != 1:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $size ('{self._size}') must be 1 when $unit is {self._unit.name}")
 
@@ -83,7 +83,7 @@ class TimeBarAggregationEventFeed:
         if self._closed:
             return
 
-        # Check: We are processing BarEvent(s). Other events are not expected
+        # Precondition: We are processing BarEvent(s). Other events are not expected
         if not isinstance(event, BarEvent):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $event (class '{type(event).__name__}') is not a BarEvent. Register this feed on an EventFeed that produces BarEvent(s).")
 

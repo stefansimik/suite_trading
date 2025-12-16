@@ -37,7 +37,7 @@ class NewBarEventAccumulator:
         Args:
             event (BarEvent): Input event to accumulate.
         """
-        # Check: ensure $event is a NewBarEvent instance to maintain type safety
+        # Precondition: ensure $event is a NewBarEvent instance to maintain type safety
         if not isinstance(event, BarEvent):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.add` because $event (class '{type(event).__name__}') is not a NewBarEvent")
 
@@ -66,7 +66,7 @@ class NewBarEventAccumulator:
         """
         bar = self._bar_accumulator.build_bar(out_bar_type, start_dt, end_dt, is_partial=is_partial)
 
-        # Check: require $last_dt_received and $last_is_historical to be present to build an event
+        # Precondition: require $last_dt_received and $last_is_historical to be present to build an event
         if self._last_dt_received is None or self._last_is_historical is None:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.build_event` because missing metadata: $last_dt_received ('{self._last_dt_received}'), $last_is_historical ('{self._last_is_historical}')")
 

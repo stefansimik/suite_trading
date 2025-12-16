@@ -170,29 +170,29 @@ class Execution:
         Raises:
             ValueError: If execution data is invalid.
         """
-        # Check: positive execution quantity
+        # Precondition: positive execution quantity
         if self._quantity <= 0:
             raise ValueError(f"Validation failed, because $quantity ({self._quantity}) is not positive")
 
-        # Check: ensure $quantity is snapped to Instrument step
+        # Precondition: ensure $quantity is snapped to Instrument step
         expected_qty = self.instrument.snap_quantity(self._quantity)
         if expected_qty != self._quantity:
             raise ValueError(f"Validation failed, because $quantity ({self._quantity}) is not snapped to Instrument step (expected {expected_qty})")
 
-        # Check: ensure $price is snapped to Instrument tick
+        # Precondition: ensure $price is snapped to Instrument tick
         expected_price = self.instrument.snap_price(self._price)
         if expected_price != self._price:
             raise ValueError(f"Validation failed, because $price ({self._price}) is not snapped to Instrument tick (expected {expected_price})")
 
-        # Check: ensure commission is provided to avoid half-built executions
+        # Precondition: ensure commission is provided to avoid half-built executions
         if self._commission is None:
             raise ValueError(f"Validation failed, because $commission is None for $id ('{self._order.id}')")
 
-        # Check: commission cannot be negative
+        # Precondition: commission cannot be negative
         if self._commission.value < 0:
             raise ValueError(f"Validation failed, because $commission ({self._commission}) is negative")
 
-        # Check: ensure execution doesn't overfill the order
+        # Precondition: ensure execution doesn't overfill the order
         if self._quantity > self._order.unfilled_quantity:
             raise ValueError(f"Validation failed, because $quantity ({self._quantity}) exceeds order $unfilled_quantity ({self._order.unfilled_quantity})")
 
