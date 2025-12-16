@@ -66,6 +66,29 @@ Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, bu
 - `Callable[[...], R]` with explicit return type
 - Import cross-module types unconditionally or under `if TYPE_CHECKING:`
 
+## 3.2. Decimal utilities (DecimalLike, as_decimal)
+
+When working with `decimal.Decimal` values (prices, quantities, P&L, ratios, fees), use `suite_trading.utils.decimal_tools`.
+
+- Prefer `as_decimal(value)` over ad-hoc conversions like `Decimal(str(value))`.
+- Use `DecimalLike` for public inputs that accept a "Decimal-ish" scalar (`Decimal | str | int | float`).
+- Keep computed return types as `Decimal`.
+
+Default import:
+
+```python
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+```
+
+Decimal-heavy modules (many conversions/Decimal operations) may use a local shortcut:
+
+```python
+from suite_trading.utils.decimal_tools import as_decimal as D  # D = as_decimal
+```
+
+Rules:
+- Use `D` only in Decimal-heavy modules.
+
 ## 3.3. Parameter Layout in Calls
 
 When calling functions/methods/constructors, keep simple argument lists on a single line for fast scanning.
