@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_tools import format_dt
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 
 class Position:
@@ -35,20 +36,20 @@ class Position:
     def __init__(
         self,
         instrument: Instrument,
-        quantity: Decimal | str | float,
-        average_price: Decimal | str | float,
-        unrealized_pnl: Decimal | str | float = Decimal("0"),
-        realized_pnl: Decimal | str | float = Decimal("0"),
+        quantity: DecimalLike,
+        average_price: DecimalLike,
+        unrealized_pnl: DecimalLike = Decimal("0"),
+        realized_pnl: DecimalLike = Decimal("0"),
         last_update: datetime | None = None,
     ) -> None:
         # Check: $last_update must be timezone-aware for consistent audit ordering
         if last_update is not None and last_update.tzinfo is None:
             raise ValueError(f"Cannot call `__init__` because $last_update ({last_update}) is not timezone-aware")
 
-        quantity_decimal = Decimal(str(quantity))
-        average_price_decimal = Decimal(str(average_price))
-        unrealized_pnl_decimal = Decimal(str(unrealized_pnl))
-        realized_pnl_decimal = Decimal(str(realized_pnl))
+        quantity_decimal = as_decimal(quantity)
+        average_price_decimal = as_decimal(average_price)
+        unrealized_pnl_decimal = as_decimal(unrealized_pnl)
+        realized_pnl_decimal = as_decimal(realized_pnl)
 
         # Check: $average_price must be finite when $quantity is non-zero
         if quantity_decimal != 0 and (average_price_decimal.is_nan() or average_price_decimal.is_infinite()):
@@ -121,7 +122,7 @@ class Position:
 
         return self.realized_pnl + self.unrealized_pnl
 
-    def market_value(self, current_price: Decimal | str | float) -> Decimal:
+    def market_value(self, current_price: DecimalLike) -> Decimal:
         """Compute the current market value of the position.
 
         Args:
@@ -131,10 +132,10 @@ class Position:
             Market value as $quantity * $current_price * $contract_size.
         """
 
-        current_price_decimal = Decimal(str(current_price))
+        current_price_decimal = as_decimal(current_price)
         return self.quantity * current_price_decimal * self.instrument.contract_size
 
-    def update_unrealized_pnl(self, current_price: Decimal | str | float, *, timestamp: datetime) -> Position:
+    def update_unrealized_pnl(self, current_price: DecimalLike, *, timestamp: datetime) -> Position:
         """Create a new Position snapshot with updated unrealized P&L.
 
         Args:
@@ -152,7 +153,7 @@ class Position:
         if timestamp.tzinfo is None:
             raise ValueError(f"Cannot call `update_unrealized_pnl` because $timestamp ({timestamp}) is not timezone-aware")
 
-        current_price_decimal = Decimal(str(current_price))
+        current_price_decimal = as_decimal(current_price)
 
         if self.is_flat:
             new_unrealized_pnl = Decimal("0")
