@@ -2,29 +2,32 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
-def round_to_increment(price: float | Decimal, increment: Decimal) -> Decimal:
+
+def round_to_increment(price: DecimalLike, increment: DecimalLike) -> Decimal:
     """
     Round a price to the nearest valid price increment.
 
     Args:
-        price: The price to round
-        increment: The price increment to round to
+        price: The price to round (Decimal-like scalar).
+        increment: The price increment to round to (Decimal-like scalar).
 
     Returns:
         The price rounded to the nearest increment
     """
     # Convert to Decimal for precise arithmetic
-    price_decimal = Decimal(str(price))
+    price_decimal = as_decimal(price)
+    increment_decimal = as_decimal(increment)
 
     # Calculate how many increments fit into the price
-    increments = price_decimal / increment
+    increments = price_decimal / increment_decimal
 
     # Round to the nearest whole number of increments
     rounded_increments = increments.quantize(Decimal("1"))
 
     # Convert back to price by multiplying by increment
-    return rounded_increments * increment
+    return rounded_increments * increment_decimal
 
 
 def ceil_to_multiple(n: int, m: int) -> int:

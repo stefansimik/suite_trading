@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from decimal import Decimal, ROUND_HALF_EVEN
 from enum import Enum
 from suite_trading.domain.monetary.currency import Currency
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 if TYPE_CHECKING:
     from suite_trading.domain.monetary.money import Money
@@ -57,9 +58,9 @@ class Instrument:
         name: str,
         exchange: str,
         asset_class: AssetClass,
-        price_increment: Decimal | str,
-        quantity_increment: Decimal | str,
-        contract_size: Decimal | str,
+        price_increment: DecimalLike,
+        quantity_increment: DecimalLike,
+        contract_size: DecimalLike,
         contract_unit: str,
         quote_currency: Currency,
         settlement_currency: Currency | None = None,
@@ -69,9 +70,9 @@ class Instrument:
         Args:
             name: The instrument identifier (e.g., "6E", "EURUSD", "AAPL").
             exchange: Venue name (e.g., "CME", "FOREX", "NASDAQ").
-            price_increment: Minimum price tick size as Decimal or str.
-            quantity_increment: Minimum quantity increment as Decimal or str.
-            contract_size: Underlying amount per contract/lot (e.g., 125000 for 6E).
+            price_increment: Minimum price tick size as a Decimal-like scalar.
+            quantity_increment: Minimum quantity increment as a Decimal-like scalar.
+            contract_size: Underlying amount per contract/lot (e.g., 125000 for 6E) as a Decimal-like scalar.
             contract_unit: Unit of the underlying (e.g., "EUR", "share", "barrel").
             quote_currency: Currency in which prices are quoted (denominator of the quote). This
                 expresses how the price is displayed/traded (e.g., USD in EURUSD = 1.1000 USD per 1 EUR).
@@ -87,9 +88,9 @@ class Instrument:
         self._name = name
         self._exchange = exchange
         self._asset_class = asset_class
-        self._price_increment = Decimal(str(price_increment))
-        self._quantity_increment = Decimal(str(quantity_increment))
-        self._contract_size = Decimal(str(contract_size))
+        self._price_increment = as_decimal(price_increment)
+        self._quantity_increment = as_decimal(quantity_increment)
+        self._contract_size = as_decimal(contract_size)
         self._contract_unit = contract_unit
 
         # Precondition: ensure $quote_currency is Currency to keep domain model typed and fail fast during migration
@@ -246,14 +247,14 @@ class Instrument:
 
     # region Normalization
 
-    def snap_price(self, value: Decimal | str | float | int) -> Decimal:
+    def snap_price(self, value: DecimalLike) -> Decimal:
         """Return $value snapped to $price_increment as an exact Decimal.
 
-        Accepts float safely by converting via str(...) before Decimal construction, then
-        quantizes to $price_increment using banker’s rounding (ROUND_HALF_EVEN).
+        Accepts float safely by converting via `as_decimal` (which uses str(...) for non-Decimal),
+        then quantizes to $price_increment using banker’s rounding (ROUND_HALF_EVEN).
 
         Args:
-            value: Price to normalize (Decimal, str, int, or float).
+            value: Price to normalize (Decimal-like scalar).
 
         Returns:
             Decimal: Price snapped to a multiple of $price_increment.
@@ -262,7 +263,7 @@ class Instrument:
             ValueError: If $value is not finite.
         """
         # Convert safely; avoid binary float artifacts by using str(...) for non-Decimal
-        v = value if isinstance(value, Decimal) else Decimal(str(value))
+        v = as_decimal(value)
 
         # Precondition: input must be finite; negative prices may be valid in some markets
         if not v.is_finite():
@@ -271,14 +272,14 @@ class Instrument:
         # Snap to the instrument's price increment (banker's rounding)
         return v.quantize(self.price_increment, rounding=ROUND_HALF_EVEN)
 
-    def snap_quantity(self, value: Decimal | str | float | int) -> Decimal:
+    def snap_quantity(self, value: DecimalLike) -> Decimal:
         """Return $value snapped to $quantity_increment as an exact Decimal.
 
-        Accepts float safely by converting via str(...) before Decimal construction, then
-        quantizes to $quantity_increment using banker’s rounding (ROUND_HALF_EVEN).
+        Accepts float safely by converting via `as_decimal` (which uses str(...) for non-Decimal),
+        then quantizes to $quantity_increment using banker’s rounding (ROUND_HALF_EVEN).
 
         Args:
-            value: Quantity to normalize (Decimal, str, int, or float).
+            value: Quantity to normalize (Decimal-like scalar).
 
         Returns:
             Decimal: Quantity snapped to a multiple of $quantity_increment.
@@ -287,7 +288,7 @@ class Instrument:
             ValueError: If $value <= 0.
         """
         # Convert safely; avoid binary float artifacts by using str(...) for non-Decimal
-        v = value if isinstance(value, Decimal) else Decimal(str(value))
+        v = as_decimal(value)
 
         # Precondition: quantity must be positive for trading semantics
         if v <= 0:

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
 
 from suite_trading.domain.market_data.order_book.order_book import FillSlice
+from suite_trading.utils.decimal_tools import as_decimal
 
 
 class DistributionFillModel:
@@ -230,7 +231,7 @@ class DistributionFillModel:
                 continue
 
             # Probability is strictly between 0 and 1: use randomness per slice
-            random_value = Decimal(str(self._rng.random()))
+            random_value = as_decimal(self._rng.random())
             if random_value <= limit_on_touch_probability:
                 accepted_fills.append(fill_slice)
 
@@ -258,7 +259,7 @@ class DistributionFillModel:
             return next(iter(distribution.keys()))
 
         # General case: draw a random value and walk the cumulative weights
-        random_value = Decimal(str(self._rng.random()))
+        random_value = as_decimal(self._rng.random())
 
         cumulative_probability = Decimal("0")
         for slippage_ticks, probability_weight in sorted(distribution.items(), key=lambda item: item[0]):

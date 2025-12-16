@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_tools import format_dt, expect_utc
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 
 class TradeTick:
@@ -22,7 +23,13 @@ class TradeTick:
 
     __slots__ = ("_instrument", "_price", "_volume", "_timestamp")
 
-    def __init__(self, instrument: Instrument, price: Decimal | str | float, volume: Decimal | str | float, timestamp: datetime):
+    def __init__(
+        self,
+        instrument: Instrument,
+        price: DecimalLike,
+        volume: DecimalLike,
+        timestamp: datetime,
+    ):
         """Initialize a new trade tick.
 
         Args:
@@ -39,8 +46,8 @@ class TradeTick:
         self._timestamp = expect_utc(timestamp)
 
         # Explicit type conversion
-        self._price = Decimal(str(price))
-        self._volume = Decimal(str(volume))
+        self._price = as_decimal(price)
+        self._volume = as_decimal(volume)
 
         # Validate volume
         if self._volume <= 0:

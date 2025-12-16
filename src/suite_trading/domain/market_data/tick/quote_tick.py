@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_tools import format_dt, expect_utc
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 
 class QuoteTick:
@@ -34,10 +35,10 @@ class QuoteTick:
     def __init__(
         self,
         instrument: Instrument,
-        bid_price: Decimal | str | float,
-        ask_price: Decimal | str | float,
-        bid_volume: Decimal | str | float,
-        ask_volume: Decimal | str | float,
+        bid_price: DecimalLike,
+        ask_price: DecimalLike,
+        bid_volume: DecimalLike,
+        ask_volume: DecimalLike,
         timestamp: datetime,
     ):
         """Initialize a new quote tick.
@@ -58,10 +59,10 @@ class QuoteTick:
         self._timestamp = expect_utc(timestamp)
 
         # Explicit type conversion
-        self._bid_price = Decimal(str(bid_price))
-        self._ask_price = Decimal(str(ask_price))
-        self._bid_volume = Decimal(str(bid_volume))
-        self._ask_volume = Decimal(str(ask_volume))
+        self._bid_price = as_decimal(bid_price)
+        self._ask_price = as_decimal(ask_price)
+        self._bid_volume = as_decimal(bid_volume)
+        self._ask_volume = as_decimal(ask_volume)
 
         # Precondition: Validate volumes
         if self._bid_volume <= 0:

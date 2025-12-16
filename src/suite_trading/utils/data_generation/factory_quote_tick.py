@@ -8,6 +8,7 @@ from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.utils.data_generation import factory_instrument
 from suite_trading.utils.data_generation.price_patterns import zig_zag_function
+from suite_trading.utils.decimal_tools import as_decimal
 from suite_trading.utils.math import round_to_increment
 
 
@@ -105,7 +106,7 @@ def create_quote_tick_series(
 
     center_prices: list[Decimal] = []
     for i in range(num_ticks):
-        pattern_value = Decimal(str(price_pattern_func(i)))
+        pattern_value = as_decimal(price_pattern_func(i))
         raw_center = center_price * pattern_value
         center_prices.append(round_to_increment(raw_center, price_increment))
 

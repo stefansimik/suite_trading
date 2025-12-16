@@ -8,6 +8,7 @@ from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.utils.datetime_tools import format_range, expect_utc
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 
 class Bar:
@@ -55,11 +56,11 @@ class Bar:
         bar_type: BarType,
         start_dt: datetime,
         end_dt: datetime,
-        open: Decimal | str | float,
-        high: Decimal | str | float,
-        low: Decimal | str | float,
-        close: Decimal | str | float,
-        volume: Decimal | str | float | None = None,
+        open: DecimalLike,
+        high: DecimalLike,
+        low: DecimalLike,
+        close: DecimalLike,
+        volume: DecimalLike | None = None,
         *,
         is_partial: bool = False,
     ):
@@ -87,11 +88,11 @@ class Bar:
         self._end_dt = expect_utc(end_dt)
 
         # Explicit type conversion for prices
-        self._open = Decimal(str(open))
-        self._high = Decimal(str(high))
-        self._low = Decimal(str(low))
-        self._close = Decimal(str(close))
-        self._volume = Decimal(str(volume)) if volume is not None else None
+        self._open = as_decimal(open)
+        self._high = as_decimal(high)
+        self._low = as_decimal(low)
+        self._close = as_decimal(close)
+        self._volume = as_decimal(volume) if volume is not None else None
         self._is_partial = bool(is_partial)
 
         # Ensure end_dt is after start_dt

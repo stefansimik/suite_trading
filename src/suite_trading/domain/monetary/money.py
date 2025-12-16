@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, getcontext, InvalidOperation
 
 from suite_trading.domain.monetary.currency import Currency
-from suite_trading.utils.decimal_tools import DecimalLike
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 # Set high precision for financial calculations
 getcontext().prec = 28
@@ -21,11 +21,11 @@ class Money:
     MAX_VALUE = Decimal("999_999_999_999_999.999999999999999999")
     MIN_VALUE = Decimal("-999_999_999_999_999.999999999999999999")
 
-    def __init__(self, value, currency: Currency):
+    def __init__(self, value: DecimalLike, currency: Currency):
         """Initialize Money with value and currency.
 
         Args:
-            value: Numeric value (int, float, str, Decimal).
+            value: Numeric value (Decimal-like scalar).
             currency (Currency): Currency object.
 
         Raises:
@@ -36,14 +36,11 @@ class Money:
         if not isinstance(currency, Currency):
             raise TypeError(f"$currency must be a Currency instance, but provided value is: {currency}")
 
-        # Precondition: value must be convertible to Decimal
+        # Precondition: $value must be convertible to Decimal
         try:
-            if isinstance(value, Decimal):
-                decimal_value = value
-            else:
-                decimal_value = Decimal(str(value))
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"$value cannot be converted to Decimal, but provided value is: {value}") from e
+            decimal_value = as_decimal(value)
+        except (ValueError, TypeError, InvalidOperation) as e:
+            raise ValueError(f"Cannot init `Money` because $value ({value}) cannot be converted to Decimal") from e
 
         # Precondition: value must be within allowed range
         if decimal_value > self.MAX_VALUE:
@@ -84,12 +81,12 @@ class Money:
         """
 
         try:
-            lower_value = Decimal(str(lower)) if lower is not None else None
+            lower_value = as_decimal(lower) if lower is not None else None
         except (ValueError, TypeError, InvalidOperation) as e:
             raise ValueError(f"Cannot call `clamp` because $lower ({lower}) cannot be converted to Decimal") from e
 
         try:
-            upper_value = Decimal(str(upper)) if upper is not None else None
+            upper_value = as_decimal(upper) if upper is not None else None
         except (ValueError, TypeError, InvalidOperation) as e:
             raise ValueError(f"Cannot call `clamp` because $upper ({upper}) cannot be converted to Decimal") from e
 
@@ -164,7 +161,7 @@ class Money:
         else:
             # Add number to Money
             try:
-                return Money(self.value + Decimal(str(other)), self.currency)
+                return Money(self.value + as_decimal(other), self.currency)
             except (ValueError, TypeError):
                 return NotImplemented
 
@@ -180,14 +177,14 @@ class Money:
         else:
             # Subtract number from Money
             try:
-                return Money(self.value - Decimal(str(other)), self.currency)
+                return Money(self.value - as_decimal(other), self.currency)
             except (ValueError, TypeError):
                 return NotImplemented
 
     def __rsub__(self, other):
         """Right subtraction: number - Money."""
         try:
-            return Money(Decimal(str(other)) - self.value, self.currency)
+            return Money(as_decimal(other) - self.value, self.currency)
         except (ValueError, TypeError):
             return NotImplemented
 
@@ -196,7 +193,7 @@ class Money:
         if isinstance(other, Money):
             return NotImplemented  # Money * Money doesn't make sense
         try:
-            return Money(self.value * Decimal(str(other)), self.currency)
+            return Money(self.value * as_decimal(other), self.currency)
         except (ValueError, TypeError):
             return NotImplemented
 
@@ -213,7 +210,7 @@ class Money:
             return self.value / other.value  # Returns Decimal ratio
         else:
             try:
-                divisor = Decimal(str(other))
+                divisor = as_decimal(other)
                 if divisor == 0:
                     raise ZeroDivisionError("Cannot divide Money by zero")
                 return Money(self.value / divisor, self.currency)

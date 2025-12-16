@@ -9,13 +9,13 @@ from suite_trading.domain.market_data.order_book.order_book import BookLevel, Or
 from suite_trading.utils.data_generation import factory_instrument
 from suite_trading.utils.data_generation.price_patterns import zig_zag_function
 from suite_trading.utils.math import round_to_increment
-from suite_trading.utils.decimal_tools import as_decimal as D
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 
 def create_order_book(
     instrument: Instrument | None = None,
-    bids: list[tuple[Decimal | str | int, Decimal | str | int]] | None = None,
-    asks: list[tuple[Decimal | str | int, Decimal | str | int]] | None = None,
+    bids: list[tuple[DecimalLike, DecimalLike]] | None = None,
+    asks: list[tuple[DecimalLike, DecimalLike]] | None = None,
     timestamp: datetime | None = None,
 ) -> OrderBook:
     """Create a simple OrderBook from raw price/volume pairs.
@@ -62,8 +62,8 @@ def create_order_book(
             (Decimal("100.03"), Decimal("10")),
         ]
     else:
-        bids_pairs = [(Decimal(str(price)), Decimal(str(volume))) for price, volume in (bids or [])]
-        asks_pairs = [(Decimal(str(price)), Decimal(str(volume))) for price, volume in (asks or [])]
+        bids_pairs = [(as_decimal(price), as_decimal(volume)) for price, volume in (bids or [])]
+        asks_pairs = [(as_decimal(price), as_decimal(volume)) for price, volume in (asks or [])]
 
     bid_levels = _build_book_levels(bids_pairs, price_increment)
     ask_levels = _build_book_levels(asks_pairs, price_increment)
@@ -194,7 +194,7 @@ def create_order_book_series(
 
     mid_prices: list[Decimal] = []
     for i in range(num_books):
-        pattern_value = Decimal(str(price_pattern_func(i)))
+        pattern_value = as_decimal(price_pattern_func(i))
         raw_mid = mid_price * pattern_value
         mid_prices.append(round_to_increment(raw_mid, price_increment))
 
@@ -243,7 +243,7 @@ def _parse_price_volume_levels(levels: Iterable[str] | None) -> list[tuple[Decim
 
 
 def _build_book_levels(
-    pairs: list[tuple[Decimal | str | int, Decimal | str | int]],
+    pairs: list[tuple[DecimalLike, DecimalLike]],
     price_increment: Decimal,
 ) -> tuple[BookLevel, ...]:
     """Convert raw (price, volume) pairs into `BookLevel` instances.
@@ -257,7 +257,13 @@ def _build_book_levels(
         Tuple of `BookLevel` objects preserving the original order.
     """
 
-    levels = tuple(BookLevel(price=round_to_increment(D(price), price_increment), volume=D(volume)) for price, volume in pairs)
+    levels = tuple(
+        BookLevel(
+            price=round_to_increment(as_decimal(price), price_increment),
+            volume=as_decimal(volume),
+        )
+        for price, volume in pairs
+    )
     return levels
 
 
@@ -291,8 +297,8 @@ def _parse_price_volume_string(raw_level: str) -> tuple[Decimal, Decimal]:
         raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has empty price or volume part")
 
     try:
-        price = D(price_str)
-        volume = D(volume_str)
+        price = as_decimal(price_str)
+        volume = as_decimal(volume_str)
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has invalid numeric content") from exc
 
