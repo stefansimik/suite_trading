@@ -21,6 +21,18 @@ SUITE Trading is a **modern Python framework for algorithmic trading**, which pr
 
 ---
 
+## Key Features
+
+- **One codebase, multiple modes**: Same strategy code runs in backtesting, paper trading, and live trading
+- **Shared timeline simulation**: Multiple strategies run together on one shared clock with predictable event ordering
+- **Simple, intuitive API**: Domain model matches how traders think — `Order`, `Position`, `Bar`, `OrderBook` behave as expected
+- **Smart components with clear jobs**: Each piece has one responsibility and they connect explicitly
+- **Realistic simulation (alpha)**: SimBroker supports MARKET, LIMIT, STOP, STOP_LIMIT orders plus margin, fees, slippage
+- **Extensible by design**: Plug in new data sources, broker adapters, and event types with minimal code
+- **Modern Python**: Typed Python 3.13+ for strong IDE support and safe refactoring
+
+---
+
 ## Quick Start (30 seconds)
 
 ### Install and run your first backtest
@@ -395,18 +407,6 @@ Need news sentiment, funding rates, or on-chain data? Create custom events:
 2. Wrap it in an `Event` with timestamps
 3. Emit from your `EventFeed`
 4. Handle in `Strategy.on_event()`
-
----
-
-## Key Features
-
-- **One codebase, multiple modes**: Same strategy code runs in backtesting, paper trading, and live trading
-- **Shared timeline simulation**: Multiple strategies run together on one shared clock with predictable event ordering
-- **Simple, intuitive API**: Domain model matches how traders think — `Order`, `Position`, `Bar`, `OrderBook` behave as expected
-- **Smart components with clear jobs**: Each piece has one responsibility and they connect explicitly
-- **Realistic simulation (alpha)**: SimBroker supports MARKET, LIMIT, STOP, STOP_LIMIT orders plus margin, fees, slippage
-- **Extensible by design**: Plug in new data sources, broker adapters, and event types with minimal code
-- **Modern Python**: Typed Python 3.13+ for strong IDE support and safe refactoring
 
 ---
 
