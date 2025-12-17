@@ -326,7 +326,7 @@ sequenceDiagram
     loop while any EventFeed is active
         TE->>EF: peek() across all feeds
         TE->>EF: pop() from the earliest feed
-        TE->>TE: set current_engine_dt = event.dt_event
+        TE->>TE: set timeline_dt = event.dt_event
 
         alt feed drives simulated fills
             TE->>C: build order book(s) from the event

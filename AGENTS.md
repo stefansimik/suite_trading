@@ -242,12 +242,12 @@ Apply to comments, docstrings, and error messages:
 
 ```python
 # Collect fills since last event and net the quantity
-fills = broker.get_fills_since(self._current_engine_dt)
+fills = broker.get_fills_since(self._timeline_dt)
 net_qty = sum(f.qty for f in fills)
 
 # Check: ensure we have quantity to trade before submitting order
 if net_qty == 0:
-    return
+  return
 
 # Send order and record submission time
 broker.submit(Order(instrument, side, net_qty))

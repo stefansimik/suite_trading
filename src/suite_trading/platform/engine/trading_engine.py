@@ -84,7 +84,7 @@ class TradingEngine:
         self._engine_state_machine: StateMachine = create_engine_state_machine()
 
         # Current simulated time on the engine-owned global timeline.
-        self._current_engine_dt: datetime | None = None
+        self._timeline_dt: datetime | None = None
 
         # Tracks timestamp of the last processed OrderBook
         self._last_processed_order_book_timestamp: datetime | None = None
@@ -586,7 +586,7 @@ class TradingEngine:
             current_event_dt = current_event.dt_event
 
             # Set current time on global engine timeline
-            self._current_engine_dt = current_event_dt
+            self._timeline_dt = current_event_dt
 
             # Decide if this Event should drive  fills in simulated brokers
             event_feed_registration = self._event_feeds_by_strategy[strategy][event_feed_name]
@@ -716,7 +716,7 @@ class TradingEngine:
             fill_event_filter = use_for_simulated_fills
 
         # Timeline filtering if the engine already processed events (shared global time)
-        last_event_time = self._current_engine_dt
+        last_event_time = self._timeline_dt
         if last_event_time is not None:
             event_feed.remove_events_before(last_event_time)
 
