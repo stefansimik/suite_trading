@@ -13,12 +13,13 @@ SUITE stands for: **S**imple, **U**nderstandable, **I**ntuitive **T**rading **E*
 SUITE Trading is built for traders who want a framework that stays out of the way: simple objects, explicit wiring, and realistic simulation.
 
 - **One codebase, multiple modes**: Same strategy code runs in backtesting, paper trading, and live trading
-- **Shared timeline simulation (portfolio realism)**: Multiple strategies execute together on a single unified clock for realistic portfolio backtests; the engine guarantees deterministic, correct chronological ordering (no cross-strategy look-ahead).
+- **Shared timeline simulation (portfolio realism)**: Multiple strategies run together on one shared clock. The engine processes events in a predictable time
+  order (as long as each EventFeed is time-ordered).
 - **Simple, intuitive API**: Domain model matches how traders think—no complex abstractions or hidden layers. Simple intuitive inspectable domain model, where types like `Order`, `Position`, `Bar` and `OrderBook` behave as you expect and are easy to debug.
 - **Smart components with clear jobs**: `TradingEngine` runs time and routes events, `Strategy` holds your logic, `Broker` manages one account and `EventFeed` brings in data.
 - **Explicit and easy to follow**: You can see where data comes from and where orders go. When something happens,
   you can follow it in the code.
-- **Production-grade simulation building blocks**: `SimBroker` supports MARKET, LIMIT, STOP, and STOP_LIMIT orders,
+- **Realistic simulation building blocks (alpha)**: `SimBroker` supports MARKET, LIMIT, STOP, and STOP_LIMIT orders,
   plus margin, fees, slippage and customizable liquidity.
 - **Extensible by design**: Plug in new data sources, broker adapters and event types with minimal boilerplate
 - **Productivity utilities**: Data generation assistant, datetime helpers, state machine utilities, ...
@@ -103,6 +104,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
+from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.domain.order.order_enums import OrderSide
@@ -123,8 +125,9 @@ class DemoStrategy(Strategy):
 
     def __init__(self, name: str, broker: Broker) -> None:
         super().__init__(name)
+        # Configuration
         self._broker = broker
-        # State
+        # Internal state
         self._bar_count = 0
         self._is_entry_submitted = False
 
@@ -132,15 +135,13 @@ class DemoStrategy(Strategy):
     def on_start(self) -> None:
         # Create 20 synthetic demo bars
         bars = DGA.bars.create_bar_series(num_bars=20)
-
         # Create an EventFeed from the bars
         bars_event_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
-
         # Add the EventFeed to this Strategy (these bars drive order simulation)
         self.add_event_feed("bars", bars_event_feed, use_for_simulated_fills=True)
 
     # This function receives all events (data) coming to strategy
-    def on_event(self, event: object) -> None:
+    def on_event(self, event: Event) -> None:
         # If event is BarEvent, then delegate it
         if isinstance(event, BarEvent):
             self.on_bar(event.bar)
@@ -194,7 +195,7 @@ if __name__ == "__main__":
 
 What happens step by step:
 
-1. `TradingEngine` starts and runs one shared timeline.
+1. `TradingEngine` starts and runs one shared timeline. (`engine.start()` blocks until the run finishes.)
 2. `on_start()` creates a synthetic bar series and attaches it as an `EventFeed`.
 3. On bar #1, the Strategy submits a BUY `MarketOrder` (to the chosen `Broker`) to open a position.
 4. On bar #6, the Strategy submits a SELL `MarketOrder` (to the same `Broker`) to close the position.
@@ -209,12 +210,9 @@ What happens step by step:
 ### `TradingEngine`
 
 Think of `TradingEngine` as the container that wires your `Strategy`(ies), `Broker`(s), and `EventFeed`(s)
-together.
-It runs the main loop and makes sure all strategies see events on one shared timeline (one global chronological
-order).
+together. It runs the main loop and makes sure all strategies see events on one shared timeline (one global chronological order).
 
-Why this matters: if you run Strategy A and Strategy B together, neither strategy should see "future" events relative
-to the other.
+Why this matters: if you run Strategy A and Strategy B together, neither strategy should see "future" events relative to the other.
 
 What it owns:
 
@@ -245,14 +243,38 @@ intentionally simple.
 One broker instance represents exactly one logical trading account.
 Multiple accounts are modelled by multiple broker instances registered into `TradingEngine`.
 
-`SimBroker` simulates fills using the "last price" from incoming market data (for example, bars) and emits
-executions back to the engine.
+`SimBroker` simulates fills by matching orders against an order book.
+After fills, it creates executions and sends them back to the engine.
+
+To do that, the engine can turn incoming market-data events into one or more order books:
+
+- `BarEvent` becomes 4 order books (open, high, low, close)
+- `TradeTickEvent` becomes 1 order book where bid=ask=trade price
+- `QuoteTickEvent` becomes 1 order book with best bid and best ask
+- `OrderBookEvent` stays 1 order book (passed through)
+
+This is why the same Strategy can work with bars (simple) or with ticks/order books (more realistic).
+
+### Driving simulated fills (`use_for_simulated_fills`)
+
+When you attach an EventFeed, you can decide if its events should also drive simulated fills.
+
+- `use_for_simulated_fills=False` (default): events go only to the Strategy
+- `use_for_simulated_fills=True`: every event also drives simulated matching in `SimBroker`
+- `use_for_simulated_fills=callable`: you decide per event (return True/False)
+
+A common setup is:
+
+- bars for signals (slow)
+- ticks or order books for fills (fast)
 
 ### `EventFeed`
 
 `EventFeed` is how data enters a Strategy.
 It can represent anything: historical bars, synthetic test data, or live market data.
-It produces time-ordered `Event` objects.
+
+For realistic runs, each EventFeed should return events in non-decreasing `Event.dt_event` order.
+(Some test feeds may intentionally return events out of order.)
 
 Common methods:
 
@@ -264,6 +286,15 @@ Common methods:
 
 An `Event` is a wrapper for "something that happened at a time".
 It carries timestamps and a payload (bar, tick, order book, custom data, ...).
+
+### Time and timestamps (UTC policy)
+
+Every `Event` has two timestamps (both must be timezone-aware UTC):
+
+- `dt_event`: when it happened in the market (used for time ordering)
+- `dt_received`: when it entered our system (used as a predictable tie-breaker)
+
+If you pass a naive datetime (no timezone), the framework fails fast so you can fix your data early.
 
 ---
 
@@ -282,11 +313,76 @@ graph TD;
     Broker -->|order fills + updates| Engine;
 ```
 
+Event loop (what happens):
+
+```mermaid
+sequenceDiagram
+    participant EF as EventFeed
+    participant TE as TradingEngine
+    participant C as Event to order book converter
+    participant SB as SimBroker(s)
+    participant S as Strategy
+
+    loop while any EventFeed is active
+        TE->>EF: peek() across all feeds
+        TE->>EF: pop() from the earliest feed
+        TE->>TE: set current_engine_dt = event.dt_event
+
+        alt feed drives simulated fills
+            TE->>C: build order book(s) from the event
+            loop for each order book
+                TE->>SB: set_current_dt(order_book.timestamp)
+                TE->>SB: process_order_book(order_book)
+            end
+        end
+
+        TE->>SB: set_current_dt(event.dt_event)
+        TE->>S: callback(event)
+    end
+
+    TE->>TE: stop() when all feeds finish
+```
+
 Event ordering:
 
 - Primary sort is by `dt_event` (when it happened in the market).
-- Secondary sort is by `dt_received` (when it entered the system), which makes ordering deterministic when two events
+- Secondary sort is by `dt_received` (when it entered the system), which makes ordering predictable when two events
   share the same market timestamp.
+
+Important note: the engine can only be as "time-ordered" as the feeds. For realistic runs, each EventFeed should emit
+events in non-decreasing `dt_event` order.
+
+Lifecycle states:
+
+```mermaid
+stateDiagram-v2
+    [*] --> NEW
+    NEW --> RUNNING: START_ENGINE
+    NEW --> ERROR: ERROR_OCCURRED
+    RUNNING --> STOPPED: STOP_ENGINE
+    RUNNING --> ERROR: ERROR_OCCURRED
+    STOPPED --> [*]
+    ERROR --> [*]
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> NEW
+    NEW --> ADDED: ADD_STRATEGY_TO_ENGINE
+    ADDED --> RUNNING: START_STRATEGY
+    ADDED --> ERROR: ERROR_OCCURRED
+    RUNNING --> STOPPED: STOP_STRATEGY
+    RUNNING --> ERROR: ERROR_OCCURRED
+    STOPPED --> [*]
+    ERROR --> [*]
+```
+
+### Simulation realism: what to expect
+
+- Bar-based simulation is an approximation. When you only have OHLC bars, the engine creates 4 order books inside each
+  bar (open, high, low, close) and uses those to drive fills.
+- If you want more realistic behavior, prefer `QuoteTickEvent`, `TradeTickEvent`, or `OrderBookEvent`, and configure
+  `SimBroker` models (market depth, fill policy, margin, fees).
 
 ---
 
@@ -301,7 +397,7 @@ In practice:
 
 1. Implement the `EventFeed` protocol (`peek()`, `pop()`, `is_finished()`, `close()`).
 2. Convert your raw inputs into domain payloads (bars, ticks, order books, or your own objects).
-3. Wrap them into time-ordered `Event` objects.
+3. Wrap them into `Event` objects (usually in time order).
 4. Attach the feed in `Strategy.on_start()` via `add_event_feed(...)`.
 
 ### Add a new `Broker`
@@ -343,7 +439,7 @@ SUITE Trading is in active development with approximately **70% of core function
 | ✅      | Data         | EventFeed system with timeline filtering. Skip/trim past events to keep the timeline in sync. |
 | ✅      | Simulation   | SimBroker order lifecycle (MARKET/LIMIT/STOP/STOP_LIMIT; cancel/modify). Base simulation in place; improving. |
 | ✅      | Core         | MessageBus with topic-based routing and wildcards. Internal event routing backbone. |
-| ✅      | Simulation   | Event → OrderBook conversion for order matching. Enables matching against order book snapshots. |
+| ✅      | Simulation   | Event → OrderBook conversion for order matching. Enables matching against order books. |
 | ✅      | Accounting   | Per-instrument position tracking. Core position state per instrument. |
 | ✅      | Reporting    | Per-strategy execution history. Raw execution data captured per Strategy. |
 | ✅      | Productivity | Data generation utilities for testing. Synthetic fixtures for fast iteration. |
