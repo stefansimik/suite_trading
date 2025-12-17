@@ -1,14 +1,14 @@
 # SUITE Trading
 
-SUITE Trading is a modern Python framework for algorithmic trading, which provides a unified, event-driven architecture for backtesting, paper trading and live trading. It is designed to make you productive quickly.
-
 SUITE stands for: **S**imple, **U**nderstandable, **I**ntuitive **T**rading **E**ngine
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stefansimik/suite_trading)
+SUITE Trading is a **modern Python framework for algorithmic trading**, which provides unified, event-driven architecture for backtesting, paper trading and live trading. It is designed to make you productive quickly.
+
+![Python Version](https://img.shields.io/badge/python-3.13%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stefansimik/suite_trading)
 
 > Work in progress: SUITE Trading is under active development. Breaking changes may happen while the API stabilizes.
 
-## Key features / Why SUITE Trading?
+## Key features
 
 SUITE Trading is built for traders who want a framework that stays out of the way: simple objects, explicit wiring, and realistic simulation.
 
@@ -25,13 +25,11 @@ SUITE Trading is built for traders who want a framework that stays out of the wa
 - **Productivity utilities**: Data generation assistant, datetime helpers, state machine utilities, ...
 - **Modern Python**: Typed Python 3.13+ codebase for strong IDE support and safe refactors.
 
-![Python Version](https://img.shields.io/badge/python-3.13%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
-
 ---
 
 ## Table of Contents
 
-- [Key features / Why SUITE Trading?](#key-features--why-suite-trading)
+- [Key features](#key-features)
 - [Getting started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
@@ -53,6 +51,7 @@ SUITE Trading is built for traders who want a framework that stays out of the wa
 ### Prerequisites
 
 - **Python 3.13.x**
+  - Latest Python version (3.14.x) will be adopted around 6 months after its release to keep stability.
 - **uv** package manager (recommended; see `pyproject.toml`)
 - Git (to clone the repository)
 
@@ -129,46 +128,41 @@ class DemoStrategy(Strategy):
         self._broker = broker
         # Internal state
         self._bar_count = 0
-        self._is_entry_submitted = False
 
-    # This function is called once when the Strategy is started
+    # Invoked once when the Strategy is started
     def on_start(self) -> None:
         # Create 20 synthetic demo bars
         bars = DGA.bars.create_bar_series(num_bars=20)
-        # Create an EventFeed from the bars
+        # Create an EventFeed from the bars and add it to the Strategy
         bars_event_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
         # Add the EventFeed to this Strategy (these bars drive order simulation)
         self.add_event_feed("bars", bars_event_feed, use_for_simulated_fills=True)
 
-    # This function receives all events (data) coming to strategy
+    # Invoked for any Event
     def on_event(self, event: Event) -> None:
-        # If event is BarEvent, then delegate it
+        # Dispatch Bars to `on_bar()` function
         if isinstance(event, BarEvent):
             self.on_bar(event.bar)
 
-    # This function receives all BarEvents from the EventFeed
+    # Invoked for each Bar
     def on_bar(self, bar: Bar) -> None:
-        # Count bars so we can act on bar #1 and bar #6
+        # Count bars
         self._bar_count += 1
 
-        # On 1st bar + if entry order was not submitted yet
-        if self._bar_count == 1 and not self._is_entry_submitted:
+        # Open position on 1st bar
+        if self._bar_count == 1:
             # Create and submit market order (open position)
             order = MarketOrder(instrument=bar.instrument, side=OrderSide.BUY, quantity=Decimal("1"))
             self.submit_order(order, self._broker)
-            # Mark entry order as submitted
-            self._is_entry_submitted = True
-            logger.info(f"Opened position on bar #{self._bar_count} at close price {bar.close}")
             return
 
-        # On 6th bar + if entry order was submitted
-        if self._bar_count == 6 and self._is_entry_submitted:
+        # Close position on 6th bar
+        if self._bar_count == 6:
             # Create and submit market order (close position)
             order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, quantity=Decimal("1"))
             self.submit_order(order, self._broker)
-            logger.info(f"Closed position on bar #{self._bar_count} at close price {bar.close}")
 
-    # This function is called once when the Strategy is stopped
+    # Invoked once when the Strategy is stopped
     def on_stop(self) -> None:
         logger.info(f"Strategy finished after {self._bar_count} bars")
 
@@ -386,7 +380,7 @@ stateDiagram-v2
 
 ---
 
-## Extending the framework (recipes)
+## Extending the framework
 
 ### Add a new `EventFeed`
 
