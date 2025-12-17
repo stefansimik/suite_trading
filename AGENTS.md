@@ -222,7 +222,8 @@ for price_level in order_book_levels:
 - [ ] Trivial, obvious assignments and one-liners have no extra comments
 
 ### Defensive Comments
-- Use **`# Check:`** prefix exclusively for validation guards
+- Use **`# Precondition:`** prefix for validation guards that raise an exception if the condition is not met.
+- Use **`# Check:`** prefix for other validation guards where no exception is raised (e.g., early return, continue, or log and skip).
 - Place **immediately above** validation check
 - Explain what condition is validated and why it matters
 
@@ -254,7 +255,7 @@ self._last_order_time = now()
 ```
 
 **Acceptance checks:**
-- [ ] `# Check:` used only for validation guards
+- [ ] `# Precondition:` or `# Check:` used only for validation guards
 - [ ] Placed immediately above guard
 - [ ] Code reference formatting followed (`$var`, `` `func` ``)
 - [ ] One empty line after a guard block before state-changing code
@@ -349,7 +350,7 @@ Acceptance checks:
   Prefer clear type hints and let errors surface naturally.
 - Keep validations cheap and close to boundaries. Avoid repeating the same guard in hot
   paths; validate once at the API boundary or where ownership is clear.
-- Use the `# Check:` prefix only for meaningful guards as described above; do not use it
+- Use the `# Precondition:` prefix only for meaningful guards as described above; do not use it
   for type/attribute presence checks.
 
 **Acceptance checks:**
