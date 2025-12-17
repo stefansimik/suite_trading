@@ -606,7 +606,7 @@ class TradingEngine:
 
                     # Route to simulated brokers for order-price matching
                     for broker in simulated_brokers:
-                        broker.set_current_dt(order_book.timestamp)  # Move broker's time by OrderBook
+                        broker.set_timeline_dt(order_book.timestamp)  # Move broker's time by OrderBook
                         broker.process_order_book(order_book)
 
                     should_update_last_processed_order_book_timestamp = self._last_processed_order_book_timestamp is None or order_book.timestamp > self._last_processed_order_book_timestamp
@@ -615,7 +615,7 @@ class TradingEngine:
 
             # Set broker time to Event time
             for broker in simulated_brokers:
-                broker.set_current_dt(current_event_dt)
+                broker.set_timeline_dt(current_event_dt)
 
             # Process event in its callback (deliver to Strategy)
             try:

@@ -29,12 +29,12 @@ class MockOrderBookDrivenBroker(Broker):
 
     def __init__(self):
         super().__init__()
-        self.current_dt: datetime | None = None
+        self.timeline_dt: datetime | None = None
         self.processed_order_books: list[OrderBook] = []
 
-    def set_current_dt(self, dt: datetime) -> None:
+    def set_timeline_dt(self, dt: datetime) -> None:
         """Capture current simulated time injected by the TradingEngine."""
-        self.current_dt = dt
+        self.timeline_dt = dt
 
     def process_order_book(self, order_book: OrderBook) -> None:
         """Track received OrderBooks."""

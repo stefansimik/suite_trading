@@ -16,7 +16,7 @@ class SimulatedBroker(Protocol):
     brokers typically ignore these updates.
     """
 
-    def set_current_dt(self, dt: datetime) -> None:
+    def set_timeline_dt(self, dt: datetime) -> None:
         """Set the broker's current simulated time.
 
         The `TradingEngine` injects simulated time into these brokers so time-based

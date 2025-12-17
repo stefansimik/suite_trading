@@ -331,12 +331,12 @@ sequenceDiagram
         alt feed drives simulated fills
             TE->>C: build order book(s) from the event
             loop for each order book
-                TE->>SB: set_current_dt(order_book.timestamp)
+                TE->>SB: set_timeline_dt(order_book.timestamp)
                 TE->>SB: process_order_book(order_book)
             end
         end
 
-        TE->>SB: set_current_dt(event.dt_event)
+        TE->>SB: set_timeline_dt(event.dt_event)
         TE->>S: callback(event)
     end
 

@@ -134,7 +134,7 @@ class SimBroker(Broker, SimulatedBroker):
         self._account: Account = SimAccount(id="SIM")
 
         # SIMULATED TIME (engine-injected)
-        self._current_dt: datetime | None = None
+        self._timeline_dt: datetime | None = None
 
         # ORDER BOOK CACHE (last known OrderBook per instrument for this account)
         self._latest_order_book_by_instrument: dict[Instrument, OrderBook] = {}
@@ -186,11 +186,11 @@ class SimBroker(Broker, SimulatedBroker):
         if order.id in self._orders_by_id:
             raise ValueError(f"Cannot call `submit_order` because $id ('{order.id}') already exists")
 
-        current_dt = self._current_dt
+        timeline_dt = self._timeline_dt
 
         # Precondition: DAY/GTD submission requires broker timeline time
-        if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and current_dt is None:
-            raise ValueError(f"Cannot call `submit_order` because $time_in_force ({order.time_in_force.value}) requires broker time, but $current_dt is None")
+        if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and timeline_dt is None:
+            raise ValueError(f"Cannot call `submit_order` because $time_in_force ({order.time_in_force.value}) requires broker time, but $timeline_dt is None")
 
         if order.time_in_force is TimeInForce.GTD:
             good_till_dt = order.good_till_dt
@@ -201,12 +201,12 @@ class SimBroker(Broker, SimulatedBroker):
             if not is_utc(good_till_dt):
                 raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(good_till_dt)}) is not timezone-aware UTC for GTD Order $id ('{order.id}')")
 
-            # Precondition: GTD deadline must not be earlier than broker $current_dt at submission
-            if good_till_dt < current_dt:
-                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(good_till_dt)}) is earlier than broker $current_dt ({format_dt(current_dt)}) for GTD Order $id ('{order.id}')")
+            # Precondition: GTD deadline must not be earlier than broker $timeline_dt at submission
+            if good_till_dt < timeline_dt:
+                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(good_till_dt)}) is earlier than broker $timeline_dt ({format_dt(timeline_dt)}) for GTD Order $id ('{order.id}')")
 
-        if current_dt is not None:
-            order._set_submitted_dt_once(current_dt)
+        if timeline_dt is not None:
+            order._set_submitted_dt_once(timeline_dt)
 
         # Track the order (submission never terminalizes in this step)
         self._orders_by_id[order.id] = order
@@ -342,7 +342,7 @@ class SimBroker(Broker, SimulatedBroker):
 
     # region Protocol SimulatedBroker
 
-    def set_current_dt(self, dt: datetime) -> None:
+    def set_timeline_dt(self, dt: datetime) -> None:
         """Set broker simulated time.
 
         The `TradingEngine` injects `$dt` before Strategy callbacks and before routing
@@ -354,9 +354,9 @@ class SimBroker(Broker, SimulatedBroker):
         """
         # Precondition: broker timeline $dt must be timezone-aware UTC
         if not is_utc(dt):
-            raise ValueError(f"Cannot call `set_current_dt` because $dt ({dt}) is not timezone-aware UTC")
+            raise ValueError(f"Cannot call `set_timeline_dt` because $dt ({dt}) is not timezone-aware UTC")
 
-        self._current_dt = dt
+        self._timeline_dt = dt
 
         # Handle expired orders
         for order in list(self._orders_by_id.values()):
@@ -366,11 +366,11 @@ class SimBroker(Broker, SimulatedBroker):
     def process_order_book(self, order_book: OrderBook) -> None:
         """Process OrderBook that drives order-fills and order-updates."""
         # Precondition: ensure engine set broker time before processing this snapshot
-        if self._current_dt is None:
-            raise ValueError(f"Cannot call `process_order_book` because $current_dt is None. TradingEngine must call `set_current_dt(order_book.timestamp)` immediately before calling `process_order_book` (got $order_book.timestamp={format_dt(order_book.timestamp)})")
+        if self._timeline_dt is None:
+            raise ValueError(f"Cannot call `process_order_book` because $timeline_dt is None. TradingEngine must call `set_timeline_dt(order_book.timestamp)` immediately before calling `process_order_book` (got $order_book.timestamp={format_dt(order_book.timestamp)})")
         # Precondition: ensure broker time matches the snapshot time exactly
-        if self._current_dt != order_book.timestamp:
-            raise ValueError(f"Cannot call `process_order_book` because $current_dt ({format_dt(self._current_dt)}) does not match $order_book.timestamp ({format_dt(order_book.timestamp)}). TradingEngine must call `set_current_dt(order_book.timestamp)` immediately before calling `process_order_book`")
+        if self._timeline_dt != order_book.timestamp:
+            raise ValueError(f"Cannot call `process_order_book` because $timeline_dt ({format_dt(self._timeline_dt)}) does not match $order_book.timestamp ({format_dt(order_book.timestamp)}). TradingEngine must call `set_timeline_dt(order_book.timestamp)` immediately before calling `process_order_book`")
 
         # Enrich with depth model and treat the result as the broker's current OrderBook snapshot
         enriched_order_book = self._depth_model.enrich_order_book(order_book)
@@ -435,7 +435,7 @@ class SimBroker(Broker, SimulatedBroker):
         if time_in_force in (TimeInForce.GTC, TimeInForce.IOC, TimeInForce.FOK):
             return False
 
-        now_dt = self._current_dt
+        now_dt = self._timeline_dt
         if now_dt is None:
             return False
 
@@ -619,7 +619,7 @@ class SimBroker(Broker, SimulatedBroker):
         instrument = order.instrument
         timestamp = order_book.timestamp
 
-        # VALIDATE
+        # MATCHING
         # Precondition: ensure $order.instrument matches $order_book.instrument for pricing and margin
         if order_book.instrument != instrument:
             raise ValueError(f"Cannot call `_process_fill_slice` because $order.instrument ('{instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
