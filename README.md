@@ -95,26 +95,20 @@ uv run pytest
 ### Minimal strategy example
 
 This Strategy buys on the first bar, then closes the position exactly 5 bars later.
-The data is intentionally synthetic so you can run it anywhere.
+The data is intentionally synthetic so you can run it anywhere. See the full runnable script: [`examples/minimal_strategy.py`](examples/minimal_strategy.py)
+
+**Run it**:
+```bash
+uv run examples/minimal_strategy.py
+```
+
+**Expected output** (excerpt):
+```
+INFO:__main__:Strategy finished after 20 bars
+```
 
 ```python
-from __future__ import annotations
-
-import logging
-from decimal import Decimal
-
-from suite_trading.domain.event import Event
-from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
-from suite_trading.domain.order.order_enums import OrderSide
-from suite_trading.domain.order.orders import MarketOrder
-from suite_trading.platform.broker.broker import Broker
-from suite_trading.platform.broker.sim.sim_broker import SimBroker
-from suite_trading.platform.engine.trading_engine import TradingEngine
-from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
-from suite_trading.strategy.strategy import Strategy
-from suite_trading.utils.data_generation.assistant import DGA
-
+# Full imports are in `examples/minimal_strategy.py`
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +132,7 @@ class DemoStrategy(Strategy):
         # Add the EventFeed to this Strategy (these bars drive order simulation)
         self.add_event_feed("bars", bars_event_feed, use_for_simulated_fills=True)
 
-    # Invoked for any Event
+    # Central function invoked for each Event
     def on_event(self, event: Event) -> None:
         # Dispatch Bars to `on_bar()` function
         if isinstance(event, BarEvent):
