@@ -356,6 +356,9 @@ class SimBroker(Broker, SimulatedBroker):
         # Precondition: broker timeline $dt must be timezone-aware UTC
         if not is_utc(dt):
             raise ValueError(f"Cannot call `set_timeline_dt` because $dt ({dt}) is not timezone-aware UTC")
+        # Precondition: broker timeline $dt cannot move backwards
+        if self._timeline_dt is not None and dt < self._timeline_dt:
+            raise ValueError(f"Cannot call `set_timeline_dt` because new $dt ({format_dt(dt)}) is earlier than current $timeline_dt ({format_dt(self._timeline_dt)})")
 
         self._timeline_dt = dt
 
