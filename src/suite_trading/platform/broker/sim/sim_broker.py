@@ -408,24 +408,55 @@ class SimBroker(Broker, SimulatedBroker):
             order: Order to process.
             order_book: Enriched OrderBook snapshot for the same instrument.
         """
+        # VALIDATE
         # Precondition: avoid cross-instrument processing bugs
         if order.instrument != order_book.instrument:
-            raise ValueError(f"Cannot call `_process_single_order_with_order_book` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
+            raise ValueError(f"Cannot call `_match_order_against_order_book` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
-        if order.state == OrderState.TRIGGER_PENDING:
-            # Precondition: TRIGGER_PENDING is valid only for stop-like orders
-            if not isinstance(order, (StopMarketOrder, StopLimitOrder)):
-                raise ValueError(f"Cannot call `_process_single_order_with_order_book` because $order.state is TRIGGER_PENDING, which is valid only for StopMarketOrder and StopLimitOrder (got '{order.__class__.__name__}', $id='{order.id}')")
-
-            should_trigger_stop = should_trigger_stop_condition(order, order_book)
-            if should_trigger_stop:
-                logger.info(f"Stop condition triggered for Order $id ('{order.id}') for instrument '{order.instrument}'")
-                self._apply_order_action(order, OrderAction.TRIGGER)  # TRIGGER_PENDING + TRIGGER = TRIGGERED
-                self._apply_order_action(order, OrderAction.SUBMIT)  # TRIGGERED + SUBMIT = PENDING_SUBMIT
-                self._apply_order_action(order, OrderAction.ACCEPT)  # PENDING_SUBMIT + ACCEPT = SUBMITTED
-                self._apply_order_action(order, OrderAction.ACCEPT)  # SUBMITTED + ACCEPT = WORKING
-
+        # ACT
+        self._maybe_trigger_stop_order(order, order_book)
         self._simulate_and_apply_fills_for_order_with_order_book(order, order_book)
+
+    def _maybe_trigger_stop_order(self, order: Order, order_book: OrderBook) -> None:
+        """Trigger a stop-like $order if its stop condition is met.
+
+        This is a single step inside the per-order order-book pipeline.
+
+        Stages:
+            Validate: Ensure TRIGGER_PENDING implies a stop-like order.
+            Compute: Evaluate stop condition against the current $order_book.
+            Decide: Build the list of state-transition actions to apply.
+            Act: Apply transitions and publish updates.
+
+        Args:
+            order: Order to evaluate for stop trigger.
+            order_book: Enriched OrderBook snapshot for the same instrument.
+        """
+
+        # VALIDATE
+        is_trigger_pending = order.state == OrderState.TRIGGER_PENDING
+        if not is_trigger_pending:
+            return
+
+        # Precondition: TRIGGER_PENDING is valid only for stop-like orders
+        if not isinstance(order, (StopMarketOrder, StopLimitOrder)):
+            raise ValueError(f"Cannot call `_maybe_trigger_stop_order` because $order.state is TRIGGER_PENDING, which is valid only for StopMarketOrder and StopLimitOrder (got '{order.__class__.__name__}', $id='{order.id}')")
+
+        # COMPUTE
+        should_trigger_stop = should_trigger_stop_condition(order, order_book)
+
+        # DECIDE
+        stop_actions_to_apply: list[OrderAction] = []
+        if should_trigger_stop:
+            stop_actions_to_apply = [OrderAction.TRIGGER, OrderAction.SUBMIT, OrderAction.ACCEPT, OrderAction.ACCEPT]
+
+        # ACT
+        if not stop_actions_to_apply:
+            return
+
+        logger.info(f"Triggered stop condition for Order $id ('{order.id}') for instrument '{order.instrument}'")
+        for action in stop_actions_to_apply:
+            self._apply_order_action(order, action)
 
     def _should_expire_order_now(self, order: Order) -> bool:
         time_in_force = order.time_in_force
