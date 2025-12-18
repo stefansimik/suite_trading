@@ -8,7 +8,7 @@ from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.order.order_state import OrderState
-from suite_trading.domain.order.orders import Order, StopLimitOrder, StopOrder
+from suite_trading.domain.order.orders import Order, StopLimitOrder, StopMarketOrder
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
 from suite_trading.platform.engine.models.event_to_order_book.default_impl import DefaultEventToOrderBookConverter
@@ -92,7 +92,7 @@ def _assert_state_order(states: list[OrderState], first: OrderState, second: Ord
     assert states.index(first) < states.index(second), f"Expected {first} to occur before {second}"
 
 
-def test_stop_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
+def test_stop_market_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
     # Arrange: engine + broker + converter
     engine = TradingEngine()
     broker = _create_sim_broker_with_deterministic_fill_model()
@@ -109,9 +109,9 @@ def test_stop_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
     ]
 
     def create_order() -> Order:
-        return StopOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("1"), stop_price=stop_price)
+        return StopMarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("1"), stop_price=stop_price)
 
-    strategy = _StopLikeOrderLifecycleStrategy(name="stop_order_lifecycle", broker=broker, feed_name="quotes", quote_tick_events=quote_tick_events, order_factory=create_order)
+    strategy = _StopLikeOrderLifecycleStrategy(name="stop_market_order_lifecycle", broker=broker, feed_name="quotes", quote_tick_events=quote_tick_events, order_factory=create_order)
     engine.add_strategy(strategy)
 
     # Act
@@ -119,7 +119,7 @@ def test_stop_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
 
     # Assert: order is filled and cleaned up
     assert len(broker.list_active_orders()) == 0
-    executions = engine.list_executions_for_strategy("stop_order_lifecycle")
+    executions = engine.list_executions_for_strategy("stop_market_order_lifecycle")
     assert len(executions) == 1
     assert executions[0].order.is_fully_filled
     assert executions[0].price == Decimal("100.00")

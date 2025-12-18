@@ -17,7 +17,7 @@ class DistributionFillModel:
 
     Applies two distinct behaviors based on order type:
 
-    1. **Fill adjustment distribution for market-like orders** (MarketOrder, StopOrder):
+    1. **Fill adjustment distribution for market-like orders** (MarketOrder, StopMarketOrder):
        - Each fill slice samples independently from a distribution over fill adjustments.
        - Positive adjustment = favorable price (better for trader).
        - Zero adjustment = no price change.
@@ -142,10 +142,10 @@ class DistributionFillModel:
             return []
 
         # Import classes for isinstance checks (avoid circular imports at module level)
-        from suite_trading.domain.order.orders import MarketOrder, StopOrder, LimitOrder, StopLimitOrder
+        from suite_trading.domain.order.orders import MarketOrder, StopMarketOrder, LimitOrder, StopLimitOrder
 
         # Dispatch based on order type
-        if isinstance(order, (MarketOrder, StopOrder)):
+        if isinstance(order, (MarketOrder, StopMarketOrder)):
             return self._apply_slippage(order, fill_slices, order_book)
         elif isinstance(order, (LimitOrder, StopLimitOrder)):
             return self._apply_limit_fill_logic(order, fill_slices, order_book)

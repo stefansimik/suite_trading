@@ -481,10 +481,13 @@ class LimitOrder(Order):
         return self._limit_price
 
 
-class StopOrder(Order):
+class StopMarketOrder(Order):
     """Stop order that becomes a market order when the stop price is reached.
 
-    Stop orders require a $stop_price and will trigger a market order when the market price reaches the specified stop price.
+    Note:
+        Stop market order is the full name for the commonly named "stop order".
+
+    Stop market orders require a $stop_price and will trigger a market order when the market price reaches the specified stop price.
 
     Note:
         Prices are snapped via `Instrument.snap_price` and may be negative where the market supports them (see guideline 7.1).
@@ -506,7 +509,7 @@ class StopOrder(Order):
         time_in_force: TimeInForce = TimeInForce.GTC,
         good_till_dt: datetime | None = None,
     ):
-        """Initialize a new StopOrder.
+        """Initialize a new StopMarketOrder.
 
         Args:
             instrument (Instrument): The financial instrument to trade.

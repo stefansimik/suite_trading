@@ -10,7 +10,7 @@ from suite_trading.platform.broker.account import Account
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.platform.broker.sim.sim_account import SimAccount
 from suite_trading.domain.monetary.currency_registry import USD
-from suite_trading.domain.order.orders import Order, StopOrder, StopLimitOrder
+from suite_trading.domain.order.orders import Order, StopMarketOrder, StopLimitOrder
 from suite_trading.domain.order.order_enums import TimeInForce
 from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory, OrderState
 from suite_trading.domain.order.execution import Execution
@@ -28,7 +28,7 @@ from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRat
 from suite_trading.platform.broker.sim.models.fill.protocol import FillModel
 from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
 from suite_trading.platform.broker.sim.order_matching import (
-    should_trigger_stop_order,
+    should_trigger_stop_condition,
     select_simulate_fills_function_for_order,
 )
 from suite_trading.utils.datetime_tools import format_dt, is_utc
@@ -213,7 +213,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         # TRANSITION ORDERS
         self._apply_order_action(order, OrderAction.SUBMIT)  # INITIALIZED + SUBMIT = PENDING_SUBMIT
-        if isinstance(order, (StopOrder, StopLimitOrder)):
+        if isinstance(order, (StopMarketOrder, StopLimitOrder)):
             self._apply_order_action(order, OrderAction.ARM_TRIGGER)  # PENDING_SUBMIT + ARM_TRIGGER = TRIGGER_PENDING
             logger.info(f"Armed stop condition for Order $id ('{order.id}') for instrument '{order.instrument}' at $stop_price ({order.stop_price})")
         else:
@@ -415,10 +415,10 @@ class SimBroker(Broker, SimulatedBroker):
 
         if order.state == OrderState.TRIGGER_PENDING:
             # Precondition: TRIGGER_PENDING is valid only for stop-like orders
-            if not isinstance(order, (StopOrder, StopLimitOrder)):
-                raise ValueError(f"Cannot call `_process_single_order_with_order_book` because $order.state is TRIGGER_PENDING, which is valid only for StopOrder and StopLimitOrder (got '{order.__class__.__name__}', $id='{order.id}')")
+            if not isinstance(order, (StopMarketOrder, StopLimitOrder)):
+                raise ValueError(f"Cannot call `_process_single_order_with_order_book` because $order.state is TRIGGER_PENDING, which is valid only for StopMarketOrder and StopLimitOrder (got '{order.__class__.__name__}', $id='{order.id}')")
 
-            should_trigger_stop = should_trigger_stop_order(order, order_book)
+            should_trigger_stop = should_trigger_stop_condition(order, order_book)
             if should_trigger_stop:
                 logger.info(f"Stop condition triggered for Order $id ('{order.id}') for instrument '{order.instrument}'")
                 self._apply_order_action(order, OrderAction.TRIGGER)  # TRIGGER_PENDING + TRIGGER = TRIGGERED

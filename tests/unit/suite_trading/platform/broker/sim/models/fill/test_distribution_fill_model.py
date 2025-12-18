@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
-from suite_trading.domain.order.orders import MarketOrder, LimitOrder, StopOrder, StopLimitOrder
+from suite_trading.domain.order.orders import MarketOrder, LimitOrder, StopMarketOrder, StopLimitOrder
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice, BookLevel
 from suite_trading.domain.instrument import Instrument, AssetClass
@@ -117,15 +117,15 @@ def test_market_order_per_slice_independence(instrument, order_book):
     assert different_outcomes_count > 0
 
 
-def test_stop_order_uses_fill_adjustment_distribution(instrument, order_book):
-    """StopOrder triggers fill adjustment distribution (same as MarketOrder)."""
+def test_stop_market_order_uses_fill_adjustment_distribution(instrument, order_book):
+    """StopMarketOrder triggers fill adjustment distribution (same as MarketOrder)."""
     model = DistributionFillModel(market_fill_adjustment_distribution={1: Decimal("1.0")}, rng_seed=42)
-    order = StopOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), stop_price=Decimal("1.1005"))
+    order = StopMarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), stop_price=Decimal("1.1005"))
     proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: StopOrder gets fill adjustment applied
+    # Check: StopMarketOrder gets fill adjustment applied
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.0999")
 

@@ -7,7 +7,7 @@ from suite_trading.domain.order.orders import (
     Order,
     MarketOrder,
     LimitOrder,
-    StopOrder,
+    StopMarketOrder,
     StopLimitOrder,
 )
 
@@ -15,7 +15,7 @@ from suite_trading.domain.order.orders import (
 # region Main
 
 
-def should_trigger_stop_order(order: StopOrder | StopLimitOrder, order_book: OrderBook) -> bool:
+def should_trigger_stop_condition(order: StopMarketOrder | StopLimitOrder, order_book: OrderBook) -> bool:
     """Return True if a stop-like $order should trigger on the current $order_book.
 
     This function is intentionally stop-specific.
@@ -50,7 +50,7 @@ def simulate_fills_for_market_order(order: Order, order_book: OrderBook) -> list
     Returns fills as price/quantity pairs. Fees are not included. Negative prices are allowed.
 
     Args:
-        order: Order to fill (MarketOrder or any market-like order such as a triggered StopOrder).
+        order: Order to fill (MarketOrder or any market-like order such as a triggered StopMarketOrder).
         order_book: OrderBook snapshot for the simulation.
 
     Returns:
@@ -93,7 +93,7 @@ def select_simulate_fills_function_for_order(order: Order) -> Callable[[Order, O
         return simulate_fills_for_market_order
     if isinstance(order, LimitOrder):
         return simulate_fills_for_limit_order
-    if isinstance(order, StopOrder):
+    if isinstance(order, StopMarketOrder):
         return simulate_fills_for_market_order
     if isinstance(order, StopLimitOrder):
         return simulate_fills_for_limit_order
