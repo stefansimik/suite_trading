@@ -493,19 +493,27 @@ return result
 - [ ] Non-trivial return values are assigned to `result` before returning
 - [ ] Statements remain ≤150 chars per line where practical (see 8.3)
 
-### Workflow decomposition (Validate → Compute → Decide → Act)
+### Workflow decomposition (`Validate` → `Compute` → `Decide` → `Act`)
 
-When implementing a complex workflow (pipeline, loop, or multi-step handler), structure it as four clear stages:
+Apply this structure to any logic with non-trivial complexity (functions, pipelines, loops, or multi-step handlers).
+It ensures the implementation is predictable and testable by separating pure derivations from side effects.
 
-- **Validate:** Cheap guards and domain invariants. Return early or raise clear errors. No state changes.
-- **Compute:** Pure, deterministic functions that derive data (signals, prices, quantities). No I/O, no broker calls, no logging.
-- **Decide:** Turn computed data into decisions (what to do next). Construct intent objects (e.g., orders to place) but avoid side effects.
-- **Act:** Perform side effects (submit/cancel orders, write files, emit logs, mutate state). Keep this stage small and explicit.
+**Standard stages (top-to-bottom):**
+- **`Validate`**: Cheap guards and domain invariants (e.g., check `$quantity > 0`). Return early or raise clear errors. No state changes.
+- **`Compute`**: Pure, deterministic derivations (signals, prices, quantities). No I/O, no broker calls, no logging.
+- **`Decide`**: Turn computed data into decisions by building "intent" objects (e.g., `Order` or `Adjustment`). Avoid side effects.
+- **`Act`**: Perform side effects (submit/cancel orders, mutate state, emit logs, write files). Keep this stage small and explicit.
+
+**Flexibility & Variants:**
+- **Merge `Compute` & `Decide`**: In simpler scenarios, these can be merged into a single pure block that transforms input data directly into intent.
+  The key principle remains separating pure logic from side effects.
+- **Strict Boundary**: The most critical separation is between pure logic (`Compute`/`Decide`) and side effects (`Act`).
+  This allows testing the core logic in isolation without mocks or complex setups.
 
 **Acceptance checks:**
-- [ ] Each workflow reads top-to-bottom as: Validate → Compute → Decide → Act
-- [ ] The Compute stage is pure (no side effects, no hidden I/O)
-- [ ] Side effects happen only in Act (easy to review and test)
+- [ ] Logic reads top-to-bottom as: `Validate` → [`Compute` → `Decide`] → `Act`
+- [ ] Derivations (`Compute` and `Decide`) are pure: no hidden I/O, logging, or state mutations
+- [ ] Side effects happen only in `Act` (easy to review and test)
 
 ### Workflow visualization (ASCII diagrams)
 
@@ -938,7 +946,7 @@ user in current message.
 When proposing changes, show per-file Before/After snippets with minimal unique context.
 Use fenced code blocks, keep lines ≤150 chars, include acceptance checks, update imports.
 
-For workflow/pipeline refactors, also include a Validate → Compute → Decide → Act ASCII diagram (see 4.5).
+For workflow/pipeline refactors, also include a `Validate` → `Compute` → `Decide` → `Act` ASCII diagram (see 4.5).
 
 **Template:**
 
