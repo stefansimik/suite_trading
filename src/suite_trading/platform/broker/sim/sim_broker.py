@@ -205,30 +205,28 @@ class SimBroker(Broker, SimulatedBroker):
             if order.good_till_dt < self._timeline_dt:
                 raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(order.good_till_dt)}) is earlier than broker $timeline_dt ({format_dt(self._timeline_dt)}) for GTD Order $id ('{order.id}')")
 
-        # COMPUTE & DECIDE (NO SIDE EFFECTS)
-        # ARM_TRIGGER for stops; double ACCEPT for other orders (SUBMITTED + WORKING)
-        # Note: OrderAction.SUBMIT is now handled by the caller (e.g. TradingEngine)
+        # COMPUTE & DECIDE
         is_stop_order = isinstance(order, (StopMarketOrder, StopLimitOrder))
-        activation_actions = [OrderAction.ARM_TRIGGER] if is_stop_order else [OrderAction.ACCEPT, OrderAction.ACCEPT]
+        order_actions_to_apply = [OrderAction.ARM_TRIGGER] if is_stop_order else [OrderAction.ACCEPT, OrderAction.ACCEPT]
 
-        # ACTIONS (SIDE EFFECTS)
-        # Set submission time from broker timeline if available
+        # ACTIONS
+        # Set submission time into order
         if self._timeline_dt is not None:
             order._set_submitted_dt_once(self._timeline_dt)
 
-        # Track the order in the broker account
+        # Store order
         self._orders_by_id[order.id] = order
 
-        # Apply activation transitions based on order type (e.g. WORKING or TRIGGER_PENDING)
-        for action in activation_actions:
+        # Do order-state transitions
+        for action in order_actions_to_apply:
             self._apply_order_action(order, action)
 
-        # Check: Handle immediate expiration
+        # Handle order expiration
         if self._should_expire_order_now(order):
             self._apply_order_action(order, OrderAction.EXPIRE)
             return
 
-        # Match against current market depth if available
+        # Match order with order-book
         last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
         if last_order_book is not None:
             self._match_order_against_order_book(order, last_order_book)
