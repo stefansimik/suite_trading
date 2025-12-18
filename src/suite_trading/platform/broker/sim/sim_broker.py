@@ -654,7 +654,7 @@ class SimBroker(Broker, SimulatedBroker):
         execution = self._commit_fill_slice_execution_and_accounting(order=order, fill_slice=fill_slice, instrument=instrument, timestamp=timestamp, affordability=affordability)
 
         self._publish_order_execution(execution)
-        self._publish_order_update(order)
+        self._handle_order_update(order)
 
     def _commit_fill_slice_execution_and_accounting(
         self,
@@ -840,6 +840,18 @@ class SimBroker(Broker, SimulatedBroker):
 
     # region Utilities - Order
 
+    def _handle_order_update(self, order: Order) -> None:
+        """Orchestrate all side effects of an order state update.
+
+        This is the single entry point for all post-transition logic.
+        """
+        # Notify external world
+        self._publish_order_update(order)
+
+        # Handle internal housekeeping for terminal orders
+        if order.state_category == OrderStateCategory.TERMINAL:
+            self._on_order_terminalized(order)
+
     def _apply_order_action(self, order: Order, action: OrderAction) -> None:
         """Apply $action to $order and publish `on_order_updated` if state changed.
 
@@ -850,23 +862,21 @@ class SimBroker(Broker, SimulatedBroker):
         new_state = order.state
 
         if new_state != previous_state:
-            self._publish_order_update(order)
+            self._handle_order_update(order)
 
     def _publish_order_update(self, order: Order) -> None:
-        """Notify listeners of order update and clean up if terminal."""
+        """Notify listeners of order update."""
         if self._order_updated_callback is not None:
             self._order_updated_callback(order)
-        self._cleanup_order_if_terminal(order)
 
     def _publish_order_execution(self, execution: Execution) -> None:
         """Publish a new Execution emitted by an Order fill."""
         if self._execution_callback is not None:
             self._execution_callback(execution)
 
-    def _cleanup_order_if_terminal(self, order: Order) -> None:
-        """Remove $order from broker tracking if it is terminal."""
-        if order.state_category == OrderStateCategory.TERMINAL:
-            self._orders_by_id.pop(order.id, None)
+    def _on_order_terminalized(self, order: Order) -> None:
+        """Perform internal cleanup for an order that reached a terminal state."""
+        self._orders_by_id.pop(order.id, None)
 
     # endregion
 
