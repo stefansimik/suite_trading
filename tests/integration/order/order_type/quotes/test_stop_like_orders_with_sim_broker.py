@@ -4,7 +4,6 @@ from decimal import Decimal
 from typing import Callable
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.order.order_state import OrderState
@@ -70,12 +69,10 @@ def _create_quote_tick_event(
     *,
     bid: str,
     ask: str,
-    bid_volume: str = "5",
-    ask_volume: str = "5",
     timestamp_index: int,
 ) -> QuoteTickEvent:
     ts = make_utc(2025, 1, 1, 12, 0, 0 + timestamp_index)
-    tick = QuoteTick(instrument, Decimal(bid), Decimal(ask), Decimal(bid_volume), Decimal(ask_volume), ts)
+    tick = DGA.quote_ticks.create_quote_tick_from_strings(instrument, bid, ask, ts)
     result = QuoteTickEvent(tick, ts)
     return result
 
@@ -104,8 +101,8 @@ def test_stop_market_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
 
     # Two ticks: first does not meet stop; second triggers and should fill immediately.
     quote_tick_events = [
-        _create_quote_tick_event(instrument, bid="99.98", ask="99.99", timestamp_index=0),
-        _create_quote_tick_event(instrument, bid="99.99", ask="100.00", timestamp_index=1),
+        _create_quote_tick_event(instrument, bid="99.98@5", ask="99.99@5", timestamp_index=0),
+        _create_quote_tick_event(instrument, bid="99.99@5", ask="100.00@5", timestamp_index=1),
     ]
 
     def create_order() -> Order:
@@ -148,8 +145,8 @@ def test_stop_limit_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
 
     # Two ticks: first does not meet stop; second triggers and should fill (marketable after trigger).
     quote_tick_events = [
-        _create_quote_tick_event(instrument, bid="99.98", ask="99.99", timestamp_index=0),
-        _create_quote_tick_event(instrument, bid="99.99", ask="100.00", timestamp_index=1),
+        _create_quote_tick_event(instrument, bid="99.98@5", ask="99.99@5", timestamp_index=0),
+        _create_quote_tick_event(instrument, bid="99.99@5", ask="100.00@5", timestamp_index=1),
     ]
 
     def create_order() -> Order:

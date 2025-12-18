@@ -3,9 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal as D
 
-from suite_trading.domain.instrument import Instrument, AssetClass
-from suite_trading.domain.monetary.currency import Currency, CurrencyType
-from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
+from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
@@ -13,6 +11,7 @@ from suite_trading.platform.broker.sim.models.fill.distribution import Distribut
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
+from suite_trading.utils.data_generation.assistant import DGA
 
 
 def _create_optimistic_sim_broker() -> SimBroker:
@@ -34,7 +33,7 @@ class _SubmitAndRecordStrategy(Strategy):
         self.executions = []
 
     def on_start(self) -> None:
-        tick = QuoteTick(self._instrument, self._bid, self._ask, D("10"), D("10"), self._ts)
+        tick = DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, f"{self._bid}@10", f"{self._ask}@10", self._ts)
         self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
@@ -52,8 +51,7 @@ class _SubmitAndRecordStrategy(Strategy):
 
 class TestEngineOrderRoutingMarket:
     def _instrument(self) -> Instrument:
-        usd = Currency("USD", 2, "US Dollar", CurrencyType.FIAT)
-        return Instrument(name="TEST", exchange="XTST", asset_class=AssetClass.FUTURE, price_increment=D("0.01"), quantity_increment=D("1"), contract_size=D("1"), contract_unit="contract", quote_currency=usd, settlement_currency=usd)
+        return DGA.instrument.create_future_es()
 
     def _ts(self) -> datetime:
         return datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc)

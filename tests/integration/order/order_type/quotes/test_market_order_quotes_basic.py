@@ -10,15 +10,14 @@ from suite_trading.strategy.strategy import Strategy
 from suite_trading.domain.order.orders import MarketOrder
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
-from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
+from suite_trading.utils.data_generation.assistant import DGA
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
-from suite_trading.domain.instrument import Instrument, AssetClass
-from suite_trading.domain.monetary.currency_registry import USD
+from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.event import Event
 
 
 def _make_instr() -> Instrument:
-    return Instrument(name="TEST", exchange="XTST", asset_class=AssetClass.FX_SPOT, price_increment=D("0.0001"), quantity_increment=D("100000"), contract_size=D("100000"), contract_unit="EUR", quote_currency=USD)
+    return DGA.instrument.create_fx_spot_eurusd()
 
 
 def _create_optimistic_sim_broker() -> SimBroker:
@@ -38,7 +37,7 @@ class _QuotesSubmitInCallbackStrategy(Strategy):
     def on_start(self) -> None:
         instr = _make_instr()
         t0 = datetime(2025, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
-        ticks = [QuoteTickEvent(QuoteTick(instr, D("1.0000"), D("1.0001"), D("5"), D("5"), t0), t0)]
+        ticks = [QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(instr, "1.0000@5", "1.0001@5", t0), t0)]
         self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
@@ -87,7 +86,7 @@ class _QuotesSubmitBeforeTicksStrategy(Strategy):
             self._submitted = True
             self.remove_event_feed("kick")
 
-            ticks = [QuoteTickEvent(QuoteTick(instr, D("1.0000"), D("1.0001"), D("5"), D("5"), t0), t0)]
+            ticks = [QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(instr, "1.0000@5", "1.0001@5", t0), t0)]
             self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
     def on_execution(self, execution) -> None:
@@ -123,8 +122,8 @@ class _QuotesPartialAcrossTicksStrategy(Strategy):
 
             t1 = t0 + timedelta(seconds=1)
             ticks = [
-                QuoteTickEvent(QuoteTick(instr, D("1.0000"), D("1.0001"), D("5"), D("1"), t0), t0),
-                QuoteTickEvent(QuoteTick(instr, D("1.0000"), D("1.0002"), D("5"), D("1"), t1), t1),
+                QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(instr, "1.0000@5", "1.0001@1", t0), t0),
+                QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(instr, "1.0000@5", "1.0002@1", t1), t1),
             ]
             self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 

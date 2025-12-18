@@ -14,12 +14,11 @@ from suite_trading.domain.order.orders import LimitOrder, Order, MarketOrder  # 
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.order.order_state import OrderState
 
-from suite_trading.domain.market_data.tick.quote_tick import QuoteTick
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
 
-from suite_trading.domain.instrument import Instrument, AssetClass
-from suite_trading.domain.monetary.currency_registry import USD
+from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_tools import make_utc
+from suite_trading.utils.data_generation.assistant import DGA
 
 
 class _LimitOrderTestStrategy(Strategy):
@@ -59,13 +58,13 @@ class _LimitOrderTestStrategy(Strategy):
 
 
 def _create_us_equity_instrument() -> Instrument:
-    return Instrument(name="TEST", exchange="TESTEX", asset_class=AssetClass.EQUITY, price_increment=Decimal("0.01"), quantity_increment=Decimal("1"), contract_size=Decimal("1"), contract_unit="share", quote_currency=USD)
+    return DGA.instrument.create_equity_aapl()
 
 
-def _create_quote_tick_event(instrument: Instrument, *, bid: str, ask: str, bid_volume: str = "1", ask_volume: str = "1", timestamp_index: int = 0) -> QuoteTickEvent:
+def _create_quote_tick_event(instrument: Instrument, *, bid: str, ask: str, timestamp_index: int = 0) -> QuoteTickEvent:
     # Use deterministic UTC timestamps separated by seconds to preserve ordering
     ts = make_utc(2025, 1, 1, 12, 0, 0 + timestamp_index)
-    tick = QuoteTick(instrument, Decimal(bid), Decimal(ask), Decimal(bid_volume), Decimal(ask_volume), ts)
+    tick = DGA.quote_ticks.create_quote_tick_from_strings(instrument, bid, ask, ts)
     return QuoteTickEvent(tick, ts)
 
 
@@ -83,7 +82,7 @@ def test_limit_buy_crossing_best_ask_fills_immediately() -> None:
 
     instrument = _create_us_equity_instrument()
     # One quote where best ask is 100.00; BUY limit with price above ask is marketable and should fill immediately
-    quote_tick_events = [_create_quote_tick_event(instrument, bid="99.97", ask="100.00", bid_volume="5", ask_volume="5", timestamp_index=0)]
+    quote_tick_events = [_create_quote_tick_event(instrument, bid="99.97@5", ask="100.00@5", timestamp_index=0)]
 
     def create_limit_order(_: QuoteTickEvent) -> Order:
         return LimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("1"), limit_price=Decimal("100.01"))
@@ -114,7 +113,7 @@ def test_limit_instant_fill_touch() -> None:
 
     instrument = _create_us_equity_instrument()
     # One quote with ask exactly at 99.98; BUY limit at 99.98 should be accepted and filled in one slice
-    quote_tick_events = [_create_quote_tick_event(instrument, bid="99.95", ask="99.98", bid_volume="5", ask_volume="5", timestamp_index=0)]
+    quote_tick_events = [_create_quote_tick_event(instrument, bid="99.95@5", ask="99.98@5", timestamp_index=0)]
 
     def create_limit_order(_: QuoteTickEvent) -> Order:
         return LimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("1"), limit_price=Decimal("99.98"))
@@ -143,9 +142,9 @@ def test_limit_multiple_partial_fills() -> None:
     instrument = _create_us_equity_instrument()
     # Three ticks with ask <= 100.00 and volume 1 each to force 3 partial fills
     quote_tick_events = [
-        _create_quote_tick_event(instrument, bid="99.95", ask="100.00", bid_volume="5", ask_volume="1", timestamp_index=0),
-        _create_quote_tick_event(instrument, bid="99.96", ask="99.99", bid_volume="5", ask_volume="1", timestamp_index=1),
-        _create_quote_tick_event(instrument, bid="99.97", ask="99.98", bid_volume="5", ask_volume="1", timestamp_index=2),
+        _create_quote_tick_event(instrument, bid="99.95@5", ask="100.00@1", timestamp_index=0),
+        _create_quote_tick_event(instrument, bid="99.96@5", ask="99.99@1", timestamp_index=1),
+        _create_quote_tick_event(instrument, bid="99.97@5", ask="99.98@1", timestamp_index=2),
     ]
 
     def create_limit_order(_: QuoteTickEvent) -> Order:

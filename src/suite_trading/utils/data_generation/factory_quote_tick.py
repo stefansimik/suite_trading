@@ -12,6 +12,9 @@ from suite_trading.utils.decimal_tools import as_decimal
 from suite_trading.utils.math import round_to_increment
 
 
+# region Main
+
+
 def create_quote_tick(
     instrument: Instrument | None = None,
     timestamp: datetime = datetime(2025, 1, 2, 0, 0, 0, tzinfo=timezone.utc),
@@ -51,6 +54,46 @@ def create_quote_tick(
         bid_volume=bid_volume,
         ask_volume=ask_volume,
         timestamp=timestamp,
+    )
+    return result
+
+
+def create_quote_tick_from_strings(
+    instrument: Instrument,
+    bid: str,
+    ask: str,
+    timestamp: datetime | None = None,
+) -> QuoteTick:
+    """Create a `QuoteTick` from "price@volume" strings.
+
+    This helper allows creating a quote tick using compact string levels.
+    Each level string must follow the "price@volume" format, for example "99@10" or "101@5".
+
+    Args:
+        instrument: Instrument for the quote.
+        bid: Bid level as "price@volume" string.
+        ask: Ask level as "price@volume" string.
+        timestamp: Optional UTC timestamp. If not provided, a fixed default
+            timestamp is used to keep fixtures deterministic.
+
+    Returns:
+        Constructed `QuoteTick` instance.
+
+    Raises:
+        ValueError: If any level string does not follow the "price@volume"
+            format or contains invalid numeric content.
+    """
+
+    bid_price, bid_volume = _parse_price_volume_string(bid)
+    ask_price, ask_volume = _parse_price_volume_string(ask)
+
+    result = create_quote_tick(
+        instrument=instrument,
+        bid_price=bid_price,
+        ask_price=ask_price,
+        bid_volume=bid_volume,
+        ask_volume=ask_volume,
+        timestamp=timestamp or datetime(2025, 1, 2, 0, 0, 0, tzinfo=timezone.utc),
     )
     return result
 
@@ -134,3 +177,36 @@ def create_quote_tick_series(
         current_timestamp += time_step
 
     return quotes
+
+
+# endregion
+
+
+# region Utilities
+
+
+def _parse_price_volume_string(raw_level: str) -> tuple[Decimal, Decimal]:
+    """Parse a single "price@volume" string into Decimal price and volume."""
+
+    # Precondition: ensure the level string uses the expected "price@volume" format
+    if "@" not in raw_level:
+        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') does not contain '@' separator")
+
+    price_str, volume_str = raw_level.split("@", 1)
+    price_str = price_str.strip()
+    volume_str = volume_str.strip()
+
+    # Precondition: ensure both price and volume parts are non-empty after stripping
+    if not price_str or not volume_str:
+        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has empty price or volume part")
+
+    try:
+        price = as_decimal(price_str)
+        volume = as_decimal(volume_str)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has invalid numeric content") from exc
+
+    return price, volume
+
+
+# endregion
