@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# BarsFromDataFrameEventFeed: Stream historical bars from an in-memory pandas DataFrame.
+# BarsFromDataFrameEventFeed: Stream historical bar from an in-memory pandas DataFrame.
 # Keeps an index pointer and a cached next event for efficient peek/pop.
 
 from datetime import datetime, tzinfo
@@ -45,7 +45,7 @@ class BarsFromDataFrameEventFeed:
 
         Args:
         - $df (pd.DataFrame): Source data with one row per bar. See class docstring for DataFrame requirements.
-        - $bar_type (BarType): Identifies instrument, timeframe, and price type for all bars.
+        - $bar_type (BarType): Identifies instrument, timeframe, and price type for all bar.
         - $metadata (dict | None): Optional metadata attached to each emitted `BarEvent`.
         - $auto_sort (bool): When True (default), automatically sort $df by 'end_dt' ascending if
           it is not already monotonic non-decreasing. The input DataFrame is not mutated; a sorted
@@ -90,7 +90,7 @@ class BarsFromDataFrameEventFeed:
                 df = df.sort_values("end_dt", kind="stable").reset_index(drop=True)
                 logger.debug("Auto-sorted DataFrame by 'end_dt' for BarsFromDataFrameEventFeed")
             else:
-                raise ValueError("Input DataFrame contains bars that are not in chronological order. Data must be sorted by the 'end_dt' column in ascending order. Solution: Please sort your DataFrame by 'end_dt' before creating the event feed, e.g., df.sort_values('end_dt').")
+                raise ValueError("Input DataFrame contains bar that are not in chronological order. Data must be sorted by the 'end_dt' column in ascending order. Solution: Please sort your DataFrame by 'end_dt' before creating the event feed, e.g., df.sort_values('end_dt').")
 
         # Copies of constructor params
         self._df: pd.DataFrame = df

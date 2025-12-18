@@ -7,12 +7,12 @@ from decimal import Decimal
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.order_book.order_book import BookLevel, OrderBook
 from suite_trading.utils.data_generation import factory_instrument
-from suite_trading.utils.data_generation.price_patterns import zig_zag_function
+from suite_trading.utils.data_generation.price_patterns import zig_zag
 from suite_trading.utils.math import round_to_increment
 from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 
-def create_order_book(
+def create(
     instrument: Instrument | None = None,
     bids: list[tuple[DecimalLike, DecimalLike]] | None = None,
     asks: list[tuple[DecimalLike, DecimalLike]] | None = None,
@@ -42,12 +42,12 @@ def create_order_book(
     Examples:
         Create a simple book with one bid and one ask level::
 
-            from suite_trading.utils.data_generation.factory_order_book import create_order_book
+            from suite_trading.utils.data_generation.factory_order_book import create
 
-            book = create_order_book(bids=[("1.0999", "1_000_000")], asks=[("1.1001", "1_000_000")])
+            book = create(bids=[("1.0999", "1_000_000")], asks=[("1.1001", "1_000_000")])
     """
 
-    effective_instrument = instrument or factory_instrument.create_equity_aapl()
+    effective_instrument = instrument or factory_instrument.equity_aapl()
     price_increment = effective_instrument.price_increment
 
     if bids is None and asks is None:
@@ -74,7 +74,7 @@ def create_order_book(
     return result
 
 
-def create_order_book_from_strings(
+def from_strings(
     instrument: Instrument,
     bids: Iterable[str] | None = None,
     asks: Iterable[str] | None = None,
@@ -82,7 +82,7 @@ def create_order_book_from_strings(
 ) -> OrderBook:
     """Create `OrderBook` from bid/ask levels given as "price@volume" strings.
 
-    This is a convenience wrapper around `create_order_book` for callers that
+    This is a convenience wrapper around `create` for callers that
     do not need to work directly with `Decimal` values. Each level string must
     be in the "price@volume" format, for example "99@10" or "101@5".
 
@@ -107,11 +107,11 @@ def create_order_book_from_strings(
     Examples:
         Build an `OrderBook` using compact string levels::
 
-            from suite_trading.utils.data_generation.factory_order_book import create_order_book_from_strings
-            from suite_trading.utils.data_generation.factory_instrument import create_equity_aapl
+            from suite_trading.utils.data_generation.factory_order_book import from_strings
+            from suite_trading.utils.data_generation.factory_instrument import equity_aapl
 
-            instrument = create_equity_aapl()
-            book = create_order_book_from_strings(
+            instrument = equity_aapl()
+            book = from_strings(
                 instrument=instrument,
                 bids=["99@10"],
                 asks=["101@5", "102@5"],
@@ -121,15 +121,15 @@ def create_order_book_from_strings(
     bid_pairs = _parse_price_volume_levels(bids)
     ask_pairs = _parse_price_volume_levels(asks)
 
-    result = create_order_book(instrument=instrument, bids=bid_pairs, asks=ask_pairs, timestamp=timestamp)
+    result = create(instrument=instrument, bids=bid_pairs, asks=ask_pairs, timestamp=timestamp)
     return result
 
 
-def create_order_book_series(
+def create_series(
     first_book: OrderBook | None = None,
     num_books: int = 20,
     time_step: timedelta = timedelta(seconds=1),
-    price_pattern_func: Callable[[int], float] = zig_zag_function,
+    price_pattern_func: Callable[[int], float] = zig_zag,
 ) -> list[OrderBook]:
     """Generate a series of demo order books along a price pattern.
 
@@ -141,7 +141,7 @@ def create_order_book_series(
 
     Args:
         first_book: First order book in the series. If None, a default book is
-            created with `create_order_book`.
+            created with `create`.
         num_books: Number of books to generate (including $first_book).
         time_step: Time distance between successive books.
         price_pattern_func: Function that controls how the central price of
@@ -156,10 +156,10 @@ def create_order_book_series(
     Examples:
         Create a short series of demo order books::
 
-            from suite_trading.utils.data_generation.factory_order_book import create_order_book, create_order_book_series
+            from suite_trading.utils.data_generation.factory_order_book import create, create_series
 
-            first_book = create_order_book()
-            books = create_order_book_series(first_book=first_book, num_books=10)
+            first_book = create()
+            books = create_series(first_book=first_book, num_books=10)
             # books[0] is $first_book
     """
 
@@ -167,7 +167,7 @@ def create_order_book_series(
         raise ValueError(f"$num_books must be >= 1, but provided value is: {num_books}")
 
     if first_book is None:
-        first_book = create_order_book()
+        first_book = create()
 
     instrument = first_book.instrument
     price_increment = instrument.price_increment
@@ -176,7 +176,7 @@ def create_order_book_series(
     asks = list(first_book.asks)
 
     if not bids or not asks:
-        raise ValueError("Cannot call `create_order_book_series` because $first_book must have at least one bid and one ask level")
+        raise ValueError("Cannot call `create_series` because $first_book must have at least one bid and one ask level")
 
     best_bid = bids[0].price
     best_ask = asks[0].price

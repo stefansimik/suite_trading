@@ -7,12 +7,12 @@ from decimal import Decimal
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.tick.trade_tick import TradeTick
 from suite_trading.utils.data_generation import factory_instrument
-from suite_trading.utils.data_generation.price_patterns import zig_zag_function
+from suite_trading.utils.data_generation.price_patterns import zig_zag
 from suite_trading.utils.decimal_tools import as_decimal
 from suite_trading.utils.math import round_to_increment
 
 
-def create_trade_tick(
+def create(
     instrument: Instrument | None = None,
     timestamp: datetime = datetime(2025, 1, 2, 0, 0, 0, tzinfo=timezone.utc),
     price: Decimal = Decimal("100.00"),
@@ -22,7 +22,7 @@ def create_trade_tick(
 
     This helper produces simple equity-style ticks with tiny volumes so that
     partial fills are easy to model in tests. The tick returned here works as
-    a natural first element for `create_trade_tick_series`, which reuses its
+    a natural first element for `create_series`, which reuses its
     $instrument and $volume.
 
     Args:
@@ -35,18 +35,18 @@ def create_trade_tick(
         A synthetic `TradeTick` instance for use in tests and examples.
     """
 
-    effective_instrument = instrument or factory_instrument.create_equity_aapl()
+    effective_instrument = instrument or factory_instrument.equity_aapl()
     price_rounded = round_to_increment(price, effective_instrument.price_increment)
 
     result = TradeTick(instrument=effective_instrument, price=price_rounded, volume=volume, timestamp=timestamp)
     return result
 
 
-def create_trade_tick_series(
+def create_series(
     first_tick: TradeTick | None = None,
     num_ticks: int = 20,
     time_step: timedelta = timedelta(seconds=1),
-    price_pattern_func: Callable[[int], float] = zig_zag_function,
+    price_pattern_func: Callable[[int], float] = zig_zag,
 ) -> list[TradeTick]:
     """Generate a series of demo trade ticks with a price pattern.
 
@@ -56,7 +56,7 @@ def create_trade_tick_series(
 
     Args:
         first_tick: First tick of the series. If None, a default tick is
-            created with `create_trade_tick`.
+            created with `create`.
         num_ticks: Number of ticks to generate (including $first_tick).
         time_step: Time distance between successive ticks.
         price_pattern_func: Function that returns Y-values representing the
@@ -74,7 +74,7 @@ def create_trade_tick_series(
         raise ValueError(f"$num_ticks must be >= 1, but provided value is: {num_ticks}")
 
     if first_tick is None:
-        first_tick = create_trade_tick()
+        first_tick = create()
 
     instrument = first_tick.instrument
     base_price = first_tick.price

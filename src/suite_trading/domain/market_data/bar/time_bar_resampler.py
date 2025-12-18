@@ -24,7 +24,7 @@ class TimeBarResampler:
     Constraints (v1):
         - Supported output units: SECOND, MINUTE, HOUR, DAY (daily = 00:00–24:00 UTC, right-closed).
         - If $unit is DAY, only $size == 1 is supported.
-        - Input bars must also be time-based with units in {SECOND, MINUTE, HOUR, DAY}.
+        - Input bar must also be time-based with units in {SECOND, MINUTE, HOUR, DAY}.
         - Output window duration must be >= input bar duration and an exact multiple of it.
         - Alignment is anchored to midnight UTC using total seconds since day start.
 
@@ -70,7 +70,7 @@ class TimeBarResampler:
     # region Main logic
 
     def add_event(self, event: BarEvent) -> None:
-        """Consume a `BarEvent` and resample it into aggregated time bars.
+        """Consume a `BarEvent` and resample it into aggregated time bar.
 
         Behavior:
         - Enforce ordering.
@@ -134,7 +134,7 @@ class TimeBarResampler:
             raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $bar.end_dt ('{bar.end_dt}') is older than previous input ('{self._last_bar_end_dt}')")
 
     def _validate_first_source_and_compatibility(self, event: BarEvent) -> None:
-        # Require time-based bars
+        # Require time-based bar
         bar = event.bar
         if bar.unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY}:
             raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $bar.unit ('{bar.unit}') is not a supported time unit; only SECOND, MINUTE, HOUR, DAY are supported")

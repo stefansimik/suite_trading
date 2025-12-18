@@ -33,7 +33,7 @@ class _SubmitAndRecordStrategy(Strategy):
         self.executions = []
 
     def on_start(self) -> None:
-        tick = DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, f"{self._bid}@10", f"{self._ask}@10", self._ts)
+        tick = DGA.quote_tick.from_strings(self._instrument, f"{self._bid}@10", f"{self._ask}@10", self._ts)
         self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
@@ -51,7 +51,7 @@ class _SubmitAndRecordStrategy(Strategy):
 
 class TestEngineOrderRoutingMarket:
     def _instrument(self) -> Instrument:
-        return DGA.instrument.create_future_es()
+        return DGA.instrument.future_es()
 
     def _ts(self) -> datetime:
         return datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc)

@@ -203,7 +203,7 @@ class Bar:
             other: The other object to compare with.
 
         Returns:
-            bool: True if bars are equal, False otherwise.
+            bool: True if bar are equal, False otherwise.
         """
         if not isinstance(other, Bar):
             return False

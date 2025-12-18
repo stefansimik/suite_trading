@@ -910,11 +910,12 @@ no shared mutable state between tests.
 Currently it provides:
 - `instrument`: Helpers for creating `Instrument` fixtures (for example,
   realistic futures, FX, or equity instruments).
-- `bars`: Helpers for creating single bars and bar series.
+- `bar`: Helpers for creating single bars and bar series.
 - `order_book`: Helpers for creating simple `OrderBook` snapshots from
   numeric tuples or "price@volume" strings.
-- `price_pattern`: Helpers for scalar price patterns (linear, sine wave,
-  zig-zag).
+- `trade_tick`: Helpers for creating trade ticks and series.
+- `quote_tick`: Helpers for creating quote ticks and series.
+- `pattern`: Helpers for scalar price patterns (linear, sine wave, zig-zag).
 
 In new tests you should:
 - Import `DGA` once, and
@@ -927,8 +928,8 @@ from suite_trading.utils.data_generation.assistant import DGA
 
 
 def test_example_instrument():
-    instrument = DGA.instrument.create_future_es()
-    # use $instrument in your test logic here
+  instrument = DGA.instrument.future_es()
+  # use $instrument in your test logic here
 ```
 
 ---

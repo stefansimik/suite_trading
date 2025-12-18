@@ -28,7 +28,7 @@ class TwoTradeDemoStrategy(Strategy):
     """Trivial demo strategy for Plan Step 1.
 
     Behavior:
-    - Adds a FixedSequenceEventFeed of 10 rising bars (Step 0)
+    - Adds a FixedSequenceEventFeed of 10 rising bar (Step 0)
     - Counts incoming BarEvent(s) as "price events"
     - On 3rd event: submit SELL Market order qty=1
     - On 5th event: submit BUY Market order qty=1, then stop by closing the feed
@@ -42,8 +42,8 @@ class TwoTradeDemoStrategy(Strategy):
 
     def on_start(self) -> None:
         logger.info(f"Started Strategy named '{self.name}'")
-        # Step 0: generate 10 rising bars and wrap into BarEvent(s)
-        bars = DGA.bars.create_bar_series(num_bars=10)
+        # Step 0: generate 10 rising bar and wrap into BarEvent(s)
+        bars = DGA.bar.create_series(num_bars=10)
         prices_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
         self.add_event_feed(self._prices_feed_name, prices_feed, use_for_simulated_fills=True)
 

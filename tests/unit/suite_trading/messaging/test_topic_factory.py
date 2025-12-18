@@ -7,7 +7,7 @@ from suite_trading.utils.data_generation.assistant import DGA
 def test_topic_protocol_create_topic_for_bar():
     """Test that TopicFactory.create_topic_for_bar generates the correct topic name."""
     # Create a bar type
-    bar_type = DGA.bars.create_bar_type(value=5)
+    bar_type = DGA.bar.create_type(value=5)
 
     # Generate the topic name
     topic = TopicFactory.create_topic_for_bar(bar_type)
@@ -22,13 +22,13 @@ def test_message_bus_publish_bar_event():
     msg_bus = MessageBus()
 
     # Create a bar type
-    bar_type = DGA.bars.create_bar_type(value=5)
+    bar_type = DGA.bar.create_type(value=5)
 
     # Create a bar using default implementation
     from datetime import datetime, timezone
 
     # Create a bar with the bar_type using a fixed datetime
-    bar = DGA.bars.create_bar(
+    bar = DGA.bar.create(
         bar_type=bar_type,
         end_dt=datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
     )

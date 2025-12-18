@@ -28,7 +28,7 @@ class _KickoffEvent(Event):
 
 
 class _BarsSubmitAtStartStrategy(Strategy):
-    """Submits a Market BUY before any bars are delivered (fills on first OPEN)."""
+    """Submits a Market BUY before any bar are delivered (fills on first OPEN)."""
 
     def __init__(self, name: str, broker: SimBroker):
         super().__init__(name)
@@ -39,13 +39,13 @@ class _BarsSubmitAtStartStrategy(Strategy):
 
     def on_start(self) -> None:
         # Prepare bar series but submit only when RUNNING using a kickoff event before first bar
-        self._bars = DGA.bars.create_bar_series(num_bars=5)
+        self._bars = DGA.bar.create_series(num_bars=5)
         first_start = self._bars[0].start_dt
         kickoff_time = first_start - timedelta(seconds=1)
         self.add_event_feed("kick", FixedSequenceEventFeed([_KickoffEvent(kickoff_time)]))
 
     def on_event(self, event) -> None:
-        # Submit in kickoff callback while no order-book exists yet; then attach bars feed
+        # Submit in kickoff callback while no order-book exists yet; then attach bar feed
         if not self._submitted and isinstance(event, _KickoffEvent):
             assert self._bars is not None
             instr = self._bars[0].instrument
@@ -53,7 +53,7 @@ class _BarsSubmitAtStartStrategy(Strategy):
             self.submit_order(order, self._broker)
             self._submitted = True
             self.remove_event_feed("kick")
-            self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
+            self.add_event_feed("bar", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
 
     def on_execution(self, execution) -> None:
         self.executions.append(execution)
@@ -69,8 +69,8 @@ class _BarsSubmitInsideCallbackStrategy(Strategy):
         self.executions = []
 
     def on_start(self) -> None:
-        self._bars = DGA.bars.create_bar_series(num_bars=5)
-        self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
+        self._bars = DGA.bar.create_series(num_bars=5)
+        self.add_event_feed("bar", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
         if not self._submitted:
@@ -82,7 +82,7 @@ class _BarsSubmitInsideCallbackStrategy(Strategy):
     def on_execution(self, execution) -> None:
         self.executions.append(execution)
         # Stop after first execution
-        self.remove_event_feed("bars")
+        self.remove_event_feed("bar")
 
 
 class _BarsOpenCloseReverseStrategy(Strategy):
@@ -96,8 +96,8 @@ class _BarsOpenCloseReverseStrategy(Strategy):
         self.executions = []
 
     def on_start(self) -> None:
-        self._bars = DGA.bars.create_bar_series(num_bars=5)
-        self.add_event_feed("bars", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
+        self._bars = DGA.bar.create_series(num_bars=5)
+        self.add_event_feed("bar", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
         self._count += 1
@@ -114,7 +114,7 @@ class _BarsOpenCloseReverseStrategy(Strategy):
         self.executions.append(execution)
         # Auto-stop when we have 2 executions for close, or 2 (open+reverse first leg) for reverse
         if len(self.executions) >= 2:
-            self.remove_event_feed("bars")
+            self.remove_event_feed("bar")
 
 
 class TestMarketOrderBarsBasic:
@@ -131,7 +131,7 @@ class TestMarketOrderBarsBasic:
         assert len(s.executions) >= 1
         first_exec = s.executions[0]
         # Expect fill at OPEN of the first bar (converter emits OPEN first)
-        bars = DGA.bars.create_bar_series(num_bars=5)
+        bars = DGA.bar.create_series(num_bars=5)
         assert first_exec.price == bars[0].open
         assert first_exec.timestamp == bars[0].start_dt
 

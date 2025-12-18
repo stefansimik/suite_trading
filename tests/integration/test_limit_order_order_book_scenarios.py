@@ -68,8 +68,8 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_enabled() -> None:
     broker = SimBroker(fill_model=fill_model)
     engine.add_broker("sim_broker", broker)
 
-    instrument = DGA.instrument.create_equity_aapl()
-    order_book = DGA.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
+    instrument = DGA.instrument.equity_aapl()
+    order_book = DGA.order_book.from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
     strategy_name = "limit_order_two_levels"
     strategy = SimgleLimitOrderStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
     engine.add_strategy(strategy)
@@ -106,8 +106,8 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_disabled() -> None:
     broker = SimBroker(fill_model=fill_model)
     engine.add_broker("sim_broker", broker)
 
-    instrument = DGA.instrument.create_equity_aapl()
-    order_book = DGA.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
+    instrument = DGA.instrument.equity_aapl()
+    order_book = DGA.order_book.from_strings(instrument=instrument, bids=["99@10"], asks=["101@5", "102@5"])
     strategy_name = "limit_order_two_levels_on_touch_disabled"
     strategy = SimgleLimitOrderStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
     engine.add_strategy(strategy)
@@ -143,8 +143,8 @@ def test_buy_limit_with_three_ask_levels_partial_fill_up_to_limit_price() -> Non
     engine.add_broker("sim_broker", broker)
 
     # OrderBook snapshot: asks at 100x3, 101x5, 102x5; bid at 99x10 to satisfy margin model while focusing on asks
-    instrument = DGA.instrument.create_equity_aapl()
-    order_book = DGA.order_book.create_order_book_from_strings(instrument=instrument, bids=["99@10"], asks=["100@3", "101@5", "102@5"])
+    instrument = DGA.instrument.equity_aapl()
+    order_book = DGA.order_book.from_strings(instrument=instrument, bids=["99@10"], asks=["100@3", "101@5", "102@5"])
     strategy_name = "limit_order_three_levels"
     strategy = SimgleLimitOrderStrategy(name=strategy_name, broker=broker, instrument=order_book.instrument, order_books=[order_book])
     engine.add_strategy(strategy)

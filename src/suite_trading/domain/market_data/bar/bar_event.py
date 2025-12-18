@@ -108,7 +108,7 @@ def wrap_bars_to_events(
     is_historical: bool = True,
     dt_received_getter: Callable[[Bar], datetime] | None = None,
 ) -> Iterator[BarEvent]:
-    """Wrap $bars into $BarEvent(s) with predictable $dt_received defaults.
+    """Wrap $bar into $BarEvent(s) with predictable $dt_received defaults.
 
     Args:
         bars: Iterable of $Bar instances to wrap.
@@ -120,7 +120,7 @@ def wrap_bars_to_events(
         Iterator[BarEvent]: A lazy iterator of wrapped events.
 
     Example:
-        feed = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(num_bars=20)))
+        feed = FixedSequenceEventFeed(wrap_bars_to_events(create_series(num_bars=20)))
     """
     if dt_received_getter is None:
         dt_received_getter = lambda b: b.end_dt  # noqa: E731

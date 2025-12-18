@@ -32,7 +32,7 @@ class DemoStrategy(Strategy):
     # Invoked once when the Strategy is started
     def on_start(self) -> None:
         # Create 20 synthetic demo bars
-        bars = DGA.bars.create_bar_series(num_bars=20)
+        bars = DGA.bar.create_series(num_bars=20)
         # Create an EventFeed from the bars and add it to the Strategy
         bars_event_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
         # Add the EventFeed to this Strategy (these bars drive order simulation)

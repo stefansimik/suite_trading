@@ -103,10 +103,10 @@ def dt(hour: int, minute: int, second: int) -> datetime:
 
 
 def test_order_book_chronology_with_mixed_tick_and_bar_feeds():
-    """Test that OrderBooks from bars are filtered when ticks already processed.
+    """Test that OrderBooks from bar are filtered when ticks already processed.
 
-    Scenario: Strategy receives BOTH trade-ticks AND 1-min bars built from same ticks.
-    When bars arrive, their decomposed OrderBooks must be filtered to prevent going back in time.
+    Scenario: Strategy receives BOTH trade-ticks AND 1-min bar built from same ticks.
+    When bar arrive, their decomposed OrderBooks must be filtered to prevent going back in time.
 
     Expected OrderBook Processing:
     | Event Time | Event Type | OrderBooks Generated | Timestamps | Processing Decision     | Last Timestamp After |
@@ -192,9 +192,9 @@ def test_order_book_chronology_with_mixed_tick_and_bar_feeds():
 
 
 def test_order_book_chronology_with_delayed_bars():
-    """Test that all bar OrderBooks are filtered when bars arrive after constituent ticks.
+    """Test that all bar OrderBooks are filtered when bar arrive after constituent ticks.
 
-    Scenario: 13 trade-ticks (one every 10 seconds), aggregated into 1-min bars that arrive
+    Scenario: 13 trade-ticks (one every 10 seconds), aggregated into 1-min bar that arrive
     immediately after each bar period closes. All bar OrderBooks should be skipped because
     constituent ticks were already processed.
 
@@ -218,9 +218,9 @@ def test_order_book_chronology_with_delayed_bars():
     | 15      | 09:02:00 | Bar 2   | 4 @ 09:01:00, 09:01:20, 09:01:40, 09:02:00  | -         | ❌❌❌❌ | All ≤ 09:02:00 |
 
     Totals:
-    - Events delivered to Strategy: 15 (13 ticks + 2 bars)
+    - Events delivered to Strategy: 15 (13 ticks + 2 bar)
     - OrderBooks processed (broker): 13 (all from ticks)
-    - OrderBooks skipped: 8 (all from bars, 4 per bar)
+    - OrderBooks skipped: 8 (all from bar, 4 per bar)
     """
     # Create test components
     instrument = create_test_instrument()
@@ -276,7 +276,7 @@ def test_order_book_chronology_with_delayed_bars():
     for i, expected_ts in enumerate(expected_timestamps):
         assert mock_broker.processed_order_books[i].timestamp == expected_ts, f"OrderBook {i} timestamp mismatch: expected {expected_ts}, got {mock_broker.processed_order_books[i].timestamp}"
 
-    # Verify Strategy received all 15 events (13 ticks + 2 bars)
+    # Verify Strategy received all 15 events (13 ticks + 2 bar)
     assert len(strategy.received_events) == 15, f"Expected 15 events, got {len(strategy.received_events)}"
     tick_events = [e for e in strategy.received_events if isinstance(e, TradeTickEvent)]
     bar_events = [e for e in strategy.received_events if isinstance(e, BarEvent)]

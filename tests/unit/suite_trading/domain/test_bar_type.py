@@ -19,7 +19,7 @@ def test_bar_type_string_representation():
         contract_unit="EUR",
         quote_currency=USD,
     )
-    bar_type = DGA.bars.create_bar_type(instrument=instrument, value=1, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
+    bar_type = DGA.bar.create_type(instrument=instrument, value=1, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
 
     assert str(bar_type) == "EURUSD@FOREX::1-MINUTE::LAST_TRADE"
     assert isinstance(bar_type.instrument, Instrument)

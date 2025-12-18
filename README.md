@@ -107,7 +107,7 @@ class DemoStrategy(Strategy):
 
     def on_start(self) -> None:
         # Create 20 synthetic bars and feed them to this strategy
-        bars = DGA.bars.create_bar_series(num_bars=20)
+        bars = DGA.bar.create_series(num_bars=20)
         bars_event_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
         self.add_event_feed("bars", bars_event_feed, use_for_simulated_fills=True)
 
@@ -328,9 +328,10 @@ from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSeq
 from suite_trading.domain.market_data.bar.bar_event import wrap_bars_to_events
 from suite_trading.utils.data_generation.assistant import DGA
 
+
 def on_start(self) -> None:
     # Create bars and wrap them as events
-    bars = DGA.bars.create_bar_series(num_bars=100)
+    bars = DGA.bar.create_series(num_bars=100)
     event_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
 
     # Attach to this strategy

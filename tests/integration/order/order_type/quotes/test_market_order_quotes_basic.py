@@ -17,7 +17,7 @@ from suite_trading.domain.event import Event
 
 
 def _make_instr() -> Instrument:
-    return DGA.instrument.create_fx_spot_eurusd()
+    return DGA.instrument.fx_spot_eurusd()
 
 
 def _create_optimistic_sim_broker() -> SimBroker:
@@ -37,7 +37,7 @@ class _QuotesSubmitInCallbackStrategy(Strategy):
     def on_start(self) -> None:
         instr = _make_instr()
         t0 = datetime(2025, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
-        ticks = [QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(instr, "1.0000@5", "1.0001@5", t0), t0)]
+        ticks = [QuoteTickEvent(DGA.quote_tick.from_strings(instr, "1.0000@5", "1.0001@5", t0), t0)]
         self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
@@ -86,7 +86,7 @@ class _QuotesSubmitBeforeTicksStrategy(Strategy):
             self._submitted = True
             self.remove_event_feed("kick")
 
-            ticks = [QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(instr, "1.0000@5", "1.0001@5", t0), t0)]
+            ticks = [QuoteTickEvent(DGA.quote_tick.from_strings(instr, "1.0000@5", "1.0001@5", t0), t0)]
             self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
     def on_execution(self, execution) -> None:
@@ -122,8 +122,8 @@ class _QuotesPartialAcrossTicksStrategy(Strategy):
 
             t1 = t0 + timedelta(seconds=1)
             ticks = [
-                QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(instr, "1.0000@5", "1.0001@1", t0), t0),
-                QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(instr, "1.0000@5", "1.0002@1", t1), t1),
+                QuoteTickEvent(DGA.quote_tick.from_strings(instr, "1.0000@5", "1.0001@1", t0), t0),
+                QuoteTickEvent(DGA.quote_tick.from_strings(instr, "1.0000@5", "1.0002@1", t1), t1),
             ]
             self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 

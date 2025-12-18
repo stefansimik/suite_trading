@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class TimeBarAggregationEventFeed:
-    """Aggregate time-based bars from a source EventFeed using `TimeBarResampler`.
+    """Aggregate time-based bar from a source EventFeed using `TimeBarResampler`.
 
-    Receive source bars path:
+    Receive source bar path:
       - `on_source_event`: receives NewBarEvent(s) from $source_feed and forwards to the
         resampler.
 
@@ -52,7 +52,7 @@ class TimeBarAggregationEventFeed:
         if self._unit in {BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH} and self._size != 1:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $size ('{self._size}') must be 1 when $unit is {self._unit.name}")
 
-        # LISTENERS OF THIS FEED (who want to be notified about aggregated bars)
+        # LISTENERS OF THIS FEED (who want to be notified about aggregated bar)
         self._listeners: dict[str, Callable[[Event], None]] = {}
 
         # LIFECYCLE

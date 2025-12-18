@@ -18,7 +18,7 @@ class BarType:
         instrument: The financial instrument.
         value: The numeric value of the period (e.g., 1, 5, 15).
         unit: The unit of the period (e.g., MINUTE, HOUR) from BarUnit.
-        price_type: The type of original higher-resolution price data used to build bars
+        price_type: The type of original higher-resolution price data used to build bar
             of this BarType (BID/ASK/MID/LAST_TRADE). LAST_TRADE denotes the last traded
             price (often called LAST by data vendors).
     """
@@ -103,7 +103,7 @@ class BarType:
 
     @property
     def price_type(self) -> PriceType:
-        """Return the $price_type indicating which input price series bars use.
+        """Return the $price_type indicating which input price series bar use.
 
         Values: BID, ASK, MID, LAST_TRADE. LAST_TRADE denotes the last traded price
         (often called LAST by data vendors).

@@ -36,15 +36,15 @@ def build_feed_from_end_times(
     """Create a FixedSequenceEventFeed from explicit bar end datetimes.
 
     Args:
-        unit: Unit of the source bars (SECOND/MINUTE/HOUR).
-        size: Size of the source bars (e.g., 1, 5, 15, 30, 60).
-        end_times: Exact end datetimes for the bars in the given order.
+        unit: Unit of the source bar (SECOND/MINUTE/HOUR).
+        size: Size of the source bar (e.g., 1, 5, 15, 30, 60).
+        end_times: Exact end datetimes for the bar in the given order.
 
     Returns:
         FixedSequenceEventFeed producing NewBarEvent(s) in the provided order.
     """
-    bt = DGA.bars.create_bar_type(value=size, unit=unit)
-    bars = [DGA.bars.create_bar(bar_type=bt, end_dt=dt) for dt in end_times]
+    bt = DGA.bar.create_type(value=size, unit=unit)
+    bars = [DGA.bar.create(bar_type=bt, end_dt=dt) for dt in end_times]
     return FixedSequenceEventFeed(wrap_bars_to_events(bars))
 
 
@@ -100,10 +100,10 @@ class TestStrategy(Strategy):
         self.types_agg: list[Period] = []
 
     def on_start(self) -> None:
-        # Source event-feed: emits input bars for the Strategy
+        # Source event-feed: emits input bar for the Strategy
         self.add_event_feed("source", self._source_feed)
 
-        # Aggregation event-feed: resamples bars from the source feed into the target period
+        # Aggregation event-feed: resamples bar from the source feed into the target period
         agg = TimeBarAggregationEventFeed(
             source_feed=self._source_feed,
             unit=self._target.unit,
@@ -119,7 +119,7 @@ class TestStrategy(Strategy):
         bar = event.bar
         bt = bar.bar_type
 
-        # Count input source bars by excluding aggregated ones via target match.
+        # Count input source bar by excluding aggregated ones via target match.
         if bt.unit == self._target.unit and int(bt.value) == int(self._target.size):
             self.count_agg += 1
             self.ends_agg.append(bar.end_dt)
@@ -213,7 +213,7 @@ def test_time_bar_aggregation_single_boundary_emits_and_type_is_correct(
 
     engine.start()
 
-    # Count of source bars equals 1 (the only event we fed)
+    # Count of source bar equals 1 (the only event we fed)
     assert strategy.count_input == 1
 
     # Aggregated output: exactly one bar at the boundary with correct type
@@ -227,11 +227,11 @@ def test_time_bar_aggregation_spans_five_intervals_with_many_inputs(
     base_period: Period,
     target: Period,
 ) -> None:
-    """Emit many source bars spanning five full aggregated intervals.
+    """Emit many source bar spanning five full aggregated intervals.
 
-    We generate two source bars per target interval: one early bar within the
+    We generate two source bar per target interval: one early bar within the
     interval and one exactly at the boundary. This keeps the test fast (10 input
-    bars total) while still verifying aggregation across a longer time range.
+    bar total) while still verifying aggregation across a longer time range.
 
     Asserts:
     - Input source event count equals 10 (2 per interval over 5 intervals)
@@ -261,7 +261,7 @@ def test_time_bar_aggregation_spans_five_intervals_with_many_inputs(
     target_dt = to_timedelta(target)
     base_dt = to_timedelta(base_period)
 
-    # Build end-times covering 5 target intervals with two source bars per interval
+    # Build end-times covering 5 target intervals with two source bar per interval
     # Order per interval: an early bar strictly inside the interval, then the boundary bar
     end_times: list[datetime] = []
     boundaries: list[datetime] = []
@@ -283,7 +283,7 @@ def test_time_bar_aggregation_spans_five_intervals_with_many_inputs(
 
     engine.start()
 
-    # Input count: all source bars (none of them match the target type)
+    # Input count: all source bar (none of them match the target type)
     assert strategy.count_input == len(end_times)
 
     # Aggregated output: exactly one bar per interval at each boundary with correct type

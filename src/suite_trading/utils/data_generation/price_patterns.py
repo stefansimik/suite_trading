@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 
-def linear_function(
+def linear(
     x: int,
     start_price: float = 1.0,
     trend_rate: float = 0.005,
@@ -11,7 +11,7 @@ def linear_function(
     """Generate a value following a linear trend pattern.
 
     This helper is used to build simple price curves in tests and examples. It
-    matches the behavior of the historical `linear_function` helper.
+    matches the behavior of the historical `linear` helper.
 
     Args:
         x: Position in the sequence (x-value in the linear equation).
@@ -24,9 +24,9 @@ def linear_function(
     Examples:
         Generate a few values along a linear trend::
 
-            from suite_trading.utils.data_generation.price_patterns import linear_function
+            from suite_trading.utils.data_generation.price_patterns import linear
 
-            prices = [linear_function(x) for x in range(3)]
+            prices = [linear(x) for x in range(3)]
             # prices == [1.0, 1.005, 1.01]
     """
 
@@ -34,7 +34,7 @@ def linear_function(
     return result
 
 
-def sine_wave_function(
+def sine_wave(
     x: float,
     start_price: float = 1.0,
     amplitude: float = 0.01,
@@ -60,9 +60,9 @@ def sine_wave_function(
         Generate a small sine wave around 1.0::
 
             from math import pi
-            from suite_trading.utils.data_generation.price_patterns import sine_wave_function
+            from suite_trading.utils.data_generation.price_patterns import sine_wave
 
-            value = sine_wave_function(pi / (2 * 0.1))
+            value = sine_wave(pi / (2 * 0.1))
             # value is approximately 1.01
     """
 
@@ -70,7 +70,7 @@ def sine_wave_function(
     return result
 
 
-def zig_zag_function(
+def zig_zag(
     x: int,
     start_price: float = 1.0,
     up_first: bool = True,
@@ -100,9 +100,9 @@ def zig_zag_function(
     Examples:
         Generate a few points from a zig-zag pattern::
 
-            from suite_trading.utils.data_generation.price_patterns import zig_zag_function
+            from suite_trading.utils.data_generation.price_patterns import zig_zag
 
-            values = [zig_zag_function(x) for x in range(4)]
+            values = [zig_zag(x) for x in range(4)]
             # values[0] is the starting price
     """
 

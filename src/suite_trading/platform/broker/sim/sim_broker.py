@@ -379,7 +379,7 @@ class SimBroker(Broker, SimulatedBroker):
         # Enrich with depth model and treat the result as the broker's current OrderBook snapshot
         enriched_order_book = self._depth_model.enrich_order_book(order_book)
 
-        # This handles redundant updates (e.g., multiple bars at same time with same price).
+        # This handles redundant updates (e.g., multiple bar at same time with same price).
         last_processed_book = self._latest_order_book_by_instrument.get(enriched_order_book.instrument)
         if last_processed_book == enriched_order_book:
             return

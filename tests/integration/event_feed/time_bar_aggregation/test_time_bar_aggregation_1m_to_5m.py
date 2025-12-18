@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class TestStrategy(Strategy):
     """Strategy wiring a 1‑minute source feed to a 5‑minute aggregator (defaults).
 
-    Records counts and end timestamps of emitted 5‑minute bars for assertions.
+    Records counts and end timestamps of emitted 5‑minute bar for assertions.
     """
 
     def __init__(self, *, name: str, source_feed_1_min) -> None:
@@ -67,15 +67,15 @@ def build_feed_from_minute_ends(
 
     Args:
         base_day: UTC date used to anchor generated bar timestamps (hour=00 is used).
-        end_minutes: Minute ends to create bars for (e.g., [1, 2, 3, 4, 5]).
+        end_minutes: Minute ends to create bar for (e.g., [1, 2, 3, 4, 5]).
         unit_minutes: Bar unit size in minutes (1 for input series).
 
     Returns:
         FixedSequenceEventFeed of BarEvent(s) in the exact provided order.
     """
-    bt = DGA.bars.create_bar_type(value=unit_minutes, unit=BarUnit.MINUTE)
+    bt = DGA.bar.create_type(value=unit_minutes, unit=BarUnit.MINUTE)
     bars = [
-        DGA.bars.create_bar(
+        DGA.bar.create(
             bar_type=bt,
             end_dt=base_day.replace(hour=0, minute=m, second=0, microsecond=0),
         )
@@ -129,7 +129,7 @@ def test_1m_to_5m_emits_end_minutes(
 
     engine.start()
 
-    # Assert input count matches processed 1‑minute bars
+    # Assert input count matches processed 1‑minute bar
     assert strategy.count_1m == len(input_1min_bars)
 
     # Assert exact aggregated 5‑minute bar end minutes

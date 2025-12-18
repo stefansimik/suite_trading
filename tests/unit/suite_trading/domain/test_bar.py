@@ -36,11 +36,11 @@ VOLUME_DECIMAL = Decimal(str(VOLUME))
 def test_bar_construction_and_values():
     """Test that Bar can be constructed properly and its values are correctly set."""
     # Create a bar type using the utility function
-    bar_type = DGA.bars.create_bar_type(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
+    bar_type = DGA.bar.create_type(instrument=INSTRUMENT, value=BAR_VALUE, unit=BarUnit.MINUTE, price_type=PriceType.LAST_TRADE)
 
     # Create a bar using the utility function with a fixed datetime
     fixed_dt = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-    bar = DGA.bars.create_bar(
+    bar = DGA.bar.create(
         bar_type=bar_type,
         end_dt=fixed_dt.replace(minute=fixed_dt.minute + BAR_VALUE),
         close_price=CLOSE_PRICE_DECIMAL,

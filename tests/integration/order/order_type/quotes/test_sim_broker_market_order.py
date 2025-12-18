@@ -24,7 +24,7 @@ class TestSimBrokerMarketOrder:
         return SimBroker(fill_model=fill_model)
 
     def _instrument(self) -> Instrument:
-        return DGA.instrument.create_equity_aapl()
+        return DGA.instrument.equity_aapl()
 
     def _ts(self, seconds: int = 0) -> datetime:
         base = datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
@@ -65,7 +65,7 @@ class TestSimBrokerMarketOrder:
                 self.remove_event_feed("kick")
 
                 # Now add a single-quote feed to produce the first order-book
-                tick = DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, f"{self._price - D('1')}@5", f"{self._price}@5", self._ts)
+                tick = DGA.quote_tick.from_strings(self._instrument, f"{self._price - D('1')}@5", f"{self._price}@5", self._ts)
                 self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
     class _SubmitWhenSnapshotExistsStrategy(Strategy):
@@ -81,7 +81,7 @@ class TestSimBrokerMarketOrder:
             self.executions = []
 
         def on_start(self) -> None:
-            tick = DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, f"{self._ask - D('2')}@5", f"{self._ask}@5", self._ts)
+            tick = DGA.quote_tick.from_strings(self._instrument, f"{self._ask - D('2')}@5", f"{self._ask}@5", self._ts)
             self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
         def on_event(self, event) -> None:
@@ -120,9 +120,9 @@ class TestSimBrokerMarketOrder:
 
                 t0 = self._t0
                 ticks = [
-                    QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, "99@5", "100@1", t0), t0),
-                    QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, "100@5", "101@1", t0 + timedelta(seconds=1)), t0 + timedelta(seconds=1)),
-                    QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, "101@5", "102@1", t0 + timedelta(seconds=2)), t0 + timedelta(seconds=2)),
+                    QuoteTickEvent(DGA.quote_tick.from_strings(self._instrument, "99@5", "100@1", t0), t0),
+                    QuoteTickEvent(DGA.quote_tick.from_strings(self._instrument, "100@5", "101@1", t0 + timedelta(seconds=1)), t0 + timedelta(seconds=1)),
+                    QuoteTickEvent(DGA.quote_tick.from_strings(self._instrument, "101@5", "102@1", t0 + timedelta(seconds=2)), t0 + timedelta(seconds=2)),
                 ]
                 self.add_event_feed("q", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
@@ -153,8 +153,8 @@ class TestSimBrokerMarketOrder:
 
                 t0 = self._t0
                 ticks = [
-                    QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, "99@5", "100@1", t0), t0),
-                    QuoteTickEvent(DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, "100@5", "101@1", t0 + timedelta(seconds=1)), t0 + timedelta(seconds=1)),
+                    QuoteTickEvent(DGA.quote_tick.from_strings(self._instrument, "99@5", "100@1", t0), t0),
+                    QuoteTickEvent(DGA.quote_tick.from_strings(self._instrument, "100@5", "101@1", t0 + timedelta(seconds=1)), t0 + timedelta(seconds=1)),
                 ]
                 self.add_event_feed("q", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
@@ -171,7 +171,7 @@ class TestSimBrokerMarketOrder:
             self.executions = []
 
         def on_start(self) -> None:
-            tick = DGA.quote_ticks.create_quote_tick_from_strings(self._instrument, f"{self._ask - D('1')}@5", f"{self._ask}@5", self._ts)
+            tick = DGA.quote_tick.from_strings(self._instrument, f"{self._ask - D('1')}@5", f"{self._ask}@5", self._ts)
             self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
         def on_event(self, event) -> None:

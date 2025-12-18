@@ -189,7 +189,7 @@ will raise ValueError when a duplicate name is provided.
 # Load your CSV data
 df = pd.read_csv("eurusd_data.csv", parse_dates=["start_dt", "end_dt"])
 
-# Define what kind of bars these are
+# Define what kind of bar these are
 instrument = Instrument("EURUSD", "FOREX", 0.00001, 1)
 bar_type = BarType(instrument, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
 
@@ -203,12 +203,12 @@ self.add_event_feed("historical_data", feed)
 2) Generating demo data
 
 ```python
-from suite_trading.utils.data_generation.factory_bar import DEFAULT_FIRST_BAR, create_bar_series
+from suite_trading.utils.data_generation.factory_bar import DEFAULT_FIRST_BAR, create_series
 from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 
 
-bars = create_bar_series(first_bar=DEFAULT_FIRST_BAR, num_bars=100)
+bars = create_series(first_bar=DEFAULT_FIRST_BAR, num_bars=100)
 demo_feed = FixedSequenceEventFeed(wrap_bars_to_events(bars))
 self.add_event_feed("demo_data", demo_feed)
 ```
@@ -219,7 +219,7 @@ self.add_event_feed("demo_data", demo_feed)
 # Start with 1-minute data
 minute_feed = BarsFromDataFrameEventFeed(df=minute_data, bar_type=minute_bar_type)
 
-# Aggregate to 5-minute bars
+# Aggregate to 5-minute bar
 five_minute_feed = TimeBarAggregationEventFeed(
     source_feed=minute_feed,
     unit=BarUnit.MINUTE,
@@ -227,7 +227,7 @@ five_minute_feed = TimeBarAggregationEventFeed(
     emit_first_partial_bar=False,  # Skip incomplete first bar
 )
 
-# Strategy receives BOTH 1-minute and 5-minute bars
+# Strategy receives BOTH 1-minute and 5-minute bar
 self.add_event_feed("minute_data", minute_feed)
 self.add_event_feed("five_minute_data", five_minute_feed)
 ```
@@ -260,7 +260,7 @@ from suite_trading.platform.event_feed.time_bar_aggregation_event_feed import (
     TimeBarAggregationEventFeed,
 )
 from suite_trading.strategy.strategy import Strategy
-from suite_trading.utils.data_generation.factory_bar import create_bar_type, create_bar, create_bar_series
+from suite_trading.utils.data_generation.factory_bar import create_type, create, create_series
 
 
 class AggregationStrategy(Strategy):
@@ -270,11 +270,11 @@ class AggregationStrategy(Strategy):
         self.n_5m = 0
 
     def on_start(self):
-        bt_1m = create_bar_type(value=1, unit=BarUnit.MINUTE)
+        bt_1m = create_type(value=1, unit=BarUnit.MINUTE)
         first_end = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc)
-        first_bar = create_bar(bar_type=bt_1m, end_dt=first_end)
+        first_bar = create(bar_type=bt_1m, end_dt=first_end)
 
-        src = FixedSequenceEventFeed(wrap_bars_to_events(create_bar_series(first_bar=first_bar, num_bars=20)))
+        src = FixedSequenceEventFeed(wrap_bars_to_events(create_series(first_bar=first_bar, num_bars=20)))
         self.add_event_feed("1m", src)
 
         agg = TimeBarAggregationEventFeed(

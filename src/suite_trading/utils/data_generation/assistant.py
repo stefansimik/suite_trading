@@ -3,7 +3,14 @@ from __future__ import annotations
 # Justification: Provide a single, discoverable entry point for data generation
 # helpers used across tests, examples, and quick-start notebooks.
 
-from suite_trading.utils.data_generation import factory_bar, factory_instrument, factory_order_book, factory_quote_tick, factory_trade_tick
+from suite_trading.utils.data_generation import (
+    factory_bar,
+    factory_instrument,
+    factory_order_book,
+    factory_quote_tick,
+    factory_trade_tick,
+    price_patterns,
+)
 
 
 class DataGenerationAssistant:
@@ -19,20 +26,22 @@ class DataGenerationAssistant:
 
     Attributes:
         instrument: Module with helper functions for Instrument fixtures.
-        bars: Module with helper functions for Bar and bar-series fixtures.
-        trade_ticks: Module with helper functions for TradeTick and trade-tick-series fixtures.
-        quote_ticks: Module with helper functions for QuoteTick and quote-tick-series fixtures.
+        bar: Module with helper functions for Bar and bar-series fixtures.
+        trade_tick: Module with helper functions for TradeTick and trade-tick-series fixtures.
+        quote_tick: Module with helper functions for QuoteTick and quote-tick-series fixtures.
         order_book: Module with helper functions for OrderBook fixtures.
+        pattern: Module with price pattern helpers (linear, sine, zig-zag).
     """
 
     # region Init
 
     def __init__(self) -> None:
         self.instrument = factory_instrument
-        self.bars = factory_bar
-        self.trade_ticks = factory_trade_tick
-        self.quote_ticks = factory_quote_tick
+        self.bar = factory_bar
+        self.trade_tick = factory_trade_tick
+        self.quote_tick = factory_quote_tick
         self.order_book = factory_order_book
+        self.pattern = price_patterns
 
     # endregion
 

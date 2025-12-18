@@ -72,7 +72,7 @@ def _create_quote_tick_event(
     timestamp_index: int,
 ) -> QuoteTickEvent:
     ts = make_utc(2025, 1, 1, 12, 0, 0 + timestamp_index)
-    tick = DGA.quote_ticks.create_quote_tick_from_strings(instrument, bid, ask, ts)
+    tick = DGA.quote_tick.from_strings(instrument, bid, ask, ts)
     result = QuoteTickEvent(tick, ts)
     return result
 
@@ -96,7 +96,7 @@ def test_stop_market_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
     engine.add_broker("sim", broker)
     engine.set_order_book_converter(DefaultEventToOrderBookConverter())
 
-    instrument = DGA.instrument.create_equity_aapl()
+    instrument = DGA.instrument.equity_aapl()
     stop_price = Decimal("100.00")
 
     # Two ticks: first does not meet stop; second triggers and should fill immediately.
@@ -139,7 +139,7 @@ def test_stop_limit_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
     engine.add_broker("sim", broker)
     engine.set_order_book_converter(DefaultEventToOrderBookConverter())
 
-    instrument = DGA.instrument.create_equity_aapl()
+    instrument = DGA.instrument.equity_aapl()
     stop_price = Decimal("100.00")
     limit_price = Decimal("100.01")
 

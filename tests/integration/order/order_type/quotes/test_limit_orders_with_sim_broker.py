@@ -58,13 +58,13 @@ class _LimitOrderTestStrategy(Strategy):
 
 
 def _create_us_equity_instrument() -> Instrument:
-    return DGA.instrument.create_equity_aapl()
+    return DGA.instrument.equity_aapl()
 
 
 def _create_quote_tick_event(instrument: Instrument, *, bid: str, ask: str, timestamp_index: int = 0) -> QuoteTickEvent:
     # Use deterministic UTC timestamps separated by seconds to preserve ordering
     ts = make_utc(2025, 1, 1, 12, 0, 0 + timestamp_index)
-    tick = DGA.quote_ticks.create_quote_tick_from_strings(instrument, bid, ask, ts)
+    tick = DGA.quote_tick.from_strings(instrument, bid, ask, ts)
     return QuoteTickEvent(tick, ts)
 
 

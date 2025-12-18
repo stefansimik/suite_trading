@@ -7,7 +7,7 @@ class BarUnit(Enum):
     """
         Represents the unit of aggregation for a bar.
 
-    This enum defines different ways to aggregate market data into bars:
+    This enum defines different ways to aggregate market data into bar:
     - Time-based aggregations (SECOND, MINUTE, HOUR, DAY, WEEK, MONTH)
     - Other aggregations (TICK, VOLUME)
     """

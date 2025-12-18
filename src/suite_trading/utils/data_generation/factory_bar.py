@@ -10,12 +10,12 @@ from suite_trading.domain.market_data.bar.bar_type import BarType
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.utils.data_generation import factory_instrument
-from suite_trading.utils.data_generation.price_patterns import zig_zag_function
+from suite_trading.utils.data_generation.price_patterns import zig_zag
 from suite_trading.utils.decimal_tools import as_decimal
 from suite_trading.utils.math import round_to_increment
 
 
-def create_bar_type(
+def create_type(
     instrument: Instrument | None = None,
     value: int = 1,
     unit: BarUnit = BarUnit.MINUTE,
@@ -35,17 +35,17 @@ def create_bar_type(
     Examples:
         Create a 1-minute last trade bar type::
 
-            from suite_trading.utils.data_generation.factory_bar import create_bar_type
+            from suite_trading.utils.data_generation.factory_bar import create_type
 
-            bar_type = create_bar_type()
+            bar_type = create_type()
     """
 
-    effective_instrument = instrument or factory_instrument.create_equity_aapl()
+    effective_instrument = instrument or factory_instrument.equity_aapl()
     result = BarType(instrument=effective_instrument, value=value, unit=unit, price_type=price_type)
     return result
 
 
-def create_bar(
+def create(
     bar_type: BarType | None = None,
     end_dt: datetime = datetime(2025, 1, 2, 0, 1, 0, tzinfo=timezone.utc),
     close_price: Decimal = Decimal("100.00"),
@@ -65,7 +65,7 @@ def create_bar(
 
     Args:
         bar_type: Type of bar to create. When None, a default `BarType` is
-            created with `create_bar_type`.
+            created with `create_type`.
         end_dt: End datetime of the bar.
         close_price: Closing price of the bar.
         is_bullish: Whether the bar is an up bar (close > open) or a down bar
@@ -82,7 +82,7 @@ def create_bar(
         New `Bar` instance with the specified properties.
     """
 
-    effective_bar_type = bar_type or create_bar_type()
+    effective_bar_type = bar_type or create_type()
 
     if volume is None:
         unit = effective_bar_type.unit
@@ -154,10 +154,10 @@ def create_bar(
     return result
 
 
-def create_bar_series(
+def create_series(
     first_bar: Bar | None = None,
     num_bars: int = 20,
-    price_pattern_func: Callable[[int], float] = zig_zag_function,
+    price_pattern_func: Callable[[int], float] = zig_zag,
 ) -> list[Bar]:
     """Generate a series of demo bars with a specified price pattern.
 
@@ -168,7 +168,7 @@ def create_bar_series(
 
     Args:
         first_bar: First bar of the series. If None, a default bar is created
-            with `create_bar`.
+            with `create`.
         num_bars: Number of bars to generate (including $first_bar).
         price_pattern_func: Function that returns Y-values representing the
             price curve.
@@ -182,10 +182,10 @@ def create_bar_series(
     Examples:
         Create a short series of demo bars::
 
-            from suite_trading.utils.data_generation.factory_bar import create_bar, create_bar_series
+            from suite_trading.utils.data_generation.factory_bar import create, create_series
 
-            first_bar = create_bar()
-            bars = create_bar_series(first_bar=first_bar, num_bars=10)
+            first_bar = create()
+            bars = create_series(first_bar=first_bar, num_bars=10)
             # bars[0] is $first_bar
     """
 
@@ -193,7 +193,7 @@ def create_bar_series(
         raise ValueError(f"$num_bars must be >= 1, but provided value is: {num_bars}")
 
     if first_bar is None:
-        first_bar = create_bar()
+        first_bar = create()
 
     bar_type = first_bar.bar_type
     end_dt = first_bar.end_dt

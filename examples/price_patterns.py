@@ -14,7 +14,7 @@
 
 import sys
 import os
-from suite_trading.utils.data_generation.price_patterns import linear_function, sine_wave_function, zig_zag_function
+from suite_trading.utils.data_generation.price_patterns import linear, sine_wave, zig_zag
 import plotly.graph_objects as go
 
 # %%
@@ -44,38 +44,35 @@ x = list(range(150))
 
 # %%
 # Generate values
-y = [linear_function(x=idx, start_price=1.0, trend_rate=+0.0010) for idx in x]
+y = [linear(x=idx, start_price=1.0, trend_rate=+0.0010) for idx in x]
 scatter_chart(x, y).show()
 
 # %%
 # Generate values
-y = [sine_wave_function(x=idx, start_price=1.0, amplitude=0.5) for idx in x]
+y = [sine_wave(x=idx, start_price=1.0, amplitude=0.5) for idx in x]
 scatter_chart(x, y).show()
 
 # %%
 # Generate values
-y = [linear_function(x=idx, start_price=1.0, trend_rate=0.005) + sine_wave_function(x=idx, start_price=1.0, amplitude=0.3) - 1 for idx in x]
-
-scatter_chart(x, y).show()
-
-# %%
-# Generate values
-y = [zig_zag_function(x=idx, start_price=1.0, increment=0.2, steps_up=5, steps_down=5) for idx in x]
+y = [linear(x=idx, start_price=1.0, trend_rate=0.005) + sine_wave(x=idx, start_price=1.0, amplitude=0.3) - 1 for idx in x]
 
 scatter_chart(x, y).show()
 
 # %%
 # Generate values
-y = [zig_zag_function(x=idx, start_price=1.0, increment=0.2, steps_up=10, steps_down=8) for idx in x]
+y = [zig_zag(x=idx, start_price=1.0, increment=0.2, steps_up=5, steps_down=5) for idx in x]
 
 scatter_chart(x, y).show()
 
 # %%
 # Generate values
-y = [
-    linear_function(x=idx, start_price=1.0, trend_rate=0.01) + zig_zag_function(x=idx, start_price=1.0, increment=0.2, steps_up=3, steps_down=2) - 1
-    for idx in x
-]
+y = [zig_zag(x=idx, start_price=1.0, increment=0.2, steps_up=10, steps_down=8) for idx in x]
+
+scatter_chart(x, y).show()
+
+# %%
+# Generate values
+y = [linear(x=idx, start_price=1.0, trend_rate=0.01) + zig_zag(x=idx, start_price=1.0, increment=0.2, steps_up=3, steps_down=2) - 1 for idx in x]
 
 scatter_chart(x, y).show()
 

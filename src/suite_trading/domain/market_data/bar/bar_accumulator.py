@@ -14,7 +14,7 @@ class BarAccumulator:
         Reusable Bar-only accumulator independent of event system and windowing.
 
     Notes:
-        - Enforces consistent BarType across all added bars in a window.
+        - Enforces consistent BarType across all added bar in a window.
         - Treats None volume as Decimal("0").
     """
 

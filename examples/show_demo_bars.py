@@ -16,8 +16,8 @@
 import sys
 import os
 from suite_trading.domain.market_data.bar.bar import Bar
-from suite_trading.utils.data_generation.factory_bar import create_bar, create_bar_series
-from suite_trading.utils.data_generation.price_patterns import linear_function, sine_wave_function, zig_zag_function
+from suite_trading.utils.data_generation.factory_bar import create, create_series
+from suite_trading.utils.data_generation.price_patterns import linear, sine_wave, zig_zag
 import plotly.graph_objects as go
 import pandas as pd
 
@@ -37,7 +37,7 @@ sys.path.append(os.path.abspath(os.path.join(this_notebook_dir, "..", "src")))
 
 
 def candlestick_chart(bars: list[Bar]):
-    # Extract data from bars for visualization
+    # Extract data from bar for visualization
     data = {
         "date": [bar.end_dt for bar in bars],
         "open": [float(bar.open) for bar in bars],
@@ -71,11 +71,11 @@ def candlestick_chart(bars: list[Bar]):
 
 
 def downtrend_function(x):
-    return linear_function(x=x, start_price=1.0, trend_rate=-0.01)  # (0.01 = 1% increase per bar)
+    return linear(x=x, start_price=1.0, trend_rate=-0.01)  # (0.01 = 1% increase per bar)
 
 
-bars = create_bar_series(
-    first_bar=create_bar(is_bullish=True),
+bars = create_series(
+    first_bar=create(is_bullish=True),
     num_bars=20,
     price_pattern_func=downtrend_function,
 )
@@ -86,7 +86,7 @@ candlestick_chart(bars).show()
 # %%
 
 
-bars = create_bar_series(first_bar=create_bar(is_bullish=True), num_bars=100, price_pattern_func=sine_wave_function)
+bars = create_series(first_bar=create(is_bullish=True), num_bars=100, price_pattern_func=sine_wave)
 
 candlestick_chart(bars).show()
 
@@ -95,11 +95,11 @@ candlestick_chart(bars).show()
 
 
 def custom_sine_function(x):
-    return sine_wave_function(x, amplitude=0.02, frequency=0.2)
+    return sine_wave(x, amplitude=0.02, frequency=0.2)
 
 
-bars = create_bar_series(
-    first_bar=create_bar(is_bullish=True),
+bars = create_series(
+    first_bar=create(is_bullish=True),
     num_bars=100,
     price_pattern_func=custom_sine_function,
 )
@@ -110,12 +110,12 @@ candlestick_chart(bars).show()
 # %%
 
 
-# Note: We subtract 1.0 because sine_wave_function returns values centered around start_price (default 1.0)
+# Note: We subtract 1.0 because sine_wave returns values centered around start_price (default 1.0)
 def combined_pattern_function(x, **kwargs):
-    return linear_function(x, trend_rate=-0.0001) + sine_wave_function(x, amplitude=0.01, frequency=0.1) - 1.0
+    return linear(x, trend_rate=-0.0001) + sine_wave(x, amplitude=0.01, frequency=0.1) - 1.0
 
 
-bars = create_bar_series(first_bar=create_bar(is_bullish=True), num_bars=500, price_pattern_func=combined_pattern_function)
+bars = create_series(first_bar=create(is_bullish=True), num_bars=500, price_pattern_func=combined_pattern_function)
 
 candlestick_chart(bars).show()
 
@@ -123,6 +123,6 @@ candlestick_chart(bars).show()
 # %%
 
 
-bars = create_bar_series(first_bar=create_bar(is_bullish=True), num_bars=100, price_pattern_func=zig_zag_function)
+bars = create_series(first_bar=create(is_bullish=True), num_bars=100, price_pattern_func=zig_zag)
 
 candlestick_chart(bars).show()
