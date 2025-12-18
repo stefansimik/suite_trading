@@ -190,34 +190,41 @@ def calculate_portfolio_value(positions: list) -> Decimal:
 - Explain business logic and reasoning
 - Use simple conversational English
 
-### Inline Line Comments for Non-Trivial Code
-- Add short, direct line comments for code that is not trivial to read and requires mental processing.
+### Inline Line Comments for Code Scan-ability
+- Add short, simple, and intuitive line comments to allow quick scanning of the logic without needing to parse complex code.
 - Keep comments focused on what the next line or tiny block does, in 3–8 simple words.
-- Prefer comments that let you scan code without re-running the code logic in your head.
-- Do not explain obvious assignments or one-liners that are already simple / very easy to understand / self-explanatory.
+- Use natural English phrases that match the trading mental model.
+- Do not explain obvious assignments or one-liners that are already self-explanatory.
 
 **Example:**
 
 ```python
-# Choose asks or bids based on $order_side
-order_book_levels = self._asks if order_side == OrderSide.BUY else self._bids
+# ACTIONS
+# Set submission time into order
+if self._timeline_dt is not None:
+    order._set_submitted_dt_once(self._timeline_dt)
 
-# Return early if there is no depth or nothing to fill
-if not order_book_levels or target_quantity <= 0:
-    return []
+# Store order
+self._orders_by_id[order.id] = order
 
-for price_level in order_book_levels:
-    # Stop once we have filled the full $target_quantity
-    if remaining_quantity <= 0:
-        break
+# Do order-state transitions
+for action in order_actions_to_apply:
+    self._apply_order_action(order, action)
 
-    # Skip levels that are outside the price band
-    if not is_price_level_within_limits(price_level):
-        continue
+# Handle order expiration
+if self._should_expire_order_now(order):
+    self._apply_order_action(order, OrderAction.EXPIRE)
+    return
+
+# Match order with order-book
+last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
+if last_order_book is not None:
+    self._match_order_against_order_book(order, last_order_book)
 ```
 
 **Acceptance checks:**
-- [ ] Non-trivial lines/blocks that need mental effort have a short inline comment
+- [ ] Non-trivial lines/blocks have short, intuitive inline comments for fast scanning
+- [ ] Comments allow scanning the logic without "executing" the code in your head
 - [ ] Comments describe what the next line or tiny block does (not restate the code)
 - [ ] Trivial, obvious assignments and one-liners have no extra comments
 
