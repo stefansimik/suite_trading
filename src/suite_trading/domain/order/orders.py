@@ -480,15 +480,6 @@ class LimitOrder(Order):
         """
         return self._limit_price
 
-    def _validate(self) -> None:
-        """Validate the limit order data.
-
-        Raises:
-            ValueError: If order data is invalid.
-        """
-        # Call parent validation first
-        super()._validate()
-
 
 class StopOrder(Order):
     """Stop order that becomes a market order when the stop price is reached.
@@ -540,15 +531,6 @@ class StopOrder(Order):
             Decimal: The stop price.
         """
         return self._stop_price
-
-    def _validate(self) -> None:
-        """Validate the stop order data.
-
-        Raises:
-            ValueError: If order data is invalid.
-        """
-        # Call parent validation first
-        super()._validate()
 
 
 class StopLimitOrder(Order):
