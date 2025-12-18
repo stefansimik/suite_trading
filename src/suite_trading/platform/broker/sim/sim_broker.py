@@ -653,7 +653,7 @@ class SimBroker(Broker, SimulatedBroker):
         # ACT
         execution = self._commit_fill_slice_execution_and_accounting(order=order, fill_slice=fill_slice, instrument=instrument, timestamp=timestamp, affordability=affordability)
 
-        self._publish_order_execution(execution)
+        self._handle_order_execution(execution)
         self._handle_order_update(order)
 
     def _commit_fill_slice_execution_and_accounting(
@@ -851,6 +851,13 @@ class SimBroker(Broker, SimulatedBroker):
         # Handle internal housekeeping for terminal orders
         if order.state_category == OrderStateCategory.TERMINAL:
             self._on_order_terminalized(order)
+
+    def _handle_order_execution(self, execution: Execution) -> None:
+        """Orchestrate all side effects of a new order execution.
+
+        This is the single entry point for all post-execution logic.
+        """
+        self._publish_order_execution(execution)
 
     def _apply_order_action(self, order: Order, action: OrderAction) -> None:
         """Apply $action to $order and publish `on_order_updated` if state changed.
