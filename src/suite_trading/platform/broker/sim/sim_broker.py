@@ -458,41 +458,6 @@ class SimBroker(Broker, SimulatedBroker):
         for action in stop_actions_to_apply:
             self._apply_order_action(order, action)
 
-    def _should_expire_order_now(self, order: Order) -> bool:
-        time_in_force = order.time_in_force
-
-        # These TIF types never expire by time
-        if time_in_force in (TimeInForce.GTC, TimeInForce.IOC, TimeInForce.FOK):
-            return False
-
-        now_dt = self._timeline_dt
-        if now_dt is None:
-            return False
-
-        # GTD
-        if time_in_force == TimeInForce.GTD:
-            good_till_dt = order.good_till_dt
-            # Precondition: GTD orders must provide $good_till_dt
-            if good_till_dt is None:
-                raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
-
-            return now_dt >= good_till_dt
-
-        # DAY
-        if time_in_force == TimeInForce.DAY:
-            submitted_dt = order.submitted_dt
-            # Precondition: DAY orders must have a $submitted_dt to define the DAY boundary
-            if submitted_dt is None:
-                raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is DAY but $submitted_dt is None for Order $id ('{order.id}')")
-
-            # TODO: DAY uses UTC midnight for now; later we should use exchange session boundaries per instrument.
-            # Note: In this SimBroker, DAY expires at the next UTC midnight after $submitted_dt.
-            day_after_submission = submitted_dt + timedelta(days=1)
-            expiry_dt = day_after_submission.replace(hour=0, minute=0, second=0, microsecond=0)
-            return now_dt >= expiry_dt
-
-        raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force ({time_in_force.value}) is not supported")
-
     def _simulate_and_apply_fills_for_order_with_order_book(
         self,
         order: Order,
@@ -870,6 +835,45 @@ class SimBroker(Broker, SimulatedBroker):
     # endregion
 
     # region Utilities - Order
+
+    # TIME IN FORCE (EXPIRATION)
+
+    def _should_expire_order_now(self, order: Order) -> bool:
+        time_in_force = order.time_in_force
+
+        # These TIF types never expire by time
+        if time_in_force in (TimeInForce.GTC, TimeInForce.IOC, TimeInForce.FOK):
+            return False
+
+        now_dt = self._timeline_dt
+        if now_dt is None:
+            return False
+
+        # GTD
+        if time_in_force == TimeInForce.GTD:
+            good_till_dt = order.good_till_dt
+            # Precondition: GTD orders must provide $good_till_dt
+            if good_till_dt is None:
+                raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
+
+            return now_dt >= good_till_dt
+
+        # DAY
+        if time_in_force == TimeInForce.DAY:
+            submitted_dt = order.submitted_dt
+            # Precondition: DAY orders must have a $submitted_dt to define the DAY boundary
+            if submitted_dt is None:
+                raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is DAY but $submitted_dt is None for Order $id ('{order.id}')")
+
+            # TODO: DAY uses UTC midnight for now; later we should use exchange session boundaries per instrument.
+            # Note: In this SimBroker, DAY expires at the next UTC midnight after $submitted_dt.
+            day_after_submission = submitted_dt + timedelta(days=1)
+            expiry_dt = day_after_submission.replace(hour=0, minute=0, second=0, microsecond=0)
+            return now_dt >= expiry_dt
+
+        raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force ({time_in_force.value}) is not supported")
+
+    # ORDER UPDATES
 
     def _handle_order_update(self, order: Order) -> None:
         """Orchestrate all side effects of an order state update.
