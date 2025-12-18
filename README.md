@@ -2,15 +2,15 @@
 
 SUITE stands for: **S**imple, **U**nderstandable, **I**ntuitive **T**rading **E**ngine
 
-SUITE Trading is a **modern Python framework for algorithmic trading**, which provides unified, event-driven architecture for backtesting, paper trading and live trading. It is designed to make you productive quickly.
+SUITE Trading is a **modern Python framework for algorithmic trading** that provides a unified, event-driven architecture for backtesting, paper trading, and live trading. It's designed to help you go from idea to execution quickly and confidently.
 
 ![Python Version](https://img.shields.io/badge/python-3.13%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stefansimik/suite_trading)
 
-> Work in progress: SUITE Trading is under active development. Breaking changes may happen while the API stabilizes.
+> ⚠️ **Work in progress:** SUITE Trading is under active development. Breaking changes may happen while the API stabilizes.
 
 ---
 
-## What can you do with SUITE Trading?
+## What Can You Do with SUITE Trading?
 
 - **Backtest your trading ideas** — Test strategies on historical data before risking real money
 - **Paper trade** — Run strategies in real-time with simulated money to validate your approach
@@ -19,23 +19,39 @@ SUITE Trading is a **modern Python framework for algorithmic trading**, which pr
 
 **Who is this for?** Developers and traders who want a clean, understandable framework without hidden magic. If you've been frustrated by complex trading libraries where you can't follow what's happening, SUITE Trading is for you.
 
+```mermaid
+flowchart LR
+    subgraph "Your Journey"
+        A[💡 Trading Idea] --> B[📊 Backtest]
+        B --> C[📝 Paper Trade]
+        C --> D[💰 Live Trading]
+    end
+
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#e8f5e9
+```
+
 ---
 
 ## Key Features
 
-- **One codebase, multiple modes**: Same strategy code runs in backtesting, paper trading, and live trading
-- **Shared timeline simulation**: Multiple strategies run together on one shared clock with predictable event ordering
-- **Simple, intuitive API**: Domain model matches how traders think — `Order`, `Position`, `Bar`, `OrderBook` behave as expected
-- **Smart components with clear jobs**: Each piece has one responsibility and they connect explicitly
-- **Realistic simulation (alpha)**: SimBroker supports MARKET, LIMIT, STOP, STOP_LIMIT orders plus margin, fees, slippage
-- **Extensible by design**: Plug in new data sources, broker adapters, and event types with minimal code
-- **Modern Python**: Typed Python 3.13+ for strong IDE support and safe refactoring
+| Feature | Description |
+|---------|-------------|
+| **One codebase, multiple modes** | Same strategy code runs in backtesting, paper trading, and live trading |
+| **Shared timeline simulation** | Multiple strategies run together on one shared clock with predictable event ordering |
+| **Simple, intuitive API** | Domain model matches how traders think — `Order`, `Position`, `Bar`, `OrderBook` behave as expected |
+| **Smart components with clear jobs** | Each piece has one responsibility and they connect explicitly |
+| **Realistic simulation** | SimBroker supports MARKET, LIMIT, STOP, STOP_LIMIT orders plus margin, fees, slippage |
+| **Extensible by design** | Plug in new data sources, broker adapters, and event types with minimal code |
+| **Modern Python** | Typed Python 3.13+ for strong IDE support and safe refactoring |
 
 ---
 
 ## Quick Start (30 seconds)
 
-### Install and run your first backtest
+### Install and Run Your First Backtest
 
 ```bash
 # Clone the repository
@@ -54,19 +70,19 @@ uv run examples/minimal_strategy.py
 INFO:__main__:Strategy finished after 20 bars
 ```
 
-That's it! You just ran a complete backtest. The example strategy bought on bar 1, sold on bar 6, and processed 20 bars of synthetic data.
+🎉 **That's it!** You just ran a complete backtest. The example strategy bought on bar 1, sold on bar 6, and processed 20 bars of synthetic data.
 
 ---
 
 ## Table of Contents
 
-- [What can you do with SUITE Trading?](#what-can-you-do-with-suite-trading)
+- [What Can You Do with SUITE Trading?](#what-can-you-do-with-suite-trading)
+- [Key Features](#key-features)
 - [Quick Start (30 seconds)](#quick-start-30-seconds)
 - [Your First Strategy (5 minutes)](#your-first-strategy-5-minutes)
 - [Core Concepts (10 minutes)](#core-concepts-10-minutes)
 - [Going Deeper](#going-deeper)
 - [Extending the Framework](#extending-the-framework)
-- [Key Features](#key-features)
 - [Installation](#installation)
 - [Roadmap](#roadmap)
 - [Project Info](#project-info)
@@ -78,24 +94,13 @@ That's it! You just ran a complete backtest. The example strategy bought on bar 
 
 ## Your First Strategy (5 minutes)
 
-Let's understand what the Quick Start example does. Here's the complete strategy:
+Let's understand what the Quick Start example does. Here's the strategy from [`examples/minimal_strategy.py`](examples/minimal_strategy.py):
 
 ```python
-from decimal import Decimal
-from suite_trading.broker.simbroker import SimBroker
-from suite_trading.core.engine import TradingEngine
-from suite_trading.core.strategy import Strategy
-from suite_trading.domain.event import Event, BarEvent
-from suite_trading.domain.order import MarketOrder, OrderSide
-from suite_trading.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
-from suite_trading.utils.data_generation.assistant import DGA
-from suite_trading.utils.event_tools import wrap_bars_to_events
-
-
 class DemoStrategy(Strategy):
     """Buys on the first bar and sells 5 bars later."""
 
-    def __init__(self, name: str, broker: SimBroker) -> None:
+    def __init__(self, name: str, broker: Broker) -> None:
         super().__init__(name)
         self._broker = broker
         self._bar_count = 0
@@ -110,7 +115,7 @@ class DemoStrategy(Strategy):
         if isinstance(event, BarEvent):
             self.on_bar(event.bar)
 
-    def on_bar(self, bar) -> None:
+    def on_bar(self, bar: Bar) -> None:
         self._bar_count += 1
 
         # Buy on bar 1
@@ -123,9 +128,12 @@ class DemoStrategy(Strategy):
             order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, quantity=Decimal("1"))
             self.submit_order(order, self._broker)
 
+    def on_stop(self) -> None:
+        logger.info(f"Strategy finished after {self._bar_count} bars")
+
 
 def run() -> None:
-    # 1. Create the engine (orchestrates everything)
+    # 1. Create the engine (coordinates everything)
     engine = TradingEngine()
 
     # 2. Create a simulated broker (handles orders and fills)
@@ -138,17 +146,47 @@ def run() -> None:
 
     # 4. Start! (blocks until all data is processed)
     engine.start()
-
-
-if __name__ == "__main__":
-    run()
 ```
 
-See the full runnable script: [`examples/minimal_strategy.py`](examples/minimal_strategy.py)
+📄 **Full runnable script with imports:** [`examples/minimal_strategy.py`](examples/minimal_strategy.py)
 
-### What happens step by step
+### What Happens Step by Step
 
-1. **TradingEngine starts** — It's the conductor that keeps everything in sync
+```mermaid
+sequenceDiagram
+    participant You as Your Code
+    participant Engine as TradingEngine
+    participant Strategy as DemoStrategy
+    participant Broker as SimBroker
+    participant Feed as EventFeed
+
+    You->>Engine: engine.start()
+    Engine->>Strategy: on_start()
+    Strategy->>Feed: Create 20 bars
+
+    loop For each bar (1-20)
+        Feed->>Engine: Next bar event
+        Engine->>Broker: Update market data
+        Engine->>Strategy: on_event(bar)
+
+        alt Bar 1
+            Strategy->>Broker: BUY order
+            Broker-->>Strategy: Fill confirmed
+        else Bar 6
+            Strategy->>Broker: SELL order
+            Broker-->>Strategy: Fill confirmed
+        else Other bars
+            Strategy->>Strategy: Just watching
+        end
+    end
+
+    Engine->>Strategy: on_stop()
+    Strategy->>You: "Finished after 20 bars"
+```
+
+**In plain English:**
+
+1. **TradingEngine starts** — It's the coordinator that keeps everything in sync
 2. **Strategy.on_start() runs** — Your strategy creates 20 synthetic bars and attaches them as data
 3. **Bars arrive one by one** — Each bar triggers `on_event()`, then `on_bar()`
 4. **Bar 1: Buy order** — Strategy submits a market order, SimBroker simulates the fill
@@ -156,11 +194,31 @@ See the full runnable script: [`examples/minimal_strategy.py`](examples/minimal_
 6. **Bars 7-20: Just watching** — Strategy receives bars but takes no action
 7. **Done** — All data processed, engine stops automatically
 
-### The four building blocks
+### The Four Building Blocks
 
 Every SUITE Trading program uses these four pieces:
 
-| Component | What it does | Your job |
+```mermaid
+flowchart TB
+    subgraph "The Four Building Blocks"
+        Engine[🎯 TradingEngine<br/>The Conductor]
+        Strategy[🧠 Strategy<br/>Your Trading Logic]
+        Broker[💼 Broker<br/>Order Handler]
+        Feed[📈 EventFeed<br/>Data Source]
+    end
+
+    Feed -->|market data| Engine
+    Engine -->|events| Strategy
+    Strategy -->|orders| Broker
+    Broker -->|fills & updates| Engine
+
+    style Engine fill:#e3f2fd
+    style Strategy fill:#fff8e1
+    style Broker fill:#f3e5f5
+    style Feed fill:#e8f5e9
+```
+
+| Component | What It Does | Your Job |
 |-----------|--------------|----------|
 | **TradingEngine** | Runs the clock, routes events | Create it, add strategies and brokers |
 | **Strategy** | Your trading logic | Write `on_event()` to react to data |
@@ -177,9 +235,12 @@ Now that you've seen a working example, let's understand each piece better.
 
 **What it is:** The central coordinator that runs your strategies on a shared timeline.
 
-**Why it matters:** When you run multiple strategies together, they all see events in the same order. Strategy A can't accidentally see "future" data that Strategy B hasn't seen yet.
+**Why it matters:** When you run multiple strategies together, they all see events in the same order. Strategy A can't accidentally see "future" data that Strategy B hasn't seen yet. This is crucial for realistic backtesting.
 
 ```python
+from suite_trading.platform.engine.trading_engine import TradingEngine
+from suite_trading.platform.broker.sim.sim_broker import SimBroker
+
 engine = TradingEngine()
 engine.add_broker("sim", SimBroker())
 engine.add_strategy(my_strategy)
@@ -187,10 +248,10 @@ engine.start()  # Blocks until finished
 ```
 
 **What it manages:**
-- All your strategies
-- All your brokers
-- The current simulation time
-- Event routing between components
+- ✅ All your strategies
+- ✅ All your brokers
+- ✅ The current simulation time
+- ✅ Event routing between components
 
 ### Strategy — Your Trading Logic
 
@@ -199,6 +260,10 @@ engine.start()  # Blocks until finished
 **Why it matters:** You focus on *what* to trade and *when*. The framework handles the plumbing.
 
 ```python
+from suite_trading.strategy.strategy import Strategy
+from suite_trading.domain.event import Event
+from suite_trading.domain.market_data.bar.bar_event import BarEvent
+
 class MyStrategy(Strategy):
     def on_start(self) -> None:
         # Set up data feeds here
@@ -216,10 +281,13 @@ class MyStrategy(Strategy):
 ```
 
 **Key callbacks:**
-- `on_start()` — Called once when strategy starts. Set up your data feeds here.
-- `on_event(event)` — Called for every piece of market data. Your main logic goes here.
-- `on_stop()` — Called once when strategy stops. Log results, clean up.
-- `on_error(error)` — Called if something goes wrong.
+
+| Callback | When It's Called | What to Do Here |
+|----------|------------------|-----------------|
+| `on_start()` | Once when strategy starts | Set up your data feeds |
+| `on_event(event)` | For every piece of market data | Your main trading logic |
+| `on_stop()` | Once when strategy stops | Log results, clean up |
+| `on_error(error)` | If something goes wrong | Handle errors gracefully |
 
 ### Broker and SimBroker — Order Handling
 
@@ -228,6 +296,11 @@ class MyStrategy(Strategy):
 **Why it matters:** `SimBroker` lets you test strategies without real money. When you're ready to go live, you swap it for a real broker adapter — your strategy code stays the same.
 
 ```python
+from suite_trading.platform.broker.sim.sim_broker import SimBroker
+from suite_trading.domain.order.orders import MarketOrder
+from suite_trading.domain.order.order_enums import OrderSide
+from decimal import Decimal
+
 # For backtesting and paper trading
 sim_broker = SimBroker()
 
@@ -237,12 +310,12 @@ self.submit_order(order, sim_broker)
 ```
 
 **SimBroker simulates:**
-- Order matching against market data
-- Position tracking
-- Account balance and margin
-- Fees and slippage (configurable)
+- ✅ Order matching against market data
+- ✅ Position tracking
+- ✅ Account balance and margin
+- ✅ Fees and slippage (configurable)
 
-**One broker = one account.** If you need multiple accounts, create multiple broker instances.
+> 💡 **Important:** One broker = one account. If you need multiple accounts, create multiple broker instances.
 
 ### EventFeed — Data Input
 
@@ -251,6 +324,10 @@ self.submit_order(order, sim_broker)
 **Why it matters:** You can plug in any data source — historical files, databases, live feeds — using the same interface.
 
 ```python
+from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
+from suite_trading.domain.market_data.bar.bar_event import wrap_bars_to_events
+from suite_trading.utils.data_generation.assistant import DGA
+
 def on_start(self) -> None:
     # Create bars and wrap them as events
     bars = DGA.bars.create_bar_series(num_bars=100)
@@ -261,26 +338,32 @@ def on_start(self) -> None:
 ```
 
 **The `use_for_simulated_fills` parameter:**
-- `True` — This data drives order matching in SimBroker
-- `False` — Data goes to your strategy only (useful for signals that shouldn't affect fills)
+- `True` — This data drives order matching in SimBroker (use for your main price data)
+- `False` — Data goes to your strategy only (useful for signals, indicators, or reference data that shouldn't affect fills)
 
 ### Event — Data Wrapper
 
-**What it is:** A container for "something that happened at a time."
+**What it is:** A container for "something that happened at a specific time."
 
-**Why it matters:** Everything in SUITE Trading is an event with timestamps. This keeps the timeline consistent.
+**Why it matters:** Everything in SUITE Trading is an event with timestamps. This keeps the timeline consistent and makes the system predictable.
 
 **Built-in event types:**
-- `BarEvent` — OHLC price bars
-- `TradeTickEvent` — Individual trades
-- `QuoteTickEvent` — Bid/ask quotes
-- `OrderBookEvent` — Full order book snapshots
+
+| Event Type | What It Contains | Use Case |
+|------------|------------------|----------|
+| `BarEvent` | OHLC price bars | Most common for backtesting |
+| `TradeTickEvent` | Individual trades | High-frequency strategies |
+| `QuoteTickEvent` | Bid/ask quotes | Spread analysis, market making |
+| `OrderBookEvent` | Full order book snapshots | Depth analysis, realistic fills |
 
 **Every event has two timestamps:**
-- `dt_event` — When it happened in the market
-- `dt_received` — When it entered our system
 
-Both must be timezone-aware UTC. The framework will reject naive datetimes to catch data issues early.
+| Timestamp | Meaning |
+|-----------|---------|
+| `dt_event` | When it happened in the market |
+| `dt_received` | When it entered our system |
+
+> ⚠️ Both timestamps must be **timezone-aware UTC**. The framework will reject naive datetimes to catch data issues early.
 
 ---
 
@@ -290,25 +373,84 @@ Both must be timezone-aware UTC. The framework will reject naive datetimes to ca
 
 When you submit an order, SimBroker needs market data to simulate fills. Here's how different data types work:
 
-| Data Type | Order Books Created | Realism Level |
-|-----------|---------------------|---------------|
-| `BarEvent` | 4 (open, high, low, close) | Basic |
-| `TradeTickEvent` | 1 (bid=ask=trade price) | Better |
-| `QuoteTickEvent` | 1 (best bid, best ask) | Good |
-| `OrderBookEvent` | 1 (full depth) | Best |
+```mermaid
+flowchart LR
+    subgraph "Data Quality → Fill Realism"
+        Bar[📊 BarEvent<br/>4 order books]
+        Trade[📍 TradeTickEvent<br/>1 order book]
+        Quote[💬 QuoteTickEvent<br/>1 order book]
+        Book[📚 OrderBookEvent<br/>1 order book]
+    end
 
-**Tip:** Start with bars for quick testing. Use ticks or order books when you need realistic fill simulation.
+    Bar -.->|Basic| Realism
+    Trade -.->|Better| Realism
+    Quote -.->|Good| Realism
+    Book -.->|Best| Realism
+
+    Realism[🎯 Fill Realism]
+
+    style Bar fill:#ffecb3
+    style Trade fill:#fff9c4
+    style Quote fill:#c8e6c9
+    style Book fill:#a5d6a7
+```
+
+| Data Type | Order Books Created | Realism Level | Best For |
+|-----------|---------------------|---------------|----------|
+| `BarEvent` | 4 (open, high, low, close) | Basic | Quick testing, daily strategies |
+| `TradeTickEvent` | 1 (bid=ask=trade price) | Better | Intraday strategies |
+| `QuoteTickEvent` | 1 (best bid, best ask) | Good | Spread-sensitive strategies |
+| `OrderBookEvent` | 1 (full depth) | Best | HFT, market making |
+
+> 💡 **Tip:** Start with bars for quick testing. Use ticks or order books when you need realistic fill simulation.
 
 ### Architecture Overview
 
-SUITE Trading uses an **event-driven architecture**. Data flows like this:
+SUITE Trading uses an **event-driven architecture**. Data flows through the system like this:
 
 ```mermaid
-graph TD;
-    EventFeed["EventFeed(s)"] --> Engine["TradingEngine"];
-    Engine --> Strategy["Strategy(ies)"];
-    Strategy -->|orders| Broker["Broker(s)"];
-    Broker -->|order fills + updates| Engine;
+flowchart TB
+    subgraph "Data Sources"
+        EF1[EventFeed 1<br/>Historical Bars]
+        EF2[EventFeed 2<br/>Live Quotes]
+        EF3[EventFeed N<br/>Custom Data]
+    end
+
+    subgraph "Core Engine"
+        Engine[TradingEngine<br/>🎯 Orchestrator]
+        Timeline[Shared Timeline<br/>⏰ Single Clock]
+    end
+
+    subgraph "Your Logic"
+        S1[Strategy A]
+        S2[Strategy B]
+    end
+
+    subgraph "Execution"
+        B1[SimBroker<br/>📊 Simulation]
+        B2[Live Broker<br/>💰 Real Trading]
+    end
+
+    EF1 --> Engine
+    EF2 --> Engine
+    EF3 --> Engine
+
+    Engine --> Timeline
+    Timeline --> S1
+    Timeline --> S2
+
+    S1 -->|orders| B1
+    S2 -->|orders| B1
+    S1 -.->|orders| B2
+    S2 -.->|orders| B2
+
+    B1 -->|fills| Engine
+    B2 -.->|fills| Engine
+
+    style Engine fill:#e3f2fd
+    style Timeline fill:#fff8e1
+    style B1 fill:#f3e5f5
+    style B2 fill:#e8f5e9
 ```
 
 ### Event Loop Detail
@@ -319,47 +461,49 @@ Here's what happens inside the engine on each iteration:
 sequenceDiagram
     participant EF as EventFeed
     participant TE as TradingEngine
-    participant C as Event to order book converter
+    participant C as OrderBook Converter
     participant SB as SimBroker(s)
     participant S as Strategy
 
-    loop while any EventFeed is active
+    loop While any EventFeed is active
         TE->>EF: peek() across all feeds
         TE->>EF: pop() from the earliest feed
-        TE->>TE: set timeline_dt = event.dt_event
+        TE->>TE: Set timeline_dt = event.dt_event
 
-        alt feed drives simulated fills
-            TE->>C: build order book(s) from the event
-            loop for each order book
-                TE->>SB: set_timeline_dt(order_book.timestamp)
+        alt Feed drives simulated fills
+            TE->>C: Build order book(s) from event
+            loop For each order book
+                TE->>SB: set_timeline_dt(timestamp)
                 TE->>SB: process_order_book(order_book)
             end
         end
 
         TE->>SB: set_timeline_dt(event.dt_event)
-        TE->>S: callback(event)
+        TE->>S: on_event(event)
     end
 
     TE->>TE: stop() when all feeds finish
 ```
 
 **Event ordering:**
-- Primary sort is by `dt_event` (when it happened in the market)
-- Secondary sort is by `dt_received` (when it entered the system) — this makes ordering predictable when two events share the same market timestamp
+- **Primary sort:** `dt_event` (when it happened in the market)
+- **Secondary sort:** `dt_received` (when it entered the system) — this makes ordering predictable when two events share the same market timestamp
 
-**Important:** The engine can only be as "time-ordered" as the feeds. For realistic runs, each EventFeed should emit events in non-decreasing `dt_event` order.
+> ⚠️ **Important:** The engine can only be as "time-ordered" as the feeds. For realistic runs, each EventFeed should emit events in non-decreasing `dt_event` order.
 
 ### Lifecycle States
+
+Understanding the state machines helps you debug issues and write robust strategies.
 
 **TradingEngine states:**
 
 ```mermaid
 stateDiagram-v2
-    [*] --> NEW
-    NEW --> RUNNING: START_ENGINE
-    NEW --> ERROR: ERROR_OCCURRED
-    RUNNING --> STOPPED: STOP_ENGINE
-    RUNNING --> ERROR: ERROR_OCCURRED
+    [*] --> NEW: Created
+    NEW --> RUNNING: start()
+    NEW --> ERROR: Error occurred
+    RUNNING --> STOPPED: All feeds finished
+    RUNNING --> ERROR: Error occurred
     STOPPED --> [*]
     ERROR --> [*]
 ```
@@ -368,12 +512,12 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> NEW
-    NEW --> ADDED: ADD_STRATEGY_TO_ENGINE
-    ADDED --> RUNNING: START_STRATEGY
-    ADDED --> ERROR: ERROR_OCCURRED
-    RUNNING --> STOPPED: STOP_STRATEGY
-    RUNNING --> ERROR: ERROR_OCCURRED
+    [*] --> NEW: Created
+    NEW --> ADDED: add_strategy()
+    ADDED --> RUNNING: Engine starts
+    ADDED --> ERROR: Error occurred
+    RUNNING --> STOPPED: Engine stops
+    RUNNING --> ERROR: Error occurred
     STOPPED --> [*]
     ERROR --> [*]
 ```
@@ -382,31 +526,56 @@ stateDiagram-v2
 
 ## Extending the Framework
 
+SUITE Trading is designed to be extended. Here's how to add your own components.
+
+```mermaid
+flowchart LR
+    subgraph "Extension Points"
+        EF[📈 Custom EventFeed<br/>Your data sources]
+        BR[💼 Custom Broker<br/>Your trading venue]
+        EV[📦 Custom Events<br/>Your data types]
+    end
+
+    subgraph "Framework"
+        Engine[TradingEngine]
+        Strategy[Your Strategy]
+    end
+
+    EF --> Engine
+    BR --> Engine
+    EV --> Engine
+    Engine --> Strategy
+
+    style EF fill:#e8f5e9
+    style BR fill:#f3e5f5
+    style EV fill:#fff8e1
+```
+
 ### Add a New EventFeed
 
 Have data in CSV, Parquet, a database, or a live websocket? Create a custom EventFeed:
 
-1. Implement the `EventFeed` protocol: `peek()`, `pop()`, `is_finished()`, `close()`
-2. Convert your data into domain objects (bars, ticks, etc.)
-3. Wrap them in `Event` objects with proper timestamps
-4. Attach in `Strategy.on_start()` via `add_event_feed(...)`
+1. **Implement the `EventFeed` protocol:** `peek()`, `pop()`, `is_finished()`, `close()`
+2. **Convert your data** into domain objects (bars, ticks, etc.)
+3. **Wrap them in `Event` objects** with proper timestamps
+4. **Attach in `Strategy.on_start()`** via `add_event_feed(...)`
 
 ### Add a New Broker
 
 To trade live, create a broker adapter for your venue:
 
-1. Implement the `Broker` protocol
-2. Register with `engine.add_broker("my_broker", my_broker)`
-3. Your strategies can now submit orders to it — same API as SimBroker
+1. **Implement the `Broker` protocol**
+2. **Register with the engine:** `engine.add_broker("my_broker", my_broker)`
+3. **Submit orders** — your strategies use the same API as SimBroker
 
 ### Add Custom Event Types
 
 Need news sentiment, funding rates, or on-chain data? Create custom events:
 
-1. Define your payload object
-2. Wrap it in an `Event` with timestamps
-3. Emit from your `EventFeed`
-4. Handle in `Strategy.on_event()`
+1. **Define your payload object**
+2. **Wrap it in an `Event`** with timestamps
+3. **Emit from your `EventFeed`**
+4. **Handle in `Strategy.on_event()`**
 
 ---
 
@@ -414,11 +583,13 @@ Need news sentiment, funding rates, or on-chain data? Create custom events:
 
 ### Prerequisites
 
-- **Python 3.13.x** (latest Python 3.14.x will be adopted ~6 months after release)
-- **uv** package manager (recommended)
-- Git
+| Requirement | Details |
+|-------------|---------|
+| **Python** | 3.13.x (Python 3.14.x will be adopted ~6 months after release) |
+| **Package Manager** | [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended) |
+| **Git** | For cloning the repository |
 
-SUITE Trading runs on macOS, Linux, and Windows.
+SUITE Trading runs on **macOS**, **Linux**, and **Windows**.
 
 ### Install
 
@@ -458,63 +629,84 @@ uv run pytest
 
 ## Roadmap
 
-Roadmap last updated: `2025-12-17`
+**Last updated:** 2025-12-17
 
 SUITE Trading is in active development with approximately **70% of core functionality** implemented.
 
-| Status | Area         | Work item |
-|:-------|:-------------|:---------|
-| ✅      | Core         | Event-driven architecture with chronological processing. Stable event ordering on the shared timeline. |
-| ✅      | Core         | TradingEngine with multi-strategy management. Deterministic processing across Strategy(ies). |
-| ✅      | Strategy     | Strategy framework (on_start, on_stop, on_error, on_event). Core lifecycle and event routing. |
-| ✅      | Domain       | Domain models: Event, Bar, Order, Instrument, Money, Position, Account. Core trading and market-data objects. |
-| ✅      | Data         | EventFeed system with timeline filtering. Skip/trim past events to keep the timeline in sync. |
-| ✅      | Simulation   | SimBroker order lifecycle (MARKET/LIMIT/STOP/STOP_LIMIT; cancel/modify). Base simulation in place; improving. |
-| ✅      | Core         | MessageBus with topic-based routing and wildcards. Internal event routing backbone. |
-| ✅      | Simulation   | Event → OrderBook conversion for order matching. Enables matching against order books. |
-| ✅      | Accounting   | Per-instrument position tracking. Core position state per instrument. |
-| ✅      | Reporting    | Per-strategy execution history. Raw execution data captured per Strategy. |
-| ✅      | Productivity | Data generation utilities for testing. Synthetic fixtures for fast iteration. |
-| ✅      | Simulation   | SimBroker realism layer (margin, fees, slippage, liquidity). Expand fill models and overall realism. |
-| ✅      | Simulation   | Time-in-force semantics in SimBroker (IOC, FOK, DAY, GTD, GTC). Add TimeInForce rules; model GTD datetime if needed. |
-| 🗓️    | Accounting   | Account correctness review (cash, margin, position lifecycle). Audit and tighten Account / SimAccount invariants. (Timeline: TBD) |
-| 🗓️    | Orders       | Order relationships (OCO; define OUO semantics). Implement OCO first; specify OUO before adding more relationships. (Timeline: TBD) |
-| 🗓️    | Orders       | OrderBuilder (safe, ergonomic order creation). Reduce boilerplate and centralize validation. (Timeline: TBD) |
-| 🗓️    | Data         | CSV/Parquet event-feeds. High-performance data loading for backtests. (Timeline: Q2 2026) |
-| 🗓️    | Indicators   | Indicators framework (SMA, EMA, RSI, MACD, ...). Common indicator set and clean Strategy API. (Timeline: TBD) |
-| 🗓️    | Reporting    | Performance statistics per Strategy + backtest reports. Build metrics from executions/positions (portfolio analytics later). (Timeline: TBD) |
-| 🗓️    | UI           | Streamlit export (bars, executions, equity curve, results). Export-friendly data for visualization. (Timeline: TBD) |
-| 🗓️    | UI           | Dashboard. Monitoring and controls (local-first). (Timeline: Q4 2026) |
-| 🗓️    | Strategy     | Strategy regression / extensibility review. Add more scenarios; consider plugins only if it reduces duplication. (Timeline: TBD) |
-| 🗓️    | Live         | First live broker adapter: Interactive Brokers (IBKR). First real-money integration (single-account Broker adapter). (Timeline: Q3 2026) |
+### ✅ Completed
 
-Legend:
+| Area | Feature |
+|------|---------|
+| **Core** | Event-driven architecture with chronological processing and stable event ordering |
+| **Core** | TradingEngine with multi-strategy management and deterministic processing |
+| **Core** | MessageBus with topic-based routing and wildcards |
+| **Strategy** | Strategy framework (`on_start`, `on_stop`, `on_error`, `on_event`) with lifecycle management |
+| **Domain** | Domain models: Event, Bar, Order, Instrument, Money, Position, Account |
+| **Data** | EventFeed system with timeline filtering (skip/trim past events) |
+| **Simulation** | SimBroker order lifecycle (MARKET/LIMIT/STOP/STOP_LIMIT; cancel/modify) |
+| **Simulation** | Event → OrderBook conversion for order matching |
+| **Simulation** | Realism layer (margin, fees, slippage, liquidity models) |
+| **Simulation** | Time-in-force semantics (IOC, FOK, DAY, GTD, GTC) |
+| **Accounting** | Per-instrument position tracking |
+| **Reporting** | Per-strategy execution history |
+| **Productivity** | Data generation utilities for testing |
 
-- ✅ **Done**
-- 🚧 **In progress**
-- 🗓️ **Planned**
+### 🗓️ Planned
+
+| Area | Feature | Timeline |
+|------|---------|----------|
+| **Accounting** | Account correctness review (cash, margin, position lifecycle) | TBD |
+| **Orders** | Order relationships (OCO; define OUO semantics) | TBD |
+| **Orders** | OrderBuilder (safe, ergonomic order creation) | TBD |
+| **Data** | CSV/Parquet event-feeds for high-performance data loading | Q2 2026 |
+| **Indicators** | Indicators framework (SMA, EMA, RSI, MACD, ...) | TBD |
+| **Reporting** | Performance statistics per Strategy + backtest reports | TBD |
+| **UI** | Streamlit export (bars, executions, equity curve, results) | TBD |
+| **UI** | Dashboard for monitoring and controls | Q4 2026 |
+| **Strategy** | Strategy regression / extensibility review | TBD |
+| **Live** | First live broker adapter: Interactive Brokers (IBKR) | Q3 2026 |
+
+### Legend
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | Done |
+| 🚧 | In progress |
+| 🗓️ | Planned |
 
 ---
 
 ## Project Info
 
-- **Version**: 0.0.1 (alpha)
-- APIs may change; breaking changes are allowed while the design stabilizes.
+| | |
+|---|---|
+| **Version** | 0.0.1 (alpha) |
+| **Status** | Active development |
+| **API Stability** | Breaking changes allowed while design stabilizes |
 
 ---
 
 ## Contributing
 
-1. Open an issue with what you want to change and why.
-2. Keep PRs small and focused.
-3. Add tests where behavior matters.
+We welcome contributions! Here's how to get started:
+
+1. **Open an issue** with what you want to change and why
+2. **Keep PRs small** and focused on one thing
+3. **Add tests** where behavior matters
+
+---
 
 ## License
 
-MIT License. See the `LICENSE` file for details.
+MIT License. See the [`LICENSE`](LICENSE) file for details.
+
+---
 
 ## Disclaimer
 
-* This project is for educational and research purposes only.
-* It is not financial advice.
-* Trading involves risk and you can lose money.
+> ⚠️ **Important:**
+>
+> - This project is for **educational and research purposes only**
+> - It is **not financial advice**
+> - Trading involves risk and **you can lose money**
+> - Always test thoroughly before using any trading system with real money
