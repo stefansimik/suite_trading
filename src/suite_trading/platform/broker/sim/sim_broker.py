@@ -412,11 +412,6 @@ class SimBroker(Broker, SimulatedBroker):
         if order.instrument != order_book.instrument:
             raise ValueError(f"Cannot call `_process_single_order_with_order_book` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
-        # Handle if order expired
-        if self._should_expire_order_now(order):
-            self._apply_order_action(order, OrderAction.EXPIRE)
-            return
-
         if order.state == OrderState.TRIGGER_PENDING:
             # Precondition: TRIGGER_PENDING is valid only for stop-like orders
             if not isinstance(order, (StopMarketOrder, StopLimitOrder)):
