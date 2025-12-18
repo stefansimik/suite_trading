@@ -10,7 +10,7 @@ from suite_trading.platform.market_data.event_feed_provider import EventFeedProv
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.simulated_broker_protocol import SimulatedBroker
 from suite_trading.domain.order.orders import Order
-from suite_trading.domain.order.order_state import OrderStateCategory
+from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction
 from suite_trading.platform.engine.engine_state_machine import EngineState, EngineAction, create_engine_state_machine
 from bidict import bidict
@@ -219,7 +219,7 @@ class TradingEngine:
             raise ValueError(f"Cannot call `add_broker` because Broker named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
         self._brokers_by_name_bidict[name] = broker
-        broker.set_callbacks(self._route_broker_execution_to_strategy, self._route_broker_order_update_to_strategy)
+        broker.set_callbacks(self._route_order_execution_to_strategy, self._route_order_update_to_strategy)
         logger.debug(f"TradingEngine added Broker named '{name}' (class {broker.__class__.__name__})")
 
         # No special registration for price-sample processing; capability is checked at use-site
@@ -869,15 +869,31 @@ class TradingEngine:
             ConnectionError: If the broker is not connected.
             ValueError: If the order is invalid or cannot be submitted, or if $order is re-owned.
         """
+        # region Workflow Diagram
+        # submit_order(order, broker, strategy)
+        # ├── [VALIDATE] check re-ownership
+        # └── [ACT]
+        #     ├── Record routing (Strategy -> Broker)
+        #     ├── Transition order to PENDING_SUBMIT
+        #     └── Delegate to broker.submit_order(order)
+        # endregion
+
+        # VALIDATE
         # Precondition: do not remap an already submitted order to a different owner
         existing_route = self._routing_by_order.get(order)
         if existing_route is not None and existing_route.strategy is not strategy:
             owner_name = self._get_strategy_name(existing_route.strategy)
             raise ValueError(f"Cannot call `submit_order` because Order $id ('{order.id}') is already owned by Strategy named '{owner_name}'")
 
+        # ACT
         # Record routing: Strategy is origin (receives callbacks), Broker is executor
         self._routing_by_order[order] = StrategyBrokerPair(strategy=strategy, broker=broker)
-        # Delegate to broker
+
+        # Transition to PENDING_SUBMIT to signal that submission has started
+        order.change_state(OrderAction.SUBMIT)
+        self._route_order_update_to_strategy(order)
+
+        # Delegate to broker for registration and acceptance
         broker.submit_order(order)
 
     def cancel_order(self, order: Order) -> None:
@@ -929,8 +945,9 @@ class TradingEngine:
         route: StrategyBrokerPair = self._routing_by_order[order]
         return route
 
-    # Broker → Engine callbacks (deterministic ordering ensured by Broker)
-    def _route_broker_execution_to_strategy(self, execution: Execution) -> None:
+    # Broker → Engine callbacks
+    def _route_order_execution_to_strategy(self, execution: Execution) -> None:
+        """Route execution update to originating Strategy."""
         strategy, broker = self.get_routing_for_order(execution.order)
 
         try:
@@ -942,13 +959,8 @@ class TradingEngine:
         # Store execution for later statistics
         self._executions_by_strategy[strategy].append(execution)
 
-    def _route_broker_order_update_to_strategy(self, order: Order) -> None:
-        """Handle order state updates from broker.
-
-        Called by broker when order changes state. Routes update to originating Strategy.
-        Broker parameter removed; brokers now call with order only. Engine determines
-        routing via `get_routing_for_order(order)`.
-        """
+    def _route_order_update_to_strategy(self, order: Order) -> None:
+        """Route order state update to originating Strategy."""
         strategy, broker = self.get_routing_for_order(order)
 
         try:

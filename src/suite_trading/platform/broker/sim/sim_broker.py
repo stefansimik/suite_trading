@@ -178,6 +178,8 @@ class SimBroker(Broker, SimulatedBroker):
 
         Validate and register an $order, publishing each state transition.
         """
+
+        # VALIDATE
         # Precondition: broker must be connected to accept new orders
         if not self._connected:
             raise RuntimeError(f"Cannot call `submit_order` because $connected ({self._connected}) is False")
@@ -186,46 +188,47 @@ class SimBroker(Broker, SimulatedBroker):
         if order.id in self._orders_by_id:
             raise ValueError(f"Cannot call `submit_order` because $id ('{order.id}') already exists")
 
-        timeline_dt = self._timeline_dt
-
         # Precondition: DAY/GTD submission requires broker timeline time
-        if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and timeline_dt is None:
+        if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and self._timeline_dt is None:
             raise ValueError(f"Cannot call `submit_order` because $time_in_force ({order.time_in_force.value}) requires broker time, but $timeline_dt is None")
 
         if order.time_in_force is TimeInForce.GTD:
-            good_till_dt = order.good_till_dt
             # Precondition: GTD orders must provide timezone-aware UTC $good_till_dt
-            if good_till_dt is None:
+            if order.good_till_dt is None:
                 raise ValueError(f"Cannot call `submit_order` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
+
             # Precondition: keep time-in-force comparisons deterministic in UTC
-            if not is_utc(good_till_dt):
-                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(good_till_dt)}) is not timezone-aware UTC for GTD Order $id ('{order.id}')")
+            if not is_utc(order.good_till_dt):
+                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(order.good_till_dt)}) is not timezone-aware UTC for GTD Order $id ('{order.id}')")
 
             # Precondition: GTD deadline must not be earlier than broker $timeline_dt at submission
-            if good_till_dt < timeline_dt:
-                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(good_till_dt)}) is earlier than broker $timeline_dt ({format_dt(timeline_dt)}) for GTD Order $id ('{order.id}')")
+            if order.good_till_dt < self._timeline_dt:
+                raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(order.good_till_dt)}) is earlier than broker $timeline_dt ({format_dt(self._timeline_dt)}) for GTD Order $id ('{order.id}')")
 
-        if timeline_dt is not None:
-            order._set_submitted_dt_once(timeline_dt)
+        # COMPUTE & DECIDE (NO SIDE EFFECTS)
+        # ARM_TRIGGER for stops; double ACCEPT for other orders (SUBMITTED + WORKING)
+        # Note: OrderAction.SUBMIT is now handled by the caller (e.g. TradingEngine)
+        is_stop_order = isinstance(order, (StopMarketOrder, StopLimitOrder))
+        activation_actions = [OrderAction.ARM_TRIGGER] if is_stop_order else [OrderAction.ACCEPT, OrderAction.ACCEPT]
 
-        # Track the order (submission never terminalizes in this step)
+        # ACTIONS (SIDE EFFECTS)
+        # Set submission time from broker timeline if available
+        if self._timeline_dt is not None:
+            order._set_submitted_dt_once(self._timeline_dt)
+
+        # Track the order in the broker account
         self._orders_by_id[order.id] = order
 
-        # TRANSITION ORDERS
-        self._apply_order_action(order, OrderAction.SUBMIT)  # INITIALIZED + SUBMIT = PENDING_SUBMIT
-        if isinstance(order, (StopMarketOrder, StopLimitOrder)):
-            self._apply_order_action(order, OrderAction.ARM_TRIGGER)  # PENDING_SUBMIT + ARM_TRIGGER = TRIGGER_PENDING
-            logger.info(f"Armed stop condition for Order $id ('{order.id}') for instrument '{order.instrument}' at $stop_price ({order.stop_price})")
-        else:
-            self._apply_order_action(order, OrderAction.ACCEPT)  # PENDING_SUBMIT + ACCEPT = SUBMITTED
-            self._apply_order_action(order, OrderAction.ACCEPT)  # SUBMITTED + ACCEPT = WORKING
+        # Apply activation transitions based on order type (e.g. WORKING or TRIGGER_PENDING)
+        for action in activation_actions:
+            self._apply_order_action(order, action)
 
-        # Handle if order expired
+        # Check: Handle immediate expiration
         if self._should_expire_order_now(order):
             self._apply_order_action(order, OrderAction.EXPIRE)
             return
 
-        # Match order with last order-book
+        # Match against current market depth if available
         last_order_book = self._latest_order_book_by_instrument.get(order.instrument)
         if last_order_book is not None:
             self._match_order_against_order_book(order, last_order_book)
