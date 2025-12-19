@@ -214,18 +214,18 @@ class SimBroker(Broker, SimulatedBroker):
             raise RuntimeError(f"Cannot call `cancel_order` because $connected ({self._connected}) is False")
 
         # Precondition: order must be known to the broker
-        tracked = self._orders_by_id.get(order.id)
-        if tracked is None:
+        tracked_order = self.get_order(order.id)
+        if tracked_order is None:
             raise ValueError(f"Cannot call `cancel_order` because $id ('{order.id}') is not tracked")
 
         # Check: If order is already in terminal state (e.g., FILLED, CANCELLED, REJECTED), warn and do nothing
-        if tracked.state_category == OrderStateCategory.TERMINAL:
-            logger.warning(f"Bad logic: Ignoring `cancel_order` for terminal Order $id ('{order.id}') with $state_category ({tracked.state_category.name})")
+        if tracked_order.state_category == OrderStateCategory.TERMINAL:
+            logger.warning(f"Bad logic: Ignoring `cancel_order` for terminal Order $id ('{order.id}') with $state_category ({tracked_order.state_category.name})")
             return
 
-        self._apply_order_action(tracked, OrderAction.CANCEL)
-        if tracked.state == OrderState.PENDING_CANCEL:
-            self._apply_order_action(tracked, OrderAction.ACCEPT)  # PENDING_CANCEL + ACCEPT = CANCELLED
+        self._apply_order_action(tracked_order, OrderAction.CANCEL)
+        if tracked_order.state == OrderState.PENDING_CANCEL:
+            self._apply_order_action(tracked_order, OrderAction.ACCEPT)  # PENDING_CANCEL + ACCEPT = CANCELLED
 
     def modify_order(self, order: Order) -> None:
         """Implements: Broker.modify_order
@@ -241,21 +241,21 @@ class SimBroker(Broker, SimulatedBroker):
             raise RuntimeError(f"Cannot call `modify_order` because $connected ({self._connected}) is False")
 
         # Precondition: order must be known to the broker
-        tracked = self._orders_by_id.get(order.id)
-        if tracked is None:
+        tracked_order = self.get_order(order.id)
+        if tracked_order is None:
             raise ValueError(f"Cannot call `modify_order` because $id ('{order.id}') is not tracked")
 
         # Precondition: terminal orders cannot be modified
-        if tracked.state_category == OrderStateCategory.TERMINAL:
-            raise ValueError(f"Cannot call `modify_order` because Order $state_category ({tracked.state_category.name}) is terminal.")
+        if tracked_order.state_category == OrderStateCategory.TERMINAL:
+            raise ValueError(f"Cannot call `modify_order` because Order $state_category ({tracked_order.state_category.name}) is terminal.")
 
         # Precondition: instrument cannot be changed via modification
-        if tracked.instrument != order.instrument:
-            raise ValueError(f"Cannot call `modify_order` because $instrument changed from '{tracked.instrument}' to '{order.instrument}' for Order $id ('{order.id}')")
+        if tracked_order.instrument != order.instrument:
+            raise ValueError(f"Cannot call `modify_order` because $instrument changed from '{tracked_order.instrument}' to '{order.instrument}' for Order $id ('{order.id}')")
 
         # Transitions: UPDATE → ACCEPT
-        self._apply_order_action(tracked, OrderAction.UPDATE)
-        self._apply_order_action(tracked, OrderAction.ACCEPT)
+        self._apply_order_action(tracked_order, OrderAction.UPDATE)
+        self._apply_order_action(tracked_order, OrderAction.ACCEPT)
 
     def list_active_orders(self) -> list[Order]:
         """Implements: `Broker.list_active_orders`."""
@@ -505,8 +505,8 @@ class SimBroker(Broker, SimulatedBroker):
         """
         # INITIALIZE STATE
         timestamp = order_book.timestamp
-        instrument = order.instrument
-        current_position = self._position_by_instrument.get(instrument)
+        instrument = order_book.instrument
+        current_position = self.get_position(instrument)
         net_position_qty = current_position.quantity if current_position is not None else Decimal("0")
 
         simulated_execution_history = list(self._execution_history)
@@ -603,16 +603,16 @@ class SimBroker(Broker, SimulatedBroker):
             fill_slice: Single FillSlice to apply.
             order_book: Broker OrderBook snapshot used for matching and margin.
         """
-        instrument = order.instrument
         timestamp = order_book.timestamp
+        instrument = order_book.instrument
 
         # VALIDATE
         # Precondition: ensure $order.instrument matches $order_book.instrument for pricing and margin
-        if order_book.instrument != instrument:
-            raise ValueError(f"Cannot call `_process_fill_slice` because $order.instrument ('{instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
+        if order.instrument != instrument:
+            raise ValueError(f"Cannot call `_process_fill_slice` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{instrument}')")
 
         # COMPUTE
-        position_before = self._position_by_instrument.get(instrument)
+        position_before = self.get_position(instrument)
         net_position_qty_before = position_before.quantity if position_before is not None else Decimal("0")
         signed_qty = fill_slice.quantity if order.is_buy else -fill_slice.quantity
         net_position_qty_after = net_position_qty_before + signed_qty
@@ -782,7 +782,7 @@ class SimBroker(Broker, SimulatedBroker):
         self._execution_history.append(execution)
 
         # Update position for this instrument
-        previous_position: Position | None = self._position_by_instrument.get(instrument)
+        previous_position = self.get_position(instrument)
         previous_quantity: Decimal = Decimal("0") if previous_position is None else previous_position.quantity
         previous_average_price: Decimal = Decimal("0") if previous_position is None else previous_position.average_price
 
