@@ -458,55 +458,66 @@ class SimBroker(Broker, SimulatedBroker):
         for action in stop_actions_to_apply:
             self._apply_order_action(order, action)
 
-    def _simulate_and_apply_fills_for_order_with_order_book(
-        self,
-        order: Order,
-        order_book: OrderBook,
-    ) -> None:
+    def _simulate_and_apply_fills_for_order_with_order_book(self, order: Order, order_book: OrderBook) -> None:
         """Simulate and apply fills for a single $order using the broker's OrderBook.
 
-        The $order_book was already enriched by MarketDepthModel and is treated as
-        the broker's current snapshot for matching, margin, and logging.
+        Flow: Validate → Compute → Decide → Act
         """
-
-        # Fill simulation is valid only for order in FILLABLE state
+        # VALIDATE
         if order.state_category != OrderStateCategory.FILLABLE:
             return
 
-        # Get proposed fills from order-type matching logic
-        simulate_fill_slices_function = select_simulate_fills_function_for_order(order)
-        proposed_fill_slices: list[FillSlice] = simulate_fill_slices_function(order, order_book)
+        # COMPUTE
+        simulate_fn = select_simulate_fills_function_for_order(order)
+        proposed_slices = simulate_fn(order, order_book)
+        actual_slices = self._fill_model.apply_fill_policy(order, order_book, proposed_slices)
 
-        # Apply FillModel policy to filter/modify fills
-        actual_fill_slices: list[FillSlice] = self._fill_model.apply_fill_policy(order, order_book, proposed_fill_slices)
+        # DECIDE
+        fill_slices, expire_remainder = self._decide_fill_plan(order, actual_slices, order_book)
 
-        tif = order.time_in_force
-
-        # Handle FOK order (must be all-or-nothing, so we pre-check liquidity and affordability before applying any fills)
-        if tif == TimeInForce.FOK:
-            total_fillable_qty = sum(fill_slice.quantity for fill_slice in actual_fill_slices)
-            if total_fillable_qty < order.unfilled_quantity:
-                self._apply_order_action(order, OrderAction.EXPIRE)
-                return
-
-            can_afford_all_slices = self._can_afford_all_fill_slices_for_order_with_order_book(order, actual_fill_slices, order_book)
-            if not can_afford_all_slices:
-                self._apply_order_action(order, OrderAction.EXPIRE)
-                return
-
-        if not actual_fill_slices:
-            if tif == TimeInForce.IOC:
-                self._apply_order_action(order, OrderAction.EXPIRE)
-            return
-
-        for fill_slice in actual_fill_slices:
+        # ACT
+        # Apply fills
+        for fill_slice in fill_slices:
             self._process_fill_slice(order, fill_slice, order_book)
-            # Stop if the order was terminalized by this fill-slice (e.g., order could be canceled on margin-call)
+
+            # Check: stop if the order was terminalized
             if order.state_category == OrderStateCategory.TERMINAL:
                 return
 
-        if tif == TimeInForce.IOC and not order.is_fully_filled and order.state_category != OrderStateCategory.TERMINAL:
+        # Handle expiration for orders of type IOC/FOK
+        if expire_remainder:
             self._apply_order_action(order, OrderAction.EXPIRE)
+
+    def _decide_fill_plan(
+        self,
+        order: Order,
+        fill_slices: list[FillSlice],
+        order_book: OrderBook,
+    ) -> tuple[list[FillSlice], bool]:
+        """Determines the fill application decision based on TIF rules and affordability.
+
+        Returns:
+            tuple: (fill_slices: list[FillSlice], expire_remainder: bool)
+        """
+        tif = order.time_in_force
+
+        # Special case 1: Order of type FOK = Fill all-or-nothing
+        if tif == TimeInForce.FOK:
+            has_liquidity = sum(s.quantity for s in fill_slices) >= order.unfilled_quantity
+            if not has_liquidity:
+                return [], True  # Expire full order: insufficient liquidity for FOK
+
+            if not self._can_afford_all_fill_slices_for_order_with_order_book(order, fill_slices, order_book):
+                return [], True  # Expire full order: insufficient funds for FOK
+
+            return fill_slices, False  # Full order will be filled: FOK satisfied
+
+        # Special case 2: Order of type IOC: Fill what is possible, then expire unfilled part
+        if tif == TimeInForce.IOC:
+            return fill_slices, True  # IOC: fill available fill slices and expire remainder
+
+        # Default: Fill all available liquidity (do not expire unfilled part)
+        return fill_slices, False
 
     def _can_afford_all_fill_slices_for_order_with_order_book(self, order: Order, fill_slices: list[FillSlice], order_book: OrderBook) -> bool:
         """Return True if applying all $fill_slices would not trigger insufficient-funds cancellation.
@@ -834,7 +845,7 @@ class SimBroker(Broker, SimulatedBroker):
 
     # endregion
 
-    # region Utilities - Order
+    # region Utilities - Order lifecycle
 
     # TIME IN FORCE (EXPIRATION)
 
