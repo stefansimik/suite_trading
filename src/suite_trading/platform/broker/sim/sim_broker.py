@@ -502,7 +502,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         Margin and funds policy (per proposed fill):
 
-        - Affordability is evaluated independently for each $proposed_fill. For the current
+        - Funding requirements are evaluated independently for each $proposed_fill. For the current
           proposed fill, the broker computes the additional absolute position size introduced by this
           trade and calls `MarginModel.compute_initial_margin` only for that incremental
           portion.
@@ -519,7 +519,7 @@ class SimBroker(Broker, SimulatedBroker):
           terminalized via a CANCEL/ACCEPT transition.
 
         Steps:
-        - compute required funds (commission, initial_margin, maintenance_margin)
+        - compute commission and margins (commission, initial_margin, maintenance_margin)
         - block initial margin (only if position increases)
         - create and store order_fill
         - update Position
@@ -546,7 +546,7 @@ class SimBroker(Broker, SimulatedBroker):
         signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
         net_position_qty_after = net_position_qty_before + signed_qty
 
-        commission, initial_margin, maintenance_margin_after = self._compute_required_funds_for_proposed_fill(
+        commission, initial_margin, maintenance_margin_after = self._compute_commission_margins_for_proposed_fill(
             order=order,
             proposed_fill=proposed_fill,
             order_book=order_book,
@@ -657,12 +657,12 @@ class SimBroker(Broker, SimulatedBroker):
 
         # PROCESS PROPOSED FILLS
         for i, proposed_fill in enumerate(proposed_fills):
-            # COMPUTE: Next state and required funds
+            # COMPUTE: Next state and required funding
             # Note: 'qty_after' is the position quantity after applying this proposed fill
             signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
             net_position_qty_after = net_position_qty + signed_qty
 
-            commission, initial_margin, maintenance_margin_after = self._compute_required_funds_for_proposed_fill(
+            commission, initial_margin, maintenance_margin_after = self._compute_commission_margins_for_proposed_fill(
                 order=order,
                 proposed_fill=proposed_fill,
                 order_book=order_book,
@@ -702,7 +702,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         return True
 
-    def _compute_required_funds_for_proposed_fill(
+    def _compute_commission_margins_for_proposed_fill(
         self,
         *,
         order: Order,
@@ -713,7 +713,7 @@ class SimBroker(Broker, SimulatedBroker):
         net_position_qty_after: Decimal,
         previous_order_fills: tuple[OrderFill, ...],
     ) -> tuple[Money, Money, Money]:
-        """Compute absolute required funds for a single $proposed_fill."""
+        """Compute absolute commission and margins for a single $proposed_fill."""
         # COMPUTE: Commission
         commission = self._fee_model.compute_commission(order=order, price=proposed_fill.price, quantity=proposed_fill.quantity, timestamp=timestamp, previous_order_fills=previous_order_fills)
 
@@ -744,7 +744,7 @@ class SimBroker(Broker, SimulatedBroker):
         order_book: OrderBook,
         funds_now: Money,
     ) -> None:
-        """Cancel $order and log a one-line message with all required funds components."""
+        """Cancel $order and log a one-line message with all funding components."""
         timestamp = order_book.timestamp
         best_bid = order_book.best_bid.price
         best_ask = order_book.best_ask.price
