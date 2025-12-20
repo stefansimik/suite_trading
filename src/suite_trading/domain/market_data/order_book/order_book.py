@@ -4,7 +4,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import NamedTuple, Sequence, TYPE_CHECKING
 
-from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.utils.datetime_tools import expect_utc, format_dt
 
 if TYPE_CHECKING:
@@ -31,13 +30,22 @@ class BookLevel(NamedTuple):
 class ProposedFill(NamedTuple):
     """Represents a pre-fee fill: how much filled and at what price.
 
-    This is intentionally a fill-like piece of information with only $quantity and $price.
+    This is intentionally a fill-like piece of information with only $signed_quantity and $price.
     It is used during matching to describe fills before fees, margins, or accounting are applied
     by the broker.
+
+    Attributes:
+        signed_quantity: Net quantity filled (positive for BUY, negative for SELL).
+        price: Execution price.
     """
 
-    quantity: Decimal
+    signed_quantity: Decimal
     price: Decimal
+
+    @property
+    def absolute_quantity(self) -> Decimal:
+        """The absolute size of the fill (magnitude)."""
+        return abs(self.signed_quantity)
 
 
 class OrderBook:
@@ -114,8 +122,7 @@ class OrderBook:
 
     def simulate_fills(
         self,
-        order_side: OrderSide,
-        target_quantity: Decimal,
+        target_signed_quantity: Decimal,
         *,
         min_price: Decimal | None = None,
         max_price: Decimal | None = None,
@@ -130,25 +137,25 @@ class OrderBook:
         liquidity, or randomization. Callers that need more advanced behavior should apply their own
         logic on top of the returned proposed fills.
 
-        Takes the opposite side, best-first, until $target_quantity is reached or there is no more
+        Takes the opposite side, best-first, until $target_signed_quantity is reached or there is no more
         eligible depth. Negative prices are allowed.
 
         Args:
-            order_side: BUY consumes asks; SELL consumes bids.
-            target_quantity: Total quantity to fill.
+            target_signed_quantity: Total signed quantity to fill (positive for BUY, negative for SELL).
             min_price: Optional inclusive floor price on the chosen side. If None, there is no lower
                 bound.
             max_price: Optional inclusive ceiling price on the chosen side. If None, there is no upper
                 bound.
 
         Returns:
-            List of `ProposedFill(quantity, price)` (pre-fee).
+            List of `ProposedFill(signed_quantity, price)`.
         """
-        # Choose (asks | bids) based on $order_side
-        order_book_levels = self._asks if order_side == OrderSide.BUY else self._bids
+        # Choose (asks | bids) based on $target_signed_quantity sign
+        is_buy = target_signed_quantity > 0
+        order_book_levels = self._asks if is_buy else self._bids
 
         # Return early if there is no depth or nothing to fill
-        if not order_book_levels or target_quantity <= 0:
+        if not order_book_levels or target_signed_quantity == 0:
             return []
 
         def is_price_level_within_limits(price_level: BookLevel) -> bool:
@@ -158,27 +165,29 @@ class OrderBook:
                 return False
             return True
 
-        # 2 variables updated in the loop below
-        remaining_quantity = target_quantity  # Track how much quantity still needs to be filled
-        result: list[ProposedFill] = []  # Collect all simulated proposed fills here
+        # Initialize state for matching
+        side_sign = Decimal("1") if is_buy else Decimal("-1")
+        remaining_signed_quantity = target_signed_quantity
+        result: list[ProposedFill] = []
 
         # Iterate over prices order-book prices from best to worst
         for price_level in order_book_levels:
-            # Stop once we have filled the full $target_quantity
-            if remaining_quantity <= 0:
+            # Stop once we have filled the full $target_signed_quantity
+            if remaining_signed_quantity == 0:
                 break
 
             if not is_price_level_within_limits(price_level):
                 continue
 
             # Take as much as possible at this price level
-            fill_quantity = price_level.volume if price_level.volume <= remaining_quantity else remaining_quantity
-            if fill_quantity > 0:
-                # Add proposed fill for this price level
-                proposed_fill = ProposedFill(quantity=fill_quantity, price=price_level.price)
+            fill_absolute_quantity = min(price_level.volume, abs(remaining_signed_quantity))
+            if fill_absolute_quantity > 0:
+                # Add proposed fill for this price level (signed based on side)
+                fill_signed_quantity = fill_absolute_quantity * side_sign
+                proposed_fill = ProposedFill(signed_quantity=fill_signed_quantity, price=price_level.price)
                 result.append(proposed_fill)
-                # Reduce remaining quantity by the filled amount
-                remaining_quantity -= fill_quantity
+                # Reduce remaining signed_quantity by the filled amount
+                remaining_signed_quantity -= fill_signed_quantity
 
         return result
 

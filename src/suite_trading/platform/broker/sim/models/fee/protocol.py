@@ -23,7 +23,7 @@ class FeeModel(Protocol):
     Args:
         order: The Order associated with this order_fill.
         price: Snapped order_fill price used as fee basis.
-        quantity: Snapped order_fill quantity used as fee basis.
+        absolute_quantity: Snapped order_fill absolute quantity used as fee basis.
         timestamp: Time of the order_fill.
         previous_order_fills: All order fills recorded before this one for context; current
             $order_fill is NOT included.
@@ -36,7 +36,7 @@ class FeeModel(Protocol):
         self,
         order: Order,
         price: Decimal,
-        quantity: Decimal,
+        absolute_quantity: Decimal,
         timestamp: datetime,
         previous_order_fills: Iterable[OrderFill],
     ) -> Money: ...

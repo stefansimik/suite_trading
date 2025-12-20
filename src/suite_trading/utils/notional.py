@@ -3,14 +3,14 @@ from __future__ import annotations
 from decimal import Decimal
 
 
-def compute_notional_value(price: Decimal, quantity: Decimal, contract_size: Decimal) -> Decimal:
-    """Compute absolute notional value for $quantity at $price.
+def compute_notional_value(price: Decimal, signed_quantity: Decimal, contract_size: Decimal) -> Decimal:
+    """Compute absolute notional value for $signed_quantity at $price.
 
-    Returns the positive magnitude |$price| * |$quantity| * $contract_size.
+    Returns the positive magnitude |$price| * |$signed_quantity| * $contract_size.
 
     Args:
         price: Trade price; negative values are allowed in some markets.
-        quantity: Contract/lot quantity; sign indicates direction but is ignored here.
+        quantity: Contract/lot absolute_quantity; sign indicates direction but is ignored here.
         contract_size: Contracts-to-notional multiplier (must be positive).
 
     Returns:
@@ -24,4 +24,4 @@ def compute_notional_value(price: Decimal, quantity: Decimal, contract_size: Dec
         raise ValueError(f"Cannot call `compute_notional_value` because $contract_size ({contract_size}) is not positive")
 
     # Use absolute values to support negative prices and short exposure (Guideline 7.1)
-    return abs(price) * abs(quantity) * contract_size
+    return abs(price) * abs(signed_quantity) * contract_size

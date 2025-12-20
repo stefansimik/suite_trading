@@ -166,10 +166,10 @@ def calculate_portfolio_value(positions: list) -> Decimal:
     """Calculates the total value of all positions in a portfolio.
 
     This sums the market value of each position based on current prices.
-    Positions with zero quantity are excluded from the calculation.
+    Positions with zero absolute_quantity are excluded from the calculation.
 
     Args:
-        positions: List of Position objects with instrument and quantity.
+        positions: List of Position objects with instrument and absolute_quantity.
 
     Returns:
         Total portfolio value as a Decimal.
@@ -248,16 +248,16 @@ Apply to comments, docstrings, and error messages:
 **Example:**
 
 ```python
-# Collect fills since last event and net the quantity
+# Collect fills since last event and net the absolute_quantity
 fills = broker.get_fills_since(self._timeline_dt)
-net_qty = sum(f.qty for f in fills)
+absolute_quantity = sum(f.absolute_quantity for f in fills)
 
-# Check: ensure we have quantity to trade before submitting order
-if net_qty == 0:
+# Check: ensure we have absolute_quantity to trade before submitting order
+if absolute_quantity == 0:
   return
 
 # Send order and record submission time
-broker.submit(Order(instrument, side, net_qty))
+broker.submit(Order(instrument, side, absolute_quantity))
 self._last_order_time = now()
 ```
 
@@ -297,14 +297,14 @@ def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> N
 # More scenarios — inside a long function
 
 def place_order(self, order: Order) -> None:
-    # PARAM VALIDATION
-    if order.quantity <= 0:
-        raise ValueError(f"Cannot call `place_order` because $order.quantity ({order.quantity}) <= 0")
+  # PARAM VALIDATION
+  if order.absolute_quantity <= 0:
+    raise ValueError(f"Cannot call `place_order` because $order.absolute_quantity ({order.absolute_quantity}) <= 0")
 
-    # ACTIONS (SIDE EFFECTS)
-    self._state = "SUBMITTED"
-    self._last_order_dt = now()
-    broker.submit(order)
+  # ACTIONS (SIDE EFFECTS)
+  self._state = "SUBMITTED"
+  self._last_order_dt = now()
+  broker.submit(order)
 ```
 
 ```python
@@ -434,17 +434,19 @@ logger.debug(
 - If the entire `raise` call fits on one line, write it on a single line; do not wrap it across lines
 
 **Short message — Preferred (one line):**
+
 ```python
-if self.quantity <= 0:
-    raise ValueError(f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive")
+if self.absolute_quantity <= 0:
+  raise ValueError(f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive")
 ```
 
 **Short message — Wrong (wrapped unnecessarily):**
+
 ```python
-if self.quantity <= 0:
-    raise ValueError(
-        f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive"
-    )
+if self.absolute_quantity <= 0:
+  raise ValueError(
+    f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive"
+  )
 ```
 
 **Template (long message that doesn't fit on one line):**
@@ -458,8 +460,8 @@ raise ValueError(
 **Example (long message):**
 ```python
 raise ValueError(
-    f"Cannot submit Order with $quantity ({quantity}) <= 0. "
-    f"Provide a positive quantity or call `cancel_order` instead."
+    f"Cannot submit Order with $absolute_quantity ({quantity}) <= 0. "
+    f"Provide a positive absolute_quantity or call `cancel_order` instead."
 )
 ```
 
@@ -483,12 +485,12 @@ Keep expressions simple and easy to inspect in a debugger.
 ```python
 # ❌ Bad — long nested return makes debugging hard
 return Money(
-    compute_notional_value(price, net_qty, instrument.contract_size) * self._maintenance_ratio,
+    compute_notional_value(price, signed_quantity, instrument.contract_size) * self._maintenance_ratio,
     instrument.settlement_currency,
 )
 
 # ✅ Good — extract into locals and return `result`
-notional = compute_notional_value(price, net_qty, instrument.contract_size)
+notional = compute_notional_value(price, signed_quantity, instrument.contract_size)
 margin = notional * self._maintenance_ratio
 currency = instrument.settlement_currency
 result = Money(margin, currency)

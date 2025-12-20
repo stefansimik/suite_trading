@@ -52,14 +52,14 @@ class DemoStrategy(Strategy):
         # Open position on 1st bar
         if self._bar_count == 1:
             # Create and submit market order (open position)
-            order = MarketOrder(instrument=bar.instrument, side=OrderSide.BUY, quantity=Decimal("1"))
+            order = MarketOrder(instrument=bar.instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"))
             self.submit_order(order, self._broker)
             return
 
         # Close position on 6th bar
         if self._bar_count == 6:
             # Create and submit market order (close position)
-            order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, quantity=Decimal("1"))
+            order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, absolute_quantity=Decimal("1"))
             self.submit_order(order, self._broker)
 
     # Invoked once when the Strategy is stopped

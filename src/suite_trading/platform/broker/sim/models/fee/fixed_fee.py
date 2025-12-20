@@ -29,12 +29,12 @@ class FixedFeeModel(FeeModel):
         self,
         order: Order,
         price: Decimal,
-        quantity: Decimal,
+        absolute_quantity: Decimal,
         timestamp: datetime,
         previous_order_fills: Iterable[OrderFill],
     ) -> Money:
-        # Precondition: ensure positive $quantity
-        if quantity <= 0:
-            raise ValueError(f"Cannot call `compute_commission` because $quantity ({quantity}) <= 0 for order $id ('{order.id}')")
+        # Precondition: ensure positive $absolute_quantity
+        if absolute_quantity <= 0:
+            raise ValueError(f"Cannot call `compute_commission` because $absolute_quantity ({absolute_quantity}) <= 0 for order $id ('{order.id}')")
 
-        return self._fee_per_unit * quantity
+        return self._fee_per_unit * absolute_quantity

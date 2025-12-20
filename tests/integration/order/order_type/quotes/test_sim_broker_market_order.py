@@ -222,7 +222,7 @@ class TestSimBrokerMarketOrder:
 
         engine.start()
 
-        pairs = [(e.quantity, e.price) for e in s.order_fills]
+        pairs = [(e.absolute_quantity, e.price) for e in s.order_fills]
         assert pairs == [(D("1"), D("100")), (D("1"), D("101")), (D("1"), D("102"))]
 
     def test_partial_fill_completes_on_next_book(self):
@@ -236,7 +236,7 @@ class TestSimBrokerMarketOrder:
 
         engine.start()
 
-        pairs = [(e.quantity, e.price) for e in s.order_fills]
+        pairs = [(e.absolute_quantity, e.price) for e in s.order_fills]
         assert pairs == [(D("1"), D("100")), (D("1"), D("101"))]
 
     def test_order_fill_timestamp_equals_order_book_timestamp(self):

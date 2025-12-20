@@ -13,9 +13,9 @@ class MarginModel(Protocol):
 
     The API is intentionally asymmetric:
 
-    - Initial margin uses trade context ($trade_quantity, $is_buy) because pre-trade
+    - Initial margin uses trade context ($signed_quantity) because pre-trade
       checks may depend on order direction and size.
-    - Maintenance margin uses position context ($net_position_quantity) because ongoing
+    - Maintenance margin uses position context ($signed_quantity) because ongoing
       requirements are based on current exposure, not a prospective order.
 
     Both methods receive the same OrderBook snapshot that the broker uses to match the
@@ -31,14 +31,14 @@ class MarginModel(Protocol):
     Per-fill order_fill and incremental blocking:
 
     - Simulated brokers such as SimBroker call `compute_initial_margin` per proposed fill,
-      not once for the whole order. The $trade_quantity passed in is the additional
-      exposure introduced by the current proposed fill, not the total order quantity.
+      not once for the whole order. The $signed_quantity passed in is the additional
+      exposure introduced by the current proposed fill, not the total order absolute_quantity.
     - Initial margin is therefore blocked incrementally per proposed fill, only when absolute
       exposure increases. If a proposed fill reduces exposure or keeps it unchanged, the
       implementation may return a zero $Money amount and no new initial margin is
       blocked.
     - After each proposed fill is executed, the broker recomputes maintenance margin for the new
-      $net_position_quantity and converts previously blocked initial margin into
+      $signed_quantity and converts previously blocked initial margin into
       maintenance margin.
 
     Currency and cross-currency handling:
@@ -55,16 +55,14 @@ class MarginModel(Protocol):
     def compute_initial_margin(
         self,
         order_book: OrderBook,
-        trade_quantity: Decimal,
-        is_buy: bool,
+        signed_quantity: Decimal,
         timestamp: datetime,
     ) -> Money:
         """Compute initial margin required for a prospective trade.
 
         Args:
             order_book: OrderBook snapshot that the broker uses to price and match this trade.
-            trade_quantity: Order size for this trade (sign may be ignored by some models).
-            is_buy: True for buy orders; enables asymmetric long/short treatment.
+            signed_quantity: Additional exposure for this trade (positive for BUY, negative for SELL).
             timestamp: Time when margin is calculated for this trade. Usually the same as
                 $order_book.timestamp, but callers can pass a different evaluation time.
         """
@@ -73,14 +71,14 @@ class MarginModel(Protocol):
     def compute_maintenance_margin(
         self,
         order_book: OrderBook,
-        net_position_quantity: Decimal,
+        signed_quantity: Decimal,
         timestamp: datetime,
     ) -> Money:
         """Compute maintenance margin for the current net position.
 
         Args:
             order_book: OrderBook snapshot that the broker uses to value this position.
-            net_position_quantity: Current net position (long > 0, short < 0).
+            signed_quantity: Current net position (long > 0, short < 0).
             timestamp: Time when margin is calculated for this position. Usually the same as
                 $order_book.timestamp, but callers can pass a different evaluation time.
         """

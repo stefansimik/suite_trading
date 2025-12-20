@@ -20,7 +20,7 @@ class SimgleLimitOrderStrategy(Strategy):
 
     The strategy attaches an OrderBook-based event-feed on start. When the first
     OrderBookEvent arrives, it submits a BUY Limit order with price 101 and
-    quantity 10 using the provided SimBroker. This setup is intended for
+    absolute_quantity 10 using the provided SimBroker. This setup is intended for
     debugging how a Limit order interacts with a specific OrderBook snapshot.
     """
 
@@ -46,7 +46,7 @@ class SimgleLimitOrderStrategy(Strategy):
 
             # Submit the Limit order only once, on the first OrderBookEvent
             if self.submitted_order is None:
-                order = LimitOrder(instrument=self._instrument, side=OrderSide.BUY, quantity=Decimal("10"), limit_price=Decimal("101"))
+                order = LimitOrder(instrument=self._instrument, side=OrderSide.BUY, absolute_quantity=Decimal("10"), limit_price=Decimal("101"))
                 self.submitted_order = order
                 self.submit_order(order, self._broker)
 
@@ -80,11 +80,11 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_enabled() -> None:
     # Assert: exactly one order_fill of 5 units at or below limit price
     order_fills = engine.list_order_fills_for_strategy(strategy_name)
     assert len(order_fills) == 1
-    total_filled_quantity = sum(Decimal(order_fill.quantity) for order_fill in order_fills)
+    total_filled_quantity = sum(Decimal(order_fill.absolute_quantity) for order_fill in order_fills)
     assert total_filled_quantity == Decimal("5")
 
     # Position should be long 5 units on the instrument
-    assert broker.get_position_quantity(order_book.instrument) == Decimal("5")
+    assert broker.get_signed_position_quantity(order_book.instrument) == Decimal("5")
 
 
 def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_disabled() -> None:
@@ -118,7 +118,7 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_disabled() -> None:
     assert len(order_fills) == 0
 
     # Position should remain flat on the instrument
-    assert broker.get_position_quantity(order_book.instrument) == Decimal("0")
+    assert broker.get_signed_position_quantity(order_book.instrument) == Decimal("0")
 
 
 def test_buy_limit_with_three_ask_levels_partial_fill_up_to_limit_price() -> None:
@@ -155,10 +155,10 @@ def test_buy_limit_with_three_ask_levels_partial_fill_up_to_limit_price() -> Non
     fill_prices = [Decimal(order_fill.price) for order_fill in order_fills]
     assert fill_prices == [Decimal("100"), Decimal("101")]
 
-    total_filled_quantity = sum(Decimal(order_fill.quantity) for order_fill in order_fills)
+    total_filled_quantity = sum(Decimal(order_fill.absolute_quantity) for order_fill in order_fills)
     assert total_filled_quantity == Decimal("8")
 
-    assert broker.get_position_quantity(order_book.instrument) == Decimal("8")
+    assert broker.get_signed_position_quantity(order_book.instrument) == Decimal("8")
 
     order = strategy.submitted_order
     assert order is not None

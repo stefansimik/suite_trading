@@ -35,7 +35,7 @@ class Order:
         id (str): Unique identifier for the order (read-only).
         instrument (Instrument): The financial instrument to trade (read-only).
         side (OrderSide): Whether this is a BUY or SELL order (read-only).
-        quantity (Decimal): The quantity to trade (read-only).
+        absolute_quantity (Decimal): The absolute_quantity to trade (read-only).
         time_in_force (TimeInForce): How long the order remains active (read-only).
         good_till_dt (datetime | None): Expiry datetime for GTD orders, or None for non-GTD orders (read-only).
         state (OrderState): Current state of the order from the internal state machine.
@@ -49,7 +49,7 @@ class Order:
         self,
         instrument: Instrument,
         side: OrderSide,
-        quantity: Decimal,
+        absolute_quantity: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         good_till_dt: datetime | None = None,
@@ -59,7 +59,7 @@ class Order:
         Args:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
-            quantity (Decimal): The quantity to trade.
+            absolute_quantity (Decimal): The absolute quantity to trade.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
@@ -70,7 +70,7 @@ class Order:
         # Trading details (private attributes with public properties)
         self._instrument = instrument
         self._side = side
-        self._quantity = instrument.snap_quantity(quantity)
+        self._absolute_quantity = instrument.snap_quantity(absolute_quantity)
 
         # Order lifecycle details (private attributes with public properties)
         self._time_in_force = time_in_force
@@ -134,58 +134,65 @@ class Order:
         return self.side == OrderSide.SELL
 
     @property
-    def quantity(self) -> Decimal:
-        """Get the quantity to trade.
-
-        Returns:
-            Decimal: The order quantity.
-        """
-        return self._quantity
+    def absolute_quantity(self) -> Decimal:
+        """The total size of the order (magnitude)."""
+        return self._absolute_quantity
 
     @property
-    def filled_quantity(self) -> Decimal:
-        """Total filled quantity across recorded fills.
+    def signed_quantity(self) -> Decimal:
+        """The net impact of the order (positive for BUY, negative for SELL)."""
+        return self.absolute_quantity if self.is_buy else -self.absolute_quantity
 
-        Returns:
-            Decimal: Sum of all fill quantities.
-        """
+    @property
+    def absolute_filled_quantity(self) -> Decimal:
+        """Total filled absolute quantity across recorded fills."""
         total = Decimal("0")
         for e in self._fills:
-            total += e.quantity
+            total += e.absolute_quantity
         return total
 
     @property
-    def unfilled_quantity(self) -> Decimal:
-        """Remaining unfilled quantity for this order."""
-        return self.quantity - self.filled_quantity
+    def signed_filled_quantity(self) -> Decimal:
+        """The net impact of filled quantity (positive for BUY, negative for SELL)."""
+        return self.absolute_filled_quantity if self.is_buy else -self.absolute_filled_quantity
+
+    @property
+    def absolute_unfilled_quantity(self) -> Decimal:
+        """Remaining unfilled absolute quantity for this order."""
+        return self.absolute_quantity - self.absolute_filled_quantity
+
+    @property
+    def signed_unfilled_quantity(self) -> Decimal:
+        """The net impact of unfilled quantity (positive for BUY, negative for SELL)."""
+        return self.absolute_unfilled_quantity if self.is_buy else -self.absolute_unfilled_quantity
 
     @property
     def is_unfilled(self) -> bool:
         """Whether no quantity has been filled yet.
 
         Returns:
-            bool: True if $filled_quantity is 0.
+            bool: True if $absolute_filled_quantity is 0.
         """
-        return self.filled_quantity == Decimal("0")
+        return self.absolute_filled_quantity == Decimal("0")
 
     @property
     def is_partially_filled(self) -> bool:
         """Whether some, but not all, quantity has been filled.
 
         Returns:
-            bool: True if 0 < $filled_quantity < $quantity.
+            bool: True if 0 < $absolute_filled_quantity < $absolute_quantity.
         """
-        filled = self.filled_quantity
-        return Decimal("0") < filled < self.quantity
+        filled = self.absolute_filled_quantity
+        return Decimal("0") < filled < self.absolute_quantity
 
     @property
     def is_fully_filled(self) -> bool:
         """Whether the order has been completely filled.
 
         Returns:
-            bool: True if $filled_quantity == $quantity.
+            bool: True if $absolute_filled_quantity == $absolute_quantity.
         """
-        return self.filled_quantity == self.quantity
+        return self.absolute_filled_quantity == self.absolute_quantity
 
     @property
     def average_fill_price(self) -> Decimal | None:
@@ -198,13 +205,13 @@ class Order:
         Returns:
             Decimal | None: VWAP of fills, or None.
         """
-        filled = self.filled_quantity
+        filled = self.absolute_filled_quantity
         if filled == 0:
             return None
 
         notional = Decimal("0")
         for e in self._fills:
-            notional += e.price * e.quantity
+            notional += e.price * e.absolute_quantity
 
         avg_price = notional / filled
         return avg_price
@@ -267,7 +274,7 @@ class Order:
 
     def add_fill(
         self,
-        quantity: Decimal,
+        absolute_quantity: Decimal,
         price: Decimal,
         timestamp: datetime,
         commission: Money,
@@ -285,7 +292,7 @@ class Order:
         `self.state` or `self.state_category` after the call if they need the latest state.
 
         Args:
-            quantity: Filled quantity.
+            absolute_quantity: Filled absolute quantity.
             price: Fill price.
             timestamp: When the fill occurred.
             commission: Commission/fees for this fill.
@@ -305,11 +312,11 @@ class Order:
 
         # Create fill
         child_id = f"{self.id}-{len(self._fills) + 1}"
-        fill = OrderFill(order=self, quantity=quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
+        fill = OrderFill(order=self, absolute_quantity=absolute_quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
 
         # Update state of the order (partial or full fill)
-        new_filled_quantity = self.filled_quantity + fill.quantity
-        action = OrderAction.FILL if new_filled_quantity == self.quantity else OrderAction.PARTIAL_FILL
+        new_filled_quantity = self.absolute_filled_quantity + fill.absolute_quantity
+        action = OrderAction.FILL if new_filled_quantity == self.absolute_quantity else OrderAction.PARTIAL_FILL
         self.change_state(action)
 
         # Store fill
@@ -362,11 +369,11 @@ class Order:
         """Validate intrinsic order inputs at construction time.
 
         Raises:
-            ValueError: If $quantity <= 0 or if `$time_in_force` and `$good_till_dt` are inconsistent.
+            ValueError: If $absolute_quantity <= 0 or if `$time_in_force` and `$good_till_dt` are inconsistent.
         """
-        # Precondition: positive order quantity
-        if self.quantity <= 0:
-            raise ValueError(f"Cannot call `_validate` because $quantity ({self.quantity}) is not positive")
+        # Precondition: positive order absolute_quantity
+        if self.absolute_quantity <= 0:
+            raise ValueError(f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive")
 
         # Precondition: GTD must define $good_till_dt
         if self.time_in_force is TimeInForce.GTD and self.good_till_dt is None:
@@ -381,10 +388,10 @@ class Order:
     # region Magic
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
+        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, absolute_quantity={self.absolute_quantity}, state={self.state})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, quantity={self.quantity}, state={self.state})"
+        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, side={self.side}, absolute_quantity={self.absolute_quantity}, state={self.state})"
 
     def __eq__(self, other: object) -> bool:
         """Check equality with another order.
@@ -421,7 +428,7 @@ class MarketOrder(Order):
         self,
         instrument: Instrument,
         side: OrderSide,
-        quantity: Decimal,
+        absolute_quantity: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         good_till_dt: datetime | None = None,
@@ -431,12 +438,12 @@ class MarketOrder(Order):
         Args:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
-            quantity (Decimal): The quantity to trade.
+            absolute_quantity (Decimal): The absolute quantity to trade.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
         """
-        super().__init__(instrument, side, quantity, id, time_in_force, good_till_dt)
+        super().__init__(instrument, side, absolute_quantity, id, time_in_force, good_till_dt)
 
 
 class LimitOrder(Order):
@@ -455,7 +462,7 @@ class LimitOrder(Order):
         self,
         instrument: Instrument,
         side: OrderSide,
-        quantity: Decimal,
+        absolute_quantity: Decimal,
         limit_price: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
@@ -466,7 +473,7 @@ class LimitOrder(Order):
         Args:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
-            quantity (Decimal): The quantity to trade.
+            absolute_quantity (Decimal): The absolute quantity to trade.
             limit_price (Decimal): The limit price for the order.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
@@ -476,7 +483,7 @@ class LimitOrder(Order):
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, good_till_dt)
+        super().__init__(instrument, side, absolute_quantity, id, time_in_force, good_till_dt)
 
     @property
     def limit_price(self) -> Decimal:
@@ -510,7 +517,7 @@ class StopMarketOrder(Order):
         self,
         instrument: Instrument,
         side: OrderSide,
-        quantity: Decimal,
+        absolute_quantity: Decimal,
         stop_price: Decimal,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
@@ -521,7 +528,7 @@ class StopMarketOrder(Order):
         Args:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
-            quantity (Decimal): The quantity to trade.
+            absolute_quantity (Decimal): The absolute quantity to trade.
             stop_price (Decimal): The stop price for the order.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
@@ -531,7 +538,7 @@ class StopMarketOrder(Order):
         self._stop_price = instrument.snap_price(stop_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, good_till_dt)
+        super().__init__(instrument, side, absolute_quantity, id, time_in_force, good_till_dt)
 
     @property
     def stop_price(self) -> Decimal:
@@ -563,7 +570,7 @@ class StopLimitOrder(Order):
         self,
         instrument: Instrument,
         side: OrderSide,
-        quantity: Decimal,
+        absolute_quantity: Decimal,
         stop_price: Decimal,
         limit_price: Decimal,
         id: str | None = None,
@@ -575,7 +582,7 @@ class StopLimitOrder(Order):
         Args:
             instrument (Instrument): The financial instrument to trade.
             side (OrderSide): Whether this is a BUY or SELL order.
-            quantity (Decimal): The quantity to trade.
+            absolute_quantity (Decimal): The absolute quantity to trade.
             stop_price (Decimal): The stop price that triggers the order.
             limit_price (Decimal): The limit price for the order once triggered.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
@@ -587,7 +594,7 @@ class StopLimitOrder(Order):
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, side, quantity, id, time_in_force, good_till_dt)
+        super().__init__(instrument, side, absolute_quantity, id, time_in_force, good_till_dt)
 
     @property
     def stop_price(self) -> Decimal:

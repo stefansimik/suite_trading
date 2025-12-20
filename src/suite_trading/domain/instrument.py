@@ -34,7 +34,7 @@ class Instrument:
         name (str): The instrument identifier (e.g., "EURUSD", "6E", "AAPL").
         exchange (str): Venue where the instrument is traded (e.g., "FOREX", "CME").
         price_increment (Decimal): Minimum price tick size.
-        quantity_increment (Decimal): Minimum quantity increment.
+        quantity_increment (Decimal): Minimum absolute_quantity increment.
         contract_size (Decimal): Underlying amount per contract/lot (e.g., 125000 for 6E).
         contract_unit (str): Unit of the underlying (e.g., "EUR", "share", "barrel", "troy_oz").
         quote_currency (Currency): Currency prices are quoted in (denominator of quote).
@@ -71,7 +71,7 @@ class Instrument:
             name: The instrument identifier (e.g., "6E", "EURUSD", "AAPL").
             exchange: Venue name (e.g., "CME", "FOREX", "NASDAQ").
             price_increment: Minimum price tick size as a Decimal-like scalar.
-            quantity_increment: Minimum quantity increment as a Decimal-like scalar.
+            quantity_increment: Minimum absolute_quantity increment as a Decimal-like scalar.
             contract_size: Underlying amount per contract/lot (e.g., 125000 for 6E) as a Decimal-like scalar.
             contract_unit: Unit of the underlying (e.g., "EUR", "share", "barrel").
             quote_currency: Currency in which prices are quoted (denominator of the quote). This
@@ -132,7 +132,7 @@ class Instrument:
 
     @property
     def quantity_increment(self) -> Decimal:
-        """Get the minimum quantity change increment."""
+        """Get the minimum absolute_quantity change increment."""
         return self._quantity_increment
 
     @property
@@ -218,7 +218,7 @@ class Instrument:
         return int(ticks)
 
     def quantity_from_lots(self, n: int) -> Decimal:
-        """Return a quantity equal to $n quantity_from_lots (n * $quantity_increment).
+        """Return a absolute_quantity equal to $n quantity_from_lots (n * $quantity_increment).
 
         Note: "lot" denotes the standardized minimal tradable unit for the Instrument.
 
@@ -226,7 +226,7 @@ class Instrument:
             n (int): Number of lot units. Must be a positive integer.
 
         Returns:
-            Decimal: Exact quantity as `n * quantity_increment`.
+            Decimal: Exact absolute_quantity as `n * quantity_increment`.
 
         Raises:
             TypeError: If $n is not an int.
@@ -236,11 +236,11 @@ class Instrument:
         if not isinstance(n, int):
             raise TypeError("Cannot call `quantity_from_lots` because $n is not int. Pass a positive int for lot count.")
 
-        # Precondition: quantity_from_lots must be positive to express a non-zero quantity
+        # Precondition: quantity_from_lots must be positive to express a non-zero absolute_quantity
         if n <= 0:
             raise ValueError(f"Cannot call `quantity_from_lots` because $n ('{n}') must be > 0.")
 
-        # Return the quantity
+        # Return the absolute_quantity
         return self.quantity_increment * n
 
     # endregion
@@ -290,11 +290,11 @@ class Instrument:
         # Convert safely; avoid binary float artifacts by using str(...) for non-Decimal
         v = as_decimal(value)
 
-        # Precondition: quantity must be positive for trading semantics
+        # Precondition: absolute_quantity must be positive for trading semantics
         if v <= 0:
             raise ValueError(f"Cannot call `snap_quantity` because $value ('{v}') must be > 0.")
 
-        # Snap to the instrument's quantity increment (banker's rounding)
+        # Snap to the instrument's absolute_quantity increment (banker's rounding)
         return v.quantize(self.quantity_increment, rounding=ROUND_HALF_EVEN)
 
     # endregion

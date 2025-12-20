@@ -45,14 +45,13 @@ class FixedRatioMarginModel(MarginModel):
     def compute_initial_margin(
         self,
         order_book: OrderBook,
-        trade_quantity: Decimal,
-        is_buy: bool,
+        signed_quantity: Decimal,
         timestamp: datetime,
     ) -> Money:
-        # This model is symmetric; $is_buy and $timestamp are ignored by design
+        # This model is symmetric; $timestamp is ignored by design
         instrument = order_book.instrument
         price = self._extract_price_from_order_book(order_book)
-        notional_value = compute_notional_value(price, trade_quantity, instrument.contract_size)
+        notional_value = compute_notional_value(price, signed_quantity, instrument.contract_size)
         margin_value = notional_value * self._initial_ratio
         currency = instrument.settlement_currency
         result = Money(margin_value, currency)
@@ -61,12 +60,12 @@ class FixedRatioMarginModel(MarginModel):
     def compute_maintenance_margin(
         self,
         order_book: OrderBook,
-        net_position_quantity: Decimal,
+        signed_quantity: Decimal,
         timestamp: datetime,
     ) -> Money:
         instrument = order_book.instrument
         price = self._extract_price_from_order_book(order_book)
-        notional_value = compute_notional_value(price, net_position_quantity, instrument.contract_size)
+        notional_value = compute_notional_value(price, signed_quantity, instrument.contract_size)
         margin_value = notional_value * self._maintenance_ratio
         currency = instrument.settlement_currency
         result = Money(margin_value, currency)

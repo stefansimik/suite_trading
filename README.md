@@ -120,12 +120,12 @@ class DemoStrategy(Strategy):
 
         # Buy on bar 1
         if self._bar_count == 1:
-            order = MarketOrder(instrument=bar.instrument, side=OrderSide.BUY, quantity=Decimal("1"))
+            order = MarketOrder(instrument=bar.instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"))
             self.submit_order(order, self._broker)
 
         # Sell on bar 6
         if self._bar_count == 6:
-            order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, quantity=Decimal("1"))
+            order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, absolute_quantity=Decimal("1"))
             self.submit_order(order, self._broker)
 
     def on_stop(self) -> None:
@@ -305,7 +305,7 @@ from decimal import Decimal
 sim_broker = SimBroker()
 
 # Submit an order
-order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("1"))
+order = MarketOrder(instrument=instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"))
 self.submit_order(order, sim_broker)
 ```
 

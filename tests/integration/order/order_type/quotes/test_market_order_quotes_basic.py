@@ -173,4 +173,4 @@ class TestMarketOrderQuotesBasic:
 
         engine.start()
 
-        assert [(e.quantity, e.price) for e in s.order_fills] == [(D("1"), D("1.0001")), (D("1"), D("1.0002"))]
+        assert [(e.absolute_quantity, e.price) for e in s.order_fills] == [(D("1"), D("1.0001")), (D("1"), D("1.0002"))]
