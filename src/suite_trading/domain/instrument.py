@@ -285,16 +285,16 @@ class Instrument:
             Decimal: Quantity snapped to a multiple of $quantity_increment.
 
         Raises:
-            ValueError: If $value <= 0.
+            ValueError: If $value is not finite.
         """
         # Convert safely; avoid binary float artifacts by using str(...) for non-Decimal
         v = as_decimal(value)
 
-        # Precondition: absolute_quantity must be positive for trading semantics
-        if v <= 0:
-            raise ValueError(f"Cannot call `snap_quantity` because $value ('{v}') must be > 0.")
+        # Precondition: input must be finite
+        if not v.is_finite():
+            raise ValueError(f"Cannot call `snap_quantity` because $value ('{v}') is not finite")
 
-        # Snap to the instrument's absolute_quantity increment (banker's rounding)
+        # Snap to the instrument's quantity increment (banker's rounding)
         return v.quantize(self.quantity_increment, rounding=ROUND_HALF_EVEN)
 
     # endregion
