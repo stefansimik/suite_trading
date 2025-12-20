@@ -8,7 +8,7 @@ import pytest
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.domain.order.orders import MarketOrder, LimitOrder, StopMarketOrder, StopLimitOrder
 from suite_trading.domain.order.order_enums import OrderSide
-from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice, BookLevel
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, ProposedFill, BookLevel
 from suite_trading.domain.instrument import Instrument, AssetClass
 from suite_trading.domain.monetary.currency import Currency, CurrencyType
 
@@ -34,7 +34,7 @@ def test_market_order_deterministic_zero_slippage(instrument, order_book):
     """Deterministic distribution with zero adjustment passes through unchanged."""
     model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -45,7 +45,7 @@ def test_market_order_negative_adjustment_buy_gets_worse_price(instrument, order
     """BUY order with negative adjustment gets higher (worse) price."""
     model = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -59,7 +59,7 @@ def test_market_order_negative_adjustment_sell_gets_worse_price(instrument, orde
     """SELL order with negative adjustment gets lower (worse) price."""
     model = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.SELL, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.0995"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.0995"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -73,7 +73,7 @@ def test_market_order_positive_adjustment_buy_gets_better_price(instrument, orde
     """BUY order with positive adjustment gets lower (better) price."""
     model = DistributionFillModel(market_fill_adjustment_distribution={2: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -87,7 +87,7 @@ def test_market_order_positive_adjustment_sell_gets_better_price(instrument, ord
     """SELL order with positive adjustment gets higher (better) price."""
     model = DistributionFillModel(market_fill_adjustment_distribution={3: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.SELL, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.0995"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.0995"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -97,23 +97,23 @@ def test_market_order_positive_adjustment_sell_gets_better_price(instrument, ord
     assert actual_fills[0].quantity == Decimal("10")
 
 
-def test_market_order_per_slice_independence(instrument, order_book):
-    """Multiple slices can have different adjustment amounts (per-slice sampling)."""
+def test_market_order_per_fill_independence(instrument, order_book):
+    """Multiple proposed fills can have different adjustment amounts (per-fill sampling)."""
     # Use 50/50 distribution between -1 and +1 tick adjustment
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("20"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000")), FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000")), ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
-    # Run 100 trials to verify slices don't always get same outcome
+    # Run 100 trials to verify proposed fills don't always get same outcome
     different_outcomes_count = 0
     for trial in range(100):
         model_trial = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=trial)
         actual_fills = model_trial.apply_fill_policy(order, order_book, proposed_fills)
 
-        # Check if slices got different adjustments
+        # Check if proposed fills got different adjustments
         if actual_fills[0].price != actual_fills[1].price:
             different_outcomes_count += 1
 
-    # Check: slices should get different outcomes in at least some trials
+    # Check: proposed fills should get different outcomes in at least some trials
     assert different_outcomes_count > 0
 
 
@@ -121,7 +121,7 @@ def test_stop_market_order_uses_fill_adjustment_distribution(instrument, order_b
     """StopMarketOrder triggers fill adjustment distribution (same as MarketOrder)."""
     model = DistributionFillModel(market_fill_adjustment_distribution={1: Decimal("1.0")}, rng_seed=42)
     order = StopMarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), stop_price=Decimal("1.1005"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -134,7 +134,7 @@ def test_market_order_default_distribution_when_none(instrument, order_book):
     """Default distribution used when None provided."""
     model = DistributionFillModel(market_fill_adjustment_distribution=None, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -148,55 +148,55 @@ def test_market_order_default_distribution_when_none(instrument, order_book):
 # region Limit/Stop-Limit On-Touch Fill Tests
 
 
-def test_limit_order_on_touch_probability_zero_skips_on_touch_slice(instrument, order_book):
-    """Limit order with probability 0 never fills on-touch slices."""
+def test_limit_order_on_touch_probability_zero_skips_on_touch_fill(instrument, order_book):
+    """Limit order with probability 0 never fills on-touch proposed fills."""
     model = DistributionFillModel(limit_on_touch_fill_probability=Decimal("0.0"), rng_seed=42)
     order = LimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), limit_price=Decimal("1.1000"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: on-touch slice is always skipped when probability is 0
+    # Check: on-touch proposed fill is always skipped when probability is 0
     assert actual_fills == []
 
 
-def test_limit_order_on_touch_probability_one_fills_on_touch_slice(instrument, order_book):
-    """Limit order with probability 1 always fills on-touch slices."""
+def test_limit_order_on_touch_probability_one_fills_on_touch_proposed_fill(instrument, order_book):
+    """Limit order with probability 1 always fills on-touch proposed fills."""
     model = DistributionFillModel(limit_on_touch_fill_probability=Decimal("1.0"), rng_seed=42)
     order = LimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), limit_price=Decimal("1.1000"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: on-touch slice is always accepted when probability is 1
+    # Check: on-touch proposed fill is always accepted when probability is 1
     assert actual_fills == proposed_fills
 
 
-def test_limit_order_crossed_slice_always_fills(instrument, order_book):
-    """Limit order slice with better-than-limit price always fills, independent of probability."""
+def test_limit_order_crossed_proposed_fill_always_fills(instrument, order_book):
+    """Limit order proposed fill with better-than-limit price always fills, independent of probability."""
     model = DistributionFillModel(limit_on_touch_fill_probability=Decimal("0.0"), rng_seed=42)
     order = LimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), limit_price=Decimal("1.1000"))
     # Price is strictly better than limit for BUY (crossed)
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.0999"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.0999"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: crossed slice is always accepted even when probability is 0
+    # Check: crossed proposed fill is always accepted even when probability is 0
     assert actual_fills == proposed_fills
 
 
-def test_limit_order_per_slice_independence(instrument, order_book):
-    """Multiple on-touch slices can have different outcomes (some filled, some not)."""
+def test_limit_order_per_fill_independence(instrument, order_book):
+    """Multiple on-touch proposed fills can have different outcomes (some filled, some not)."""
     order = LimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("20"), limit_price=Decimal("1.1000"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000")), FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000")), ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
-    # Run trials with probability 0.5 to verify slices do not always get the same outcome
+    # Run trials with probability 0.5 to verify proposed fills do not always get the same outcome
     some_partial_fills = False
     for trial in range(100):
         model_trial = DistributionFillModel(limit_on_touch_fill_probability=Decimal("0.5"), rng_seed=trial)
         actual_fills = model_trial.apply_fill_policy(order, order_book, proposed_fills)
 
-        # Check if we got partial fill (one slice filled, one not)
+        # Check if we got partial fill (one proposed fill filled, one not)
         if len(actual_fills) == 1:
             some_partial_fills = True
             break
@@ -209,11 +209,11 @@ def test_stop_limit_order_uses_on_touch_probability(instrument, order_book):
     """StopLimitOrder uses the same on-touch probability logic as LimitOrder."""
     model = DistributionFillModel(limit_on_touch_fill_probability=Decimal("1.0"), rng_seed=42)
     order = StopLimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), stop_price=Decimal("1.0995"), limit_price=Decimal("1.1000"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: StopLimitOrder fills on-touch slice when probability is 1
+    # Check: StopLimitOrder fills on-touch proposed fill when probability is 1
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.1000")
 
@@ -222,7 +222,7 @@ def test_limit_order_default_on_touch_probability_when_none(instrument, order_bo
     """Default on-touch probability used when None provided."""
     model = DistributionFillModel(limit_on_touch_fill_probability=None, rng_seed=42)
     order = LimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"), limit_price=Decimal("1.1000"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -242,7 +242,7 @@ def test_reproducibility_same_seed_identical_sequences(instrument, order_book):
     model2 = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=999)
 
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     # Run same sequence on both models
     results1 = []
@@ -263,7 +263,7 @@ def test_reproducibility_different_seeds_different_sequences(instrument, order_b
     model2 = DistributionFillModel(market_fill_adjustment_distribution={-1: Decimal("0.5"), 1: Decimal("0.5")}, rng_seed=200)
 
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     # Run same sequence on both models
     results1 = []
@@ -283,8 +283,8 @@ def test_reproducibility_different_seeds_different_sequences(instrument, order_b
 # region Edge Case Tests
 
 
-def test_empty_fill_slices_returns_empty(instrument, order_book):
-    """Empty fill_slices returns empty list."""
+def test_empty_proposed_fills_returns_empty(instrument, order_book):
+    """Empty proposed_fills returns empty list."""
     model = DistributionFillModel(rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
     proposed_fills = []
@@ -294,11 +294,11 @@ def test_empty_fill_slices_returns_empty(instrument, order_book):
     assert actual_fills == []
 
 
-def test_single_slice_processed_correctly(instrument, order_book):
-    """Single fill slice processed correctly."""
+def test_single_fill_processed_correctly(instrument, order_book):
+    """Single proposed fill processed correctly."""
     model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("10"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
@@ -306,16 +306,16 @@ def test_single_slice_processed_correctly(instrument, order_book):
     assert actual_fills[0].quantity == Decimal("10")
 
 
-def test_multiple_slices_processed_correctly(instrument, order_book):
-    """Multiple fill slices processed correctly."""
+def test_multiple_fills_processed_correctly(instrument, order_book):
+    """Multiple proposed fills processed correctly."""
     model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1.0")}, rng_seed=42)
     order = MarketOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("30"))
-    proposed_fills = [FillSlice(quantity=Decimal("10"), price=Decimal("1.1000")), FillSlice(quantity=Decimal("10"), price=Decimal("1.1001")), FillSlice(quantity=Decimal("10"), price=Decimal("1.1002"))]
+    proposed_fills = [ProposedFill(quantity=Decimal("10"), price=Decimal("1.1000")), ProposedFill(quantity=Decimal("10"), price=Decimal("1.1001")), ProposedFill(quantity=Decimal("10"), price=Decimal("1.1002"))]
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
     assert len(actual_fills) == 3
-    # Check: all slices present with correct quantities
+    # Check: all proposed fills present with correct quantities
     assert sum(f.quantity for f in actual_fills) == Decimal("30")
 
 

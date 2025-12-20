@@ -112,7 +112,7 @@ def test_limit_instant_fill_touch() -> None:
     engine.set_order_book_converter(DefaultEventToOrderBookConverter())
 
     instrument = _create_us_equity_instrument()
-    # One quote with ask exactly at 99.98; BUY limit at 99.98 should be accepted and filled in one slice
+    # One quote with ask exactly at 99.98; BUY limit at 99.98 should be accepted and filled in one proposed fill
     quote_tick_events = [_create_quote_tick_event(instrument, bid="99.95@5", ask="99.98@5", timestamp_index=0)]
 
     def create_limit_order(_: QuoteTickEvent) -> Order:

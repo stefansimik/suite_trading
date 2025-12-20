@@ -94,7 +94,7 @@ class TestSimBrokerMarketOrder:
             self.remove_event_feed("q")
 
     class _PartialAcrossSuccessiveSnapshotsStrategy(Strategy):
-        """Submit BUY 3 before quotes; three quote ticks with ask=100/101/102 and vol=1 each fill in three slices."""
+        """Submit BUY 3 before quotes; three quote ticks with ask=100/101/102 and vol=1 each fill in three proposed fills."""
 
         def __init__(self, name: str, broker: SimBroker, instrument: Instrument, t0: datetime) -> None:
             super().__init__(name)
@@ -127,7 +127,7 @@ class TestSimBrokerMarketOrder:
                 self.add_event_feed("q", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
     class _PartialCompletesOnNextSnapshotStrategy(Strategy):
-        """Submit BUY 2; first tick has ask vol=1@100, next tick 1@101 → two slices across snapshots."""
+        """Submit BUY 2; first tick has ask vol=1@100, next tick 1@101 → two proposed fills across snapshots."""
 
         def __init__(self, name: str, broker: SimBroker, instrument: Instrument, t0: datetime) -> None:
             super().__init__(name)
@@ -212,7 +212,7 @@ class TestSimBrokerMarketOrder:
         assert len(s.executions) == 1 and s.executions[0].price == D("101") and s.executions[0].timestamp == self._ts(2)
 
     def test_partial_fill_across_multiple_levels(self):
-        """Three successive order-books with 1 lot each at 100/101/102 should fill BUY 3 in three slices."""
+        """Three successive order-books with 1 lot each at 100/101/102 should fill BUY 3 in three proposed fills."""
         instr = self._instrument()
         broker = self._create_optimistic_sim_broker()
         engine = TradingEngine()

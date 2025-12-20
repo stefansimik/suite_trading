@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, ProposedFill
 from suite_trading.domain.order.orders import (
     Order,
     MarketOrder,
@@ -44,7 +44,7 @@ def should_trigger_stop_condition(order: StopMarketOrder | StopLimitOrder, order
     return best_bid.price <= order.stop_price
 
 
-def simulate_fills_for_market_order(order: Order, order_book: OrderBook) -> list[FillSlice]:
+def simulate_fills_for_market_order(order: Order, order_book: OrderBook) -> list[ProposedFill]:
     """Simulate fills for a market-like order from the other side of the book (best price first).
 
     Returns fills as price/quantity pairs. Fees are not included. Negative prices are allowed.
@@ -54,13 +54,13 @@ def simulate_fills_for_market_order(order: Order, order_book: OrderBook) -> list
         order_book: OrderBook snapshot for the simulation.
 
     Returns:
-        list[FillSlice]: Fills (price and quantity); fees not included.
+        list[ProposedFill]: Fills (price and quantity); fees not included.
     """
     fills = order_book.simulate_fills(order_side=order.side, target_quantity=order.unfilled_quantity)
     return fills
 
 
-def simulate_fills_for_limit_order(order: LimitOrder | StopLimitOrder, order_book: OrderBook) -> list[FillSlice]:
+def simulate_fills_for_limit_order(order: LimitOrder | StopLimitOrder, order_book: OrderBook) -> list[ProposedFill]:
     """Simulate fills for a limit-like order at prices equal to or better than $order.limit_price.
 
     Args:
@@ -68,7 +68,7 @@ def simulate_fills_for_limit_order(order: LimitOrder | StopLimitOrder, order_boo
         order_book: OrderBook snapshot for fill simulation.
 
     Returns:
-        list[FillSlice]: Fills (price and quantity); fees not included.
+        list[ProposedFill]: Fills (price and quantity); fees not included.
     """
     if order.is_buy:
         fills = order_book.simulate_fills(order_side=order.side, target_quantity=order.unfilled_quantity, max_price=order.limit_price)
@@ -77,14 +77,14 @@ def simulate_fills_for_limit_order(order: LimitOrder | StopLimitOrder, order_boo
     return fills
 
 
-def select_simulate_fills_function_for_order(order: Order) -> Callable[[Order, OrderBook], list[FillSlice]]:
+def select_simulate_fills_function_for_order(order: Order) -> Callable[[Order, OrderBook], list[ProposedFill]]:
     """Return the fill-simulation function for $order or raise if unsupported.
 
     Args:
         order: The order to simulate.
 
     Returns:
-        Callable that returns `FillSlice` items (price and quantity). Fees are handled elsewhere.
+        Callable that returns `ProposedFill` items (price and quantity). Fees are handled elsewhere.
 
     Raises:
         ValueError: If the order type is unsupported by the simulator.

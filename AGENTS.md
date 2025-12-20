@@ -543,15 +543,15 @@ function_name(...)
 **Example (real workflow, keep it short):**
 
 ```text
-_process_fill_slice(order, fill_slice, order_book)
+_process_proposed_fill(order, proposed_fill, order_book)
 ├── [VALIDATE] Check instrument match
 ├── [COMPUTE]
 │   ├── position_before, net_qty_after
-│   ├── affordability = compute_fill_slice_affordability(...)
+│   ├── affordability = _compute_proposed_fill_affordability(...)
 │   └── funds_now = get_funds(...)
 ├── [DECIDE] IF not has_enough_funds(...): handle insufficient funds
 └── [ACT]
-    ├── execution = _commit_fill_slice_execution_and_accounting(...)
+    ├── execution = _commit_proposed_fill_execution_and_accounting(...)
     ├── publish execution callback
     └── _handle_order_update(order)
 ```

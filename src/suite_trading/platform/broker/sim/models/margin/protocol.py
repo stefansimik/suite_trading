@@ -28,16 +28,16 @@ class MarginModel(Protocol):
     simulation broker this is usually the same as $order_book.timestamp, but callers may
     pass a different time when they want to evaluate margin at another moment.
 
-    Slice-by-slice fills and incremental blocking:
+    Per-fill execution and incremental blocking:
 
-    - Simulated brokers such as SimBroker call `compute_initial_margin` per fill-slice,
+    - Simulated brokers such as SimBroker call `compute_initial_margin` per proposed fill,
       not once for the whole order. The $trade_quantity passed in is the additional
-      exposure introduced by the current slice, not the total order quantity.
-    - Initial margin is therefore blocked incrementally per slice, only when absolute
-      exposure increases. If a slice reduces exposure or keeps it unchanged, the
+      exposure introduced by the current proposed fill, not the total order quantity.
+    - Initial margin is therefore blocked incrementally per proposed fill, only when absolute
+      exposure increases. If a proposed fill reduces exposure or keeps it unchanged, the
       implementation may return a zero $Money amount and no new initial margin is
       blocked.
-    - After each slice is executed, the broker recomputes maintenance margin for the new
+    - After each proposed fill is executed, the broker recomputes maintenance margin for the new
       $net_position_quantity and converts previously blocked initial margin into
       maintenance margin.
 

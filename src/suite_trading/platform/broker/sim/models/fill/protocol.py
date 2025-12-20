@@ -4,7 +4,7 @@ from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.orders import Order
-    from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
+    from suite_trading.domain.market_data.order_book.order_book import OrderBook, ProposedFill
 
 
 # region Interface
@@ -28,17 +28,17 @@ class FillModel(Protocol):
         self,
         order: Order,
         order_book: OrderBook,
-        fill_slices: list[FillSlice],
-    ) -> list[FillSlice]:
+        proposed_fills: list[ProposedFill],
+    ) -> list[ProposedFill]:
         """Apply fill policy to proposed fills, returning actual fills to execute.
 
         Args:
             order: Order being filled.
             order_book: Current OrderBook snapshot used for matching.
-            fill_slices: Proposed fills from OrderBook.simulate_fills().
+            proposed_fills: Proposed fills from OrderBook.simulate_fills().
 
         Returns:
-            Filtered/modified list of FillSlice to actually execute.
+            Filtered/modified list of ProposedFill to actually execute.
         """
         ...
 

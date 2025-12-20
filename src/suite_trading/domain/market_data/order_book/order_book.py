@@ -25,11 +25,11 @@ class BookLevel(NamedTuple):
     volume: Decimal
 
 
-# Justification: Represent execution slices reused between broker, order matching, and tests.
+# Justification: Represent proposed fills reused between broker, order matching, and tests.
 
 
-class FillSlice(NamedTuple):
-    """Represents a pre-fee fill slice: how much filled and at what price.
+class ProposedFill(NamedTuple):
+    """Represents a pre-fee fill: how much filled and at what price.
 
     This is intentionally an execution-like piece of information with only $quantity and $price.
     It is used during matching to describe fills before fees, margins, or accounting are applied
@@ -119,16 +119,16 @@ class OrderBook:
         *,
         min_price: Decimal | None = None,
         max_price: Decimal | None = None,
-    ) -> list[FillSlice]:
+    ) -> list[ProposedFill]:
         """Simulate deterministic fills by walking the opposite side of this book.
 
         This is the default, purely deterministic matching model. It assumes that any visible resting
         volume at prices within the [$min_price, $max_price] band is immediately executable and creates
-        `FillSlice` entries for the levels that would be hit if the order trades through that price range.
+        `ProposedFill` entries for the levels that would be hit if the order trades through that price range.
 
         The function only walks the current snapshot and does not model queue position, latency, hidden
         liquidity, or randomization. Callers that need more advanced behavior should apply their own
-        logic on top of the returned fill slices.
+        logic on top of the returned proposed fills.
 
         Takes the opposite side, best-first, until $target_quantity is reached or there is no more
         eligible depth. Negative prices are allowed.
@@ -142,7 +142,7 @@ class OrderBook:
                 bound.
 
         Returns:
-            List of `FillSlice(quantity, price)` (pre-fee).
+            List of `ProposedFill(quantity, price)` (pre-fee).
         """
         # Choose (asks | bids) based on $order_side
         order_book_levels = self._asks if order_side == OrderSide.BUY else self._bids
@@ -160,7 +160,7 @@ class OrderBook:
 
         # 2 variables updated in the loop below
         remaining_quantity = target_quantity  # Track how much quantity still needs to be filled
-        result: list[FillSlice] = []  # Collect all simulated fill slices here
+        result: list[ProposedFill] = []  # Collect all simulated proposed fills here
 
         # Iterate over prices order-book prices from best to worst
         for price_level in order_book_levels:
@@ -174,9 +174,9 @@ class OrderBook:
             # Take as much as possible at this price level
             fill_quantity = price_level.volume if price_level.volume <= remaining_quantity else remaining_quantity
             if fill_quantity > 0:
-                # Add fill slice for this price level
-                fill_slice = FillSlice(quantity=fill_quantity, price=price_level.price)
-                result.append(fill_slice)
+                # Add proposed fill for this price level
+                proposed_fill = ProposedFill(quantity=fill_quantity, price=price_level.price)
+                result.append(proposed_fill)
                 # Reduce remaining quantity by the filled amount
                 remaining_quantity -= fill_quantity
 

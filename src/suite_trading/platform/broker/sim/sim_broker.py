@@ -25,7 +25,7 @@ from suite_trading.domain.monetary.money import Money
 from suite_trading.platform.broker.sim.models.margin.protocol import MarginModel
 from suite_trading.platform.broker.sim.models.margin.fixed_ratio import FixedRatioMarginModel
 from suite_trading.platform.broker.sim.models.fill.protocol import FillModel
-from suite_trading.domain.market_data.order_book.order_book import OrderBook, FillSlice
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, ProposedFill
 from suite_trading.platform.broker.sim.order_matching import (
     should_trigger_stop_condition,
     select_simulate_fills_function_for_order,
@@ -438,16 +438,16 @@ class SimBroker(Broker, SimulatedBroker):
 
         # COMPUTE
         simulate_fn = select_simulate_fills_function_for_order(order)
-        proposed_slices = simulate_fn(order, order_book)
-        actual_slices = self._fill_model.apply_fill_policy(order, order_book, proposed_slices)
+        proposed_fills_raw = simulate_fn(order, order_book)
+        actual_fills = self._fill_model.apply_fill_policy(order, order_book, proposed_fills_raw)
 
         # DECIDE
-        fill_slices, expire_remainder = self._decide_fill_plan(order, actual_slices, order_book)
+        proposed_fills, expire_remainder = self._decide_fill_plan(order, actual_fills, order_book)
 
         # ACT
         # Apply fills
-        for fill_slice in fill_slices:
-            self._process_fill_slice(order, fill_slice, order_book)
+        for proposed_fill in proposed_fills:
+            self._process_proposed_fill(order, proposed_fill, order_book)
 
             # Check: stop if the order was terminalized
             if order.state_category == OrderStateCategory.TERMINAL:
@@ -460,45 +460,45 @@ class SimBroker(Broker, SimulatedBroker):
     def _decide_fill_plan(
         self,
         order: Order,
-        fill_slices: list[FillSlice],
+        proposed_fills: list[ProposedFill],
         order_book: OrderBook,
-    ) -> tuple[list[FillSlice], bool]:
+    ) -> tuple[list[ProposedFill], bool]:
         """Determines the fill application decision based on TIF rules and affordability.
 
         Returns:
-            tuple: (fill_slices: list[FillSlice], expire_remainder: bool)
+            tuple: (proposed_fills: list[ProposedFill], expire_remainder: bool)
         """
         tif = order.time_in_force
 
         # Special case 1: Order of type FOK = Fill all-or-nothing
         if tif == TimeInForce.FOK:
-            has_liquidity = sum(s.quantity for s in fill_slices) >= order.unfilled_quantity
+            has_liquidity = sum(s.quantity for s in proposed_fills) >= order.unfilled_quantity
             if not has_liquidity:
                 return [], True  # Expire full order: insufficient liquidity for FOK
 
-            if not self._has_enough_funds_for_fill_slices(order, fill_slices, order_book):
+            if not self._has_enough_funds_for_proposed_fills(order, proposed_fills, order_book):
                 return [], True  # Expire full order: insufficient funds for FOK
 
-            return fill_slices, False  # Full order will be filled: FOK satisfied
+            return proposed_fills, False  # Full order will be filled: FOK satisfied
 
         # Special case 2: Order of type IOC: Fill what is possible, then expire unfilled part
         if tif == TimeInForce.IOC:
-            return fill_slices, True  # IOC: fill available fill slices and expire remainder
+            return proposed_fills, True  # IOC: fill available proposed fills and expire remainder
 
         # Default: Fill all available liquidity (do not expire unfilled part)
-        return fill_slices, False
+        return proposed_fills, False
 
-    def _has_enough_funds_for_fill_slices(
+    def _has_enough_funds_for_proposed_fills(
         self,
         order: Order,
-        fill_slices: list[FillSlice],
+        proposed_fills: list[ProposedFill],
         order_book: OrderBook,
     ) -> bool:
-        """Evaluate if the account has enough funds for margins and fees for all $fill_slices (dry-run).
+        """Evaluate if the account has enough funds for margins and fees for all $proposed_fills (dry-run).
 
         Note:
-            The loop evaluates affordability slice-by-slice. Variables with '_after' or 'after'
-            represent the simulated state once the current $fill_slice is applied.
+            The loop evaluates affordability per proposed fill. Variables with '_after' or 'after'
+            represent the simulated state once the current $proposed_fill is applied.
         """
         # INITIALIZE STATE
         timestamp = order_book.timestamp
@@ -509,16 +509,16 @@ class SimBroker(Broker, SimulatedBroker):
         simulated_execution_history = list(self._execution_history)
         funds_by_currency = {curr: money for curr, money in self._account.list_funds_by_currency()}
 
-        # PROCESS SLICES
-        for i, fill_slice in enumerate(fill_slices):
+        # PROCESS PROPOSED FILLS
+        for i, proposed_fill in enumerate(proposed_fills):
             # COMPUTE: Next state and affordability requirements
-            # Note: 'qty_after' is the position quantity after applying this slice
-            signed_qty = fill_slice.quantity if order.is_buy else -fill_slice.quantity
+            # Note: 'qty_after' is the position quantity after applying this proposed fill
+            signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
             net_position_qty_after = net_position_qty + signed_qty
 
-            commission, initial_margin, maintenance_margin_after = self._compute_fill_slice_affordability(
+            commission, initial_margin, maintenance_margin_after = self._compute_proposed_fill_affordability(
                 order=order,
-                fill_slice=fill_slice,
+                proposed_fill=proposed_fill,
                 order_book=order_book,
                 timestamp=timestamp,
                 net_position_qty_before=net_position_qty,
@@ -526,7 +526,7 @@ class SimBroker(Broker, SimulatedBroker):
                 previous_executions=tuple(simulated_execution_history),
             )
 
-            # COMPUTE: Total funds required upfront for this specific slice
+            # COMPUTE: Total funds required upfront for this specific proposed fill
             required_funds = initial_margin + commission
             currency = required_funds.currency
             funds = funds_by_currency.get(currency, Money(0, currency))
@@ -537,53 +537,53 @@ class SimBroker(Broker, SimulatedBroker):
                 return False
 
             # COMPUTE: Verify maintenance margin requirement for the resulting position
-            # We must ensure that after paying for this slice, the account remains above maintenance levels.
+            # We must ensure that after paying for this proposed fill, the account remains above maintenance levels.
             maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_qty, timestamp=timestamp)
             maintenance_margin_delta = maintenance_margin_after.value - maintenance_margin_before.value
 
-            # Check: if maintenance requirement increases, do we have the extra buffer available?
+            # DECIDE: if maintenance requirement increases, do we have the extra buffer available?
             if maintenance_margin_delta > 0 and (funds.value - required_funds.value) < maintenance_margin_delta:
                 return False
 
-            # ACT (Simulated): Update tracking for the next slice iteration
+            # ACT (Simulated): Update tracking for the next proposed fill iteration
             # Subtract commission and any maintenance increase from the available simulation pool
             new_funds_value = funds.value - commission.value - max(0, maintenance_margin_delta)
             funds_by_currency[currency] = Money(new_funds_value, currency)
 
-            sim_exec = Execution(order=order, quantity=fill_slice.quantity, price=fill_slice.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
+            sim_exec = Execution(order=order, quantity=proposed_fill.quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
             simulated_execution_history.append(sim_exec)
             net_position_qty = net_position_qty_after
 
         return True
 
-    def _process_fill_slice(
+    def _process_proposed_fill(
         self,
         order: Order,
-        fill_slice: FillSlice,
+        proposed_fill: ProposedFill,
         order_book: OrderBook,
     ) -> None:
-        """Apply a single $fill_slice to $order using the broker's OrderBook.
+        """Apply a single $proposed_fill to $order using the broker's OrderBook.
 
         Note:
             Suffixes '_before' and '_after' refer to the state before and after applying
-            the current $fill_slice.
+            the current $proposed_fill.
 
-        Margin and funds policy (slice-by-slice):
+        Margin and funds policy (per proposed fill):
 
-        - Affordability is evaluated independently for each $fill_slice. For the current
-          slice, the broker computes the additional absolute position size introduced by this
+        - Affordability is evaluated independently for each $proposed_fill. For the current
+          proposed fill, the broker computes the additional absolute position size introduced by this
           trade and calls `MarginModel.compute_initial_margin` only for that incremental
           portion.
-        - Initial margin is blocked *incrementally* per slice, immediately before the
+        - Initial margin is blocked *incrementally* per proposed fill, immediately before the
           execution is recorded, and only when absolute position size increases.
-        - After recording the execution, initial margin blocked for this slice is
+        - After recording the execution, initial margin blocked for this proposed fill is
           released and the required maintenance margin for the post-trade net position
           is set instead.
-        - Commission is charged per slice using the configured `FeeModel`.
-        - If, at the moment of a slice, the account cannot fund the required initial
+        - Commission is charged per proposed fill using the configured `FeeModel`.
+        - If, at the moment of a proposed fill, the account cannot fund the required initial
           margin plus commission (all represented as $Money in a single
           settlement currency), OR if the resulting state would violate maintenance margin
-          requirements, the slice is rejected and the entire $order is immediately
+          requirements, the proposed fill is rejected and the entire $order is immediately
           terminalized via a CANCEL/ACCEPT transition.
 
         Steps:
@@ -597,7 +597,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         Args:
             order: Order being filled.
-            fill_slice: Single FillSlice to apply.
+            proposed_fill: Single ProposedFill to apply.
             order_book: Broker OrderBook snapshot used for matching and margin.
         """
         timestamp = order_book.timestamp
@@ -606,17 +606,17 @@ class SimBroker(Broker, SimulatedBroker):
         # VALIDATE
         # Precondition: ensure $order.instrument matches $order_book.instrument for pricing and margin
         if order.instrument != instrument:
-            raise ValueError(f"Cannot call `_process_fill_slice` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{instrument}')")
+            raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{instrument}')")
 
         # COMPUTE
         position_before = self.get_position(instrument)
         net_position_qty_before = position_before.quantity if position_before is not None else Decimal("0")
-        signed_qty = fill_slice.quantity if order.is_buy else -fill_slice.quantity
+        signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
         net_position_qty_after = net_position_qty_before + signed_qty
 
-        commission, initial_margin, maintenance_margin_after = self._compute_fill_slice_affordability(
+        commission, initial_margin, maintenance_margin_after = self._compute_proposed_fill_affordability(
             order=order,
-            fill_slice=fill_slice,
+            proposed_fill=proposed_fill,
             order_book=order_book,
             timestamp=timestamp,
             net_position_qty_before=net_position_qty_before,
@@ -641,9 +641,9 @@ class SimBroker(Broker, SimulatedBroker):
             has_enough_for_maintenance_increase = (funds_now.value - required_funds.value) >= maintenance_margin_delta
 
         if not has_enough_upfront or not has_enough_for_maintenance_increase:
-            self._handle_insufficient_funds_for_fill_slice(
+            self._handle_insufficient_funds_for_proposed_fill(
                 order=order,
-                fill_slice=fill_slice,
+                proposed_fill=proposed_fill,
                 commission=commission,
                 initial_margin=initial_margin,
                 maintenance_margin_delta=maintenance_margin_delta,
@@ -653,9 +653,9 @@ class SimBroker(Broker, SimulatedBroker):
             return
 
         # ACT
-        execution = self._commit_fill_slice_execution_and_accounting(
+        execution = self._commit_proposed_fill_execution_and_accounting(
             order=order,
-            fill_slice=fill_slice,
+            proposed_fill=proposed_fill,
             instrument=instrument,
             timestamp=timestamp,
             commission=commission,
@@ -666,18 +666,18 @@ class SimBroker(Broker, SimulatedBroker):
         self._handle_order_execution(execution)
         self._handle_order_update(order)
 
-    def _commit_fill_slice_execution_and_accounting(
+    def _commit_proposed_fill_execution_and_accounting(
         self,
         *,
         order: Order,
-        fill_slice: FillSlice,
+        proposed_fill: ProposedFill,
         instrument: Instrument,
         timestamp: datetime,
         commission: Money,
         initial_margin: Money,
         maintenance_margin_after: Money,
     ) -> Execution:
-        """Commit one fill slice to broker state and account state.
+        """Commit one proposed fill to broker state and account state.
 
         This method is intentionally side-effectful and contains the exact mutation order:
         block initial (if any) → record execution & update position/history → unblock initial → set maintenance → pay commission.
@@ -686,7 +686,7 @@ class SimBroker(Broker, SimulatedBroker):
         if can_block_initial_margin:
             self._account.block_initial_margin_for_instrument(instrument, initial_margin)
 
-        execution = order.add_execution(quantity=fill_slice.quantity, price=fill_slice.price, timestamp=timestamp, commission=commission)
+        execution = order.add_execution(quantity=proposed_fill.quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission)
         self._append_execution_to_history_and_update_position(execution)
 
         if can_block_initial_margin:
@@ -700,11 +700,11 @@ class SimBroker(Broker, SimulatedBroker):
 
         return execution
 
-    def _handle_insufficient_funds_for_fill_slice(
+    def _handle_insufficient_funds_for_proposed_fill(
         self,
         *,
         order: Order,
-        fill_slice: FillSlice,
+        proposed_fill: ProposedFill,
         commission: Money,
         initial_margin: Money,
         maintenance_margin_delta: Decimal,
@@ -718,33 +718,33 @@ class SimBroker(Broker, SimulatedBroker):
 
         required_funds = initial_margin + commission
 
-        logger.error(f"Reject FillSlice for Order '{order.id}': initial_margin={initial_margin}, commission={commission}, maintenance_margin_delta={maintenance_margin_delta}, required_funds={required_funds}, funds_now={funds_now}, best_bid={best_bid}, best_ask={best_ask}, qty={fill_slice.quantity}, price={fill_slice.price}, ts={timestamp}")
+        logger.error(f"Reject ProposedFill for Order '{order.id}': initial_margin={initial_margin}, commission={commission}, maintenance_margin_delta={maintenance_margin_delta}, required_funds={required_funds}, funds_now={funds_now}, best_bid={best_bid}, best_ask={best_ask}, qty={proposed_fill.quantity}, price={proposed_fill.price}, ts={timestamp}")
 
         self._apply_order_action(order, OrderAction.CANCEL)
         self._apply_order_action(order, OrderAction.ACCEPT)
 
-    def _compute_fill_slice_affordability(
+    def _compute_proposed_fill_affordability(
         self,
         *,
         order: Order,
-        fill_slice: FillSlice,
+        proposed_fill: ProposedFill,
         order_book: OrderBook,
         timestamp: datetime,
         net_position_qty_before: Decimal,
         net_position_qty_after: Decimal,
         previous_executions: tuple[Execution, ...],
     ) -> tuple[Money, Money, Money]:
-        """Compute absolute affordability requirements for a single $fill_slice.
+        """Compute absolute affordability requirements for a single $proposed_fill.
 
         Note:
             Suffixes '_before' and '_after' refer to the state before and after applying
-            the current $fill_slice.
+            the current $proposed_fill.
 
         Returns:
             A tuple of (commission, initial_margin, maintenance_margin).
         """
         # COMPUTE: Commission
-        commission = self._fee_model.compute_commission(order=order, price=fill_slice.price, quantity=fill_slice.quantity, timestamp=timestamp, previous_executions=previous_executions)
+        commission = self._fee_model.compute_commission(order=order, price=proposed_fill.price, quantity=proposed_fill.quantity, timestamp=timestamp, previous_executions=previous_executions)
 
         # COMPUTE: Incremental position size
         # Check: initial margin is only required if we are increasing the absolute size of the position
@@ -757,7 +757,7 @@ class SimBroker(Broker, SimulatedBroker):
         if position_size_increase > 0:
             initial_margin = self._margin_model.compute_initial_margin(order_book=order_book, trade_quantity=position_size_increase, is_buy=order.is_buy, timestamp=timestamp)
 
-        # COMPUTE: Total maintenance margin required after this slice
+        # COMPUTE: Total maintenance margin required after this proposed fill
         maintenance_margin = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_qty_after, timestamp=timestamp)
 
         return commission, initial_margin, maintenance_margin
@@ -958,7 +958,7 @@ class SimBroker(Broker, SimulatedBroker):
         Returns:
             A FillModel instance with deterministic, slightly pessimistic behavior that
             applies one tick of adverse slippage to market-like orders and never fills
-            pure on-touch limit slices.
+            pure on-touch limit proposed fills.
         """
         return DistributionFillModel(
             market_fill_adjustment_distribution={-1: Decimal("1.0")},  # 1-tick worse price with 100% chance
