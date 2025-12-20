@@ -488,74 +488,6 @@ class SimBroker(Broker, SimulatedBroker):
         # Default: Fill all available liquidity (do not expire unfilled part)
         return proposed_fills, False
 
-    def _has_enough_funds_for_proposed_fills(
-        self,
-        order: Order,
-        proposed_fills: list[ProposedFill],
-        order_book: OrderBook,
-    ) -> bool:
-        """Evaluate if the account has enough funds for margins and fees for all $proposed_fills (dry-run).
-
-        Note:
-            The loop evaluates required funds per proposed fill. Variables with '_after' or 'after'
-            represent the simulated state once the current $proposed_fill is applied.
-        """
-        # INITIALIZE STATE
-        timestamp = order_book.timestamp
-        instrument = order_book.instrument
-        current_position = self.get_position(instrument)
-        net_position_qty = current_position.quantity if current_position is not None else Decimal("0")
-
-        simulated_order_fill_history = list(self._order_fill_history)
-        funds_by_currency = {curr: money for curr, money in self._account.list_funds_by_currency()}
-
-        # PROCESS PROPOSED FILLS
-        for i, proposed_fill in enumerate(proposed_fills):
-            # COMPUTE: Next state and required funds
-            # Note: 'qty_after' is the position quantity after applying this proposed fill
-            signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
-            net_position_qty_after = net_position_qty + signed_qty
-
-            commission, initial_margin, maintenance_margin_after = self._compute_required_funds_for_proposed_fill(
-                order=order,
-                proposed_fill=proposed_fill,
-                order_book=order_book,
-                timestamp=timestamp,
-                net_position_qty_before=net_position_qty,
-                net_position_qty_after=net_position_qty_after,
-                previous_order_fills=tuple(simulated_order_fill_history),
-            )
-
-            # COMPUTE: Total funds required upfront for this specific proposed fill
-            required_funds = initial_margin + commission
-            currency = required_funds.currency
-            funds = funds_by_currency.get(currency, Money(0, currency))
-
-            # DECIDE: Can we fund the upfront costs?
-            # Check: ensure we have enough funds for initial margin and fees
-            if funds.value < required_funds.value:
-                return False
-
-            # COMPUTE: Verify maintenance margin requirement for the resulting position
-            # We must ensure that after paying for this proposed fill, the account remains above maintenance levels.
-            maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_qty, timestamp=timestamp)
-            maintenance_margin_delta = maintenance_margin_after.value - maintenance_margin_before.value
-
-            # DECIDE: if maintenance requirement increases, do we have the extra buffer available?
-            if maintenance_margin_delta > 0 and (funds.value - required_funds.value) < maintenance_margin_delta:
-                return False
-
-            # ACT (Simulated): Update tracking for the next proposed fill iteration
-            # Subtract commission and any maintenance increase from the available simulation pool
-            new_funds_value = funds.value - commission.value - max(0, maintenance_margin_delta)
-            funds_by_currency[currency] = Money(new_funds_value, currency)
-
-            sim_order_fill = OrderFill(order=order, quantity=proposed_fill.quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
-            simulated_order_fill_history.append(sim_order_fill)
-            net_position_qty = net_position_qty_after
-
-        return True
-
     def _process_proposed_fill(
         self,
         order: Order,
@@ -700,28 +632,75 @@ class SimBroker(Broker, SimulatedBroker):
 
         return order_fill
 
-    def _handle_insufficient_funds_for_proposed_fill(
+    # FUNDS-CENTRIC VALIDATION
+
+    def _has_enough_funds_for_proposed_fills(
         self,
-        *,
         order: Order,
-        proposed_fill: ProposedFill,
-        commission: Money,
-        initial_margin: Money,
-        maintenance_margin_delta: Decimal,
+        proposed_fills: list[ProposedFill],
         order_book: OrderBook,
-        funds_now: Money,
-    ) -> None:
-        """Cancel $order and log a one-line message with all required funds components."""
+    ) -> bool:
+        """Evaluate if the account has enough funds for margins and fees for all $proposed_fills (dry-run).
+
+        Note:
+            The loop evaluates required funds per proposed fill. Variables with '_after' or 'after'
+            represent the simulated state once the current $proposed_fill is applied.
+        """
+        # INITIALIZE STATE
         timestamp = order_book.timestamp
-        best_bid = order_book.best_bid.price
-        best_ask = order_book.best_ask.price
+        instrument = order_book.instrument
+        current_position = self.get_position(instrument)
+        net_position_qty = current_position.quantity if current_position is not None else Decimal("0")
 
-        required_funds = initial_margin + commission
+        simulated_order_fill_history = list(self._order_fill_history)
+        funds_by_currency = {curr: money for curr, money in self._account.list_funds_by_currency()}
 
-        logger.error(f"Reject ProposedFill for Order '{order.id}': initial_margin={initial_margin}, commission={commission}, maintenance_margin_delta={maintenance_margin_delta}, required_funds={required_funds}, funds_now={funds_now}, best_bid={best_bid}, best_ask={best_ask}, qty={proposed_fill.quantity}, price={proposed_fill.price}, ts={timestamp}")
+        # PROCESS PROPOSED FILLS
+        for i, proposed_fill in enumerate(proposed_fills):
+            # COMPUTE: Next state and required funds
+            # Note: 'qty_after' is the position quantity after applying this proposed fill
+            signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
+            net_position_qty_after = net_position_qty + signed_qty
 
-        self._apply_order_action(order, OrderAction.CANCEL)
-        self._apply_order_action(order, OrderAction.ACCEPT)
+            commission, initial_margin, maintenance_margin_after = self._compute_required_funds_for_proposed_fill(
+                order=order,
+                proposed_fill=proposed_fill,
+                order_book=order_book,
+                timestamp=timestamp,
+                net_position_qty_before=net_position_qty,
+                net_position_qty_after=net_position_qty_after,
+                previous_order_fills=tuple(simulated_order_fill_history),
+            )
+
+            # COMPUTE: Total funds required upfront for this specific proposed fill
+            required_funds = initial_margin + commission
+            currency = required_funds.currency
+            funds = funds_by_currency.get(currency, Money(0, currency))
+
+            # DECIDE: Can we fund the upfront costs?
+            # Check: ensure we have enough funds for initial margin and fees
+            if funds.value < required_funds.value:
+                return False
+
+            # COMPUTE: Verify maintenance margin requirement for the resulting position
+            # We must ensure that after paying for this proposed fill, the account remains above maintenance levels.
+            maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_qty, timestamp=timestamp)
+            maintenance_margin_delta = maintenance_margin_after.value - maintenance_margin_before.value
+
+            # DECIDE: if maintenance requirement increases, do we have the extra buffer available?
+            if maintenance_margin_delta > 0 and (funds.value - required_funds.value) < maintenance_margin_delta:
+                return False
+
+            # ACT (Simulated): Update tracking for the next proposed fill iteration
+            # Subtract commission and any maintenance increase from the available simulation pool
+            new_funds_value = funds.value - commission.value - max(0, maintenance_margin_delta)
+            funds_by_currency[currency] = Money(new_funds_value, currency)
+
+            sim_order_fill = OrderFill(order=order, quantity=proposed_fill.quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
+            simulated_order_fill_history.append(sim_order_fill)
+            net_position_qty = net_position_qty_after
+
+        return True
 
     def _compute_required_funds_for_proposed_fill(
         self,
@@ -753,6 +732,29 @@ class SimBroker(Broker, SimulatedBroker):
         maintenance_margin = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_qty_after, timestamp=timestamp)
 
         return commission, initial_margin, maintenance_margin
+
+    def _handle_insufficient_funds_for_proposed_fill(
+        self,
+        *,
+        order: Order,
+        proposed_fill: ProposedFill,
+        commission: Money,
+        initial_margin: Money,
+        maintenance_margin_delta: Decimal,
+        order_book: OrderBook,
+        funds_now: Money,
+    ) -> None:
+        """Cancel $order and log a one-line message with all required funds components."""
+        timestamp = order_book.timestamp
+        best_bid = order_book.best_bid.price
+        best_ask = order_book.best_ask.price
+
+        required_funds = initial_margin + commission
+
+        logger.error(f"Reject ProposedFill for Order '{order.id}': initial_margin={initial_margin}, commission={commission}, maintenance_margin_delta={maintenance_margin_delta}, required_funds={required_funds}, funds_now={funds_now}, best_bid={best_bid}, best_ask={best_ask}, qty={proposed_fill.quantity}, price={proposed_fill.price}, ts={timestamp}")
+
+        self._apply_order_action(order, OrderAction.CANCEL)
+        self._apply_order_action(order, OrderAction.ACCEPT)
 
     def _append_order_fill_to_history_and_update_position(self, order_fill: OrderFill) -> None:
         """Append $order_fill to order_fill history and update Position.
