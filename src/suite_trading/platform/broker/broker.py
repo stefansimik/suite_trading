@@ -14,6 +14,7 @@ Multiple accounts are modelled by multiple Broker instances, typically added to 
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Protocol, runtime_checkable, TYPE_CHECKING, Callable
 
 from suite_trading.platform.broker.account import Account
@@ -209,6 +210,20 @@ class Broker(Protocol):
         Returns:
             Position | None: Current Position for $instrument in this Broker's
             account, or None if there is no open exposure.
+        """
+        ...
+
+    def get_position_quantity(self, instrument: Instrument) -> Decimal:
+        """Retrieve the current net position quantity for $instrument (0 if flat).
+
+        This is a helper method that returns `Decimal("0")` if there is no open
+        exposure, avoiding the need for `None` checks in calling code.
+
+        Args:
+            instrument: Instrument to look up.
+
+        Returns:
+            Decimal: Current net quantity (positive for long, negative for short, 0 if flat).
         """
         ...
 

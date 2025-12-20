@@ -286,7 +286,9 @@ class SimBroker(Broker, SimulatedBroker):
         return [p for p in self._position_by_instrument.values() if not p.is_flat]
 
     def get_position(self, instrument: Instrument) -> Position | None:
-        """Retrieve the current Position for $instrument, or None if flat.
+        """Implements: Broker.get_position
+
+        Retrieve the current Position for $instrument, or None if flat.
 
         The returned Position is broker-maintained for this simulated account;
         treat it as read-only.
@@ -298,6 +300,20 @@ class SimBroker(Broker, SimulatedBroker):
             Position | None: Current Position for $instrument, or None if no open exposure.
         """
         return self._position_by_instrument.get(instrument)
+
+    def get_position_quantity(self, instrument: Instrument) -> Decimal:
+        """Implements: Broker.get_position_quantity
+
+        Retrieve the current net position quantity for $instrument (0 if flat).
+
+        Args:
+            instrument: Instrument to look up.
+
+        Returns:
+            Decimal: Current net quantity (positive for long, negative for short, 0 if flat).
+        """
+        position = self.get_position(instrument)
+        return position.quantity if position is not None else Decimal("0")
 
     def get_account(self) -> Account:
         """Implements: Broker.get_account
@@ -541,8 +557,7 @@ class SimBroker(Broker, SimulatedBroker):
             raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{instrument}')")
 
         # COMPUTE
-        position_before = self.get_position(instrument)
-        net_position_qty_before = position_before.quantity if position_before is not None else Decimal("0")
+        net_position_qty_before = self.get_position_quantity(instrument)
         signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
         net_position_qty_after = net_position_qty_before + signed_qty
 
@@ -649,8 +664,7 @@ class SimBroker(Broker, SimulatedBroker):
         # INITIALIZE STATE
         timestamp = order_book.timestamp
         instrument = order_book.instrument
-        current_position = self.get_position(instrument)
-        net_position_qty = current_position.quantity if current_position is not None else Decimal("0")
+        net_position_qty = self.get_position_quantity(instrument)
 
         simulated_order_fill_history = list(self._order_fill_history)
         funds_by_currency = {curr: money for curr, money in self._account.list_funds_by_currency()}

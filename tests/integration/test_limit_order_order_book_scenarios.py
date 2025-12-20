@@ -84,9 +84,7 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_enabled() -> None:
     assert total_filled_quantity == Decimal("5")
 
     # Position should be long 5 units on the instrument
-    position = broker.get_position(order_book.instrument)
-    assert position is not None
-    assert position.quantity == Decimal("5")
+    assert broker.get_position_quantity(order_book.instrument) == Decimal("5")
 
 
 def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_disabled() -> None:
@@ -120,8 +118,7 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_disabled() -> None:
     assert len(order_fills) == 0
 
     # Position should remain flat on the instrument
-    position = broker.get_position(order_book.instrument)
-    assert position is None or position.quantity == Decimal("0")
+    assert broker.get_position_quantity(order_book.instrument) == Decimal("0")
 
 
 def test_buy_limit_with_three_ask_levels_partial_fill_up_to_limit_price() -> None:
@@ -161,9 +158,7 @@ def test_buy_limit_with_three_ask_levels_partial_fill_up_to_limit_price() -> Non
     total_filled_quantity = sum(Decimal(order_fill.quantity) for order_fill in order_fills)
     assert total_filled_quantity == Decimal("8")
 
-    position = broker.get_position(order_book.instrument)
-    assert position is not None
-    assert position.quantity == Decimal("8")
+    assert broker.get_position_quantity(order_book.instrument) == Decimal("8")
 
     order = strategy.submitted_order
     assert order is not None

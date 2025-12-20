@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Callable, TYPE_CHECKING
 
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.strategy.strategy import Strategy
@@ -19,6 +20,11 @@ from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.market_data.order_book.order_book import OrderBook
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.domain.order.orders import Order
+
+if TYPE_CHECKING:
+    from suite_trading.platform.broker.account import Account
+    from suite_trading.domain.order.order_fill import OrderFill
+    from suite_trading.platform.broker.position import Position
 
 
 # region Mock Components
@@ -59,6 +65,42 @@ class MockOrderBookDrivenBroker(Broker):
     def modify_order(self, order: Order) -> None:
         """No-op order modification."""
         pass
+
+    def is_connected(self) -> bool:
+        """No-op connection status."""
+        return True
+
+    def set_callbacks(
+        self,
+        on_order_fill: Callable[[OrderFill], None],
+        on_order_state_update: Callable[[Order], None],
+    ) -> None:
+        """No-op callback registration."""
+        pass
+
+    def list_active_orders(self) -> list[Order]:
+        """No-op list active orders."""
+        return []
+
+    def get_order(self, id: str) -> Order | None:
+        """No-op get order."""
+        return None
+
+    def list_open_positions(self) -> list[Position]:
+        """No-op list open positions."""
+        return []
+
+    def get_position(self, instrument: Instrument) -> Position | None:
+        """No-op get position."""
+        return None
+
+    def get_position_quantity(self, instrument: Instrument) -> Decimal:
+        """No-op get position quantity."""
+        return Decimal("0")
+
+    def get_account(self) -> Account:
+        """No-op get account."""
+        raise NotImplementedError
 
 
 class RecordingStrategy(Strategy):
