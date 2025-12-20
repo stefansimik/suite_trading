@@ -510,9 +510,14 @@ class TradingEngine:
             raise ValueError(f"Cannot stop engine in state {self.state.name}. Valid actions: {valid_actions}")
 
         try:
-            # Firsr: Stop all strategies and clean up their event-feeds
+            # Use reversed (LIFO) order for shutdown to ensure that dependents (registered later)
+            # are stopped before their dependencies (registered earlier). This respects the
+            # implicit dependency graph of the trading system and prevents race conditions
+            # during cleanup (e.g., dependents unsubscribing from already-closed dependencies).
+
+            # First: Stop all strategies and clean up their event-feeds
             stopped = 0
-            for strategy_name, strategy in list(self._strategies_by_name_bidict.items()):
+            for strategy_name, strategy in reversed(list(self._strategies_by_name_bidict.items())):
                 if strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
                     self.stop_strategy(strategy_name)
                     logger.info(f"Stopped Strategy named '{strategy_name}' (class {strategy.__class__.__name__})")
@@ -520,14 +525,14 @@ class TradingEngine:
 
             # Second: Disconnect brokers
             disconnected_brokers = 0
-            for broker_name, broker in self._brokers_by_name_bidict.items():
+            for broker_name, broker in reversed(list(self._brokers_by_name_bidict.items())):
                 broker.disconnect()
                 logger.info(f"Disconnected Broker named '{broker_name}' (class {broker.__class__.__name__})")
                 disconnected_brokers += 1
 
             # Last: Disconnect event-feed-providers
             disconnected_providers = 0
-            for provider_name, provider in self._event_feed_providers_by_name_bidict.items():
+            for provider_name, provider in reversed(list(self._event_feed_providers_by_name_bidict.items())):
                 provider.disconnect()
                 logger.info(f"Disconnected EventFeedProvider named '{provider_name}' (class {provider.__class__.__name__})")
                 disconnected_providers += 1
@@ -841,9 +846,10 @@ class TradingEngine:
     def _close_and_remove_all_feeds_for_strategy(self, strategy: Strategy) -> None:
         strategy_name = self._get_strategy_name(strategy)
 
-        # Close all feeds for this Strategy
+        # Close all feeds for this Strategy. Use reversed (LIFO) order to ensure that
+        # dependent feeds (like aggregators) are closed before their source feeds.
         event_feeds_by_name_dict = self._event_feeds_by_strategy[strategy]
-        for name, registration in list(event_feeds_by_name_dict.items()):
+        for name, registration in reversed(list(event_feeds_by_name_dict.items())):
             try:
                 feed = registration.feed
                 feed.close()

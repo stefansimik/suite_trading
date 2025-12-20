@@ -99,7 +99,6 @@ class FixedSequenceEventFeed:
         if self._closed:
             return
         self._event_deque.clear()
-        self._listeners.clear()
         self._closed = True
 
     def remove_events_before(self, cutoff_time: datetime) -> None:

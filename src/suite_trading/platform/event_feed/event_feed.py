@@ -71,6 +71,26 @@ class EventFeed(Protocol):
         """
         ...
 
+    def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
+        """Register a listener for events consumed from this feed.
+
+        Notes:
+            Listeners are invoked by TradingEngine after each successful pop() from this feed.
+
+        Args:
+            key (str): Unique identifier for the listener.
+            listener (Callable[[Event], None]): Callback called with the popped Event.
+        """
+        ...
+
+    def remove_listener(self, key: str) -> None:
+        """Unregister listener under $key.
+
+        Args:
+            key (str): Key of the listener to remove.
+        """
+        ...
+
     def list_listeners(self) -> list[Callable[[Event], None]]:
         """Return all registered listeners for this EventFeed in registration order."""
         ...
