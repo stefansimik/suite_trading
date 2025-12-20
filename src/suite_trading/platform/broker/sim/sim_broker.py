@@ -348,19 +348,16 @@ class SimBroker(Broker, SimulatedBroker):
         if self._timeline_dt != order_book.timestamp:
             raise ValueError(f"Cannot call `process_order_book` because $timeline_dt ({format_dt(self._timeline_dt)}) does not match $order_book.timestamp ({format_dt(order_book.timestamp)}). TradingEngine must call `set_timeline_dt(order_book.timestamp)` immediately before calling `process_order_book`")
 
-        # Enrich with depth model and treat the result as the broker's current OrderBook snapshot
+        # Reusable variables
+        instrument = order_book.instrument
+
+        # Enrich OrderBook (simulates customizable liquidity)
         enriched_order_book = self._depth_model.enrich_order_book(order_book)
-
-        # This handles redundant updates (e.g., multiple bar at same time with same price).
-        last_processed_book = self._latest_order_book_by_instrument.get(enriched_order_book.instrument)
-        if last_processed_book == enriched_order_book:
-            return
-
-        # Store latest broker OrderBook snapshot (already enriched)
-        self._latest_order_book_by_instrument[enriched_order_book.instrument] = enriched_order_book
+        # Store OrderBook
+        self._latest_order_book_by_instrument[instrument] = enriched_order_book
 
         # Single pass per order: trigger stop-like orders, then simulate fills if fillable
-        orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument == enriched_order_book.instrument]
+        orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument == instrument]
         for order in orders_for_instrument:
             self._match_order_against_order_book(order, enriched_order_book)
 
