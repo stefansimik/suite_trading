@@ -19,7 +19,7 @@ from suite_trading.utils.data_generation.assistant import DGA
 logger = logging.getLogger(__name__)
 
 
-class TestStrategy(Strategy):
+class RecordingStrategy(Strategy):
     """Strategy wiring a 1‑minute source feed to a 5‑minute aggregator (defaults).
 
     Records counts and end timestamps of emitted 5‑minute bar for assertions.
@@ -124,7 +124,7 @@ def test_1m_to_5m_emits_end_minutes(
     base_day = datetime(2025, 1, 2, tzinfo=timezone.utc)
     event_feed_1min_bars = build_feed_from_minute_ends(base_day=base_day, end_minutes=input_1min_bars)
 
-    strategy = TestStrategy(name="test_strategy", source_feed_1_min=event_feed_1min_bars)
+    strategy = RecordingStrategy(name="test_strategy", source_feed_1_min=event_feed_1min_bars)
     engine.add_strategy(strategy)
 
     engine.start()

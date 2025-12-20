@@ -76,7 +76,7 @@ def boundary_dt_for_target(
 # region Strategy
 
 
-class TestStrategy(Strategy):
+class RecordingStrategy(Strategy):
     """Strategy wiring a source feed to a TimeBarAggregationEventFeed.
 
     Records only aggregated NewBarEvent(s) matching the target period.
@@ -208,7 +208,7 @@ def test_time_bar_aggregation_single_boundary_emits_and_type_is_correct(
         end_times=[boundary],
     )
 
-    strategy = TestStrategy(name="probe", source_feed=feed, target=target)
+    strategy = RecordingStrategy(name="probe", source_feed=feed, target=target)
     engine.add_strategy(strategy)
 
     engine.start()
@@ -278,7 +278,7 @@ def test_time_bar_aggregation_spans_five_intervals_with_many_inputs(
         end_times=end_times,
     )
 
-    strategy = TestStrategy(name="test_strategy", source_feed=feed, target=target)
+    strategy = RecordingStrategy(name="test_strategy", source_feed=feed, target=target)
     engine.add_strategy(strategy)
 
     engine.start()

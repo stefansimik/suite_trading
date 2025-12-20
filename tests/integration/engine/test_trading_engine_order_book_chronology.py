@@ -61,7 +61,7 @@ class MockOrderBookDrivenBroker(Broker):
         pass
 
 
-class TestStrategy(Strategy):
+class RecordingStrategy(Strategy):
     """Test strategy that records all received events."""
 
     def __init__(self, name: str):
@@ -126,7 +126,7 @@ def test_order_book_chronology_with_mixed_tick_and_bar_feeds():
     # Create test components
     instrument = create_test_instrument()
     mock_broker = MockOrderBookDrivenBroker()
-    strategy = TestStrategy("test_strategy")
+    strategy = RecordingStrategy("test_strategy")
     engine = TradingEngine()
 
     # Add broker and strategy to engine
@@ -225,7 +225,7 @@ def test_order_book_chronology_with_delayed_bars():
     # Create test components
     instrument = create_test_instrument()
     mock_broker = MockOrderBookDrivenBroker()
-    strategy = TestStrategy("test_strategy")
+    strategy = RecordingStrategy("test_strategy")
     engine = TradingEngine()
 
     # Add broker and strategy to engine
