@@ -31,7 +31,7 @@ class BookLevel(NamedTuple):
 class ProposedFill(NamedTuple):
     """Represents a pre-fee fill: how much filled and at what price.
 
-    This is intentionally an execution-like piece of information with only $quantity and $price.
+    This is intentionally a fill-like piece of information with only $quantity and $price.
     It is used during matching to describe fills before fees, margins, or accounting are applied
     by the broker.
     """

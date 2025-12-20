@@ -41,7 +41,7 @@ class DistributionFillModel:
        - This models queue uncertainty at the limit price while keeping crossed prices
          deterministic.
 
-    The per-fill independent sampling creates realistic variance in execution quality,
+    The per-fill independent sampling creates realistic variance in order_fill quality,
     where different portions of the same order can have different outcomes.
 
     Examples:

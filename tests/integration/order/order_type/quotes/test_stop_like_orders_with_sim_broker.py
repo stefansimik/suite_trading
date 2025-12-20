@@ -47,7 +47,7 @@ class _StopLikeOrderLifecycleStrategy(Strategy):
             self._submitted_order = order
             self.submit_order(order, self._broker)
 
-    def on_order_updated(self, order: Order) -> None:
+    def on_order_state_update(self, order: Order) -> None:
         submitted = self._submitted_order
         if submitted is None:
             return
@@ -116,10 +116,10 @@ def test_stop_market_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
 
     # Assert: order is filled and cleaned up
     assert len(broker.list_active_orders()) == 0
-    executions = engine.list_executions_for_strategy("stop_market_order_lifecycle")
-    assert len(executions) == 1
-    assert executions[0].order.is_fully_filled
-    assert executions[0].price == Decimal("100.00")
+    order_fills = engine.list_order_fills_for_strategy("stop_market_order_lifecycle")
+    assert len(order_fills) == 1
+    assert order_fills[0].order.is_fully_filled
+    assert order_fills[0].price == Decimal("100.00")
 
     submitted_order = strategy.submitted_order
     assert submitted_order is not None
@@ -160,10 +160,10 @@ def test_stop_limit_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
 
     # Assert: order is filled and cleaned up
     assert len(broker.list_active_orders()) == 0
-    executions = engine.list_executions_for_strategy("stop_limit_order_lifecycle")
-    assert len(executions) == 1
-    assert executions[0].order.is_fully_filled
-    assert executions[0].price == Decimal("100.00")
+    order_fills = engine.list_order_fills_for_strategy("stop_limit_order_lifecycle")
+    assert len(order_fills) == 1
+    assert order_fills[0].order.is_fully_filled
+    assert order_fills[0].price == Decimal("100.00")
 
     submitted_order = strategy.submitted_order
     assert submitted_order is not None

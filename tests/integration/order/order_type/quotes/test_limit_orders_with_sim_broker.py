@@ -95,10 +95,10 @@ def test_limit_buy_crossing_best_ask_fills_immediately() -> None:
 
     # Assert: marketable limit order fills immediately and becomes terminal
     assert len(broker.list_active_orders()) == 0
-    executions = engine.list_executions_for_strategy("limit_reject")
-    assert len(executions) == 1
-    assert executions[0].order.is_fully_filled
-    assert executions[0].price == Decimal("100.00")
+    order_fills = engine.list_order_fills_for_strategy("limit_reject")
+    assert len(order_fills) == 1
+    assert order_fills[0].order.is_fully_filled
+    assert order_fills[0].price == Decimal("100.00")
     submitted_order = limit_order_strategy.submitted_order
     assert submitted_order is not None
     assert submitted_order.state == OrderState.FILLED
@@ -126,10 +126,10 @@ def test_limit_instant_fill_touch() -> None:
 
     # Assert: filled once and terminal
     assert len(broker.list_active_orders()) == 0
-    executions = engine.list_executions_for_strategy("limit_instant_fill")
-    assert len(executions) == 1
-    assert executions[0].order.is_fully_filled
-    assert executions[0].price == Decimal("99.98")
+    order_fills = engine.list_order_fills_for_strategy("limit_instant_fill")
+    assert len(order_fills) == 1
+    assert order_fills[0].order.is_fully_filled
+    assert order_fills[0].price == Decimal("99.98")
 
 
 def test_limit_multiple_partial_fills() -> None:
@@ -150,17 +150,17 @@ def test_limit_multiple_partial_fills() -> None:
     def create_limit_order(_: QuoteTickEvent) -> Order:
         return LimitOrder(instrument=instrument, side=OrderSide.BUY, quantity=Decimal("3"), limit_price=Decimal("100.00"))
 
-    limit_order_strategy = _LimitOrderTestStrategy(name="limit_partials", broker=broker, feed_name="executed_prices", quote_tick_events=quote_tick_events, order_factory=create_limit_order, remove_feed_after_submit=False)
+    limit_order_strategy = _LimitOrderTestStrategy(name="limit_partials", broker=broker, feed_name="fill_prices", quote_tick_events=quote_tick_events, order_factory=create_limit_order, remove_feed_after_submit=False)
     engine.add_strategy(limit_order_strategy)
 
     # Act
     engine.start()
 
-    # Assert: three executions with executed_prices following the feed and total quantity 3
+    # Assert: three order_fills with fill_prices following the feed and total quantity 3
     assert len(broker.list_active_orders()) == 0
-    executions = engine.list_executions_for_strategy("limit_partials")
-    assert len(executions) == 3
-    total_filled_quantity = sum(e.quantity for e in executions)
+    order_fills = engine.list_order_fills_for_strategy("limit_partials")
+    assert len(order_fills) == 3
+    total_filled_quantity = sum(e.quantity for e in order_fills)
     assert total_filled_quantity == Decimal("3")
-    executed_prices = [e.price for e in executions]
-    assert executed_prices == [Decimal("100.00"), Decimal("99.99"), Decimal("99.98")]
+    fill_prices = [e.price for e in order_fills]
+    assert fill_prices == [Decimal("100.00"), Decimal("99.99"), Decimal("99.98")]

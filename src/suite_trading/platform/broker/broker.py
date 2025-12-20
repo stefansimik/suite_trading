@@ -21,7 +21,7 @@ from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.position import Position
 
 if TYPE_CHECKING:
-    from suite_trading.domain.order.execution import Execution
+    from suite_trading.domain.order.order_fill import OrderFill
     from suite_trading.domain.instrument import Instrument
 
 
@@ -92,16 +92,16 @@ class Broker(Protocol):
 
     def set_callbacks(
         self,
-        on_execution: Callable[[Execution], None],
-        on_order_updated: Callable[[Order], None],
+        on_order_fill: Callable[[OrderFill], None],
+        on_order_state_update: Callable[[Order], None],
     ) -> None:
-        """Each broker has to report executions + order updates into TradingEngine
+        """Each broker has to report order fills and order state updates into TradingEngine.
 
         The Broker must invoke:
-         - `on_execution` callback, when a fill/partial-fill occurs
-         - `on_order_updated` callback, when an order changes state
+         - `on_order_fill` callback, when a fill/partial-fill occurs
+         - `on_order_state_update` callback, when an order changes state
 
-         When both happen for the same broker event, call `on_execution` first, then `on_order_updated`.
+         When both happen for the same broker event, call `on_order_fill` first, then `on_order_state_update`.
         """
         ...
 
@@ -110,10 +110,10 @@ class Broker(Protocol):
     # region Orders
 
     def submit_order(self, order: Order) -> None:
-        """Submit $order for execution.
+        """Submit $order for trading.
 
         Args:
-            order (Order): The order to submit for execution.
+            order (Order): The order to submit.
 
         Raises:
             ConnectionError: If not connected to broker.

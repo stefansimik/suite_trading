@@ -551,8 +551,8 @@ _process_proposed_fill(order, proposed_fill, order_book)
 │   └── funds_now = get_funds(...)
 ├── [DECIDE] IF not has_enough_funds(...): handle insufficient funds
 └── [ACT]
-    ├── execution = _commit_proposed_fill_execution_and_accounting(...)
-    ├── publish execution callback
+    ├── order_fill = _commit_proposed_fill_and_accounting(...)
+    ├── publish order fill callback
     └── _handle_order_update(order)
 ```
 
@@ -759,7 +759,7 @@ negative prices.
 
 **SimBroker usage:**
 
-- A `SimBroker` instance holds state for exactly one simulated account (orders, executions,
+- A `SimBroker` instance holds state for exactly one simulated account (orders, order fills,
   positions, account snapshot, last OrderBook per instrument).
 - To simulate multiple accounts you must create multiple `SimBroker` instances (for example,
   `"sim_portfolio"`, `"sim_A"`, `"sim_B"`) and register them under different names.
@@ -768,11 +768,11 @@ negative prices.
 
 **Responsibilities split:**
 
-- Brokers simulate realistic order lifecycle, execution, margin, and fee handling for their
+- Brokers simulate realistic order lifecycle, order fills, margin, and fee handling for their
   account.
-- `TradingEngine` records executions per Strategy and provides the raw data for backtest
+- `TradingEngine` records order fills per Strategy and provides the raw data for backtest
   statistics.
-- Reporting utilities should reconstruct per-Strategy and portfolio metrics from executions and
+- Reporting utilities should reconstruct per-Strategy and portfolio metrics from order fills and
   positions instead of embedding reporting into Broker implementations.
 
 # 8. Code Organization

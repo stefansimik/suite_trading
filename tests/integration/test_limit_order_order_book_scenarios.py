@@ -77,10 +77,10 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_enabled() -> None:
     # Act
     engine.start()
 
-    # Assert: exactly one execution of 5 units at or below limit price
-    executions = engine.list_executions_for_strategy(strategy_name)
-    assert len(executions) == 1
-    total_filled_quantity = sum(Decimal(execution.quantity) for execution in executions)
+    # Assert: exactly one order_fill of 5 units at or below limit price
+    order_fills = engine.list_order_fills_for_strategy(strategy_name)
+    assert len(order_fills) == 1
+    total_filled_quantity = sum(Decimal(order_fill.quantity) for order_fill in order_fills)
     assert total_filled_quantity == Decimal("5")
 
     # Position should be long 5 units on the instrument
@@ -115,9 +115,9 @@ def test_buy_limit_with_two_ask_levels__limit_fill_on_touch_disabled() -> None:
     # Act
     engine.start()
 
-    # Assert: no executions because on-touch fills are disabled
-    executions = engine.list_executions_for_strategy(strategy_name)
-    assert len(executions) == 0
+    # Assert: no order_fills because on-touch fills are disabled
+    order_fills = engine.list_order_fills_for_strategy(strategy_name)
+    assert len(order_fills) == 0
 
     # Position should remain flat on the instrument
     position = broker.get_position(order_book.instrument)
@@ -153,12 +153,12 @@ def test_buy_limit_with_three_ask_levels_partial_fill_up_to_limit_price() -> Non
     engine.start()
 
     # Assert: partial fills across ask levels up to $limit_price
-    executions = engine.list_executions_for_strategy(strategy_name)
-    assert len(executions) == 2
-    executed_prices = [Decimal(execution.price) for execution in executions]
-    assert executed_prices == [Decimal("100"), Decimal("101")]
+    order_fills = engine.list_order_fills_for_strategy(strategy_name)
+    assert len(order_fills) == 2
+    fill_prices = [Decimal(order_fill.price) for order_fill in order_fills]
+    assert fill_prices == [Decimal("100"), Decimal("101")]
 
-    total_filled_quantity = sum(Decimal(execution.quantity) for execution in executions)
+    total_filled_quantity = sum(Decimal(order_fill.quantity) for order_fill in order_fills)
     assert total_filled_quantity == Decimal("8")
 
     position = broker.get_position(order_book.instrument)

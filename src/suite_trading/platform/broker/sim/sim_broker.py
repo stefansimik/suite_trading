@@ -12,7 +12,7 @@ from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.order.orders import Order, StopMarketOrder, StopLimitOrder
 from suite_trading.domain.order.order_enums import TimeInForce
 from suite_trading.domain.order.order_state import OrderAction, OrderStateCategory, OrderState
-from suite_trading.domain.order.execution import Execution
+from suite_trading.domain.order.order_fill import OrderFill
 from suite_trading.domain.instrument import Instrument
 from suite_trading.platform.broker.position import Position
 from suite_trading.platform.broker.broker import Broker
@@ -42,7 +42,7 @@ class SimBroker(Broker, SimulatedBroker):
     order matching driven by OrderBook updates.
 
     - One `SimBroker` instance models exactly one simulated trading account.
-      All orders, executions, positions, and account balances stored here
+      All orders, order fills, positions, and account balances stored here
       belong to that single account.
     - To model multiple simulated accounts, create multiple `SimBroker`
       instances (for example, ``"sim_portfolio"``, ``"sim_strategy_A"``) and
@@ -93,14 +93,14 @@ class SimBroker(Broker, SimulatedBroker):
         self._fee_model: FeeModel = fee_model or self._build_default_fee_model()
         self._fill_model: FillModel = fill_model or self._build_default_fill_model()
 
-        # ORDERS, EXECUTIONS, POSITIONS for this simulated account instance
+        # ORDERS, ORDER FILLS, POSITIONS for this simulated account instance
         self._orders_by_id: dict[str, Order] = {}
-        self._execution_history: list[Execution] = []  # Track executions per Broker (account scope); allows implementing volume-tiered fees
+        self._order_fill_history: list[OrderFill] = []  # Track fills per Broker (account scope); allows implementing volume-tiered fees
         self._position_by_instrument: dict[Instrument, Position] = {}
 
-        # Callbacks (where this broker should propagate executions and orders-changes?)
-        self._execution_callback: Callable[[Execution], None] | None = None
-        self._order_updated_callback: Callable[[Order], None] | None = None
+        # Callbacks (where this broker should propagate fills and order-state updates?)
+        self._order_fill_callback: Callable[[OrderFill], None] | None = None
+        self._order_state_update_callback: Callable[[Order], None] | None = None
 
         # ACCOUNT for this simulated broker instance (single logical account)
         self._account: Account = SimAccount(id="SIM")
@@ -138,12 +138,12 @@ class SimBroker(Broker, SimulatedBroker):
 
     def set_callbacks(
         self,
-        on_execution: Callable[[Execution], None],
-        on_order_updated: Callable[[Order], None],
+        on_order_fill: Callable[[OrderFill], None],
+        on_order_state_update: Callable[[Order], None],
     ) -> None:
         """Register Engine callbacks for broker events."""
-        self._execution_callback = on_execution
-        self._order_updated_callback = on_order_updated
+        self._order_fill_callback = on_order_fill
+        self._order_state_update_callback = on_order_state_update
 
     def submit_order(self, order: Order) -> None:
         """Implements: Broker.submit_order
@@ -506,7 +506,7 @@ class SimBroker(Broker, SimulatedBroker):
         current_position = self.get_position(instrument)
         net_position_qty = current_position.quantity if current_position is not None else Decimal("0")
 
-        simulated_execution_history = list(self._execution_history)
+        simulated_order_fill_history = list(self._order_fill_history)
         funds_by_currency = {curr: money for curr, money in self._account.list_funds_by_currency()}
 
         # PROCESS PROPOSED FILLS
@@ -523,7 +523,7 @@ class SimBroker(Broker, SimulatedBroker):
                 timestamp=timestamp,
                 net_position_qty_before=net_position_qty,
                 net_position_qty_after=net_position_qty_after,
-                previous_executions=tuple(simulated_execution_history),
+                previous_order_fills=tuple(simulated_order_fill_history),
             )
 
             # COMPUTE: Total funds required upfront for this specific proposed fill
@@ -550,8 +550,8 @@ class SimBroker(Broker, SimulatedBroker):
             new_funds_value = funds.value - commission.value - max(0, maintenance_margin_delta)
             funds_by_currency[currency] = Money(new_funds_value, currency)
 
-            sim_exec = Execution(order=order, quantity=proposed_fill.quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
-            simulated_execution_history.append(sim_exec)
+            sim_order_fill = OrderFill(order=order, quantity=proposed_fill.quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
+            simulated_order_fill_history.append(sim_order_fill)
             net_position_qty = net_position_qty_after
 
         return True
@@ -575,8 +575,8 @@ class SimBroker(Broker, SimulatedBroker):
           trade and calls `MarginModel.compute_initial_margin` only for that incremental
           portion.
         - Initial margin is blocked *incrementally* per proposed fill, immediately before the
-          execution is recorded, and only when absolute position size increases.
-        - After recording the execution, initial margin blocked for this proposed fill is
+          order_fill is recorded, and only when absolute position size increases.
+        - After recording the order_fill, initial margin blocked for this proposed fill is
           released and the required maintenance margin for the post-trade net position
           is set instead.
         - Commission is charged per proposed fill using the configured `FeeModel`.
@@ -589,11 +589,11 @@ class SimBroker(Broker, SimulatedBroker):
         Steps:
         - compute affordability (commission, initial_margin, maintenance_margin)
         - block initial margin (only if position increases)
-        - create and store execution
+        - create and store order_fill
         - update Position
         - convert initial to maintenance margin
         - pay commission
-        - publish execution + update order
+        - publish order_fill + update order
 
         Args:
             order: Order being filled.
@@ -621,7 +621,7 @@ class SimBroker(Broker, SimulatedBroker):
             timestamp=timestamp,
             net_position_qty_before=net_position_qty_before,
             net_position_qty_after=net_position_qty_after,
-            previous_executions=tuple(self._execution_history),
+            previous_order_fills=tuple(self._order_fill_history),
         )
 
         required_funds = initial_margin + commission
@@ -653,7 +653,7 @@ class SimBroker(Broker, SimulatedBroker):
             return
 
         # ACT
-        execution = self._commit_proposed_fill_execution_and_accounting(
+        order_fill = self._commit_proposed_fill_and_accounting(
             order=order,
             proposed_fill=proposed_fill,
             instrument=instrument,
@@ -663,10 +663,10 @@ class SimBroker(Broker, SimulatedBroker):
             maintenance_margin_after=maintenance_margin_after,
         )
 
-        self._handle_order_execution(execution)
+        self._handle_order_fill(order_fill)
         self._handle_order_update(order)
 
-    def _commit_proposed_fill_execution_and_accounting(
+    def _commit_proposed_fill_and_accounting(
         self,
         *,
         order: Order,
@@ -676,29 +676,29 @@ class SimBroker(Broker, SimulatedBroker):
         commission: Money,
         initial_margin: Money,
         maintenance_margin_after: Money,
-    ) -> Execution:
+    ) -> OrderFill:
         """Commit one proposed fill to broker state and account state.
 
         This method is intentionally side-effectful and contains the exact mutation order:
-        block initial (if any) → record execution & update position/history → unblock initial → set maintenance → pay commission.
+        block initial (if any) → record order_fill & update position/history → unblock initial → set maintenance → pay commission.
         """
         can_block_initial_margin = initial_margin.value > 0
         if can_block_initial_margin:
             self._account.block_initial_margin_for_instrument(instrument, initial_margin)
 
-        execution = order.add_execution(quantity=proposed_fill.quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission)
-        self._append_execution_to_history_and_update_position(execution)
+        order_fill = order.add_fill(quantity=proposed_fill.quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission)
+        self._append_order_fill_to_history_and_update_position(order_fill)
 
         if can_block_initial_margin:
             self._account.unblock_initial_margin_for_instrument(instrument, initial_margin)
 
         self._account.set_maintenance_margin_for_instrument_position(instrument, maintenance_margin_after)
 
-        if execution.commission.value > 0:
-            fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {execution.quantity} Order ID / Execution ID: {execution.order.id} / {execution.id}"
-            self._account.pay_fee(execution.timestamp, execution.commission, fee_description)
+        if order_fill.commission.value > 0:
+            fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {order_fill.quantity} Order ID / OrderFill ID: {order_fill.order.id} / {order_fill.id}"
+            self._account.pay_fee(order_fill.timestamp, order_fill.commission, fee_description)
 
-        return execution
+        return order_fill
 
     def _handle_insufficient_funds_for_proposed_fill(
         self,
@@ -732,7 +732,7 @@ class SimBroker(Broker, SimulatedBroker):
         timestamp: datetime,
         net_position_qty_before: Decimal,
         net_position_qty_after: Decimal,
-        previous_executions: tuple[Execution, ...],
+        previous_order_fills: tuple[OrderFill, ...],
     ) -> tuple[Money, Money, Money]:
         """Compute absolute affordability requirements for a single $proposed_fill.
 
@@ -744,7 +744,7 @@ class SimBroker(Broker, SimulatedBroker):
             A tuple of (commission, initial_margin, maintenance_margin).
         """
         # COMPUTE: Commission
-        commission = self._fee_model.compute_commission(order=order, price=proposed_fill.price, quantity=proposed_fill.quantity, timestamp=timestamp, previous_executions=previous_executions)
+        commission = self._fee_model.compute_commission(order=order, price=proposed_fill.price, quantity=proposed_fill.quantity, timestamp=timestamp, previous_order_fills=previous_order_fills)
 
         # COMPUTE: Incremental position size
         # Check: initial margin is only required if we are increasing the absolute size of the position
@@ -762,21 +762,21 @@ class SimBroker(Broker, SimulatedBroker):
 
         return commission, initial_margin, maintenance_margin
 
-    def _append_execution_to_history_and_update_position(self, execution: Execution) -> None:
-        """Append $execution to execution history and update Position.
+    def _append_order_fill_to_history_and_update_position(self, order_fill: OrderFill) -> None:
+        """Append $order_fill to order_fill history and update Position.
 
-        Appends the provided $execution to the broker-maintained execution history (account scope),
+        Appends the provided $order_fill to the broker-maintained order_fill history (account scope),
         not to the `Order` object, then updates the per-instrument Position to reflect the new
         quantity and average price.
         """
-        order = execution.order
+        order = order_fill.order
         instrument = order.instrument
-        trade_qty: Decimal = Decimal(execution.quantity)
-        trade_price: Decimal = Decimal(execution.price)
+        trade_qty: Decimal = Decimal(order_fill.quantity)
+        trade_price: Decimal = Decimal(order_fill.price)
         signed_qty: Decimal = trade_qty if order.is_buy else -trade_qty
 
-        # Record execution to history
-        self._execution_history.append(execution)
+        # Record order_fill to history
+        self._order_fill_history.append(order_fill)
 
         # Update position for this instrument
         previous_position = self.get_position(instrument)
@@ -791,17 +791,17 @@ class SimBroker(Broker, SimulatedBroker):
         else:
             # Precondition: if $new_quantity is non-zero, we must have a $new_average_price
             if new_average_price is None:
-                raise RuntimeError(f"Cannot call `_append_execution_to_history_and_update_position` because $new_quantity ({new_quantity}) != 0 but $new_average_price is None")
+                raise RuntimeError(f"Cannot call `_append_order_fill_to_history_and_update_position` because $new_quantity ({new_quantity}) != 0 but $new_average_price is None")
 
             # Commit the new/updated Position for this instrument
             self._position_by_instrument[instrument] = Position(
                 instrument=instrument,
                 quantity=new_quantity,
                 average_price=new_average_price,
-                last_update=execution.timestamp,
+                last_update=order_fill.timestamp,
             )
 
-        logger.debug(f"Appended execution to history and updated Position for Instrument '{instrument}' (class {self.__class__.__name__}): prev_qty={previous_quantity}, new_qty={new_quantity}, trade_price={trade_price}")
+        logger.debug(f"Appended order_fill to history and updated Position for Instrument '{instrument}' (class {self.__class__.__name__}): prev_qty={previous_quantity}, new_qty={new_quantity}, trade_price={trade_price}")
 
     @staticmethod
     def _compute_new_position_after_trade(
@@ -891,15 +891,15 @@ class SimBroker(Broker, SimulatedBroker):
         if order.state_category == OrderStateCategory.TERMINAL:
             self._on_order_terminalized(order)
 
-    def _handle_order_execution(self, execution: Execution) -> None:
-        """Orchestrate all side effects of a new order execution.
+    def _handle_order_fill(self, order_fill: OrderFill) -> None:
+        """Orchestrate all side effects of a new order order_fill.
 
-        This is the single entry point for all post-execution logic.
+        This is the single entry point for all post-order_fill logic.
         """
-        self._publish_order_execution(execution)
+        self._publish_order_fill(order_fill)
 
     def _apply_order_action(self, order: Order, action: OrderAction) -> None:
-        """Apply $action to $order and publish `on_order_updated` if state changed.
+        """Apply $action to $order and publish `on_order_state_update` if state changed.
 
         This centralizes per-transition publishing so callers remain simple.
         """
@@ -912,13 +912,13 @@ class SimBroker(Broker, SimulatedBroker):
 
     def _publish_order_update(self, order: Order) -> None:
         """Notify listeners of order update."""
-        if self._order_updated_callback is not None:
-            self._order_updated_callback(order)
+        if self._order_state_update_callback is not None:
+            self._order_state_update_callback(order)
 
-    def _publish_order_execution(self, execution: Execution) -> None:
-        """Publish a new Execution emitted by an Order fill."""
-        if self._execution_callback is not None:
-            self._execution_callback(execution)
+    def _publish_order_fill(self, order_fill: OrderFill) -> None:
+        """Publish a new OrderFill emitted by an Order."""
+        if self._order_fill_callback is not None:
+            self._order_fill_callback(order_fill)
 
     def _on_order_terminalized(self, order: Order) -> None:
         """Perform internal cleanup for an order that reached a terminal state."""

@@ -28,7 +28,7 @@ class MarginModel(Protocol):
     simulation broker this is usually the same as $order_book.timestamp, but callers may
     pass a different time when they want to evaluate margin at another moment.
 
-    Per-fill execution and incremental blocking:
+    Per-fill order_fill and incremental blocking:
 
     - Simulated brokers such as SimBroker call `compute_initial_margin` per proposed fill,
       not once for the whole order. The $trade_quantity passed in is the additional

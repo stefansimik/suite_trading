@@ -11,7 +11,7 @@ from suite_trading.strategy.strategy_state_machine import StrategyState, Strateg
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
-    from suite_trading.domain.order.execution import Execution
+    from suite_trading.domain.order.order_fill import OrderFill
 
 logger = logging.getLogger(__name__)
 
@@ -342,12 +342,12 @@ class Strategy(ABC):
     # region Orders
 
     def submit_order(self, order: Order, broker: Broker) -> None:
-        """Submit an order for execution.
+        """Submit an order for trading.
 
         Allowed only when the strategy is RUNNING.
 
         Args:
-            order (Order): The order to submit for execution.
+            order (Order): The order to submit.
             broker (Broker): The broker to submit the order to.
 
         Raises:
@@ -408,21 +408,21 @@ class Strategy(ABC):
 
     # region Broker callbacks
 
-    def on_execution(self, execution: Execution) -> None:
-        """Called when an execution (fill/partial-fill) happens for $execution.order.
+    def on_order_fill(self, order_fill: OrderFill) -> None:
+        """Called when an OrderFill (fill/partial-fill) happens for $order_fill.order.
 
         Args:
-            execution: The execution that occurred.
+            order_fill: The order fill that occurred.
         """
-        logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received execution for Order $id ('{execution.order.id}')")
+        logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received Order fill for Order $id ('{order_fill.order.id}')")
 
-    def on_order_updated(self, order: Order) -> None:
-        """Called when $order changes one of its attributes (most common is filled/unfilled or order-state).
+    def on_order_state_update(self, order: Order) -> None:
+        """Called when $order changes one of its attributes (most common is filled/unfilled or order state).
 
         Args:
             order: The order that was updated.
         """
-        logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received order update for Order $id ('{order.id}')")
+        logger.debug(f"Strategy named '{self.name}' (class {self.__class__.__name__}) received order state update for Order $id ('{order.id}')")
 
     # endregion
 

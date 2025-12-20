@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
-from suite_trading.domain.order.execution import Execution
+from suite_trading.domain.order.order_fill import OrderFill
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
@@ -66,10 +66,10 @@ class TwoTradeDemoStrategy(Strategy):
                 # Request strategy stop by closing feed (engine will auto-stop it)
                 self.remove_event_feed(self._prices_feed_name)
 
-    def on_execution(self, execution: Execution) -> None:
+    def on_order_fill(self, order_fill: OrderFill) -> None:
         pass
 
-    def on_order_updated(self, order: Order) -> None:
+    def on_order_state_update(self, order: Order) -> None:
         pass
 
     @property
@@ -89,7 +89,7 @@ def test_two_trade_demo_strategy_steps_0_and_1():
     # Act
     engine.start()
 
-    # Assert: exactly two submissions resulted in executions (SELL then BUY)
+    # Assert: exactly two submissions resulted in order fills (SELL then BUY)
     # Note: broker.list_active_orders() will be empty because orders are filled (terminal)
     active = broker.list_active_orders()
     assert len(active) == 0, "All orders should be terminal and cleaned up"
@@ -97,14 +97,14 @@ def test_two_trade_demo_strategy_steps_0_and_1():
     # The Strategy should have processed at least 5 events and then stopped (feed closed)
     assert strategy.processed_event_count == 5
 
-    # Verify executions were tracked by TradingEngine
-    executions = engine.list_executions_for_strategy("two_trade_demo_strategy")
-    assert len(executions) == 2, "Engine should track exactly two executions"
+    # Verify order fills were tracked by TradingEngine
+    order_fills = engine.list_order_fills_for_strategy("two_trade_demo_strategy")
+    assert len(order_fills) == 2, "Engine should track exactly two order fills"
 
-    # First execution: SELL
-    assert executions[0].order.side == OrderSide.SELL
-    assert executions[0].quantity == Decimal("1")
+    # First order_fill: SELL
+    assert order_fills[0].order.side == OrderSide.SELL
+    assert order_fills[0].quantity == Decimal("1")
 
-    # Second execution: BUY
-    assert executions[1].order.side == OrderSide.BUY
-    assert executions[1].quantity == Decimal("1")
+    # Second order_fill: BUY
+    assert order_fills[1].order.side == OrderSide.BUY
+    assert order_fills[1].quantity == Decimal("1")

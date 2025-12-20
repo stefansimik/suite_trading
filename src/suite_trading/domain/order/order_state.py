@@ -61,7 +61,7 @@ class OrderAction(Action):
     UPDATE = "UPDATE"  # Ask to change price, quantity, or other order params
     CANCEL = "CANCEL"  # Ask the broker to cancel the order
 
-    # Execution actions
+    # Fill actions
     PARTIAL_FILL = "PARTIAL_FILL"  # Some quantity just filled; some remains unfilled
     FILL = "FILL"  # All remaining quantity just filled; order complete
 
@@ -116,7 +116,7 @@ def create_order_state_machine(initial_state: OrderState) -> StateMachine:
         (OrderState.PENDING_CANCEL, OrderAction.REJECT): OrderState.WORKING,  # cancel failed
         (OrderState.PENDING_CANCEL, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,
         (OrderState.PENDING_CANCEL, OrderAction.FILL): OrderState.FILLED,
-        # Execution state transitions
+        # Fill state transitions
         (OrderState.PARTIALLY_FILLED, OrderAction.UPDATE): OrderState.PENDING_UPDATE,
         (OrderState.PARTIALLY_FILLED, OrderAction.CANCEL): OrderState.PENDING_CANCEL,
         (OrderState.PARTIALLY_FILLED, OrderAction.PARTIAL_FILL): OrderState.PARTIALLY_FILLED,

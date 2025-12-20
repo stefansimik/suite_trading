@@ -79,7 +79,7 @@ class FixedRatioMarginModel(MarginModel):
     def _extract_price_from_order_book(self, order_book: OrderBook) -> Decimal:
         """Extract a representative price from OrderBook for margin calculations.
 
-        Uses execution price for zero-spread books, otherwise uses mid price.
+        Uses order_fill price for zero-spread books, otherwise uses mid price.
 
         Args:
             order_book: OrderBook to extract price from.

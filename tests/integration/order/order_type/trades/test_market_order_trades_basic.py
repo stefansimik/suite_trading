@@ -37,7 +37,7 @@ class _TradesSubmitInCallbackStrategy(Strategy):
     def __init__(self, name: str, broker: SimBroker):
         super().__init__(name)
         self._broker = broker
-        self.executions = []
+        self.order_fills = []
         self._submitted = False
 
     def on_start(self) -> None:
@@ -52,8 +52,8 @@ class _TradesSubmitInCallbackStrategy(Strategy):
             self.submit_order(MarketOrder(instr, OrderSide.SELL, D("2")), self._broker)
             self._submitted = True
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
         self.remove_event_feed("trades")
 
 
@@ -61,7 +61,7 @@ class _TradesSubmitBeforeTicksStrategy(Strategy):
     def __init__(self, name: str, broker: SimBroker):
         super().__init__(name)
         self._broker = broker
-        self.executions = []
+        self.order_fills = []
         self._submitted = False
         self._instr: Instrument | None = None
         self._t0: datetime | None = None
@@ -85,8 +85,8 @@ class _TradesSubmitBeforeTicksStrategy(Strategy):
             ticks = [TradeTickEvent(TradeTick(instr, D("250"), D("10"), t0), t0)]
             self.add_event_feed("trades", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
         self.remove_event_feed("trades")
 
 
@@ -94,7 +94,7 @@ class _TradesTwoOrdersSameTickStrategy(Strategy):
     def __init__(self, name: str, broker: SimBroker):
         super().__init__(name)
         self._broker = broker
-        self.executions = []
+        self.order_fills = []
         self._submitted = False
 
     def on_start(self) -> None:
@@ -110,9 +110,9 @@ class _TradesTwoOrdersSameTickStrategy(Strategy):
             self.submit_order(MarketOrder(instr, OrderSide.SELL, D("1")), self._broker)
             self._submitted = True
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
-        if len(self.executions) >= 2:
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
+        if len(self.order_fills) >= 2:
             self.remove_event_feed("trades")
 
 
@@ -127,8 +127,8 @@ class TestMarketOrderTradesBasic:
 
         engine.start()
 
-        assert len(s.executions) == 1
-        e = s.executions[0]
+        assert len(s.order_fills) == 1
+        e = s.order_fills[0]
         assert e.price == D("250")
 
     def test_submit_before_any_trade_fills_on_first_trade(self):
@@ -141,8 +141,8 @@ class TestMarketOrderTradesBasic:
 
         engine.start()
 
-        assert len(s.executions) == 1
-        assert s.executions[0].price == D("250")
+        assert len(s.order_fills) == 1
+        assert s.order_fills[0].price == D("250")
 
     def test_two_orders_same_tick_both_fill(self):
         """Two opposite orders on the same trade tick should both fill at that tick's price; both callbacks recorded."""
@@ -154,4 +154,4 @@ class TestMarketOrderTradesBasic:
 
         engine.start()
 
-        assert len(s.executions) == 2
+        assert len(s.order_fills) == 2

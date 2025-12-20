@@ -22,7 +22,7 @@ from suite_trading.utils.state_machine import StateMachine
 from suite_trading.utils.datetime_tools import format_dt
 
 if TYPE_CHECKING:
-    from suite_trading.domain.order.execution import Execution
+    from suite_trading.domain.order.order_fill import OrderFill
 
 
 logger = logging.getLogger(__name__)
@@ -102,8 +102,8 @@ class TradingEngine:
         # Orders
         self._routing_by_order: dict[Order, StrategyBrokerPair] = {}
 
-        # Executions
-        self._executions_by_strategy: dict[Strategy, list[Execution]] = {}
+        # Order fills
+        self._order_fills_by_strategy: dict[Strategy, list[OrderFill]] = {}
 
         # MODELS (EVENT → ORDER BOOK)
         # Converter used to transform market‑data `Event`(s) into `OrderBook` snapshot(s)
@@ -219,7 +219,7 @@ class TradingEngine:
             raise ValueError(f"Cannot call `add_broker` because Broker named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
         self._brokers_by_name_bidict[name] = broker
-        broker.set_callbacks(self._route_order_execution_to_strategy, self._route_order_update_to_strategy)
+        broker.set_callbacks(self._route_order_fill_to_strategy, self._route_order_update_to_strategy)
         logger.debug(f"TradingEngine added Broker named '{name}' (class {broker.__class__.__name__})")
 
         # No special registration for price-sample processing; capability is checked at use-site
@@ -301,8 +301,8 @@ class TradingEngine:
         # Set up EventFeed tracking for this strategy
         self._event_feeds_by_strategy[strategy] = {}
 
-        # Set up execution tracking for this strategy (keyed by Strategy instance)
-        self._executions_by_strategy[strategy] = []
+        # Set up order_fill tracking for this strategy (keyed by Strategy instance)
+        self._order_fills_by_strategy[strategy] = []
 
         # Mark strategy as added
         strategy._state_machine.execute_action(StrategyAction.ADD_STRATEGY_TO_ENGINE)
@@ -398,9 +398,9 @@ class TradingEngine:
         # Remove EventFeed tracking for this strategy
         del self._event_feeds_by_strategy[strategy]
 
-        # Remove execution tracking for this strategy
-        if strategy in self._executions_by_strategy:
-            del self._executions_by_strategy[strategy]
+        # Remove order_fill tracking for this strategy
+        if strategy in self._order_fills_by_strategy:
+            del self._order_fills_by_strategy[strategy]
 
         # Remove from strategies' dictionary
         del self._strategies_by_name_bidict[name]
@@ -426,24 +426,24 @@ class TradingEngine:
         """
         return list(self._strategies_by_name_bidict.keys())
 
-    def list_executions_for_strategy(self, strategy_name: str) -> list[Execution]:
-        """Return all executions for Strategy named $strategy_name.
+    def list_order_fills_for_strategy(self, strategy_name: str) -> list[OrderFill]:
+        """Return all order fills for Strategy named $strategy_name.
 
         Args:
-            strategy_name: Name of the Strategy to get executions for.
+            strategy_name: Name of the Strategy to get order fills for.
 
         Returns:
-            List of Execution objects in chronological order.
+            List of OrderFill objects in chronological order.
 
         Raises:
             KeyError: If $strategy_name is not registered in this TradingEngine.
         """
         # Precondition: ensure $strategy_name exists in this TradingEngine
         if strategy_name not in self._strategies_by_name_bidict:
-            raise KeyError(f"Cannot call `list_executions_for_strategy` because Strategy named '{strategy_name}' is not registered in this TradingEngine")
+            raise KeyError(f"Cannot call `list_order_fills_for_strategy` because Strategy named '{strategy_name}' is not registered in this TradingEngine")
 
         strategy = self._strategies_by_name_bidict[strategy_name]
-        return list(self._executions_by_strategy.get(strategy, []))
+        return list(self._order_fills_by_strategy.get(strategy, []))
 
     # endregion
 
@@ -942,7 +942,7 @@ class TradingEngine:
         """Get routing information for an order.
 
         Returns the Strategy and Broker associated with $order. The Strategy is the origin
-        that submitted the order and receives execution and order-state updates. The Broker
+        that submitted the order and receives order_fill and order-state updates. The Broker
         is responsible for executing the order.
 
         Args:
@@ -952,25 +952,25 @@ class TradingEngine:
         return route
 
     # Broker → Engine callbacks
-    def _route_order_execution_to_strategy(self, execution: Execution) -> None:
-        """Route execution update to originating Strategy."""
-        strategy, broker = self.get_routing_for_order(execution.order)
+    def _route_order_fill_to_strategy(self, order_fill: OrderFill) -> None:
+        """Route order_fill update to originating Strategy."""
+        strategy, broker = self.get_routing_for_order(order_fill.order)
 
         try:
-            strategy.on_execution(execution)
+            strategy.on_order_fill(order_fill)
         except Exception as e:
-            logger.error(f"Error in `Strategy.on_execution` for Strategy named '{strategy.name}' (class {strategy.__class__.__name__}): {e}")
+            logger.error(f"Error in `Strategy.on_order_fill` for Strategy named '{strategy.name}' (class {strategy.__class__.__name__}): {e}")
             self._transition_strategy_to_error(strategy, e)
 
-        # Store execution for later statistics
-        self._executions_by_strategy[strategy].append(execution)
+        # Store order_fill for later statistics
+        self._order_fills_by_strategy[strategy].append(order_fill)
 
     def _route_order_update_to_strategy(self, order: Order) -> None:
         """Route order state update to originating Strategy."""
         strategy, broker = self.get_routing_for_order(order)
 
         try:
-            strategy.on_order_updated(order)
+            strategy.on_order_state_update(order)
         except Exception as e:
             logger.error(f"Error in `Strategy.on_order_updated` for Strategy named '{strategy.name}' (class {strategy.__class__.__name__}): {e}")
             self._transition_strategy_to_error(strategy, e)

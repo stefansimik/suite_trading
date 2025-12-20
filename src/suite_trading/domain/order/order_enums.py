@@ -11,7 +11,7 @@ class OrderSide(Enum):
 
 
 class OrderType(Enum):
-    """Represents the type of order execution."""
+    """Represents the type of an order."""
 
     MARKET = "MARKET"  # Execute immediately at best available price
     LIMIT = "LIMIT"  # Execute only at specified price or better

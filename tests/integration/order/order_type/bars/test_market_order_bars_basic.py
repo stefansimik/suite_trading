@@ -35,7 +35,7 @@ class _BarsSubmitAtStartStrategy(Strategy):
         self._broker = broker
         self._bars: list | None = None
         self._submitted = False
-        self.executions = []
+        self.order_fills = []
 
     def on_start(self) -> None:
         # Prepare bar series but submit only when RUNNING using a kickoff event before first bar
@@ -55,8 +55,8 @@ class _BarsSubmitAtStartStrategy(Strategy):
             self.remove_event_feed("kick")
             self.add_event_feed("bar", FixedSequenceEventFeed(wrap_bars_to_events(self._bars)), use_for_simulated_fills=True)
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
 
 
 class _BarsSubmitInsideCallbackStrategy(Strategy):
@@ -66,7 +66,7 @@ class _BarsSubmitInsideCallbackStrategy(Strategy):
         super().__init__(name)
         self._broker = broker
         self._submitted = False
-        self.executions = []
+        self.order_fills = []
 
     def on_start(self) -> None:
         self._bars = DGA.bar.create_series(num_bars=5)
@@ -79,9 +79,9 @@ class _BarsSubmitInsideCallbackStrategy(Strategy):
             self.submit_order(order, self._broker)
             self._submitted = True
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
-        # Stop after first execution
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
+        # Stop after first order_fill
         self.remove_event_feed("bar")
 
 
@@ -93,7 +93,7 @@ class _BarsOpenCloseReverseStrategy(Strategy):
         self._broker = broker
         self._mode = mode  # "close" or "reverse"
         self._count = 0
-        self.executions = []
+        self.order_fills = []
 
     def on_start(self) -> None:
         self._bars = DGA.bar.create_series(num_bars=5)
@@ -110,10 +110,10 @@ class _BarsOpenCloseReverseStrategy(Strategy):
             else:
                 self.submit_order(MarketOrder(instr, OrderSide.SELL, D("2")), self._broker)
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
-        # Auto-stop when we have 2 executions for close, or 2 (open+reverse first leg) for reverse
-        if len(self.executions) >= 2:
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
+        # Auto-stop when we have 2 order_fills for close, or 2 (open+reverse first leg) for reverse
+        if len(self.order_fills) >= 2:
             self.remove_event_feed("bar")
 
 
@@ -128,8 +128,8 @@ class TestMarketOrderBarsBasic:
 
         engine.start()
 
-        assert len(s.executions) >= 1
-        first_exec = s.executions[0]
+        assert len(s.order_fills) >= 1
+        first_exec = s.order_fills[0]
         # Expect fill at OPEN of the first bar (converter emits OPEN first)
         bars = DGA.bar.create_series(num_bars=5)
         assert first_exec.price == bars[0].open
@@ -145,11 +145,11 @@ class TestMarketOrderBarsBasic:
 
         engine.start()
 
-        assert len(s.executions) == 1
+        assert len(s.order_fills) == 1
         bars = s._bars
         # Since engine processes OHLC before callback, immediate fill uses last processed snapshot (CLOSE)
-        assert s.executions[0].price == bars[0].close
-        assert s.executions[0].timestamp == bars[0].end_dt
+        assert s.order_fills[0].price == bars[0].close
+        assert s.order_fills[0].timestamp == bars[0].end_dt
 
     def test_open_then_close_and_reverse(self):
         """Open 1 on bar 1, then either close (SELL 1) or reverse (SELL 2); verify final position state for both flows."""
@@ -160,8 +160,8 @@ class TestMarketOrderBarsBasic:
         s_close = _BarsOpenCloseReverseStrategy("bars_close", broker, mode="close")
         engine.add_strategy(s_close)
         engine.start()
-        assert len(s_close.executions) == 2
-        pos = broker.get_position(s_close.executions[0].order.instrument)
+        assert len(s_close.order_fills) == 2
+        pos = broker.get_position(s_close.order_fills[0].order.instrument)
         assert pos is None or pos.is_flat
 
         # Reverse path
@@ -172,5 +172,5 @@ class TestMarketOrderBarsBasic:
         engine2.add_strategy(s_rev)
         engine2.start()
         # After BUY 1 then SELL 2, final position should be short 1
-        pos2 = broker2.get_position(s_rev.executions[0].order.instrument)
+        pos2 = broker2.get_position(s_rev.order_fills[0].order.instrument)
         assert pos2 is not None and pos2.is_short and pos2.quantity == D("-1")

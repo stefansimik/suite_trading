@@ -1,9 +1,11 @@
 from __future__ import annotations
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from suite_trading.domain.instrument import Instrument
-from suite_trading.domain.order.execution import Execution
+from suite_trading.domain.monetary.money import Money
+from suite_trading.domain.order.order_fill import OrderFill
 from suite_trading.domain.order.order_enums import OrderSide, TimeInForce
 from suite_trading.domain.order.order_state import (
     OrderState,
@@ -14,8 +16,6 @@ from suite_trading.domain.order.order_state import (
 )
 from suite_trading.utils.id_generator import get_next_id
 from suite_trading.utils.state_machine import StateMachine
-from datetime import datetime
-from suite_trading.domain.monetary.money import Money
 
 if TYPE_CHECKING:
     # No type-only imports needed in this module at the moment
@@ -72,13 +72,13 @@ class Order:
         self._side = side
         self._quantity = instrument.snap_quantity(quantity)
 
-        # Execution details (private attributes with public properties)
+        # Order lifecycle details (private attributes with public properties)
         self._time_in_force = time_in_force
         self._good_till_dt = good_till_dt
         self._submitted_dt: datetime | None = None
 
-        # Execution tracking (single source of truth)
-        self._executions: list[Execution] = []  # Chronological by append order
+        # Fill tracking (single source of truth)
+        self._fills: list[OrderFill] = []  # Chronological by append order
 
         # Internal state — created exactly once based on subclass-declared INITIAL_STATE
         self._state_machine: StateMachine = create_order_state_machine(initial_state=self.__class__.INITIAL_STATE)
@@ -144,13 +144,13 @@ class Order:
 
     @property
     def filled_quantity(self) -> Decimal:
-        """Total executed quantity across `executions`.
+        """Total filled quantity across recorded fills.
 
         Returns:
-            Decimal: Sum of execution quantities.
+            Decimal: Sum of all fill quantities.
         """
         total = Decimal("0")
-        for e in self._executions:
+        for e in self._fills:
             total += e.quantity
         return total
 
@@ -189,21 +189,21 @@ class Order:
 
     @property
     def average_fill_price(self) -> Decimal | None:
-        """Weighted average price (VWAP) of executions, or None if no fills.
+        """Weighted average fill price (VWAP), or None if there are no fills.
 
         Note:
             VWAP is not snapped to tick size; it may fall between ticks. Use
             presentation-layer formatting if you need display rounding.
 
         Returns:
-            Decimal | None: VWAP of executions, or None.
+            Decimal | None: VWAP of fills, or None.
         """
         filled = self.filled_quantity
         if filled == 0:
             return None
 
         notional = Decimal("0")
-        for e in self._executions:
+        for e in self._fills:
             notional += e.price * e.quantity
 
         avg_price = notional / filled
@@ -265,58 +265,65 @@ class Order:
 
     # region Main
 
-    def add_execution(
+    def add_fill(
         self,
         quantity: Decimal,
         price: Decimal,
         timestamp: datetime,
         commission: Money,
-    ) -> Execution:
-        """Create and record a new `Execution`, then advance `state` based on cumulative fills.
+    ) -> OrderFill:
+        """Create and record a new `OrderFill`, then advance `state` based on cumulative fills.
+
+        Ordering:
+            - The fill object is constructed and validated first.
+            - The order state transition is applied next.
+            - The fill is appended to `$self._fills` last.
+
+        This ordering ensures that if the state transition fails, no fill is recorded.
 
         This method keeps the `Order` internally consistent after a fill. Callers can read
         `self.state` or `self.state_category` after the call if they need the latest state.
 
         Args:
-            quantity: Executed quantity.
-            price: Execution price.
-            timestamp: When the execution occurred.
-            commission: Commission/fees for this execution.
+            quantity: Filled quantity.
+            price: Fill price.
+            timestamp: When the fill occurred.
+            commission: Commission/fees for this fill.
 
         Returns:
-            The created `Execution`.
+            The created `OrderFill`.
 
         Raises:
             ValueError: If `$state_category` is not FILLABLE for the current `$state`, or if the
-                transition is invalid. Validation and snapping are performed in `Execution`.
+                transition is invalid. Validation and snapping are performed in `OrderFill`.
         """
 
         # Precondition: allow fills only when $state_category is FILLABLE
         cat = self.state_category
         if cat is not OrderStateCategory.FILLABLE:
-            raise ValueError(f"Cannot call `add_execution` because $state_category ('{cat.name}') is not FILLABLE for $state ('{self.state}')")
+            raise ValueError(f"Cannot call `add_fill` because $state_category ('{cat.name}') is not FILLABLE for $state ('{self.state}')")
 
-        # Create execution
-        child_id = f"{self.id}-{len(self._executions) + 1}"
-        execution = Execution(order=self, quantity=quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
+        # Create fill
+        child_id = f"{self.id}-{len(self._fills) + 1}"
+        fill = OrderFill(order=self, quantity=quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
 
         # Update state of the order (partial or full fill)
-        new_filled_quantity = self.filled_quantity + execution.quantity
+        new_filled_quantity = self.filled_quantity + fill.quantity
         action = OrderAction.FILL if new_filled_quantity == self.quantity else OrderAction.PARTIAL_FILL
         self.change_state(action)
 
-        # Store execution
-        self._executions.append(execution)
+        # Store fill
+        self._fills.append(fill)
 
-        return execution
+        return fill
 
-    def list_executions(self) -> tuple[Execution, ...]:
-        """Return executions in chronological order as an immutable tuple.
+    def list_fills(self) -> tuple[OrderFill, ...]:
+        """Return fills in chronological order as an immutable tuple.
 
         Returns:
-            tuple[Execution, ...]: Executions for this order.
+            tuple[OrderFill, ...]: Fills for this order.
         """
-        return tuple(self._executions)
+        return tuple(self._fills)
 
     def change_state(self, action: OrderAction) -> None:
         """Change order state based on action.

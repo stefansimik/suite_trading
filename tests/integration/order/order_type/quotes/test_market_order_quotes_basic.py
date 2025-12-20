@@ -31,7 +31,7 @@ class _QuotesSubmitInCallbackStrategy(Strategy):
     def __init__(self, name: str, broker: SimBroker):
         super().__init__(name)
         self._broker = broker
-        self.executions = []
+        self.order_fills = []
         self._submitted = False
 
     def on_start(self) -> None:
@@ -47,9 +47,9 @@ class _QuotesSubmitInCallbackStrategy(Strategy):
             self.submit_order(MarketOrder(instr, OrderSide.SELL, D("1")), self._broker)
             self._submitted = True
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
-        if len(self.executions) >= 2:
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
+        if len(self.order_fills) >= 2:
             self.remove_event_feed("quotes")
 
 
@@ -66,7 +66,7 @@ class _QuotesSubmitBeforeTicksStrategy(Strategy):
     def __init__(self, name: str, broker: SimBroker):
         super().__init__(name)
         self._broker = broker
-        self.executions = []
+        self.order_fills = []
         self._submitted = False
         self._instr: Instrument | None = None
         self._t0: datetime | None = None
@@ -89,8 +89,8 @@ class _QuotesSubmitBeforeTicksStrategy(Strategy):
             ticks = [QuoteTickEvent(DGA.quote_tick.from_strings(instr, "1.0000@5", "1.0001@5", t0), t0)]
             self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
         self.remove_event_feed("quotes")
 
 
@@ -100,7 +100,7 @@ class _QuotesPartialAcrossTicksStrategy(Strategy):
     def __init__(self, name: str, broker: SimBroker):
         super().__init__(name)
         self._broker = broker
-        self.executions = []
+        self.order_fills = []
         self._submitted = False
         self._instr: Instrument | None = None
         self._t0: datetime | None = None
@@ -127,9 +127,9 @@ class _QuotesPartialAcrossTicksStrategy(Strategy):
             ]
             self.add_event_feed("quotes", FixedSequenceEventFeed(ticks), use_for_simulated_fills=True)
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
-        if len(self.executions) >= 2:
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
+        if len(self.order_fills) >= 2:
             self.remove_event_feed("quotes")
 
 
@@ -144,9 +144,9 @@ class TestMarketOrderQuotesBasic:
 
         engine.start()
 
-        assert len(s.executions) == 2
-        buy_exec = next(e for e in s.executions if e.order.side == OrderSide.BUY)
-        sell_exec = next(e for e in s.executions if e.order.side == OrderSide.SELL)
+        assert len(s.order_fills) == 2
+        buy_exec = next(e for e in s.order_fills if e.order.side == OrderSide.BUY)
+        sell_exec = next(e for e in s.order_fills if e.order.side == OrderSide.SELL)
         assert buy_exec.price == D("1.0001")
         assert sell_exec.price == D("1.0000")
 
@@ -160,8 +160,8 @@ class TestMarketOrderQuotesBasic:
 
         engine.start()
 
-        assert len(s.executions) == 1
-        assert s.executions[0].price == D("1.0001")
+        assert len(s.order_fills) == 1
+        assert s.order_fills[0].price == D("1.0001")
 
     def test_partial_fill_across_successive_quote_ticks(self):
         """BUY 2 with only 1 available per tick should fill 1 on the first tick and 1 on the next at its ask."""
@@ -173,4 +173,4 @@ class TestMarketOrderQuotesBasic:
 
         engine.start()
 
-        assert [(e.quantity, e.price) for e in s.executions] == [(D("1"), D("1.0001")), (D("1"), D("1.0002"))]
+        assert [(e.quantity, e.price) for e in s.order_fills] == [(D("1"), D("1.0001")), (D("1"), D("1.0002"))]

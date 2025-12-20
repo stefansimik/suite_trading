@@ -427,7 +427,7 @@ flowchart TB
         S2[Strategy B]
     end
 
-    subgraph "Execution"
+    subgraph "Brokers"
         B1[SimBroker<br/>📊 Simulation]
         B2[Live Broker<br/>💰 Real Trading]
     end
@@ -649,7 +649,7 @@ SUITE Trading is in active development with approximately **70% of core function
 | **Simulation** | Realism layer (margin, fees, slippage, liquidity models) |
 | **Simulation** | Time-in-force semantics (IOC, FOK, DAY, GTD, GTC) |
 | **Accounting** | Per-instrument position tracking |
-| **Reporting** | Per-strategy execution history |
+| **Reporting** | Per-strategy order fill history |
 | **Productivity** | Data generation utilities for testing |
 
 ### 🗓️ Planned
@@ -662,7 +662,7 @@ SUITE Trading is in active development with approximately **70% of core function
 | **Data** | CSV/Parquet event-feeds for high-performance data loading | Q2 2026 |
 | **Indicators** | Indicators framework (SMA, EMA, RSI, MACD, ...) | TBD |
 | **Reporting** | Performance statistics per Strategy + backtest reports | TBD |
-| **UI** | Streamlit export (bars, executions, equity curve, results) | TBD |
+| **UI** | Streamlit export (bars, order fills, equity curve, results) | TBD |
 | **UI** | Dashboard for monitoring and controls | Q4 2026 |
 | **Strategy** | Strategy regression / extensibility review | TBD |
 | **Live** | First live broker adapter: Interactive Brokers (IBKR) | Q3 2026 |

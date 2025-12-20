@@ -20,7 +20,7 @@ def _create_optimistic_sim_broker() -> SimBroker:
 
 
 class _SubmitAndRecordStrategy(Strategy):
-    """Adds a one-tick quotes feed and submits a Market BUY in the callback; records executions."""
+    """Adds a one-tick quotes feed and submits a Market BUY in the callback; records order_fills."""
 
     def __init__(self, name: str, broker: SimBroker, instrument: Instrument, bid: D, ask: D, ts: datetime) -> None:
         super().__init__(name)
@@ -30,7 +30,7 @@ class _SubmitAndRecordStrategy(Strategy):
         self._ask = ask
         self._ts = ts
         self._submitted = False
-        self.executions = []
+        self.order_fills = []
 
     def on_start(self) -> None:
         tick = DGA.quote_tick.from_strings(self._instrument, f"{self._bid}@10", f"{self._ask}@10", self._ts)
@@ -44,8 +44,8 @@ class _SubmitAndRecordStrategy(Strategy):
             self.submit_order(MarketOrder(self._instrument, OrderSide.BUY, D("1")), self._broker)
             self._submitted = True
 
-    def on_execution(self, execution) -> None:
-        self.executions.append(execution)
+    def on_order_fill(self, order_fill) -> None:
+        self.order_fills.append(order_fill)
         self.remove_event_feed("q")
 
 
@@ -56,8 +56,8 @@ class TestEngineOrderRoutingMarket:
     def _ts(self) -> datetime:
         return datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
 
-    def test_engine_routes_execution_back_to_originating_strategy(self):
-        """Engine should route execution callback to the same Strategy that submitted the order."""
+    def test_engine_routes_order_fill_back_to_originating_strategy(self):
+        """Engine should route order_fill callback to the same Strategy that submitted the order."""
         instr = self._instrument()
         broker = _create_optimistic_sim_broker()
         engine = TradingEngine()
@@ -68,12 +68,12 @@ class TestEngineOrderRoutingMarket:
 
         engine.start()
 
-        assert len(strategy.executions) == 1
+        assert len(strategy.order_fills) == 1
         # Price should be the ask from the quote tick
-        assert strategy.executions[0].price == D("101")
+        assert strategy.order_fills[0].price == D("101")
 
     def test_deterministic_callbacks_for_two_orders_same_time(self):
-        """Two strategies submit at the same time; each must receive exactly one execution for its own order."""
+        """Two strategies submit at the same time; each must receive exactly one order_fill for its own order."""
         instr = self._instrument()
         broker = _create_optimistic_sim_broker()
         engine = TradingEngine()
@@ -86,6 +86,6 @@ class TestEngineOrderRoutingMarket:
 
         engine.start()
 
-        # Both should receive exactly one execution routed back to the correct Strategy
-        assert len(s1.executions) == 1 and s1.executions[0].order.is_buy
-        assert len(s2.executions) == 1 and s2.executions[0].order.is_buy
+        # Both should receive exactly one order_fill routed back to the correct Strategy
+        assert len(s1.order_fills) == 1 and s1.order_fills[0].order.is_buy
+        assert len(s2.order_fills) == 1 and s2.order_fills[0].order.is_buy

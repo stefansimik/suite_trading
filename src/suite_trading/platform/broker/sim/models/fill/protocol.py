@@ -20,7 +20,7 @@ class FillModel(Protocol):
     - Partial fills (only portion of available liquidity fills)
     - Queue position (limit order priority in the book)
 
-    FillModel is called after OrderBook.simulate_fills() but before executions
+    FillModel is called after OrderBook.simulate_fills() but before order fills
     are recorded, allowing it to filter, modify, or reject proposed fills.
     """
 
