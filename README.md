@@ -12,8 +12,8 @@ SUITE Trading is a **modern Python framework for algorithmic trading** that prov
 
 ## What Can You Do with SUITE Trading?
 
-- **Backtest your trading ideas** — Test strategies on historical data before risking real money
-- **Paper trade** — Run strategies in real-time with simulated money to validate your approach
+- **Backtest your trading ideas** — Test strategies on historical data before risking real funds
+- **Paper trade** — Run strategies in real-time with simulated funds to validate your approach
 - **Go live** — Deploy the same strategy code to real brokers when you're ready
 - **Run multiple strategies together** — Test how strategies interact when sharing the same timeline
 
@@ -293,7 +293,7 @@ class MyStrategy(Strategy):
 
 **What it is:** The interface between your strategy and the market.
 
-**Why it matters:** `SimBroker` lets you test strategies without real money. When you're ready to go live, you swap it for a real broker adapter — your strategy code stays the same.
+**Why it matters:** `SimBroker` lets you test strategies without real funds. When you're ready to go live, you swap it for a real broker adapter — your strategy code stays the same.
 
 ```python
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
@@ -709,5 +709,5 @@ MIT License. See the [`LICENSE`](LICENSE) file for details.
 >
 > - This project is for **educational and research purposes only**
 > - It is **not financial advice**
-> - Trading involves risk and **you can lose money**
-> - Always test thoroughly before using any trading system with real money
+> - Trading involves risk and **you can lose funds**
+> - Always test thoroughly before using any trading system with real funds

@@ -14,10 +14,10 @@ if TYPE_CHECKING:
 
 
 class SimAccount(Account):
-    """Tracks available money and margins for simulation broker.
+    """Tracks funds and margins for simulation broker.
 
     We store:
-    - Available money per currency
+    - Funds per currency
     - Per-instrument margin amounts (initial, maintenance)
     """
 
@@ -27,10 +27,10 @@ class SimAccount(Account):
         self,
         *,
         id: str,
-        initial_available_money_by_currency: Mapping[Currency, Money] | None = None,
+        initial_funds: Mapping[Currency, Money] | None = None,
     ) -> None:
         self._id = id
-        self._available_money_by_currency: dict[Currency, Money] = dict(initial_available_money_by_currency or {})
+        self._funds_by_currency: dict[Currency, Money] = dict(initial_funds or {})
         self._margins_by_instrument: dict[Instrument, MarginRequirements] = {}
         self._paid_fees: list[PaidFee] = []
 
@@ -44,48 +44,48 @@ class SimAccount(Account):
     def id(self) -> str:
         return self._id
 
-    # AVAILABLE MONEY
+    # FUNDS
 
-    def list_available_money_by_currency(self) -> list[tuple[Currency, Money]]:
+    def list_funds_by_currency(self) -> list[tuple[Currency, Money]]:
         result: list[tuple[Currency, Money]] = []
-        for currency in sorted(self._available_money_by_currency.keys(), key=lambda c: c.code):
-            result.append((currency, self._available_money_by_currency[currency]))
+        for currency in sorted(self._funds_by_currency.keys(), key=lambda c: c.code):
+            result.append((currency, self._funds_by_currency[currency]))
         return result
 
-    def get_available_money(self, currency: Currency) -> Money:
-        """Return current available money for the given $currency.
+    def get_funds(self, currency: Currency) -> Money:
+        """Return current funds for the given $currency.
 
         This is a cheap read with no side effects.
         """
-        return self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
+        return self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
 
-    def has_enough_available_money(self, required_amount: Money) -> bool:
+    def has_enough_funds(self, required_amount: Money) -> bool:
         currency = required_amount.currency
-        current = self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
+        current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
         return current.value >= required_amount.value
 
-    def add_available_money(self, amount: Money) -> None:
+    def add_funds(self, amount: Money) -> None:
         currency = amount.currency
-        current = self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
-        self._available_money_by_currency[currency] = current + amount
+        current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
+        self._funds_by_currency[currency] = current + amount
 
-    def subtract_available_money(self, amount: Money) -> None:
+    def subtract_funds(self, amount: Money) -> None:
         currency = amount.currency
-        current = self._available_money_by_currency.get(currency, Money(Decimal("0"), currency))
+        current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
         new_value = current.value - amount.value
 
-        # Precondition: available money cannot go below zero
+        # Precondition: funds cannot go below zero
         if new_value < 0:
-            raise ValueError(f"Cannot call `subtract_available_money` because resulting $available ({new_value} {currency}) would be negative")
+            raise ValueError(f"Cannot call `subtract_funds` because resulting $funds ({new_value} {currency}) would be negative")
 
-        self._available_money_by_currency[currency] = Money(new_value, currency)
+        self._funds_by_currency[currency] = Money(new_value, currency)
 
     # FEES
 
     def pay_fee(self, timestamp: datetime, amount: Money, description: str) -> None:
         """Pay a fee and record it.
 
-        This is a high-level operation that subtracts from $available money and stores a
+        This is a high-level operation that subtracts from $funds and stores a
         `PaidFee` record. Only strictly positive $amount is allowed.
 
         Args:
@@ -94,14 +94,14 @@ class SimAccount(Account):
             description: Human-readable context.
 
         Raises:
-            ValueError: If $amount.value <= 0 or subtracting would make $available negative.
+            ValueError: If $amount.value <= 0 or subtracting would make $funds negative.
         """
         # Precondition: $amount must be strictly positive (no zero or rebates for now)
         if amount.value <= 0:
             raise ValueError(f"Cannot call `pay_fee` because $amount ({amount.value} {amount.currency}) is not positive")
 
-        # Subtract fee from available money
-        self.subtract_available_money(amount)
+        # Subtract fee from funds
+        self.subtract_funds(amount)
 
         # Record fee
         self._paid_fees.append(PaidFee(timestamp=timestamp, amount=amount, description=description))
@@ -113,11 +113,11 @@ class SimAccount(Account):
     # MARGIN (PER-INSTRUMENT)
 
     def block_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None:
-        # Precondition: available money must be sufficient to block initial margin
-        if not self.has_enough_available_money(amount):
-            raise ValueError(f"Cannot call `block_initial_margin_for_instrument` because $available in {amount.currency} is insufficient for $amount ({amount.value})")
+        # Precondition: funds must be sufficient to block initial margin
+        if not self.has_enough_funds(amount):
+            raise ValueError(f"Cannot call `block_initial_margin_for_instrument` because $funds in {amount.currency} is insufficient for $amount ({amount.value})")
 
-        self.subtract_available_money(amount)
+        self.subtract_funds(amount)
         pair = self._margins_by_instrument.get(instrument)
         if pair is None:
             pair = MarginRequirements(initial=Money(Decimal("0"), amount.currency), maintenance=Money(Decimal("0"), amount.currency))
@@ -135,14 +135,14 @@ class SimAccount(Account):
 
         new_initial = Money(new_initial_value, amount.currency)
         self._margins_by_instrument[instrument] = MarginRequirements(initial=new_initial, maintenance=pair.maintenance)
-        self.add_available_money(amount)
+        self.add_funds(amount)
 
     def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> None:
         pair = self._margins_by_instrument.get(instrument)
         if pair is None or pair.initial.value == 0:
             return
         currency = pair.initial.currency
-        self.add_available_money(pair.initial)
+        self.add_funds(pair.initial)
         self._margins_by_instrument[instrument] = MarginRequirements(initial=Money(Decimal("0"), currency), maintenance=pair.maintenance)
 
     def set_maintenance_margin_for_instrument_position(
@@ -159,10 +159,10 @@ class SimAccount(Account):
         delta = maintenance_margin_amount.value - previous_pair.maintenance.value
 
         if delta > 0:
-            # Check: available money cannot go negative when increasing maintenance
-            self.subtract_available_money(Money(delta, currency))
+            # Check: funds cannot go negative when increasing maintenance
+            self.subtract_funds(Money(delta, currency))
         elif delta < 0:
-            self.add_available_money(Money(-delta, currency))
+            self.add_funds(Money(-delta, currency))
 
         self._margins_by_instrument[instrument] = MarginRequirements(initial=previous_pair.initial, maintenance=maintenance_margin_amount)
 
@@ -174,7 +174,7 @@ class SimAccount(Account):
         return f"{self.__class__.__name__}(id={self._id})"
 
     def __repr__(self) -> str:
-        balances = {c.code: m.value for c, m in self._available_money_by_currency.items()}
-        return f"{self.__class__.__name__}(id={self._id}, available_money={balances}, instruments_with_margin={len(self._margins_by_instrument)})"
+        balances = {c.code: m.value for c, m in self._funds_by_currency.items()}
+        return f"{self.__class__.__name__}(id={self._id}, funds={balances}, instruments_with_margin={len(self._margins_by_instrument)})"
 
     # endregion

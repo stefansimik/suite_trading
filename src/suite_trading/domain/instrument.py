@@ -160,7 +160,7 @@ class Instrument:
         """Get the asset class of this Instrument."""
         return self._asset_class
 
-    def compute_tick_value_money(self) -> Money:
+    def compute_tick_value(self) -> Money:
         """Return tick value as Money in $settlement_currency for 1 contract and 1 tick."""
         from suite_trading.domain.monetary.money import Money
 

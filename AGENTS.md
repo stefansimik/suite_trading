@@ -282,9 +282,9 @@ Examples:
 
 # region Interface
 
-# MONEY (AVAILABLE FUNDS)
-def list_available_money_by_currency(self) -> list[tuple[Currency, Money]]: ...
-def get_available_money(self, currency: Currency) -> Money: ...
+# FUNDS
+def list_funds_by_currency(self) -> list[tuple[Currency, Money]]: ...
+def get_funds(self, currency: Currency) -> Money: ...
 
 # MARGIN (PER-INSTRUMENT)
 def block_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None: ...
@@ -548,8 +548,8 @@ _process_fill_slice(order, fill_slice, order_book)
 ├── [COMPUTE]
 │   ├── position_before, net_qty_after
 │   ├── affordability = compute_fill_slice_affordability(...)
-│   └── available_money_now = get_available_money(...)
-├── [DECIDE] IF not has_enough_available_money(...): handle insufficient funds
+│   └── funds_now = get_funds(...)
+├── [DECIDE] IF not has_enough_funds(...): handle insufficient funds
 └── [ACT]
     ├── execution = _commit_fill_slice_execution_and_accounting(...)
     ├── publish execution callback

@@ -479,7 +479,7 @@ class SimBroker(Broker, SimulatedBroker):
             if not has_liquidity:
                 return [], True  # Expire full order: insufficient liquidity for FOK
 
-            if not self._evaluate_account_affordability_for_fill_slices(order, fill_slices, order_book):
+            if not self._has_enough_funds_for_fill_slices(order, fill_slices, order_book):
                 return [], True  # Expire full order: insufficient funds for FOK
 
             return fill_slices, False  # Full order will be filled: FOK satisfied
@@ -491,7 +491,7 @@ class SimBroker(Broker, SimulatedBroker):
         # Default: Fill all available liquidity (do not expire unfilled part)
         return fill_slices, False
 
-    def _evaluate_account_affordability_for_fill_slices(
+    def _has_enough_funds_for_fill_slices(
         self,
         order: Order,
         fill_slices: list[FillSlice],
@@ -510,7 +510,7 @@ class SimBroker(Broker, SimulatedBroker):
         net_position_qty = current_position.quantity if current_position is not None else Decimal("0")
 
         simulated_execution_history = list(self._execution_history)
-        available_money_by_currency = {curr: money for curr, money in self._account.list_available_money_by_currency()}
+        funds_by_currency = {curr: money for curr, money in self._account.list_funds_by_currency()}
 
         # PROCESS SLICES
         for i, fill_slice in enumerate(fill_slices):
@@ -529,14 +529,14 @@ class SimBroker(Broker, SimulatedBroker):
                 previous_executions=tuple(simulated_execution_history),
             )
 
-            # COMPUTE: Total money required upfront for this specific slice
-            required_money_upfront = initial_margin + commission
-            currency = required_money_upfront.currency
-            available_money = available_money_by_currency.get(currency, Money(0, currency))
+            # COMPUTE: Total funds required upfront for this specific slice
+            required_funds = initial_margin + commission
+            currency = required_funds.currency
+            funds = funds_by_currency.get(currency, Money(0, currency))
 
             # DECIDE: Can we fund the upfront costs?
-            # Check: ensure we have enough available money for initial margin and fees
-            if available_money.value < required_money_upfront.value:
+            # Check: ensure we have enough funds for initial margin and fees
+            if funds.value < required_funds.value:
                 return False
 
             # COMPUTE: Verify maintenance margin requirement for the resulting position
@@ -545,13 +545,13 @@ class SimBroker(Broker, SimulatedBroker):
             maintenance_margin_delta = maintenance_margin_after.value - maintenance_margin_before.value
 
             # Check: if maintenance requirement increases, do we have the extra buffer available?
-            if maintenance_margin_delta > 0 and (available_money.value - required_money_upfront.value) < maintenance_margin_delta:
+            if maintenance_margin_delta > 0 and (funds.value - required_funds.value) < maintenance_margin_delta:
                 return False
 
             # ACT (Simulated): Update tracking for the next slice iteration
             # Subtract commission and any maintenance increase from the available simulation pool
-            new_available_value = available_money.value - commission.value - max(0, maintenance_margin_delta)
-            available_money_by_currency[currency] = Money(new_available_value, currency)
+            new_funds_value = funds.value - commission.value - max(0, maintenance_margin_delta)
+            funds_by_currency[currency] = Money(new_funds_value, currency)
 
             sim_exec = Execution(order=order, quantity=fill_slice.quantity, price=fill_slice.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
             simulated_execution_history.append(sim_exec)
@@ -627,13 +627,13 @@ class SimBroker(Broker, SimulatedBroker):
             previous_executions=tuple(self._execution_history),
         )
 
-        required_money_upfront = initial_margin + commission
-        currency = required_money_upfront.currency
-        available_money_now = self._account.get_available_money(currency)
+        required_funds = initial_margin + commission
+        currency = required_funds.currency
+        funds_now = self._account.get_funds(currency)
 
         # DECIDE
-        # Check: ensure we have enough available money for initial margin and fees
-        has_enough_upfront = self._account.has_enough_available_money(required_money_upfront)
+        # Check: ensure we have enough funds for initial margin and fees
+        has_enough_upfront = self._account.has_enough_funds(required_funds)
 
         # Check: if maintenance requirement increases, do we have the extra buffer available?
         maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, net_position_quantity=net_position_qty_before, timestamp=timestamp)
@@ -641,7 +641,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         has_enough_for_maintenance_increase = True
         if maintenance_margin_delta > 0:
-            has_enough_for_maintenance_increase = (available_money_now.value - required_money_upfront.value) >= maintenance_margin_delta
+            has_enough_for_maintenance_increase = (funds_now.value - required_funds.value) >= maintenance_margin_delta
 
         if not has_enough_upfront or not has_enough_for_maintenance_increase:
             self._handle_insufficient_funds_for_fill_slice(
@@ -651,7 +651,7 @@ class SimBroker(Broker, SimulatedBroker):
                 initial_margin=initial_margin,
                 maintenance_margin_delta=maintenance_margin_delta,
                 order_book=order_book,
-                available_money_now=available_money_now,
+                funds_now=funds_now,
             )
             return
 
@@ -712,16 +712,16 @@ class SimBroker(Broker, SimulatedBroker):
         initial_margin: Money,
         maintenance_margin_delta: Decimal,
         order_book: OrderBook,
-        available_money_now: Money,
+        funds_now: Money,
     ) -> None:
         """Cancel $order and log a one-line message with all affordability components."""
         timestamp = order_book.timestamp
         best_bid = order_book.best_bid.price
         best_ask = order_book.best_ask.price
 
-        required_money_upfront = initial_margin + commission
+        required_funds = initial_margin + commission
 
-        logger.error(f"Reject FillSlice for Order '{order.id}': initial_margin={initial_margin}, commission={commission}, maintenance_margin_delta={maintenance_margin_delta}, required_money_upfront={required_money_upfront}, available_now={available_money_now}, best_bid={best_bid}, best_ask={best_ask}, qty={fill_slice.quantity}, price={fill_slice.price}, ts={timestamp}")
+        logger.error(f"Reject FillSlice for Order '{order.id}': initial_margin={initial_margin}, commission={commission}, maintenance_margin_delta={maintenance_margin_delta}, required_funds={required_funds}, funds_now={funds_now}, best_bid={best_bid}, best_ask={best_ask}, qty={fill_slice.quantity}, price={fill_slice.price}, ts={timestamp}")
 
         self._apply_order_action(order, OrderAction.CANCEL)
         self._apply_order_action(order, OrderAction.ACCEPT)

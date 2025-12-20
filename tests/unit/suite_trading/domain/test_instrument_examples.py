@@ -17,7 +17,7 @@ def test_euro_fx_future_6e() -> None:
         contract_unit="EUR",
         quote_currency=USD,
     )
-    assert six_e.compute_tick_value_money().value == Decimal("12.5")  # USD per tick
+    assert six_e.compute_tick_value().value == Decimal("12.5")  # USD per tick
     assert six_e.quote_currency.code == "USD"
     assert six_e.contract_unit == "EUR"
     # Verify defaulting behavior: $settlement_currency falls back to $quote_currency when omitted
@@ -35,7 +35,7 @@ def test_eurusd_spot_standard_lot() -> None:
         contract_unit="EUR",
         quote_currency=USD,
     )
-    assert eurusd.compute_tick_value_money().value == Decimal("10")  # 0.0001 * 100000
+    assert eurusd.compute_tick_value().value == Decimal("10")  # 0.0001 * 100000
 
 
 def test_crude_oil_cl_future() -> None:
@@ -49,7 +49,7 @@ def test_crude_oil_cl_future() -> None:
         contract_unit="barrel",
         quote_currency=USD,
     )
-    assert cl.compute_tick_value_money().value == Decimal("10")  # 0.01 * 1000
+    assert cl.compute_tick_value().value == Decimal("10")  # 0.01 * 1000
 
 
 def test_stock_aapl() -> None:
@@ -63,7 +63,7 @@ def test_stock_aapl() -> None:
         contract_unit="share",
         quote_currency=USD,
     )
-    assert aapl.compute_tick_value_money().value == Decimal("0.01")
+    assert aapl.compute_tick_value().value == Decimal("0.01")
 
 
 def test_gold_xauusd_spot() -> None:
@@ -79,7 +79,7 @@ def test_gold_xauusd_spot() -> None:
         quote_currency=USD,
     )
     # Tick value = 0.01 * 1 oz = 0.01 USD
-    assert xauusd.compute_tick_value_money().value == Decimal("0.01")
+    assert xauusd.compute_tick_value().value == Decimal("0.01")
     assert xauusd.quote_currency.code == "USD"
     assert xauusd.contract_unit == "XAU"
 
@@ -99,4 +99,4 @@ def test_e_mini_sp500_es_future() -> None:
         contract_unit="index_point",
         quote_currency=USD,
     )
-    assert es.compute_tick_value_money().value == Decimal("12.5")
+    assert es.compute_tick_value().value == Decimal("12.5")
