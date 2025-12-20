@@ -547,7 +547,7 @@ _process_proposed_fill(order, proposed_fill, order_book)
 ├── [VALIDATE] Check instrument match
 ├── [COMPUTE]
 │   ├── position_before, net_qty_after
-│   ├── affordability = _compute_proposed_fill_affordability(...)
+│   ├── required_funds = _compute_required_funds_for_proposed_fill(...)
 │   └── funds_now = get_funds(...)
 ├── [DECIDE] IF not has_enough_funds(...): handle insufficient funds
 └── [ACT]

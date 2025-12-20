@@ -463,7 +463,7 @@ class SimBroker(Broker, SimulatedBroker):
         proposed_fills: list[ProposedFill],
         order_book: OrderBook,
     ) -> tuple[list[ProposedFill], bool]:
-        """Determines the fill application decision based on TIF rules and affordability.
+        """Determines the fill application decision based on TIF rules and required funds.
 
         Returns:
             tuple: (proposed_fills: list[ProposedFill], expire_remainder: bool)
@@ -497,7 +497,7 @@ class SimBroker(Broker, SimulatedBroker):
         """Evaluate if the account has enough funds for margins and fees for all $proposed_fills (dry-run).
 
         Note:
-            The loop evaluates affordability per proposed fill. Variables with '_after' or 'after'
+            The loop evaluates required funds per proposed fill. Variables with '_after' or 'after'
             represent the simulated state once the current $proposed_fill is applied.
         """
         # INITIALIZE STATE
@@ -511,12 +511,12 @@ class SimBroker(Broker, SimulatedBroker):
 
         # PROCESS PROPOSED FILLS
         for i, proposed_fill in enumerate(proposed_fills):
-            # COMPUTE: Next state and affordability requirements
+            # COMPUTE: Next state and required funds
             # Note: 'qty_after' is the position quantity after applying this proposed fill
             signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
             net_position_qty_after = net_position_qty + signed_qty
 
-            commission, initial_margin, maintenance_margin_after = self._compute_proposed_fill_affordability(
+            commission, initial_margin, maintenance_margin_after = self._compute_required_funds_for_proposed_fill(
                 order=order,
                 proposed_fill=proposed_fill,
                 order_book=order_book,
@@ -587,7 +587,7 @@ class SimBroker(Broker, SimulatedBroker):
           terminalized via a CANCEL/ACCEPT transition.
 
         Steps:
-        - compute affordability (commission, initial_margin, maintenance_margin)
+        - compute required funds (commission, initial_margin, maintenance_margin)
         - block initial margin (only if position increases)
         - create and store order_fill
         - update Position
@@ -614,7 +614,7 @@ class SimBroker(Broker, SimulatedBroker):
         signed_qty = proposed_fill.quantity if order.is_buy else -proposed_fill.quantity
         net_position_qty_after = net_position_qty_before + signed_qty
 
-        commission, initial_margin, maintenance_margin_after = self._compute_proposed_fill_affordability(
+        commission, initial_margin, maintenance_margin_after = self._compute_required_funds_for_proposed_fill(
             order=order,
             proposed_fill=proposed_fill,
             order_book=order_book,
@@ -711,7 +711,7 @@ class SimBroker(Broker, SimulatedBroker):
         order_book: OrderBook,
         funds_now: Money,
     ) -> None:
-        """Cancel $order and log a one-line message with all affordability components."""
+        """Cancel $order and log a one-line message with all required funds components."""
         timestamp = order_book.timestamp
         best_bid = order_book.best_bid.price
         best_ask = order_book.best_ask.price
@@ -723,7 +723,7 @@ class SimBroker(Broker, SimulatedBroker):
         self._apply_order_action(order, OrderAction.CANCEL)
         self._apply_order_action(order, OrderAction.ACCEPT)
 
-    def _compute_proposed_fill_affordability(
+    def _compute_required_funds_for_proposed_fill(
         self,
         *,
         order: Order,
@@ -734,15 +734,7 @@ class SimBroker(Broker, SimulatedBroker):
         net_position_qty_after: Decimal,
         previous_order_fills: tuple[OrderFill, ...],
     ) -> tuple[Money, Money, Money]:
-        """Compute absolute affordability requirements for a single $proposed_fill.
-
-        Note:
-            Suffixes '_before' and '_after' refer to the state before and after applying
-            the current $proposed_fill.
-
-        Returns:
-            A tuple of (commission, initial_margin, maintenance_margin).
-        """
+        """Compute absolute required funds for a single $proposed_fill."""
         # COMPUTE: Commission
         commission = self._fee_model.compute_commission(order=order, price=proposed_fill.price, quantity=proposed_fill.quantity, timestamp=timestamp, previous_order_fills=previous_order_fills)
 
