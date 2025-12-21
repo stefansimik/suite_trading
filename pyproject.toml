@@ -40,6 +40,9 @@ fix = true
 show-fixes = true
 line-length = 9999
 
+[tool.ty.src]
+include = ["src", "tests"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
