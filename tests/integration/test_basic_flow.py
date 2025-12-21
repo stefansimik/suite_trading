@@ -21,8 +21,12 @@ class DemoStrategy(Strategy):
         self.add_event_feed("bars_feed", bars_feed)
 
         # Add data to strategy: Time notifications each 10 seconds
+        first_event = bars_feed.peek()
+        assert first_event is not None
+        assert isinstance(first_event, BarEvent)
+
         time_feed: EventFeed = FixedIntervalEventFeed(
-            start_dt=bars_feed.peek().bar.end_dt,  # Align first time notification with first bar
+            start_dt=first_event.bar.end_dt,  # Align first time notification with first bar
             interval=timedelta(seconds=10),  # Le'ts have time notifications each 10 seconds
             finish_with_feed=bars_feed,  # Stop time notifications, when $bars_feed is finished
         )

@@ -60,7 +60,7 @@ def simulate_fills_for_market_order(order: Order, order_book: OrderBook) -> list
     return fills
 
 
-def simulate_fills_for_limit_order(order: LimitOrder | StopLimitOrder, order_book: OrderBook) -> list[ProposedFill]:
+def simulate_fills_for_limit_order(order: Order, order_book: OrderBook) -> list[ProposedFill]:
     """Simulate fills for a limit-like order at prices equal to or better than $order.limit_price.
 
     Args:
@@ -70,6 +70,10 @@ def simulate_fills_for_limit_order(order: LimitOrder | StopLimitOrder, order_boo
     Returns:
         list[ProposedFill]: Fills (price and signed_quantity); fees not included.
     """
+    # Narrowing for the type checker
+    if not isinstance(order, (LimitOrder, StopLimitOrder)):
+        raise ValueError(f"Cannot call `simulate_fills_for_limit_order` because order class '{order.__class__.__name__}' does not have a limit price")
+
     fills = order_book.simulate_fills(
         target_signed_quantity=order.signed_unfilled_quantity,
         min_price=order.limit_price if order.is_sell else None,

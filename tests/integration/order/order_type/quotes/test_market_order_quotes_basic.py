@@ -81,8 +81,10 @@ class _QuotesSubmitBeforeTicksStrategy(Strategy):
 
     def on_event(self, event) -> None:
         if not self._submitted and isinstance(event, _KickoffEvent):
-            instr = self._instr  # type: ignore[assignment]
-            t0 = self._t0  # type: ignore[assignment]
+            assert self._instr is not None
+            assert self._t0 is not None
+            instr = self._instr
+            t0 = self._t0
             self.submit_order(MarketOrder(instr, 1), self._broker)
             self._submitted = True
             self.remove_event_feed("kick")
@@ -115,8 +117,10 @@ class _QuotesPartialAcrossTicksStrategy(Strategy):
 
     def on_event(self, event) -> None:
         if not self._submitted and isinstance(event, _KickoffEvent):
-            instr = self._instr  # type: ignore[assignment]
-            t0 = self._t0  # type: ignore[assignment]
+            assert self._instr is not None
+            assert self._t0 is not None
+            instr = self._instr
+            t0 = self._t0
             self.submit_order(MarketOrder(instr, 2), self._broker)
             self._submitted = True
             self.remove_event_feed("kick")

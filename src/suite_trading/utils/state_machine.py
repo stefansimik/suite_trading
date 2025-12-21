@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import TypeVar, Generic
 
 
 class State(Enum):
@@ -21,7 +22,11 @@ class Action(Enum):
     pass
 
 
-class StateMachine:
+S = TypeVar("S", bound=State)
+A = TypeVar("A", bound=Action)
+
+
+class StateMachine(Generic[S, A]):
     """A simple, elegant state machine implementation.
 
     This state machine accepts state transition definitions as a dictionary
@@ -58,12 +63,12 @@ class StateMachine:
         ```
     """
 
-    def __init__(self, initial_state: State, transitions: dict[tuple[State, Action], State]):
+    def __init__(self, initial_state: S, transitions: dict[tuple[S, A], S]):
         """Initialize the state machine.
 
         Args:
-            initial_state (State): The initial state of the machine.
-            transitions (Dict[Tuple[State, Action], State]): Dictionary mapping
+            initial_state (S): The initial state of the machine.
+            transitions (dict[tuple[S, A], S]): Dictionary mapping
                 (from_state, action) tuples to target states.
 
         Raises:
@@ -76,41 +81,41 @@ class StateMachine:
         self._transitions = transitions
 
     @property
-    def current_state(self) -> State:
+    def current_state(self) -> S:
         """Get the current state of the machine.
 
         Returns:
-            State: The current state.
+            S: The current state.
         """
         return self._current_state
 
-    def can_execute_action(self, action: Action) -> bool:
+    def can_execute_action(self, action: A) -> bool:
         """Check if an action can be executed from the current state.
 
         Args:
-            action (Action): The action to check.
+            action (A): The action to check.
 
         Returns:
             bool: True if the action can be executed, False otherwise.
         """
         return (self._current_state, action) in self._transitions
 
-    def list_valid_actions(self) -> list[Action]:
+    def list_valid_actions(self) -> list[A]:
         """Get all valid actions from the current state.
 
         Returns:
-            list[Action]: List of actions that can be executed from current state.
+            list[A]: List of actions that can be executed from current state.
         """
         return [action for (state, action) in self._transitions.keys() if state == self._current_state]
 
-    def execute_action(self, action: Action) -> State:
+    def execute_action(self, action: A) -> S:
         """Execute an action and transition to the new state.
 
         Args:
-            action (Action): The action to execute.
+            action (A): The action to execute.
 
         Returns:
-            State: The new state after transition.
+            S: The new state after transition.
 
         Raises:
             ValueError: If the action is not valid from the current state.
@@ -137,10 +142,10 @@ class StateMachine:
         """
         return len(self.list_valid_actions()) == 0
 
-    def reset(self, new_state: State):
+    def reset(self, new_state: S):
         """Reset the state machine to a specific state.
 
         Args:
-            new_state (State): The state to reset to.
+            new_state (S): The state to reset to.
         """
         self._current_state = new_state

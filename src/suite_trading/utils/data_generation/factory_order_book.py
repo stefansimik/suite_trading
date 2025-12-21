@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -14,8 +14,8 @@ from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 def create(
     instrument: Instrument | None = None,
-    bids: list[tuple[DecimalLike, DecimalLike]] | None = None,
-    asks: list[tuple[DecimalLike, DecimalLike]] | None = None,
+    bids: Sequence[tuple[DecimalLike, DecimalLike]] | None = None,
+    asks: Sequence[tuple[DecimalLike, DecimalLike]] | None = None,
     timestamp: datetime | None = None,
 ) -> OrderBook:
     """Create a simple OrderBook from raw price/volume pairs.
@@ -213,7 +213,10 @@ def create_series(
             price = round_to_increment(mid_i + offset, price_increment)
             ask_pairs.append((price, volume))
 
-        book = OrderBook(instrument=instrument, timestamp=current_timestamp, bids=tuple(bid_pairs), asks=tuple(ask_pairs))
+        bid_levels = _build_book_levels(bid_pairs, price_increment)
+        ask_levels = _build_book_levels(ask_pairs, price_increment)
+
+        book = OrderBook(instrument=instrument, timestamp=current_timestamp, bids=bid_levels, asks=ask_levels)
         books.append(book)
         current_timestamp += time_step
 
@@ -243,7 +246,7 @@ def _parse_price_volume_levels(levels: Iterable[str] | None) -> list[tuple[Decim
 
 
 def _build_book_levels(
-    pairs: list[tuple[DecimalLike, DecimalLike]],
+    pairs: Sequence[tuple[DecimalLike, DecimalLike]],
     price_increment: Decimal,
 ) -> tuple[BookLevel, ...]:
     """Convert raw (price, volume) pairs into `BookLevel` instances.

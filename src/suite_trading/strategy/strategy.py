@@ -8,6 +8,7 @@ from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction, create_strategy_state_machine
+from suite_trading.utils.state_machine import StateMachine
 from suite_trading.domain.order.order_fill import OrderFill
 
 if TYPE_CHECKING:
@@ -62,7 +63,7 @@ class Strategy(ABC):
 
         self._name = name
         self._trading_engine = None
-        self._state_machine = create_strategy_state_machine()
+        self._state_machine: StateMachine[StrategyState, StrategyAction] = create_strategy_state_machine()
 
     # endregion
 
@@ -304,7 +305,7 @@ class Strategy(ABC):
         Raises:
             RuntimeError: If $_trading_engine is None.
         """
-        return self._require_trading_engine().brokers
+        return dict(self._require_trading_engine().brokers)
 
     def get_broker(self, name: str) -> Broker:
         """Get a Broker by its registered name from the attached TradingEngine.

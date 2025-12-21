@@ -46,11 +46,11 @@ class EngineAction(Action):
     ERROR_OCCURRED = "ERROR_OCCURRED"
 
 
-def create_engine_state_machine() -> StateMachine:
+def create_engine_state_machine() -> StateMachine[EngineState, EngineAction]:
     """Create a configured StateMachine for TradingEngine lifecycle management.
 
     Returns:
-        StateMachine: A StateMachine instance configured with TradingEngine transitions,
+        StateMachine[EngineState, EngineAction]: A StateMachine instance configured with TradingEngine transitions,
         starting in NEW state.
     """
     transitions = {

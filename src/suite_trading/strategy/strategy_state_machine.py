@@ -46,11 +46,11 @@ class StrategyAction(Action):
     ERROR_OCCURRED = "ERROR_OCCURRED"
 
 
-def create_strategy_state_machine() -> StateMachine:
+def create_strategy_state_machine() -> StateMachine[StrategyState, StrategyAction]:
     """Create a configured StateMachine for Strategy lifecycle management.
 
     Returns:
-        StateMachine: A StateMachine instance configured with Strategy transitions,
+        StateMachine[StrategyState, StrategyAction]: A StateMachine instance configured with Strategy transitions,
         starting in NEW state.
     """
     transitions = {

@@ -101,6 +101,10 @@ class FixedRatioMarginModel(MarginModel):
         best_bid = order_book.best_bid
         best_ask = order_book.best_ask
 
+        # Check: ensure OrderBook has quotes on both sides to compute mid price
+        if best_bid is None or best_ask is None:
+            raise ValueError(f"Cannot call `_extract_price_from_order_book` because OrderBook for Instrument '{order_book.instrument}' is empty on one or both sides (bid={best_bid}, ask={best_ask})")
+
         return (best_bid.price + best_ask.price) / Decimal("2")
 
     # endregion

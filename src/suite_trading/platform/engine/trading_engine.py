@@ -79,7 +79,7 @@ class TradingEngine:
         """Create a new TradingEngine."""
 
         # Current state
-        self._engine_state_machine: StateMachine = create_engine_state_machine()
+        self._engine_state_machine: StateMachine[EngineState, EngineAction] = create_engine_state_machine()
 
         # Current simulated time on the engine-owned global timeline.
         self._timeline_dt: datetime | None = None
@@ -586,6 +586,11 @@ class TradingEngine:
             strategy, event_feed_name, event_feed, callback = event_feed_tuple
             strategy_name = self._get_strategy_name(strategy)
             current_event = event_feed.pop()
+
+            # Check: ensure current_event is not None (should be guaranteed by _find_event_feed_with_earliest_event)
+            if current_event is None:
+                continue
+
             current_event_dt = current_event.dt_event
 
             # Set current time on global engine timeline
@@ -743,8 +748,7 @@ class TradingEngine:
 
         # Handle case where feed doesn't exist
         registration = self._event_feeds_by_strategy[strategy].get(feed_name)
-        feed_does_not_exist = registration is None
-        if feed_does_not_exist:
+        if registration is None:
             logger.warning(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) cannot be removed, as there is no such EventFeed")
             return
 

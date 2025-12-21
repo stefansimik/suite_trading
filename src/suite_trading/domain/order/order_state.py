@@ -74,14 +74,14 @@ class OrderAction(Action):
     COMMUNICATION_FAILURE = "COMMUNICATION_FAILURE"  # Lost connection or received conflicting status
 
 
-def create_order_state_machine(initial_state: OrderState) -> StateMachine:
+def create_order_state_machine(initial_state: OrderState) -> StateMachine[OrderState, OrderAction]:
     """Create a state machine for order lifecycle management.
 
     Args:
         initial_state: Starting `OrderState` for the state machine.
 
     Returns:
-        StateMachine: A configured state machine for managing order states.
+        StateMachine[OrderState, OrderAction]: A configured state machine for managing order states.
     """
     transitions = {
         # Initial submission of order

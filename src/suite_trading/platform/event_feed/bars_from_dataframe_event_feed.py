@@ -93,7 +93,7 @@ class BarsFromDataFrameEventFeed:
                 raise ValueError("Input DataFrame contains bar that are not in chronological order. Data must be sorted by the 'end_dt' column in ascending order. Solution: Please sort your DataFrame by 'end_dt' before creating the event feed, e.g., df.sort_values('end_dt').")
 
         # Copies of constructor params
-        self._df: pd.DataFrame = df
+        self._df: pd.DataFrame | None = df
         self._bar_type = bar_type
 
         # Internal state

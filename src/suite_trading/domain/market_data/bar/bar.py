@@ -60,7 +60,7 @@ class Bar:
         high: DecimalLike,
         low: DecimalLike,
         close: DecimalLike,
-        volume: DecimalLike | None = None,
+        volume: DecimalLike,
         *,
         is_partial: bool = False,
     ):

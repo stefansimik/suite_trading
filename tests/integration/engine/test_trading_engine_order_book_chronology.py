@@ -169,9 +169,8 @@ def test_order_book_chronology_with_mixed_tick_and_bar_feeds():
     strategy = RecordingStrategy("test_strategy")
     engine = TradingEngine()
 
-    # Add broker and strategy to engine
+    # Add broker to engine
     engine.add_broker("mock_broker", mock_broker)
-    engine.add_strategy(strategy)
 
     # Create tick events
     tick1 = TradeTickEvent(TradeTick(instrument, Decimal("100.0"), Decimal("10"), dt(9, 0, 0)), dt(9, 0, 0))
@@ -182,20 +181,21 @@ def test_order_book_chronology_with_mixed_tick_and_bar_feeds():
 
     # Create bar event (built from first 4 ticks)
     bar_type = BarType(instrument, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
-    bar1 = BarEvent(Bar(bar_type, dt(9, 0, 0), dt(9, 1, 0), Decimal("100.0"), Decimal("102.0"), Decimal("99.0"), Decimal("99.0")), dt(9, 1, 0), is_historical=True)
+    bar1 = BarEvent(Bar(bar_type, dt(9, 0, 0), dt(9, 1, 0), Decimal("100.0"), Decimal("102.0"), Decimal("99.0"), Decimal("99.0"), Decimal("100")), dt(9, 1, 0), is_historical=True)
 
     # Create event feeds (tick feed added first, then bar feed). Both feeds
     # should drive OrderBook generation, so we enable simulated fills.
     tick_feed = FixedSequenceEventFeed([tick1, tick2, tick3, tick4, tick5])
     bar_feed = FixedSequenceEventFeed([bar1])
 
-    # Add feeds to strategy during on_start and opt in for simulated fills so the
-    # TradingEngine converts these events to OrderBook snapshot(s).
-    def on_start_override():
-        strategy.add_event_feed("tick_feed", tick_feed, use_for_simulated_fills=True)
-        strategy.add_event_feed("bar_feed", bar_feed, use_for_simulated_fills=True)
+    # Define strategy that adds feeds during on_start
+    class ChronologyStrategy(RecordingStrategy):
+        def on_start(self) -> None:
+            self.add_event_feed("tick_feed", tick_feed, use_for_simulated_fills=True)
+            self.add_event_feed("bar_feed", bar_feed, use_for_simulated_fills=True)
 
-    strategy.on_start = on_start_override
+    strategy = ChronologyStrategy("test_strategy")
+    engine.add_strategy(strategy)
 
     # Run engine
     engine.start()
@@ -268,9 +268,8 @@ def test_order_book_chronology_with_delayed_bars():
     strategy = RecordingStrategy("test_strategy")
     engine = TradingEngine()
 
-    # Add broker and strategy to engine
+    # Add broker to engine
     engine.add_broker("mock_broker", mock_broker)
-    engine.add_strategy(strategy)
 
     # Create 13 tick events (one every 10 seconds from 09:00:00 to 09:02:00)
     ticks = []
@@ -282,19 +281,20 @@ def test_order_book_chronology_with_delayed_bars():
 
     # Create bar events (aggregated from ticks)
     bar_type = BarType(instrument, 1, BarUnit.MINUTE, PriceType.LAST_TRADE)
-    bar1 = BarEvent(Bar(bar_type, dt(9, 0, 0), dt(9, 1, 0), Decimal("100.0"), Decimal("102.0"), Decimal("100.0"), Decimal("101.0")), dt(9, 1, 0), is_historical=True)
-    bar2 = BarEvent(Bar(bar_type, dt(9, 1, 0), dt(9, 2, 0), Decimal("101.0"), Decimal("101.0"), Decimal("98.0"), Decimal("98.0")), dt(9, 2, 0), is_historical=True)
+    bar1 = BarEvent(Bar(bar_type, dt(9, 0, 0), dt(9, 1, 0), Decimal("100.0"), Decimal("102.0"), Decimal("100.0"), Decimal("101.0"), Decimal("100")), dt(9, 1, 0), is_historical=True)
+    bar2 = BarEvent(Bar(bar_type, dt(9, 1, 0), dt(9, 2, 0), Decimal("101.0"), Decimal("101.0"), Decimal("98.0"), Decimal("98.0"), Decimal("100")), dt(9, 2, 0), is_historical=True)
 
     # Create event feeds: ticks 1-7, then bar1, then ticks 8-13, then bar2. The
     # combined feed must drive OrderBook generation, so we enable simulated fills.
     tick_feed = FixedSequenceEventFeed(ticks[:7] + [bar1] + ticks[7:] + [bar2])
 
-    # Add feed to strategy during on_start and opt in for simulated fills so the
-    # TradingEngine converts these events to OrderBook snapshot(s).
-    def on_start_override():
-        strategy.add_event_feed("tick_feed", tick_feed, use_for_simulated_fills=True)
+    # Define strategy that adds feed during on_start
+    class DelayedBarStrategy(RecordingStrategy):
+        def on_start(self) -> None:
+            self.add_event_feed("tick_feed", tick_feed, use_for_simulated_fills=True)
 
-    strategy.on_start = on_start_override
+    strategy = DelayedBarStrategy("test_strategy")
+    engine.add_strategy(strategy)
 
     # Run engine
     engine.start()

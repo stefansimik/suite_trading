@@ -113,17 +113,15 @@ class BarAccumulator:
         if start_dt is None or end_dt is None:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.build_bar` because $start_dt or $end_dt is None")
 
-        return Bar(
-            bar_type=out_bar_type,
-            start_dt=start_dt,
-            end_dt=end_dt,
-            open=self._open,
-            high=self._high,
-            low=self._low,
-            close=self._close,
-            volume=self._volume,
-            is_partial=is_partial,
-        )
+        # Precondition: cannot build a bar if no data has been accumulated
+        if not self.has_data():
+            raise ValueError(f"Cannot call `{self.__class__.__name__}.build_bar` because no data has been accumulated")
+
+        # DECIDE
+        result = Bar(out_bar_type, start_dt, end_dt, self._open, self._high, self._low, self._close, self._volume, is_partial=is_partial)
+
+        # ACT
+        return result
 
     # endregion
 

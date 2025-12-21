@@ -189,7 +189,7 @@ class DistributionFillModel:
 
         return slipped_fills
 
-    def _apply_limit_fill_logic(self, order: Order, proposed_fills: list[ProposedFill], order_book: OrderBook) -> list[ProposedFill]:
+    def _apply_limit_fill_logic(self, order: LimitOrder | StopLimitOrder, proposed_fills: list[ProposedFill], order_book: OrderBook) -> list[ProposedFill]:
         """Apply on-touch behavior for limit-like orders.
 
         Behavior is split into clear cases:

@@ -228,7 +228,7 @@ def create_series(
 
     close_prices: list[Decimal] = []
     for i in range(num_bars):
-        pattern_value = as_decimal(price_pattern_func(x=i))
+        pattern_value = as_decimal(price_pattern_func(i))
         close_price = base_price * pattern_value
         close_prices.append(round_to_increment(close_price, price_increment))
 

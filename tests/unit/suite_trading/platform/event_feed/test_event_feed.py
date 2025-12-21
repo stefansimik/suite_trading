@@ -1,8 +1,20 @@
 import pytest
 from typing import Optional, List
-from unittest.mock import Mock
 
+from datetime import datetime, timezone
 from suite_trading.domain.event import Event
+
+
+class MockEvent(Event):
+    """Subclass of Event that adds a name for testing purposes."""
+
+    __slots__ = ("name",)
+
+    def __init__(self, name: str):
+        # Use a fixed timestamp for all test events
+        dt = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        super().__init__(dt_event=dt, dt_received=dt)
+        self.name = name
 
 
 class MockEventFeed:
@@ -79,11 +91,9 @@ class MockEventFeed:
         return {"event_type": "test", "parameters": {}, "callback": None, "event_feed_provider_ref": "mock"}
 
 
-def create_test_event(name: str) -> Event:
+def create_test_event(name: str) -> MockEvent:
     """Create a test event with the given name."""
-    event = Mock(spec=Event)
-    event.name = name
-    return event
+    return MockEvent(name)
 
 
 def create_test_feed_with_one_event() -> MockEventFeed:

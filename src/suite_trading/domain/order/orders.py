@@ -77,7 +77,7 @@ class Order:
         self._fills: list[OrderFill] = []  # Chronological by append order
 
         # Internal state — created exactly once based on subclass-declared INITIAL_STATE
-        self._state_machine: StateMachine = create_order_state_machine(initial_state=self.__class__.INITIAL_STATE)
+        self._state_machine: StateMachine[OrderState, OrderAction] = create_order_state_machine(initial_state=self.__class__.INITIAL_STATE)
 
         # Validation
         self._validate()
