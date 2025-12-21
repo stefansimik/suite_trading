@@ -214,7 +214,10 @@ class Broker(Protocol):
         ...
 
     def get_signed_position_quantity(self, instrument: Instrument) -> Decimal:
-        """Retrieve the current signed position quantity for $instrument (0 if flat).
+        """Retrieve the net position quantity for $instrument.
+
+        Returns a positive value for buy (long) positions, a negative value for
+        sell (short) positions, and zero if there is no position.
 
         This is a helper method that returns `Decimal("0")` if there is no open
         exposure, avoiding the need for `None` checks in calling code.
@@ -223,7 +226,7 @@ class Broker(Protocol):
             instrument: Instrument to look up.
 
         Returns:
-            Decimal: Current net exposure (positive for long, negative for short, 0 if flat).
+            The signed net quantity for $instrument.
         """
         ...
 

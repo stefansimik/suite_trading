@@ -52,7 +52,8 @@ class OrderFill:
 
         Args:
             order: Reference to the parent order that was filled.
-            signed_quantity: Filled net quantity (positive for BUY, negative for SELL).
+            signed_quantity: The net filled quantity. Returns a positive value for buy fills
+                and a negative value for sell fills.
             price: Fill price.
             timestamp: When this fill occurred.
             commission: Commission/fees charged for this fill.
@@ -128,12 +129,19 @@ class OrderFill:
 
     @property
     def absolute_quantity(self) -> Decimal:
-        """The absolute size of the fill (magnitude)."""
+        """The absolute amount of filled quantity.
+
+        This value is always positive and represents the magnitude of the
+        filled quantity, regardless of whether it is a buy or sell.
+        """
         return abs(self._signed_quantity)
 
     @property
     def signed_quantity(self) -> Decimal:
-        """The net impact of the fill (positive for BUY, negative for SELL)."""
+        """The signed filled quantity.
+
+        Returns a positive value for buy fills and a negative value for sell fills.
+        """
         return self._signed_quantity
 
     @property

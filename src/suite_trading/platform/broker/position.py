@@ -15,14 +15,15 @@ class Position:
     the broker's view of that account's net holding for one $instrument.
 
     Notes:
-        - Quantity can be positive (long), negative (short), or zero (flat).
+        - Quantity is positive for buy (long) positions, negative for sell (short)
+          positions, or zero (flat).
         - Prices can be negative in markets that support them.
         - $last_update is a timezone-aware timestamp supplied by the caller
           (engine time, broker event time, or market data timestamp).
 
     Args:
         instrument: The financial instrument for this position.
-        signed_quantity: Net position quantity (positive for long, negative for short).
+        signed_quantity: Net position quantity (positive for buy/long, negative for sell/short).
         average_price: Average entry price for the current net position.
         unrealized_pnl: Current unrealized profit/loss based on market price.
         realized_pnl: Total realized profit/loss from closed portions.
@@ -70,12 +71,20 @@ class Position:
 
     @property
     def signed_quantity(self) -> Decimal:
-        """The current net exposure (positive for LONG, negative for SHORT)."""
+        """The net position quantity.
+
+        Returns a positive value for buy (long) positions, a negative value for
+        sell (short) positions, and zero if flat.
+        """
         return self._signed_quantity
 
     @property
     def absolute_quantity(self) -> Decimal:
-        """The absolute size of the position (magnitude)."""
+        """The absolute amount of exposure.
+
+        This value is always positive regardless of whether the position is
+        buy (long) or sell (short). It represents the magnitude of the holding.
+        """
         return abs(self.signed_quantity)
 
     @property

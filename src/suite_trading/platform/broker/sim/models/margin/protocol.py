@@ -63,7 +63,8 @@ class MarginModel(Protocol):
 
         Args:
             order_book: OrderBook snapshot that the broker uses to price and match this trade.
-            signed_quantity: Additional exposure for this trade (positive for BUY, negative for SELL).
+            signed_quantity: Additional net exposure for this trade. Returns a positive value for
+                buy fills and a negative value for sell fills.
                 Accepts Decimal-like scalar.
             timestamp: Time when margin is calculated for this trade. Usually the same as
                 $order_book.timestamp, but callers can pass a different evaluation time.

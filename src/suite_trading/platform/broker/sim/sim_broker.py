@@ -304,13 +304,16 @@ class SimBroker(Broker, SimulatedBroker):
     def get_signed_position_quantity(self, instrument: Instrument) -> Decimal:
         """Implements: Broker.get_signed_position_quantity
 
-        Retrieve the current net position signed quantity for $instrument (0 if flat).
+        Retrieve the net position quantity for $instrument.
+
+        Returns a positive value for buy (long) positions, a negative value for
+        sell (short) positions, and zero if there is no position.
 
         Args:
             instrument: Instrument to look up.
 
         Returns:
-            Decimal: Current net signed quantity (positive for long, negative for short, 0 if flat).
+            The signed net quantity for $instrument.
         """
         position = self.get_position(instrument)
         return position.signed_quantity if position is not None else Decimal("0")

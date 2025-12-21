@@ -35,9 +35,10 @@ class Order:
     Properties:
         id (str): Unique identifier for the order (read-only).
         instrument (Instrument): The financial instrument to trade (read-only).
-        signed_quantity (Decimal): The net quantity to trade (positive for BUY, negative for SELL) (read-only).
+        signed_quantity (Decimal): The net quantity to trade. Returns a positive value for buy
+            orders and a negative value for sell orders (read-only).
         side (OrderSide): Whether this is a BUY or SELL order (read-only).
-        absolute_quantity (Decimal): The magnitude of the order (read-only).
+        absolute_quantity (Decimal): The total magnitude of the order; always positive (read-only).
         time_in_force (TimeInForce): How long the order remains active (read-only).
         good_till_dt (datetime | None): Expiry datetime for GTD orders, or None for non-GTD orders (read-only).
         state (OrderState): Current state of the order from the internal state machine.
@@ -59,7 +60,7 @@ class Order:
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for BUY, negative for SELL).
+            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
@@ -135,17 +136,28 @@ class Order:
 
     @property
     def absolute_quantity(self) -> Decimal:
-        """The total size of the order (magnitude)."""
+        """The absolute size of the order.
+
+        This value is always positive and represents the magnitude of the
+        order quantity, regardless of whether it is a buy or sell.
+        """
         return abs(self._signed_quantity)
 
     @property
     def signed_quantity(self) -> Decimal:
-        """The net impact of the order (positive for BUY, negative for SELL)."""
+        """The signed quantity of the order.
+
+        Returns a positive value for buy orders and a negative value for sell orders.
+        """
         return self._signed_quantity
 
     @property
     def absolute_filled_quantity(self) -> Decimal:
-        """Total filled absolute quantity across recorded fills."""
+        """The total amount of filled quantity.
+
+        This value is always positive and represents the magnitude of fills
+        regardless of whether it is a buy or sell order.
+        """
         total = Decimal("0")
         for e in self._fills:
             total += e.absolute_quantity
@@ -153,7 +165,10 @@ class Order:
 
     @property
     def signed_filled_quantity(self) -> Decimal:
-        """The net impact of filled quantity (positive for BUY, negative for SELL)."""
+        """The net filled quantity.
+
+        Returns a positive value for buy fills and a negative value for sell fills.
+        """
         total = Decimal("0")
         for e in self._fills:
             total += e.signed_quantity
@@ -161,12 +176,19 @@ class Order:
 
     @property
     def absolute_unfilled_quantity(self) -> Decimal:
-        """Remaining unfilled absolute quantity for this order."""
+        """The total amount of unfilled quantity.
+
+        This value is always positive and represents the magnitude of the
+        remaining quantity regardless of whether it is a buy or sell order.
+        """
         return self.absolute_quantity - self.absolute_filled_quantity
 
     @property
     def signed_unfilled_quantity(self) -> Decimal:
-        """The net impact of unfilled quantity (positive for BUY, negative for SELL)."""
+        """The net unfilled quantity.
+
+        Returns a positive value for buy orders and a negative value for sell orders.
+        """
         return self.signed_quantity - self.signed_filled_quantity
 
     @property
@@ -294,7 +316,8 @@ class Order:
         `self.state` or `self.state_category` after the call if they need the latest state.
 
         Args:
-            signed_quantity: Filled net quantity (positive for BUY, negative for SELL).
+            signed_quantity: The net filled quantity. Returns a positive value for buy fills
+                and a negative value for sell fills.
             price: Fill price.
             timestamp: When the fill occurred.
             commission: Commission/fees for this fill.
@@ -438,7 +461,7 @@ class MarketOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for BUY, negative for SELL).
+            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
@@ -472,7 +495,7 @@ class LimitOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for BUY, negative for SELL).
+            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
             limit_price (DecimalLike): The limit price for the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.
@@ -527,7 +550,7 @@ class StopMarketOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for BUY, negative for SELL).
+            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
             stop_price (DecimalLike): The stop price for the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.
@@ -581,7 +604,7 @@ class StopLimitOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for BUY, negative for SELL).
+            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
             stop_price (DecimalLike): The stop price that triggers the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.

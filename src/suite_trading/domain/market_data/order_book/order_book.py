@@ -35,7 +35,8 @@ class ProposedFill(NamedTuple):
     by the broker.
 
     Attributes:
-        signed_quantity: Net quantity filled (positive for BUY, negative for SELL).
+        signed_quantity: The net filled quantity. Returns a positive value for buy fills
+            and a negative value for sell fills.
         price: Execution price.
     """
 
@@ -44,7 +45,11 @@ class ProposedFill(NamedTuple):
 
     @property
     def absolute_quantity(self) -> Decimal:
-        """The absolute size of the fill (magnitude)."""
+        """The absolute amount of filled quantity.
+
+        This value is always positive and represents the magnitude of the
+        filled quantity, regardless of whether it is a buy or sell.
+        """
         return abs(self.signed_quantity)
 
 
@@ -141,7 +146,8 @@ class OrderBook:
         eligible depth. Negative prices are allowed.
 
         Args:
-            target_signed_quantity: Total signed quantity to fill (positive for BUY, negative for SELL).
+            target_signed_quantity: Total signed quantity to fill. Returns a positive value for buy
+                fills and a negative value for sell fills.
             min_price: Optional inclusive floor price on the chosen side. If None, there is no lower
                 bound.
             max_price: Optional inclusive ceiling price on the chosen side. If None, there is no upper
