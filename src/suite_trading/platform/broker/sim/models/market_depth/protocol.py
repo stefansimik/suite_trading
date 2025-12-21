@@ -9,41 +9,34 @@ from suite_trading.domain.market_data.order_book.order_book import OrderBook
 
 
 class MarketDepthModel(Protocol):
-    """Protocol for enriching thin OrderBooks with market microstructure.
+    """Protocol for customizing the liquidity available for matching our orders.
 
-    Purpose:
-        Take a thin or zero-spread OrderBook from the converter and return an
-        enriched version with added spread, depth, and liquidity modeling. This
-        allows different brokers to test with different market microstructure
-        assumptions.
+    This model allows you to tailor the OrderBook to meet specific simulation
+    requirements. It defines exactly what liquidity—the volume available at
+    various price levels—is provided specifically for fulfilling 'our' orders
+    within the simulated environment.
 
-    Enrichment may include:
-        - Adding spread for zero-spread books (realistic bid/ask)
-        - Adding depth for thin books (multiple price levels)
-        - Modeling slippage and market impact
-        - Broker-specific liquidity assumptions
+    By customizing the matching liquidity, you can:
+    - **Simulate thin markets**: Lower the available volume to test how larger
+      orders are filled or to simulate increased slippage.
+    - **Model deep markets**: Increase liquidity to test strategy capacity
+      without realistic market impact.
+    - **Tailor spreads**: Adjust the gap between bid and ask to reflect
+      broker-specific execution environments or wider market conditions.
 
-    Notes:
-        - Implementations may return the input unchanged (pass-through) or create
-          a new OrderBook with added microstructure.
-        - The enriched OrderBook becomes the broker's current OrderBook used as the
-          single source of pricing truth for matching, margin, and logging at that
-          timestamp.
+    The resulting OrderBook is used by the broker as the single source of truth
+    for order matching, margin calculations, and reporting.
     """
 
-    def enrich_order_book(self, order_book: OrderBook) -> OrderBook:
-        """Return an enriched OrderBook snapshot for trading, margin, and logging.
-
-        Implementations may adjust spreads, depth, or liquidity based on broker
-        assumptions, but must preserve $instrument and $timestamp from the input
-        $order_book. The returned OrderBook becomes the single source of truth
-        for this timestamp inside simulated brokers.
+    def customize_matching_liquidity(self, order_book: OrderBook) -> OrderBook:
+        """Customize the OrderBook liquidity to represent what is available for matching.
 
         Args:
-            order_book: Input OrderBook snapshot to enrich.
+            order_book: The raw OrderBook snapshot from the market data feed.
 
         Returns:
-            OrderBook: Enriched OrderBook snapshot for this timestamp.
+            A customized OrderBook representing the specific liquidity available
+            for fulfilling our orders at this timestamp.
         """
         ...
 

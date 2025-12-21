@@ -370,15 +370,15 @@ class SimBroker(Broker, SimulatedBroker):
         # Reusable variables
         instrument = order_book.instrument
 
-        # Enrich OrderBook (simulates customizable liquidity)
-        enriched_order_book = self._depth_model.enrich_order_book(order_book)
+        # Customize matching liquidity (simulates broker-specific environments)
+        customized_order_book = self._depth_model.customize_matching_liquidity(order_book)
         # Store OrderBook
-        self._latest_order_book_by_instrument[instrument] = enriched_order_book
+        self._latest_order_book_by_instrument[instrument] = customized_order_book
 
         # Single pass per order: trigger stop-like orders, then simulate fills if fillable
         orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument == instrument]
         for order in orders_for_instrument:
-            self._match_order_against_order_book(order, enriched_order_book)
+            self._match_order_against_order_book(order, customized_order_book)
 
     # endregion
 
@@ -394,7 +394,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         Args:
             order: Order to process.
-            order_book: Enriched OrderBook snapshot for the same instrument.
+            order_book: Customized OrderBook snapshot for matching.
         """
         # VALIDATE
         # Precondition: avoid cross-instrument processing bugs
@@ -418,7 +418,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         Args:
             order: Order to evaluate for stop trigger.
-            order_book: Enriched OrderBook snapshot for the same instrument.
+            order_book: Customized OrderBook snapshot for matching.
         """
 
         # VALIDATE

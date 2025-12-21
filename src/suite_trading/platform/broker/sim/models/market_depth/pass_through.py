@@ -11,7 +11,7 @@ from .protocol import MarketDepthModel
 class PassThroughMarketDepthModel(MarketDepthModel):
     """Pass-through depth model – returns the incoming OrderBook as-is.
 
-    This model performs no enrichment, returning the provided OrderBook
+    This model performs no customization, returning the provided OrderBook
     unchanged. Suitable for backtesting with zero-spread assumptions or
     when upstream OrderBooks already contain the desired liquidity.
 
@@ -22,14 +22,14 @@ class PassThroughMarketDepthModel(MarketDepthModel):
 
     __slots__ = ()
 
-    def enrich_order_book(self, order_book: OrderBook) -> OrderBook:
+    def customize_matching_liquidity(self, order_book: OrderBook) -> OrderBook:
         """Return the provided OrderBook unchanged (pass-through).
 
         Args:
             order_book: OrderBook snapshot from the converter.
 
         Returns:
-            OrderBook: Same OrderBook instance, no enrichment applied.
+            OrderBook: Same OrderBook instance, no customization applied.
         """
         return order_book
 
