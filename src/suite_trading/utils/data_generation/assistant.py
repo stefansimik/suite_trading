@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-# Justification: Provide a single, discoverable entry point for data generation
-# helpers used across tests, examples, and quick-start notebooks.
-
 from suite_trading.utils.data_generation import (
     factory_bar,
     factory_instrument,

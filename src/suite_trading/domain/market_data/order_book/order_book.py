@@ -9,8 +9,6 @@ from suite_trading.utils.datetime_tools import expect_utc, format_dt
 if TYPE_CHECKING:
     from suite_trading.domain.instrument import Instrument
 
-# Justification: Shared order book price level shape reused across broker, engine, and tests.
-
 
 class BookLevel(NamedTuple):
     """Price level with a limit $price and total resting $volume.
@@ -22,9 +20,6 @@ class BookLevel(NamedTuple):
 
     price: Decimal
     volume: Decimal
-
-
-# Justification: Represent proposed fills reused between broker, order matching, and tests.
 
 
 class ProposedFill(NamedTuple):

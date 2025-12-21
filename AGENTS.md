@@ -703,12 +703,10 @@ bids: Sequence[tuple[Decimal, Decimal]]
 ## 6.3. If Adding One
 - Prefer `NamedTuple` for read-only shapes
 - Or `@dataclass(frozen=True)` with `__slots__` when validation needed
-- Include **`# Justification: <reason>`** comment above definition
-- State invariant(s) or performance reason in docstring
+- State the justification, invariant(s) or performance reason in the docstring if the reason for the abstraction is not obvious from the context.
 
 **Example:**
 ```python
-# Justification: Enforce non-negative volume and unify schema across 5 modules
 class BookLevel(NamedTuple):
     """Represents a single price level in an order book.
 
@@ -726,7 +724,7 @@ class BookLevel(NamedTuple):
 
 **Acceptance checks:**
 - [ ] No primitive aliases exposed in public APIs
-- [ ] New abstractions include `# Justification:` line
+- [ ] New abstractions have a clear justification in their docstring if the reason for their existence is not obvious
 - [ ] Signatures use explicit types unless justified value object exists
 - [ ] Utils/wrappers only with 3+ reuse sites or explicit hot-path perf need
 
