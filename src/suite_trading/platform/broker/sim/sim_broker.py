@@ -488,7 +488,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         # Special case 1: Order of type FOK = Fill all-or-nothing
         if tif == TimeInForce.FOK:
-            has_liquidity = sum(s.signed_quantity for s in proposed_fills) >= order.absolute_unfilled_quantity
+            has_liquidity = sum(s.absolute_quantity for s in proposed_fills) >= order.absolute_unfilled_quantity
             if not has_liquidity:
                 return [], True  # Expire full order: insufficient liquidity for FOK
 
@@ -632,7 +632,7 @@ class SimBroker(Broker, SimulatedBroker):
         if can_block_initial_margin:
             self._account.block_initial_margin_for_instrument(instrument, initial_margin)
 
-        order_fill = order.add_fill(absolute_quantity=proposed_fill.absolute_quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission)
+        order_fill = order.add_fill(signed_quantity=proposed_fill.signed_quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission)
         self._append_order_fill_to_history_and_update_position(order_fill)
 
         if can_block_initial_margin:
@@ -641,7 +641,7 @@ class SimBroker(Broker, SimulatedBroker):
         self._account.set_maintenance_margin_for_instrument_position(instrument, maintenance_margin_after)
 
         if order_fill.commission.value > 0:
-            fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {order_fill.absolute_quantity} Order ID / OrderFill ID: {order_fill.order.id} / {order_fill.id}"
+            fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {order_fill.signed_quantity} Order ID / OrderFill ID: {order_fill.order.id} / {order_fill.id}"
             self._account.pay_fee(order_fill.timestamp, order_fill.commission, fee_description)
 
         return order_fill
@@ -708,7 +708,7 @@ class SimBroker(Broker, SimulatedBroker):
             new_funds_value = funds.value - commission.value - max(0, maintenance_margin_delta)
             funds_by_currency[currency] = Money(new_funds_value, currency)
 
-            sim_order_fill = OrderFill(order=order, absolute_quantity=proposed_fill.absolute_quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
+            sim_order_fill = OrderFill(order=order, signed_quantity=proposed_fill.signed_quantity, price=proposed_fill.price, timestamp=timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
             simulated_order_fill_history.append(sim_order_fill)
             signed_position_quantity = signed_position_quantity_after
 
@@ -727,7 +727,7 @@ class SimBroker(Broker, SimulatedBroker):
     ) -> tuple[Money, Money, Money]:
         """Compute absolute commission and margins for a single $proposed_fill."""
         # COMPUTE: Commission
-        commission = self._fee_model.compute_commission(order=order, price=proposed_fill.price, absolute_quantity=proposed_fill.absolute_quantity, timestamp=timestamp, previous_order_fills=previous_order_fills)
+        commission = self._fee_model.compute_commission(order=order, price=proposed_fill.price, signed_quantity=proposed_fill.signed_quantity, timestamp=timestamp, previous_order_fills=previous_order_fills)
 
         # COMPUTE: Incremental position size
         # Check: initial margin is only required if we are increasing the absolute size of the position

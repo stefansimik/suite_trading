@@ -11,7 +11,6 @@ from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSeq
 from suite_trading.platform.engine.models.event_to_order_book.default_impl import DefaultEventToOrderBookConverter
 
 from suite_trading.domain.order.orders import LimitOrder, Order, MarketOrder  # noqa: F401 (MarketOrder kept for parity with other tests)
-from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.order.order_state import OrderState
 
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
@@ -85,7 +84,7 @@ def test_limit_buy_crossing_best_ask_fills_immediately() -> None:
     quote_tick_events = [_create_quote_tick_event(instrument, bid="99.97@5", ask="100.00@5", timestamp_index=0)]
 
     def create_limit_order(_: QuoteTickEvent) -> Order:
-        return LimitOrder(instrument=instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"), limit_price=Decimal("100.01"))
+        return LimitOrder(instrument=instrument, signed_quantity=1, limit_price=100.01)
 
     limit_order_strategy = _LimitOrderTestStrategy(name="limit_reject", broker=broker, feed_name="prices", quote_tick_events=quote_tick_events, order_factory=create_limit_order, remove_feed_after_submit=True)
     engine.add_strategy(limit_order_strategy)
@@ -116,7 +115,7 @@ def test_limit_instant_fill_touch() -> None:
     quote_tick_events = [_create_quote_tick_event(instrument, bid="99.95@5", ask="99.98@5", timestamp_index=0)]
 
     def create_limit_order(_: QuoteTickEvent) -> Order:
-        return LimitOrder(instrument=instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"), limit_price=Decimal("99.98"))
+        return LimitOrder(instrument=instrument, signed_quantity=1, limit_price=99.98)
 
     limit_order_strategy = _LimitOrderTestStrategy(name="limit_instant_fill", broker=broker, feed_name="prices", quote_tick_events=quote_tick_events, order_factory=create_limit_order, remove_feed_after_submit=True)
     engine.add_strategy(limit_order_strategy)
@@ -148,7 +147,7 @@ def test_limit_multiple_partial_fills() -> None:
     ]
 
     def create_limit_order(_: QuoteTickEvent) -> Order:
-        return LimitOrder(instrument=instrument, side=OrderSide.BUY, absolute_quantity=Decimal("3"), limit_price=Decimal("100.00"))
+        return LimitOrder(instrument=instrument, signed_quantity=3, limit_price=100.00)
 
     limit_order_strategy = _LimitOrderTestStrategy(name="limit_partials", broker=broker, feed_name="fill_prices", quote_tick_events=quote_tick_events, order_factory=create_limit_order, remove_feed_after_submit=False)
     engine.add_strategy(limit_order_strategy)

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from datetime import datetime, timezone
-from decimal import Decimal as D
 
 
 from suite_trading.domain.instrument import Instrument, AssetClass
@@ -18,9 +19,9 @@ class TestOrderBookSimulateFills:
             name="TEST",
             exchange="XTST",
             asset_class=AssetClass.FUTURE,
-            price_increment=D("0.01"),
-            quantity_increment=D("1"),
-            contract_size=D("1"),
+            price_increment=Decimal("0.01"),
+            quantity_increment=Decimal("1"),
+            contract_size=Decimal("1"),
             contract_unit="contract",
             quote_currency=usd,
             settlement_currency=usd,
@@ -33,41 +34,41 @@ class TestOrderBookSimulateFills:
         """BUY should consume ask levels best-first until absolute_quantity is met (10@100 then 2@101)."""
         instr = self._instrument()
         ts = self._ts()
-        asks = [BookLevel(D("100"), D("10")), BookLevel(D("101"), D("5"))]
+        asks = [BookLevel(Decimal("100"), Decimal("10")), BookLevel(Decimal("101"), Decimal("5"))]
         book = OrderBook(instr, ts, bids=(), asks=tuple(asks))
 
-        fills = book.simulate_fills(target_signed_quantity=D("12"))
+        fills = book.simulate_fills(target_signed_quantity=Decimal("12"))
         pairs = [(f.signed_quantity, f.price) for f in fills]
-        assert pairs == [(D("10"), D("100")), (D("2"), D("101"))]
+        assert pairs == [(Decimal("10"), Decimal("100")), (Decimal("2"), Decimal("101"))]
 
     def test_sell_consumes_bids_best_first(self):
         """SELL should consume bid levels best-first (4@99 then 1@98 to reach absolute_quantity=5)."""
         instr = self._instrument()
         ts = self._ts()
-        bids = [BookLevel(D("99"), D("4")), BookLevel(D("98"), D("7"))]
+        bids = [BookLevel(Decimal("99"), Decimal("4")), BookLevel(Decimal("98"), Decimal("7"))]
         book = OrderBook(instr, ts, bids=tuple(bids), asks=())
 
-        fills = book.simulate_fills(target_signed_quantity=-D("5"))
+        fills = book.simulate_fills(target_signed_quantity=-Decimal("5"))
         pairs = [(f.signed_quantity, f.price) for f in fills]
-        assert pairs == [(D("-4"), D("99")), (D("-1"), D("98"))]
+        assert pairs == [(Decimal("-4"), Decimal("99")), (Decimal("-1"), Decimal("98"))]
 
     def test_price_filters_min_max_respected(self):
         """Max price filter should cap BUY fills at 101, skipping higher levels."""
         instr = self._instrument()
         ts = self._ts()
-        asks = [BookLevel(D("100"), D("10")), BookLevel(D("101"), D("10")), BookLevel(D("102"), D("10"))]
+        asks = [BookLevel(Decimal("100"), Decimal("10")), BookLevel(Decimal("101"), Decimal("10")), BookLevel(Decimal("102"), Decimal("10"))]
         book = OrderBook(instr, ts, bids=(), asks=tuple(asks))
 
-        fills = book.simulate_fills(target_signed_quantity=D("30"), max_price=D("101"))
+        fills = book.simulate_fills(target_signed_quantity=Decimal("30"), max_price=Decimal("101"))
         pairs = [(f.signed_quantity, f.price) for f in fills]
-        assert pairs == [(D("10"), D("100")), (D("10"), D("101"))]
+        assert pairs == [(Decimal("10"), Decimal("100")), (Decimal("10"), Decimal("101"))]
 
     def test_negative_prices_allowed(self):
         """Support markets that allow negative prices: BUY 1 at −5 should be accepted."""
         instr = self._instrument()
         ts = self._ts()
-        asks = [BookLevel(D("-5"), D("1"))]
+        asks = [BookLevel(Decimal("-5"), Decimal("1"))]
         book = OrderBook(instr, ts, bids=(), asks=tuple(asks))
 
-        fills = book.simulate_fills(target_signed_quantity=D("1"))
-        assert [(f.signed_quantity, f.price) for f in fills] == [(D("1"), D("-5"))]
+        fills = book.simulate_fills(target_signed_quantity=Decimal("1"))
+        assert [(f.signed_quantity, f.price) for f in fills] == [(Decimal("1"), Decimal("-5"))]

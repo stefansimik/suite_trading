@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol
 from datetime import datetime
-from decimal import Decimal
+
+from suite_trading.utils.decimal_tools import DecimalLike
 
 from suite_trading.domain.monetary.money import Money
 from suite_trading.domain.market_data.order_book.order_book import OrderBook
@@ -55,7 +56,7 @@ class MarginModel(Protocol):
     def compute_initial_margin(
         self,
         order_book: OrderBook,
-        signed_quantity: Decimal,
+        signed_quantity: DecimalLike,
         timestamp: datetime,
     ) -> Money:
         """Compute initial margin required for a prospective trade.
@@ -63,6 +64,7 @@ class MarginModel(Protocol):
         Args:
             order_book: OrderBook snapshot that the broker uses to price and match this trade.
             signed_quantity: Additional exposure for this trade (positive for BUY, negative for SELL).
+                Accepts Decimal-like scalar.
             timestamp: Time when margin is calculated for this trade. Usually the same as
                 $order_book.timestamp, but callers can pass a different evaluation time.
         """
@@ -71,7 +73,7 @@ class MarginModel(Protocol):
     def compute_maintenance_margin(
         self,
         order_book: OrderBook,
-        signed_quantity: Decimal,
+        signed_quantity: DecimalLike,
         timestamp: datetime,
     ) -> Money:
         """Compute maintenance margin for the current net position.
@@ -79,6 +81,7 @@ class MarginModel(Protocol):
         Args:
             order_book: OrderBook snapshot that the broker uses to value this position.
             signed_quantity: Current net position (long > 0, short < 0).
+                Accepts Decimal-like scalar.
             timestamp: Time when margin is calculated for this position. Usually the same as
                 $order_book.timestamp, but callers can pass a different evaluation time.
         """

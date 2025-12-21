@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from datetime import datetime, timezone, timedelta
-from decimal import Decimal as D
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
-from suite_trading.domain.order.order_enums import OrderSide
+
 from suite_trading.domain.order.orders import MarketOrder
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
@@ -20,7 +21,7 @@ class TestSimBrokerMarketOrder:
     """Market orders fill using the latest order-book snapshot through the full engine pipeline."""
 
     def _create_optimistic_sim_broker(self) -> SimBroker:
-        fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: D("1")}, limit_on_touch_fill_probability=D("1"), rng_seed=42)
+        fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1")}, limit_on_touch_fill_probability=Decimal("1"), rng_seed=42)
         return SimBroker(fill_model=fill_model)
 
     def _instrument(self) -> Instrument:
@@ -41,7 +42,7 @@ class TestSimBrokerMarketOrder:
     class _SubmitBeforeAnySnapshotStrategy(Strategy):
         """Submit a BUY at start when no order-books exist; then feed one quote to trigger the fill."""
 
-        def __init__(self, name: str, broker: SimBroker, instrument: Instrument, price: D, ts: datetime) -> None:
+        def __init__(self, name: str, broker: SimBroker, instrument: Instrument, price: Decimal, ts: datetime) -> None:
             super().__init__(name)
             self._broker = broker
             self._instrument = instrument
@@ -61,17 +62,17 @@ class TestSimBrokerMarketOrder:
         def on_event(self, event) -> None:
             # Submit in the kickoff event callback (no order-book exists yet), then attach the first quote tick feed
             if isinstance(event, TestSimBrokerMarketOrder._KickoffEvent):
-                self.submit_order(MarketOrder(self._instrument, OrderSide.BUY, D("1")), self._broker)
+                self.submit_order(MarketOrder(self._instrument, 1), self._broker)
                 self.remove_event_feed("kick")
 
                 # Now add a single-quote feed to produce the first order-book
-                tick = DGA.quote_tick.from_strings(self._instrument, f"{self._price - D('1')}@5", f"{self._price}@5", self._ts)
+                tick = DGA.quote_tick.from_strings(self._instrument, f"{self._price - Decimal('1')}@5", f"{self._price}@5", self._ts)
                 self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
     class _SubmitWhenSnapshotExistsStrategy(Strategy):
         """Create a quote first, then submit inside callback so an order-book exists on submit."""
 
-        def __init__(self, name: str, broker: SimBroker, instrument: Instrument, ask_price: D, ts: datetime) -> None:
+        def __init__(self, name: str, broker: SimBroker, instrument: Instrument, ask_price: Decimal, ts: datetime) -> None:
             super().__init__(name)
             self._broker = broker
             self._instrument = instrument
@@ -81,12 +82,12 @@ class TestSimBrokerMarketOrder:
             self.order_fills = []
 
         def on_start(self) -> None:
-            tick = DGA.quote_tick.from_strings(self._instrument, f"{self._ask - D('2')}@5", f"{self._ask}@5", self._ts)
+            tick = DGA.quote_tick.from_strings(self._instrument, f"{self._ask - Decimal('2')}@5", f"{self._ask}@5", self._ts)
             self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
         def on_event(self, event) -> None:
             if not self._submitted:
-                self.submit_order(MarketOrder(self._instrument, OrderSide.BUY, D("1")), self._broker)
+                self.submit_order(MarketOrder(self._instrument, 1), self._broker)
                 self._submitted = True
 
         def on_order_fill(self, order_fill) -> None:
@@ -115,7 +116,7 @@ class TestSimBrokerMarketOrder:
         def on_event(self, event) -> None:
             if isinstance(event, TestSimBrokerMarketOrder._KickoffEvent):
                 # Submit before any order-book exists; then attach three successive quote ticks
-                self.submit_order(MarketOrder(self._instrument, OrderSide.BUY, D("3")), self._broker)
+                self.submit_order(MarketOrder(self._instrument, 3), self._broker)
                 self.remove_event_feed("kick")
 
                 t0 = self._t0
@@ -148,7 +149,7 @@ class TestSimBrokerMarketOrder:
         def on_event(self, event) -> None:
             if isinstance(event, TestSimBrokerMarketOrder._KickoffEvent):
                 # Submit before any order-book exists; then attach two successive quote ticks
-                self.submit_order(MarketOrder(self._instrument, OrderSide.BUY, D("2")), self._broker)
+                self.submit_order(MarketOrder(self._instrument, 2), self._broker)
                 self.remove_event_feed("kick")
 
                 t0 = self._t0
@@ -161,7 +162,7 @@ class TestSimBrokerMarketOrder:
     class _TimestampEqualsSnapshotStrategy(Strategy):
         """Submit SELL inside first tick callback; expect order_fill timestamp equals that order-book's timestamp."""
 
-        def __init__(self, name: str, broker: SimBroker, instrument: Instrument, ask: D, ts: datetime) -> None:
+        def __init__(self, name: str, broker: SimBroker, instrument: Instrument, ask: Decimal, ts: datetime) -> None:
             super().__init__(name)
             self._broker = broker
             self._instrument = instrument
@@ -171,12 +172,12 @@ class TestSimBrokerMarketOrder:
             self.order_fills = []
 
         def on_start(self) -> None:
-            tick = DGA.quote_tick.from_strings(self._instrument, f"{self._ask - D('1')}@5", f"{self._ask}@5", self._ts)
+            tick = DGA.quote_tick.from_strings(self._instrument, f"{self._ask - Decimal('1')}@5", f"{self._ask}@5", self._ts)
             self.add_event_feed("q", FixedSequenceEventFeed([QuoteTickEvent(tick, self._ts)]), use_for_simulated_fills=True)
 
         def on_event(self, event) -> None:
             if not self._submitted:
-                self.submit_order(MarketOrder(self._instrument, OrderSide.SELL, D("2")), self._broker)
+                self.submit_order(MarketOrder(self._instrument, -2), self._broker)
                 self._submitted = True
 
         def on_order_fill(self, order_fill) -> None:
@@ -191,12 +192,12 @@ class TestSimBrokerMarketOrder:
         broker = self._create_optimistic_sim_broker()
         engine = TradingEngine()
         engine.add_broker("sim", broker)
-        s = self._SubmitBeforeAnySnapshotStrategy("s_before", broker, instr, D("100"), self._ts(1))
+        s = self._SubmitBeforeAnySnapshotStrategy("s_before", broker, instr, Decimal("100"), self._ts(1))
         engine.add_strategy(s)
 
         engine.start()
 
-        assert len(s.order_fills) == 1 and s.order_fills[0].price == D("100") and s.order_fills[0].timestamp == self._ts(1)
+        assert len(s.order_fills) == 1 and s.order_fills[0].price == Decimal("100") and s.order_fills[0].timestamp == self._ts(1)
 
     def test_immediate_fill_when_book_exists(self):
         """If an order-book exists on submit, Market order fills immediately at best ask with that snapshot's timestamp."""
@@ -204,12 +205,12 @@ class TestSimBrokerMarketOrder:
         broker = self._create_optimistic_sim_broker()
         engine = TradingEngine()
         engine.add_broker("sim", broker)
-        s = self._SubmitWhenSnapshotExistsStrategy("s_immediate", broker, instr, D("101"), self._ts(2))
+        s = self._SubmitWhenSnapshotExistsStrategy("s_immediate", broker, instr, Decimal("101"), self._ts(2))
         engine.add_strategy(s)
 
         engine.start()
 
-        assert len(s.order_fills) == 1 and s.order_fills[0].price == D("101") and s.order_fills[0].timestamp == self._ts(2)
+        assert len(s.order_fills) == 1 and s.order_fills[0].price == Decimal("101") and s.order_fills[0].timestamp == self._ts(2)
 
     def test_partial_fill_across_multiple_levels(self):
         """Three successive order-books with 1 lot each at 100/101/102 should fill BUY 3 in three proposed fills."""
@@ -223,7 +224,7 @@ class TestSimBrokerMarketOrder:
         engine.start()
 
         pairs = [(e.absolute_quantity, e.price) for e in s.order_fills]
-        assert pairs == [(D("1"), D("100")), (D("1"), D("101")), (D("1"), D("102"))]
+        assert pairs == [(Decimal("1"), Decimal("100")), (Decimal("1"), Decimal("101")), (Decimal("1"), Decimal("102"))]
 
     def test_partial_fill_completes_on_next_book(self):
         """Not enough depth now: fill 1@100, remain working, and complete on next snapshot 1@101."""
@@ -237,7 +238,7 @@ class TestSimBrokerMarketOrder:
         engine.start()
 
         pairs = [(e.absolute_quantity, e.price) for e in s.order_fills]
-        assert pairs == [(D("1"), D("100")), (D("1"), D("101"))]
+        assert pairs == [(Decimal("1"), Decimal("100")), (Decimal("1"), Decimal("101"))]
 
     def test_order_fill_timestamp_equals_order_book_timestamp(self):
         """OrderFill timestamp must equal the OrderBook timestamp used for matching."""
@@ -246,7 +247,7 @@ class TestSimBrokerMarketOrder:
         engine = TradingEngine()
         engine.add_broker("sim", broker)
         ts = self._ts(6)
-        s = self._TimestampEqualsSnapshotStrategy("s_ts", broker, instr, D("101"), ts)
+        s = self._TimestampEqualsSnapshotStrategy("s_ts", broker, instr, Decimal("101"), ts)
         engine.add_strategy(s)
 
         engine.start()

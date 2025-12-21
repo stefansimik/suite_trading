@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
 
 from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.domain.market_data.bar.bar_event import BarEvent, wrap_bars_to_events
-from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.order.orders import MarketOrder
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
@@ -52,14 +50,14 @@ class DemoStrategy(Strategy):
         # Open position on 1st bar
         if self._bar_count == 1:
             # Create and submit market order (open position)
-            order = MarketOrder(instrument=bar.instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"))
+            order = MarketOrder(instrument=bar.instrument, signed_quantity=1)
             self.submit_order(order, self._broker)
             return
 
         # Close position on 6th bar
         if self._bar_count == 6:
             # Create and submit market order (close position)
-            order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, absolute_quantity=Decimal("1"))
+            order = MarketOrder(instrument=bar.instrument, signed_quantity=-1)
             self.submit_order(order, self._broker)
 
     # Invoked once when the Strategy is stopped

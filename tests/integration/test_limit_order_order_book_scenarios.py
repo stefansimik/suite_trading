@@ -4,7 +4,6 @@ from decimal import Decimal
 
 from suite_trading.domain.market_data.order_book.order_book import OrderBook
 from suite_trading.domain.market_data.order_book.order_book_event import OrderBookEvent, wrap_order_books_to_events
-from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.order.orders import LimitOrder
 from suite_trading.domain.order.order_state import OrderState
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
@@ -46,7 +45,7 @@ class SimgleLimitOrderStrategy(Strategy):
 
             # Submit the Limit order only once, on the first OrderBookEvent
             if self.submitted_order is None:
-                order = LimitOrder(instrument=self._instrument, side=OrderSide.BUY, absolute_quantity=Decimal("10"), limit_price=Decimal("101"))
+                order = LimitOrder(instrument=self._instrument, signed_quantity=10, limit_price=101)
                 self.submitted_order = order
                 self.submit_order(order, self._broker)
 

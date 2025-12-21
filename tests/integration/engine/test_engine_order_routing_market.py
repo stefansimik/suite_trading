@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from datetime import datetime, timezone
-from decimal import Decimal as D
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
-from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -15,14 +15,14 @@ from suite_trading.utils.data_generation.assistant import DGA
 
 
 def _create_optimistic_sim_broker() -> SimBroker:
-    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: D("1")}, limit_on_touch_fill_probability=D("1"), rng_seed=42)
+    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1")}, limit_on_touch_fill_probability=Decimal("1"), rng_seed=42)
     return SimBroker(fill_model=fill_model)
 
 
 class _SubmitAndRecordStrategy(Strategy):
     """Adds a one-tick quotes feed and submits a Market BUY in the callback; records order_fills."""
 
-    def __init__(self, name: str, broker: SimBroker, instrument: Instrument, bid: D, ask: D, ts: datetime) -> None:
+    def __init__(self, name: str, broker: SimBroker, instrument: Instrument, bid: Decimal, ask: Decimal, ts: datetime) -> None:
         super().__init__(name)
         self._broker = broker
         self._instrument = instrument
@@ -41,7 +41,7 @@ class _SubmitAndRecordStrategy(Strategy):
             # Submit via Strategy API so TradingEngine coordinates routing
             from suite_trading.domain.order.orders import MarketOrder
 
-            self.submit_order(MarketOrder(self._instrument, OrderSide.BUY, D("1")), self._broker)
+            self.submit_order(MarketOrder(self._instrument, 1), self._broker)
             self._submitted = True
 
     def on_order_fill(self, order_fill) -> None:
@@ -61,7 +61,7 @@ class TestEngineOrderRoutingMarket:
         instr = self._instrument()
         broker = _create_optimistic_sim_broker()
         engine = TradingEngine()
-        strategy = _SubmitAndRecordStrategy("s1", broker, instr, D("99"), D("101"), self._ts())
+        strategy = _SubmitAndRecordStrategy("s1", broker, instr, Decimal("99"), Decimal("101"), self._ts())
 
         engine.add_broker("sim", broker)
         engine.add_strategy(strategy)
@@ -70,15 +70,15 @@ class TestEngineOrderRoutingMarket:
 
         assert len(strategy.order_fills) == 1
         # Price should be the ask from the quote tick
-        assert strategy.order_fills[0].price == D("101")
+        assert strategy.order_fills[0].price == Decimal("101")
 
     def test_deterministic_callbacks_for_two_orders_same_time(self):
         """Two strategies submit at the same time; each must receive exactly one order_fill for its own order."""
         instr = self._instrument()
         broker = _create_optimistic_sim_broker()
         engine = TradingEngine()
-        s1 = _SubmitAndRecordStrategy("s1", broker, instr, D("99"), D("101"), self._ts())
-        s2 = _SubmitAndRecordStrategy("s2", broker, instr, D("99"), D("101"), self._ts())
+        s1 = _SubmitAndRecordStrategy("s1", broker, instr, Decimal("99"), Decimal("101"), self._ts())
+        s2 = _SubmitAndRecordStrategy("s2", broker, instr, Decimal("99"), Decimal("101"), self._ts())
 
         engine.add_broker("sim", broker)
         engine.add_strategy(s1)

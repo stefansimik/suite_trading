@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Iterable, Protocol, TYPE_CHECKING
 from datetime import datetime
-from decimal import Decimal
+
+from suite_trading.utils.decimal_tools import DecimalLike
 
 if TYPE_CHECKING:
     from suite_trading.domain.order.orders import Order
@@ -22,8 +23,8 @@ class FeeModel(Protocol):
 
     Args:
         order: The Order associated with this order_fill.
-        price: Snapped order_fill price used as fee basis.
-        absolute_quantity: Snapped order_fill absolute quantity used as fee basis.
+        price: Snapped order_fill price used as fee basis (Decimal-like scalar).
+        signed_quantity: Snapped order_fill signed quantity used as fee basis (Decimal-like scalar).
         timestamp: Time of the order_fill.
         previous_order_fills: All order fills recorded before this one for context; current
             $order_fill is NOT included.
@@ -35,8 +36,8 @@ class FeeModel(Protocol):
     def compute_commission(
         self,
         order: Order,
-        price: Decimal,
-        absolute_quantity: Decimal,
+        price: DecimalLike,
+        signed_quantity: DecimalLike,
         timestamp: datetime,
         previous_order_fills: Iterable[OrderFill],
     ) -> Money: ...

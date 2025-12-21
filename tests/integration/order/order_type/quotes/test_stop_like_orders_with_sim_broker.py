@@ -5,7 +5,6 @@ from typing import Callable
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.tick.quote_tick_event import QuoteTickEvent
-from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.order.order_state import OrderState
 from suite_trading.domain.order.orders import Order, StopLimitOrder, StopMarketOrder
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
@@ -106,7 +105,7 @@ def test_stop_market_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
     ]
 
     def create_order() -> Order:
-        return StopMarketOrder(instrument=instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"), stop_price=stop_price)
+        return StopMarketOrder(instrument=instrument, signed_quantity=1, stop_price=stop_price)
 
     strategy = _StopLikeOrderLifecycleStrategy(name="stop_market_order_lifecycle", broker=broker, feed_name="quotes", quote_tick_events=quote_tick_events, order_factory=create_order)
     engine.add_strategy(strategy)
@@ -150,7 +149,7 @@ def test_stop_limit_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
     ]
 
     def create_order() -> Order:
-        return StopLimitOrder(instrument=instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"), stop_price=stop_price, limit_price=limit_price)
+        return StopLimitOrder(instrument=instrument, signed_quantity=1, stop_price=stop_price, limit_price=limit_price)
 
     strategy = _StopLikeOrderLifecycleStrategy(name="stop_limit_order_lifecycle", broker=broker, feed_name="quotes", quote_tick_events=quote_tick_events, order_factory=create_order)
     engine.add_strategy(strategy)

@@ -37,12 +37,12 @@ class OrderFill:
         is_sell: True if this is a sell-side fill.
     """
 
-    __slots__ = ("_order", "_absolute_quantity", "_price", "_timestamp", "_commission", "_id")
+    __slots__ = ("_order", "_signed_quantity", "_price", "_timestamp", "_commission", "_id")
 
     def __init__(
         self,
         order: Order,
-        absolute_quantity: DecimalLike,
+        signed_quantity: DecimalLike,
         price: DecimalLike,
         timestamp: datetime,
         commission: Money,
@@ -52,7 +52,7 @@ class OrderFill:
 
         Args:
             order: Reference to the parent order that was filled.
-            absolute_quantity: Filled absolute quantity.
+            signed_quantity: Filled net quantity (positive for BUY, negative for SELL).
             price: Fill price.
             timestamp: When this fill occurred.
             commission: Commission/fees charged for this fill.
@@ -69,7 +69,7 @@ class OrderFill:
         self._id = id
 
         # Normalize values
-        self._absolute_quantity = self.instrument.snap_quantity(absolute_quantity)
+        self._signed_quantity = self.instrument.snap_quantity(signed_quantity)
         self._price = self.instrument.snap_price(price)
 
         # Commission
@@ -115,7 +115,7 @@ class OrderFill:
         Returns:
             bool: True if this is a buy-side fill.
         """
-        return self.side == OrderSide.BUY
+        return self._signed_quantity > 0
 
     @property
     def is_sell(self) -> bool:
@@ -124,17 +124,17 @@ class OrderFill:
         Returns:
             bool: True if this is a sell-side fill.
         """
-        return self.side == OrderSide.SELL
+        return self._signed_quantity < 0
 
     @property
     def absolute_quantity(self) -> Decimal:
         """The absolute size of the fill (magnitude)."""
-        return self._absolute_quantity
+        return abs(self._signed_quantity)
 
     @property
     def signed_quantity(self) -> Decimal:
         """The net impact of the fill (positive for BUY, negative for SELL)."""
-        return self.absolute_quantity if self.is_buy else -self.absolute_quantity
+        return self._signed_quantity
 
     @property
     def price(self) -> Decimal:
@@ -181,14 +181,18 @@ class OrderFill:
         Raises:
             ValueError: If fill data is invalid.
         """
-        # Precondition: fill absolute_quantity must be positive
-        if self._absolute_quantity <= 0:
-            raise ValueError(f"Cannot call `OrderFill._validate` because $absolute_quantity ({self._absolute_quantity}) is not positive")
+        # Precondition: fill quantity must be non-zero
+        if self._signed_quantity == 0:
+            raise ValueError(f"Cannot call `OrderFill._validate` because $signed_quantity ({self._signed_quantity}) cannot be zero")
 
-        # Precondition: absolute_quantity must be snapped
-        expected_quantity = self.instrument.snap_quantity(self._absolute_quantity)
-        if expected_quantity != self._absolute_quantity:
-            raise ValueError(f"Cannot call `OrderFill._validate` because $absolute_quantity ({self._absolute_quantity}) is not snapped (expected {expected_quantity})")
+        # Precondition: fill sign must match order sign
+        if (self._signed_quantity > 0) != (self._order.signed_quantity > 0):
+            raise ValueError(f"Cannot call `OrderFill._validate` because fill sign does not match order sign ($signed_quantity={self._signed_quantity}, order.signed_quantity={self._order.signed_quantity})")
+
+        # Precondition: quantity must be snapped
+        expected_quantity = self.instrument.snap_quantity(self._signed_quantity)
+        if expected_quantity != self._signed_quantity:
+            raise ValueError(f"Cannot call `OrderFill._validate` because $signed_quantity ({self._signed_quantity}) is not snapped (expected {expected_quantity})")
 
         # Precondition: price must be snapped
         expected_price = self.instrument.snap_price(self._price)
@@ -204,8 +208,8 @@ class OrderFill:
             raise ValueError(f"Cannot call `OrderFill._validate` because $commission ({self._commission}) is negative")
 
         # Precondition: a fill must not overfill the order
-        if self._absolute_quantity > self._order.absolute_unfilled_quantity:
-            raise ValueError(f"Cannot call `OrderFill._validate` because $absolute_quantity ({self._absolute_quantity}) exceeds order $unfilled_quantity ({self._order.absolute_unfilled_quantity})")
+        if self.absolute_quantity > self._order.absolute_unfilled_quantity:
+            raise ValueError(f"Cannot call `OrderFill._validate` because $absolute_quantity ({self.absolute_quantity}) exceeds order $unfilled_quantity ({self._order.absolute_unfilled_quantity})")
 
     # endregion
 
@@ -220,7 +224,7 @@ class OrderFill:
         Returns:
             str: String representation of the fill.
         """
-        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, side={self.side}, absolute_quantity={self.absolute_quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
+        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, signed_quantity={self.signed_quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another fill.

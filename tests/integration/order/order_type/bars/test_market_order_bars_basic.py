@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from decimal import Decimal as D
+from decimal import Decimal
+
 from datetime import datetime, timedelta
 
 from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -8,7 +9,6 @@ from suite_trading.platform.broker.sim.sim_broker import SimBroker
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.strategy.strategy import Strategy
 from suite_trading.domain.order.orders import MarketOrder
-from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.domain.market_data.bar.bar_event import wrap_bars_to_events
 from suite_trading.domain.event import Event
@@ -16,7 +16,7 @@ from suite_trading.utils.data_generation.assistant import DGA
 
 
 def _create_optimistic_sim_broker() -> SimBroker:
-    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: D("1")}, limit_on_touch_fill_probability=D("1"), rng_seed=42)
+    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1")}, limit_on_touch_fill_probability=Decimal("1"), rng_seed=42)
     return SimBroker(fill_model=fill_model)
 
 
@@ -49,7 +49,7 @@ class _BarsSubmitAtStartStrategy(Strategy):
         if not self._submitted and isinstance(event, _KickoffEvent):
             assert self._bars is not None
             instr = self._bars[0].instrument
-            order = MarketOrder(instr, OrderSide.BUY, D("1"))
+            order = MarketOrder(instr, 1)
             self.submit_order(order, self._broker)
             self._submitted = True
             self.remove_event_feed("kick")
@@ -75,7 +75,7 @@ class _BarsSubmitInsideCallbackStrategy(Strategy):
     def on_event(self, event) -> None:
         if not self._submitted:
             instr = self._bars[0].instrument
-            order = MarketOrder(instr, OrderSide.BUY, D("1"))
+            order = MarketOrder(instr, 1)
             self.submit_order(order, self._broker)
             self._submitted = True
 
@@ -103,12 +103,12 @@ class _BarsOpenCloseReverseStrategy(Strategy):
         self._count += 1
         instr = self._bars[0].instrument
         if self._count == 1:
-            self.submit_order(MarketOrder(instr, OrderSide.BUY, D("1")), self._broker)
+            self.submit_order(MarketOrder(instr, 1), self._broker)
         elif self._count == 3:
             if self._mode == "close":
-                self.submit_order(MarketOrder(instr, OrderSide.SELL, D("1")), self._broker)
+                self.submit_order(MarketOrder(instr, -1), self._broker)
             else:
-                self.submit_order(MarketOrder(instr, OrderSide.SELL, D("2")), self._broker)
+                self.submit_order(MarketOrder(instr, -2), self._broker)
 
     def on_order_fill(self, order_fill) -> None:
         self.order_fills.append(order_fill)
@@ -161,7 +161,7 @@ class TestMarketOrderBarsBasic:
         engine.add_strategy(s_close)
         engine.start()
         assert len(s_close.order_fills) == 2
-        assert broker.get_signed_position_quantity(s_close.order_fills[0].order.instrument) == D("0")
+        assert broker.get_signed_position_quantity(s_close.order_fills[0].order.instrument) == Decimal("0")
 
         # Reverse path
         engine2 = TradingEngine()
@@ -171,4 +171,4 @@ class TestMarketOrderBarsBasic:
         engine2.add_strategy(s_rev)
         engine2.start()
         # After BUY 1 then SELL 2, final position should be short 1
-        assert broker2.get_signed_position_quantity(s_rev.order_fills[0].order.instrument) == D("-1")
+        assert broker2.get_signed_position_quantity(s_rev.order_fills[0].order.instrument) == Decimal("-1")

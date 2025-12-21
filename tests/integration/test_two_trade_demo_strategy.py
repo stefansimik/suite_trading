@@ -55,12 +55,12 @@ class TwoTradeDemoStrategy(Strategy):
             broker = self._broker
 
             if self._event_count == 3:
-                order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, absolute_quantity=Decimal("1"))
+                order = MarketOrder(instrument=bar.instrument, signed_quantity=-1)
                 self.submit_order(order, broker)
                 logger.info(f"Submitted SELL Market order on event #{self._event_count}")
 
             if self._event_count == 5:
-                order = MarketOrder(instrument=bar.instrument, side=OrderSide.BUY, absolute_quantity=Decimal("1"))
+                order = MarketOrder(instrument=bar.instrument, signed_quantity=1)
                 self.submit_order(order, broker)
                 logger.info(f"Submitted BUY Market order on event #{self._event_count}")
                 # Request strategy stop by closing feed (engine will auto-stop it)

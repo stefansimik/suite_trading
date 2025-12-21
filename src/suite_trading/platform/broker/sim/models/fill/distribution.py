@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from suite_trading.domain.market_data.order_book.order_book import OrderBook, ProposedFill
 
 from suite_trading.domain.market_data.order_book.order_book import ProposedFill
-from suite_trading.utils.decimal_tools import as_decimal
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 
 class DistributionFillModel:
@@ -85,7 +85,7 @@ class DistributionFillModel:
     def __init__(
         self,
         market_fill_adjustment_distribution: dict[int, Decimal] | None = None,
-        limit_on_touch_fill_probability: Decimal | None = None,
+        limit_on_touch_fill_probability: DecimalLike | None = None,
         rng_seed: int | None = None,
     ):
         """Initialize distribution fill model.
@@ -104,8 +104,9 @@ class DistributionFillModel:
                 filling exactly at the order's limit price will actually execute.
                 Value must be between 0 and 1 inclusive. A value of 0 means on-touch fills
                 never fill, 1 means they always fill. Proposed fills at strictly better prices than
-                the limit are always accepted regardless of this probability. If None, uses
-                a pessimistic default of Decimal("0.30") (30% chance to fill on touch).
+                the limit are always accepted regardless of this probability. Accepts
+                Decimal-like scalar. If None, uses a pessimistic default of Decimal("0.30")
+                (30% chance to fill on touch).
             rng_seed: Random seed for reproducible backtests. If None, uses system randomness.
         """
         # Use realistic defaults if None provided
@@ -119,11 +120,13 @@ class DistributionFillModel:
         if limit_on_touch_fill_probability is None:
             limit_on_touch_fill_probability = Decimal("0.30")
 
-        if limit_on_touch_fill_probability < Decimal("0") or limit_on_touch_fill_probability > Decimal("1"):
-            raise ValueError(f"Cannot create `DistributionFillModel` because $limit_on_touch_fill_probability ({limit_on_touch_fill_probability}) is outside [0, 1]")
+        limit_on_touch_fill_probability_decimal = as_decimal(limit_on_touch_fill_probability)
+
+        if limit_on_touch_fill_probability_decimal < Decimal("0") or limit_on_touch_fill_probability_decimal > Decimal("1"):
+            raise ValueError(f"Cannot create `DistributionFillModel` because $limit_on_touch_fill_probability ({limit_on_touch_fill_probability_decimal}) is outside [0, 1]")
 
         self._market_fill_adjustment_distribution = market_fill_adjustment_distribution
-        self._limit_on_touch_fill_probability = limit_on_touch_fill_probability
+        self._limit_on_touch_fill_probability = limit_on_touch_fill_probability_decimal
         self._rng = random.Random(rng_seed)
 
     # endregion

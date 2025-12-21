@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Iterable, TYPE_CHECKING
 from datetime import datetime
-from decimal import Decimal
+
+from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 from .protocol import FeeModel
 
@@ -28,13 +29,15 @@ class FixedFeeModel(FeeModel):
     def compute_commission(
         self,
         order: Order,
-        price: Decimal,
-        absolute_quantity: Decimal,
+        price: DecimalLike,
+        signed_quantity: DecimalLike,
         timestamp: datetime,
         previous_order_fills: Iterable[OrderFill],
     ) -> Money:
-        # Precondition: ensure positive $absolute_quantity
-        if absolute_quantity <= 0:
-            raise ValueError(f"Cannot call `compute_commission` because $absolute_quantity ({absolute_quantity}) <= 0 for order $id ('{order.id}')")
+        q = as_decimal(signed_quantity)
 
-        return self._fee_per_unit * absolute_quantity
+        # Precondition: ensure non-zero $signed_quantity
+        if q == 0:
+            raise ValueError(f"Cannot call `compute_commission` because $signed_quantity ({q}) is zero for order $id ('{order.id}')")
+
+        return self._fee_per_unit * abs(q)

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from datetime import datetime, timezone, timedelta
-from decimal import Decimal as D
 
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
@@ -21,7 +22,7 @@ def _make_instr() -> Instrument:
 
 
 def _create_optimistic_sim_broker() -> SimBroker:
-    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: D("1")}, limit_on_touch_fill_probability=D("1"), rng_seed=42)
+    fill_model = DistributionFillModel(market_fill_adjustment_distribution={0: Decimal("1")}, limit_on_touch_fill_probability=Decimal("1"), rng_seed=42)
     return SimBroker(fill_model=fill_model)
 
 
@@ -43,8 +44,8 @@ class _QuotesSubmitInCallbackStrategy(Strategy):
     def on_event(self, event) -> None:
         if not self._submitted:
             instr = event.quote_tick.instrument
-            self.submit_order(MarketOrder(instr, OrderSide.BUY, D("1")), self._broker)
-            self.submit_order(MarketOrder(instr, OrderSide.SELL, D("1")), self._broker)
+            self.submit_order(MarketOrder(instr, 1), self._broker)
+            self.submit_order(MarketOrder(instr, -1), self._broker)
             self._submitted = True
 
     def on_order_fill(self, order_fill) -> None:
@@ -82,7 +83,7 @@ class _QuotesSubmitBeforeTicksStrategy(Strategy):
         if not self._submitted and isinstance(event, _KickoffEvent):
             instr = self._instr  # type: ignore[assignment]
             t0 = self._t0  # type: ignore[assignment]
-            self.submit_order(MarketOrder(instr, OrderSide.BUY, D("1")), self._broker)
+            self.submit_order(MarketOrder(instr, 1), self._broker)
             self._submitted = True
             self.remove_event_feed("kick")
 
@@ -116,7 +117,7 @@ class _QuotesPartialAcrossTicksStrategy(Strategy):
         if not self._submitted and isinstance(event, _KickoffEvent):
             instr = self._instr  # type: ignore[assignment]
             t0 = self._t0  # type: ignore[assignment]
-            self.submit_order(MarketOrder(instr, OrderSide.BUY, D("2")), self._broker)
+            self.submit_order(MarketOrder(instr, 2), self._broker)
             self._submitted = True
             self.remove_event_feed("kick")
 
@@ -147,8 +148,8 @@ class TestMarketOrderQuotesBasic:
         assert len(s.order_fills) == 2
         buy_exec = next(e for e in s.order_fills if e.order.side == OrderSide.BUY)
         sell_exec = next(e for e in s.order_fills if e.order.side == OrderSide.SELL)
-        assert buy_exec.price == D("1.0001")
-        assert sell_exec.price == D("1.0000")
+        assert buy_exec.price == Decimal("1.0001")
+        assert sell_exec.price == Decimal("1.0000")
 
     def test_submit_before_any_quote_fills_on_first_quote(self):
         """Submitting before any quotes exist should fill on the first quote's ask when it arrives."""
@@ -161,7 +162,7 @@ class TestMarketOrderQuotesBasic:
         engine.start()
 
         assert len(s.order_fills) == 1
-        assert s.order_fills[0].price == D("1.0001")
+        assert s.order_fills[0].price == Decimal("1.0001")
 
     def test_partial_fill_across_successive_quote_ticks(self):
         """BUY 2 with only 1 available per tick should fill 1 on the first tick and 1 on the next at its ask."""
@@ -173,4 +174,4 @@ class TestMarketOrderQuotesBasic:
 
         engine.start()
 
-        assert [(e.absolute_quantity, e.price) for e in s.order_fills] == [(D("1"), D("1.0001")), (D("1"), D("1.0002"))]
+        assert [(e.absolute_quantity, e.price) for e in s.order_fills] == [(Decimal("1"), Decimal("1.0001")), (Decimal("1"), Decimal("1.0002"))]
