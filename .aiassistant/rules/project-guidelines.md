@@ -68,7 +68,7 @@ Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, bu
 - Use `|` and `| None` instead of `Union`/`Optional`
 - Use `type[T]` for class objects
 - `Callable[[...], R]` with explicit return type
-- Import cross-module types unconditionally or under `if TYPE_CHECKING:`
+- Import cross-module types unconditionally. Use `if TYPE_CHECKING:` only when strictly required to avoid circular runtime dependencies.
 
 ## 3.2. Decimal utilities (DecimalLike, as_decimal)
 

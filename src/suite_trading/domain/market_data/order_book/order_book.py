@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import NamedTuple, Sequence, TYPE_CHECKING
+from typing import NamedTuple, Sequence
 
+from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_tools import expect_utc, format_dt
-
-if TYPE_CHECKING:
-    from suite_trading.domain.instrument import Instrument
 
 
 class BookLevel(NamedTuple):

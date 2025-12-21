@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import Protocol, TYPE_CHECKING
+from typing import Protocol
 
-if TYPE_CHECKING:
-    from suite_trading.domain.event import Event
-    from suite_trading.domain.market_data.order_book.order_book import OrderBook
+from suite_trading.domain.event import Event
+from suite_trading.domain.market_data.order_book.order_book import OrderBook
 
 
 class EventToOrderBookConverter(Protocol):

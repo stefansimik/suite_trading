@@ -8,10 +8,10 @@ from suite_trading.domain.order.orders import Order
 from suite_trading.platform.broker.broker import Broker
 from suite_trading.platform.event_feed.event_feed import EventFeed
 from suite_trading.strategy.strategy_state_machine import StrategyState, StrategyAction, create_strategy_state_machine
+from suite_trading.domain.order.order_fill import OrderFill
 
 if TYPE_CHECKING:
     from suite_trading.platform.engine.trading_engine import TradingEngine
-    from suite_trading.domain.order.order_fill import OrderFill
 
 logger = logging.getLogger(__name__)
 

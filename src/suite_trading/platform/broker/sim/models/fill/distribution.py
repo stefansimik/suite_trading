@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from decimal import Decimal
 import random
 
-if TYPE_CHECKING:
-    from suite_trading.domain.order.orders import Order
-    from suite_trading.domain.market_data.order_book.order_book import OrderBook, ProposedFill
-
-from suite_trading.domain.market_data.order_book.order_book import ProposedFill
+from suite_trading.domain.order.orders import (
+    Order,
+    MarketOrder,
+    StopMarketOrder,
+    LimitOrder,
+    StopLimitOrder,
+)
+from suite_trading.domain.market_data.order_book.order_book import OrderBook, ProposedFill
 from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 
@@ -143,9 +145,6 @@ class DistributionFillModel:
         # Pass through empty list immediately
         if not proposed_fills:
             return []
-
-        # Import classes for isinstance checks (avoid circular imports at module level)
-        from suite_trading.domain.order.orders import MarketOrder, StopMarketOrder, LimitOrder, StopLimitOrder
 
         # Dispatch based on order type
         if isinstance(order, (MarketOrder, StopMarketOrder)):

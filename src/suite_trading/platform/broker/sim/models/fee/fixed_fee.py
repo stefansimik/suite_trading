@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-from typing import Iterable, TYPE_CHECKING
+from typing import Iterable
 from datetime import datetime
 
+from suite_trading.domain.monetary.money import Money
+from suite_trading.domain.order.orders import Order
+from suite_trading.domain.order.order_fill import OrderFill
 from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 
 from .protocol import FeeModel
-
-if TYPE_CHECKING:
-    from suite_trading.domain.monetary.money import Money
-    from suite_trading.domain.order.orders import Order
-    from suite_trading.domain.order.order_fill import OrderFill
 
 
 class FixedFeeModel(FeeModel):

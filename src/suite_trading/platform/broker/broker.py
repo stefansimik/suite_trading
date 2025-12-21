@@ -15,15 +15,13 @@ Multiple accounts are modelled by multiple Broker instances, typically added to 
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Protocol, runtime_checkable, TYPE_CHECKING, Callable
+from typing import Protocol, runtime_checkable, Callable
 
 from suite_trading.platform.broker.account import Account
 from suite_trading.domain.order.orders import Order
+from suite_trading.domain.order.order_fill import OrderFill
+from suite_trading.domain.instrument import Instrument
 from suite_trading.platform.broker.position import Position
-
-if TYPE_CHECKING:
-    from suite_trading.domain.order.order_fill import OrderFill
-    from suite_trading.domain.instrument import Instrument
 
 
 @runtime_checkable

@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import Iterable, Protocol, TYPE_CHECKING
+from typing import Iterable, Protocol
 from datetime import datetime
 
+from suite_trading.domain.order.orders import Order
+from suite_trading.domain.order.order_fill import OrderFill
+from suite_trading.domain.monetary.money import Money
 from suite_trading.utils.decimal_tools import DecimalLike
-
-if TYPE_CHECKING:
-    from suite_trading.domain.order.orders import Order
-    from suite_trading.domain.order.order_fill import OrderFill
-    from suite_trading.domain.monetary.money import Money
 
 
 # region Interface

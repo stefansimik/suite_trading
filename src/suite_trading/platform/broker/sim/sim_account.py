@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from decimal import Decimal
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
 from datetime import datetime
 
+from suite_trading.domain.instrument import Instrument
 from suite_trading.platform.broker.account import Account, MarginRequirements, PaidFee
 from suite_trading.domain.monetary.currency import Currency
 from suite_trading.domain.monetary.money import Money
-
-if TYPE_CHECKING:
-    from suite_trading.domain.instrument import Instrument
 
 
 class SimAccount(Account):

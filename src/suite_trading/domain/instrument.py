@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from decimal import Decimal, ROUND_HALF_EVEN
 from enum import Enum
 from suite_trading.domain.monetary.currency import Currency
+from suite_trading.domain.monetary.money import Money
 from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
-
-if TYPE_CHECKING:
-    from suite_trading.domain.monetary.money import Money
 
 
 class AssetClass(Enum):
@@ -162,8 +159,6 @@ class Instrument:
 
     def compute_tick_value(self) -> Money:
         """Return tick value as Money in $settlement_currency for 1 contract and 1 tick."""
-        from suite_trading.domain.monetary.money import Money
-
         tick_amount = self.contract_size * self.price_increment
         return Money(tick_amount, self.settlement_currency)
 

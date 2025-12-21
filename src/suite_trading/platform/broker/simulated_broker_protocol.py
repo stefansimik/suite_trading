@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, runtime_checkable
 
-if TYPE_CHECKING:
-    from suite_trading.domain.market_data.order_book.order_book import OrderBook
+from suite_trading.domain.market_data.order_book.order_book import OrderBook
 
 
 @runtime_checkable

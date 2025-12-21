@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol, NamedTuple, TYPE_CHECKING
+from typing import Protocol, NamedTuple
 
+from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.monetary.currency import Currency
 from suite_trading.domain.monetary.money import Money
-
-if TYPE_CHECKING:
-    from suite_trading.domain.instrument import Instrument
 
 
 class MarginRequirements(NamedTuple):

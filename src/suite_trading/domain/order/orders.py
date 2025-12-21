@@ -1,7 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.monetary.money import Money
@@ -17,10 +16,6 @@ from suite_trading.domain.order.order_state import (
 from suite_trading.utils.id_generator import get_next_id
 from suite_trading.utils.state_machine import StateMachine
 from suite_trading.utils.decimal_tools import DecimalLike
-
-if TYPE_CHECKING:
-    # No type-only imports needed in this module at the moment
-    pass
 
 
 # region Orders

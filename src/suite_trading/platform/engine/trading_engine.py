@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from datetime import datetime
-from typing import Callable, NamedTuple, TYPE_CHECKING
+from typing import Callable, NamedTuple
 
 from suite_trading.domain.event import Event
 from suite_trading.platform.event_feed.event_feed import EventFeed
@@ -20,9 +20,7 @@ from suite_trading.platform.engine.models.event_to_order_book.default_impl impor
 
 from suite_trading.utils.state_machine import StateMachine
 from suite_trading.utils.datetime_tools import format_dt
-
-if TYPE_CHECKING:
-    from suite_trading.domain.order.order_fill import OrderFill
+from suite_trading.domain.order.order_fill import OrderFill
 
 
 logger = logging.getLogger(__name__)

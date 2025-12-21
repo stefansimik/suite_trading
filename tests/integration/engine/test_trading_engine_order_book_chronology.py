@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Callable, TYPE_CHECKING
+from typing import Callable
 
 from suite_trading.platform.engine.trading_engine import TradingEngine
 from suite_trading.strategy.strategy import Strategy
@@ -20,11 +20,9 @@ from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.domain.market_data.order_book.order_book import OrderBook
 from suite_trading.platform.event_feed.fixed_sequence_event_feed import FixedSequenceEventFeed
 from suite_trading.domain.order.orders import Order
-
-if TYPE_CHECKING:
-    from suite_trading.platform.broker.account import Account
-    from suite_trading.domain.order.order_fill import OrderFill
-    from suite_trading.platform.broker.position import Position
+from suite_trading.platform.broker.account import Account
+from suite_trading.domain.order.order_fill import OrderFill
+from suite_trading.platform.broker.position import Position
 
 
 # region Mock Components
