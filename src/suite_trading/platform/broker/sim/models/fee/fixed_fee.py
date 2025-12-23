@@ -6,7 +6,7 @@ from datetime import datetime
 from suite_trading.domain.monetary.money import Money
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.order.order_fill import OrderFill
-from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+from suite_trading.domain.market_data.order_book.order_book import ProposedFill
 
 from .protocol import FeeModel
 
@@ -27,12 +27,11 @@ class FixedFeeModel(FeeModel):
     def compute_commission(
         self,
         order: Order,
-        price: DecimalLike,
-        signed_quantity: DecimalLike,
+        proposed_fill: ProposedFill,
         timestamp: datetime,
         previous_order_fills: Iterable[OrderFill],
     ) -> Money:
-        q = as_decimal(signed_quantity)
+        q = proposed_fill.signed_quantity
 
         # Precondition: ensure non-zero $signed_quantity
         if q == 0:

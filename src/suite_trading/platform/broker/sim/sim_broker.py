@@ -742,8 +742,7 @@ class SimBroker(Broker, SimulatedBroker):
         # COMPUTE: Commission
         commission = self._fee_model.compute_commission(
             order=order,
-            price=proposed_fill.price,
-            signed_quantity=proposed_fill.signed_quantity,
+            proposed_fill=proposed_fill,
             timestamp=timestamp,
             previous_order_fills=previous_order_fills,
         )

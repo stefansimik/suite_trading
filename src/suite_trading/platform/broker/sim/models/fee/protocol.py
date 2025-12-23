@@ -6,7 +6,7 @@ from datetime import datetime
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.order.order_fill import OrderFill
 from suite_trading.domain.monetary.money import Money
-from suite_trading.utils.decimal_tools import DecimalLike
+from suite_trading.domain.market_data.order_book.order_book import ProposedFill
 
 
 # region Interface
@@ -21,8 +21,7 @@ class FeeModel(Protocol):
 
     Args:
         order: The Order associated with this order_fill.
-        price: Snapped order_fill price used as fee basis (Decimal-like scalar).
-        signed_quantity: Snapped order_fill signed quantity used as fee basis (Decimal-like scalar).
+        proposed_fill: Pre-fee fill describing how much was filled and at what price.
         timestamp: Time of the order_fill.
         previous_order_fills: All order fills recorded before this one for context; current
             $order_fill is NOT included.
@@ -34,8 +33,7 @@ class FeeModel(Protocol):
     def compute_commission(
         self,
         order: Order,
-        price: DecimalLike,
-        signed_quantity: DecimalLike,
+        proposed_fill: ProposedFill,
         timestamp: datetime,
         previous_order_fills: Iterable[OrderFill],
     ) -> Money: ...
