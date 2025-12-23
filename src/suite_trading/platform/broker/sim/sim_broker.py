@@ -560,16 +560,14 @@ class SimBroker(Broker, SimulatedBroker):
             raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{instrument}')")
 
         # COMPUTE
-        signed_position_quantity_before = self.get_signed_position_quantity(instrument)
-        signed_position_quantity_after = signed_position_quantity_before + proposed_fill.signed_quantity
+        signed_position_quantity = self.get_signed_position_quantity(instrument)
 
         commission, initial_margin, maintenance_margin_after = self._compute_commission_margins_for_proposed_fill(
             order=order,
             proposed_fill=proposed_fill,
             order_book=order_book,
             timestamp=timestamp,
-            signed_position_quantity_before=signed_position_quantity_before,
-            signed_position_quantity_after=signed_position_quantity_after,
+            signed_position_quantity=signed_position_quantity,
             previous_order_fills=tuple(self._order_fill_history),
         )
 
@@ -582,7 +580,7 @@ class SimBroker(Broker, SimulatedBroker):
         has_enough_upfront = self._account.has_enough_funds(required_funds)
 
         # Check: if maintenance requirement increases, do we have the extra buffer available?
-        maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_quantity_before, timestamp=timestamp)
+        maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_quantity, timestamp=timestamp)
         maintenance_margin_delta = maintenance_margin_after.value - maintenance_margin_before.value
 
         has_enough_for_maintenance_increase = True
@@ -682,8 +680,7 @@ class SimBroker(Broker, SimulatedBroker):
                 proposed_fill=proposed_fill,
                 order_book=order_book,
                 timestamp=timestamp,
-                signed_position_quantity_before=signed_position_quantity,
-                signed_position_quantity_after=signed_position_quantity_after,
+                signed_position_quantity=signed_position_quantity,
                 previous_order_fills=tuple(simulated_order_fill_history),
             )
 
@@ -724,17 +721,37 @@ class SimBroker(Broker, SimulatedBroker):
         proposed_fill: ProposedFill,
         order_book: OrderBook,
         timestamp: datetime,
-        signed_position_quantity_before: Decimal,
-        signed_position_quantity_after: Decimal,
+        signed_position_quantity: Decimal,
         previous_order_fills: tuple[OrderFill, ...],
     ) -> tuple[Money, Money, Money]:
-        """Compute absolute commission and margins for a single $proposed_fill."""
+        """Compute absolute commission and margins for a single $proposed_fill.
+
+        Args:
+            order: Order being filled.
+            proposed_fill: Single ProposedFill to apply.
+            order_book: Broker OrderBook snapshot used for matching and margin.
+            timestamp: Current simulated time.
+            signed_position_quantity: Net position signed quantity before applying $proposed_fill.
+            previous_order_fills: History of order fills for commission calculation (e.g. tiered fees).
+
+        Returns:
+            Tuple of (commission, initial_margin, maintenance_margin_after).
+        """
+        # COMPUTE: Next state
+        signed_position_quantity_after = signed_position_quantity + proposed_fill.signed_quantity
+
         # COMPUTE: Commission
-        commission = self._fee_model.compute_commission(order=order, price=proposed_fill.price, signed_quantity=proposed_fill.signed_quantity, timestamp=timestamp, previous_order_fills=previous_order_fills)
+        commission = self._fee_model.compute_commission(
+            order=order,
+            price=proposed_fill.price,
+            signed_quantity=proposed_fill.signed_quantity,
+            timestamp=timestamp,
+            previous_order_fills=previous_order_fills,
+        )
 
         # COMPUTE: Incremental position size
         # Check: initial margin is only required if we are increasing the absolute size of the position
-        position_size_before = abs(signed_position_quantity_before)
+        position_size_before = abs(signed_position_quantity)
         position_size_after = abs(signed_position_quantity_after)
         position_size_increase = max(Decimal("0"), position_size_after - position_size_before)
 
@@ -742,10 +759,18 @@ class SimBroker(Broker, SimulatedBroker):
         initial_margin = Money(0, commission.currency)
         if position_size_increase > 0:
             signed_increase = position_size_increase if proposed_fill.signed_quantity > 0 else -position_size_increase
-            initial_margin = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_increase, timestamp=timestamp)
+            initial_margin = self._margin_model.compute_initial_margin(
+                order_book=order_book,
+                signed_quantity=signed_increase,
+                timestamp=timestamp,
+            )
 
         # COMPUTE: Total maintenance margin required after this proposed fill
-        maintenance_margin = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_quantity_after, timestamp=timestamp)
+        maintenance_margin = self._margin_model.compute_maintenance_margin(
+            order_book=order_book,
+            signed_quantity=signed_position_quantity_after,
+            timestamp=timestamp,
+        )
 
         return commission, initial_margin, maintenance_margin
 
