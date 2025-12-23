@@ -566,7 +566,6 @@ class SimBroker(Broker, SimulatedBroker):
             order=order,
             proposed_fill=proposed_fill,
             order_book=order_book,
-            timestamp=timestamp,
             signed_position_quantity=signed_position_quantity,
             previous_order_fills=tuple(self._order_fill_history),
         )
@@ -679,7 +678,6 @@ class SimBroker(Broker, SimulatedBroker):
                 order=order,
                 proposed_fill=proposed_fill,
                 order_book=order_book,
-                timestamp=timestamp,
                 signed_position_quantity=signed_position_quantity,
                 previous_order_fills=tuple(simulated_order_fill_history),
             )
@@ -720,7 +718,6 @@ class SimBroker(Broker, SimulatedBroker):
         order: Order,
         proposed_fill: ProposedFill,
         order_book: OrderBook,
-        timestamp: datetime,
         signed_position_quantity: Decimal,
         previous_order_fills: tuple[OrderFill, ...],
     ) -> tuple[Money, Money, Money]:
@@ -730,13 +727,15 @@ class SimBroker(Broker, SimulatedBroker):
             order: Order being filled.
             proposed_fill: Single ProposedFill to apply.
             order_book: Broker OrderBook snapshot used for matching and margin.
-            timestamp: Current simulated time.
             signed_position_quantity: Net position signed quantity before applying $proposed_fill.
             previous_order_fills: History of order fills for commission calculation (e.g. tiered fees).
 
         Returns:
             Tuple of (commission, initial_margin, maintenance_margin_after).
         """
+        # Use timestamp from the order book snapshot
+        timestamp = order_book.timestamp
+
         # COMPUTE: Next state
         signed_position_quantity_after = signed_position_quantity + proposed_fill.signed_quantity
 
