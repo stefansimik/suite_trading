@@ -40,6 +40,7 @@ class TestOrderBookSimulateFills:
         fills = book.simulate_fills(target_signed_quantity=Decimal("12"))
         pairs = [(f.signed_quantity, f.price) for f in fills]
         assert pairs == [(Decimal("10"), Decimal("100")), (Decimal("2"), Decimal("101"))]
+        assert all(f.timestamp == ts for f in fills)
 
     def test_sell_consumes_bids_best_first(self):
         """SELL should consume bid levels best-first (4@99 then 1@98 to reach absolute_quantity=5)."""
@@ -51,6 +52,7 @@ class TestOrderBookSimulateFills:
         fills = book.simulate_fills(target_signed_quantity=-Decimal("5"))
         pairs = [(f.signed_quantity, f.price) for f in fills]
         assert pairs == [(Decimal("-4"), Decimal("99")), (Decimal("-1"), Decimal("98"))]
+        assert all(f.timestamp == ts for f in fills)
 
     def test_price_filters_min_max_respected(self):
         """Max price filter should cap BUY fills at 101, skipping higher levels."""

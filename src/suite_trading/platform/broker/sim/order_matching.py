@@ -47,14 +47,14 @@ def should_trigger_stop_condition(order: StopMarketOrder | StopLimitOrder, order
 def simulate_fills_for_market_order(order: Order, order_book: OrderBook) -> list[ProposedFill]:
     """Simulate fills for a market-like order from the other side of the book (best price first).
 
-    Returns fills as price/signed_quantity pairs. Fees are not included. Negative prices are allowed.
+    Returns fills as price/signed_quantity/timestamp triplets. Fees are not included. Negative prices are allowed.
 
     Args:
         order: Order to fill (MarketOrder or any market-like order such as a triggered StopMarketOrder).
         order_book: OrderBook snapshot for the simulation.
 
     Returns:
-        list[ProposedFill]: Fills (price and signed_quantity); fees not included.
+        list[ProposedFill]: Fills (price, signed_quantity, timestamp); fees not included.
     """
     fills = order_book.simulate_fills(target_signed_quantity=order.signed_unfilled_quantity)
     return fills
@@ -68,7 +68,7 @@ def simulate_fills_for_limit_order(order: Order, order_book: OrderBook) -> list[
         order_book: OrderBook snapshot for fill simulation.
 
     Returns:
-        list[ProposedFill]: Fills (price and signed_quantity); fees not included.
+        list[ProposedFill]: Fills (price, signed_quantity, timestamp); fees not included.
     """
     # Narrowing for the type checker
     if not isinstance(order, (LimitOrder, StopLimitOrder)):
@@ -89,7 +89,7 @@ def select_simulate_fills_function_for_order(order: Order) -> Callable[[Order, O
         order: The order to simulate.
 
     Returns:
-        Callable that returns `ProposedFill` items (price and signed_quantity). Fees are handled elsewhere.
+        Callable that returns `ProposedFill` items (price, signed_quantity, timestamp). Fees are handled elsewhere.
 
     Raises:
         ValueError: If the order type is unsupported by the simulator.

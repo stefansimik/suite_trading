@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
 
 from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
@@ -53,13 +52,11 @@ class FixedRatioMarginModel(MarginModel):
         self,
         order_book: OrderBook,
         signed_quantity: DecimalLike,
-        timestamp: datetime,
     ) -> Money:
-        # This model is symmetric; $timestamp is ignored by design
-        q = as_decimal(signed_quantity)
+        signed_quantity = as_decimal(signed_quantity)
         instrument = order_book.instrument
         price = self._extract_price_from_order_book(order_book)
-        notional_value = compute_notional_value(price, q, instrument.contract_size)
+        notional_value = compute_notional_value(price, signed_quantity, instrument.contract_size)
         margin_value = notional_value * self._initial_ratio
         currency = instrument.settlement_currency
         result = Money(margin_value, currency)
@@ -69,12 +66,11 @@ class FixedRatioMarginModel(MarginModel):
         self,
         order_book: OrderBook,
         signed_quantity: DecimalLike,
-        timestamp: datetime,
     ) -> Money:
-        q = as_decimal(signed_quantity)
+        signed_quantity = as_decimal(signed_quantity)
         instrument = order_book.instrument
         price = self._extract_price_from_order_book(order_book)
-        notional_value = compute_notional_value(price, q, instrument.contract_size)
+        notional_value = compute_notional_value(price, signed_quantity, instrument.contract_size)
         margin_value = notional_value * self._maintenance_ratio
         currency = instrument.settlement_currency
         result = Money(margin_value, currency)

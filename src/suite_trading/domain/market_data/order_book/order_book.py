@@ -23,7 +23,7 @@ class BookLevel(NamedTuple):
 class ProposedFill(NamedTuple):
     """Represents a pre-fee fill: how much filled and at what price.
 
-    This is intentionally a fill-like piece of information with only $signed_quantity and $price.
+    This is intentionally a fill-like piece of information with $signed_quantity, $price, and $timestamp.
     It is used during matching to describe fills before fees, margins, or accounting are applied
     by the broker.
 
@@ -31,10 +31,12 @@ class ProposedFill(NamedTuple):
         signed_quantity: The net filled quantity. Returns a positive value for buy fills
             and a negative value for sell fills.
         price: Execution price.
+        timestamp: When this fill was proposed.
     """
 
     signed_quantity: Decimal
     price: Decimal
+    timestamp: datetime
 
     @property
     def absolute_quantity(self) -> Decimal:
@@ -147,7 +149,7 @@ class OrderBook:
                 bound.
 
         Returns:
-            List of `ProposedFill(signed_quantity, price)`.
+            List of `ProposedFill(signed_quantity, price, timestamp)`.
         """
         # Choose (asks | bids) based on $target_signed_quantity sign
         is_buy = target_signed_quantity > 0
@@ -183,7 +185,7 @@ class OrderBook:
             if fill_absolute_quantity > 0:
                 # Add proposed fill for this price level (signed based on side)
                 fill_signed_quantity = fill_absolute_quantity * side_sign
-                proposed_fill = ProposedFill(signed_quantity=fill_signed_quantity, price=price_level.price)
+                proposed_fill = ProposedFill(signed_quantity=fill_signed_quantity, price=price_level.price, timestamp=self._timestamp)
                 result.append(proposed_fill)
                 # Reduce remaining signed_quantity by the filled amount
                 remaining_signed_quantity -= fill_signed_quantity

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Protocol
-from datetime import datetime
 
 from suite_trading.utils.decimal_tools import DecimalLike
 
@@ -24,10 +23,6 @@ class MarginModel(Protocol):
     snapshot for their own timeline; implementations should treat the provided
     $order_book as the single source of pricing truth rather than reading global broker
     state.
-
-    The $timestamp argument represents the time when margin is calculated. In the simple
-    simulation broker this is usually the same as $order_book.timestamp, but callers may
-    pass a different time when they want to evaluate margin at another moment.
 
     Per-fill order_fill and incremental blocking:
 
@@ -57,7 +52,6 @@ class MarginModel(Protocol):
         self,
         order_book: OrderBook,
         signed_quantity: DecimalLike,
-        timestamp: datetime,
     ) -> Money:
         """Compute initial margin required for a prospective trade.
 
@@ -66,8 +60,6 @@ class MarginModel(Protocol):
             signed_quantity: Additional net exposure for this trade. Returns a positive value for
                 buy fills and a negative value for sell fills.
                 Accepts Decimal-like scalar.
-            timestamp: Time when margin is calculated for this trade. Usually the same as
-                $order_book.timestamp, but callers can pass a different evaluation time.
         """
         ...
 
@@ -75,7 +67,6 @@ class MarginModel(Protocol):
         self,
         order_book: OrderBook,
         signed_quantity: DecimalLike,
-        timestamp: datetime,
     ) -> Money:
         """Compute maintenance margin for the current net position.
 
@@ -83,7 +74,5 @@ class MarginModel(Protocol):
             order_book: OrderBook snapshot that the broker uses to value this position.
             signed_quantity: Current net position (long > 0, short < 0).
                 Accepts Decimal-like scalar.
-            timestamp: Time when margin is calculated for this position. Usually the same as
-                $order_book.timestamp, but callers can pass a different evaluation time.
         """
         ...

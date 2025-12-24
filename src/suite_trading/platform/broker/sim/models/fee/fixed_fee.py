@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Iterable
-from datetime import datetime
 
 from suite_trading.domain.monetary.money import Money
 from suite_trading.domain.order.orders import Order
@@ -28,7 +27,6 @@ class FixedFeeModel(FeeModel):
         self,
         order: Order,
         proposed_fill: ProposedFill,
-        timestamp: datetime,
         previous_order_fills: Iterable[OrderFill],
     ) -> Money:
         q = proposed_fill.signed_quantity

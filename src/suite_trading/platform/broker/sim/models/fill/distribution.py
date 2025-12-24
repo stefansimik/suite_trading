@@ -185,7 +185,9 @@ class DistributionFillModel:
             else:
                 slipped_price = proposed_fill.price + adjustment_amount
 
-            slipped_fills.append(ProposedFill(signed_quantity=proposed_fill.signed_quantity, price=slipped_price))
+            slipped_fills.append(
+                ProposedFill(signed_quantity=proposed_fill.signed_quantity, price=slipped_price, timestamp=proposed_fill.timestamp),
+            )
 
         return slipped_fills
 
