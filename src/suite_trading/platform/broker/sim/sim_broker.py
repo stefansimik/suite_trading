@@ -561,7 +561,7 @@ class SimBroker(Broker, SimulatedBroker):
         # COMPUTE
         signed_position_quantity = self.get_signed_position_quantity(instrument)
 
-        commission, initial_margin, maintenance_margin_after = self._compute_commission_margins_for_proposed_fill(
+        commission, initial_margin, maintenance_margin_after = self._compute_commission_and_margins(
             order=order,
             proposed_fill=proposed_fill,
             order_book=order_book,
@@ -675,7 +675,7 @@ class SimBroker(Broker, SimulatedBroker):
             # Note: 'quantity_after' is the position signed_quantity after applying this proposed fill
             signed_position_quantity_after = signed_position_quantity + proposed_fill.signed_quantity
 
-            commission, initial_margin, maintenance_margin_after = self._compute_commission_margins_for_proposed_fill(
+            commission, initial_margin, maintenance_margin_after = self._compute_commission_and_margins(
                 order=order,
                 proposed_fill=proposed_fill,
                 order_book=order_book,
@@ -720,7 +720,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         return True
 
-    def _compute_commission_margins_for_proposed_fill(
+    def _compute_commission_and_margins(
         self,
         *,
         order: Order,

@@ -29,10 +29,10 @@ class FixedFeeModel(FeeModel):
         proposed_fill: ProposedFill,
         previous_order_fills: Iterable[OrderFill],
     ) -> Money:
-        q = proposed_fill.signed_quantity
+        signed_quantity = proposed_fill.signed_quantity
 
         # Precondition: ensure non-zero $signed_quantity
-        if q == 0:
-            raise ValueError(f"Cannot call `compute_commission` because $signed_quantity ({q}) is zero for order $id ('{order.id}')")
+        if signed_quantity == 0:
+            raise ValueError(f"Cannot call `compute_commission` because $signed_quantity ({signed_quantity}) is zero for order $id ('{order.id}')")
 
-        return self._fee_per_unit * abs(q)
+        return self._fee_per_unit * abs(signed_quantity)

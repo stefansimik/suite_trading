@@ -553,7 +553,7 @@ _process_proposed_fill(order, proposed_fill, order_book)
 ├── [VALIDATE] Check instrument match
 ├── [COMPUTE]
 │   ├── position_before, net_qty_after
-│   ├── commission_margins = _compute_commission_margins_for_proposed_fill(...)
+│   ├── commission_and_margins = _compute_commission_and_margins(...)
 │   └── funds_now = get_funds(...)
 ├── [DECIDE] IF not has_enough_funds(...): handle insufficient funds
 └── [ACT]
