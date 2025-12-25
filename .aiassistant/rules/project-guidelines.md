@@ -57,6 +57,12 @@ Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, bu
   - Example: `compute_realized_pnl(trades)`, `compute_sharpe(returns)`
 - `find_*` or `query_*`: Search/filter with partial/empty results (optional, future scope)
 
+## 2.3. Parameter Design & Ordering
+
+- **Order by Importance:** Always place the most important parameters first. The first parameter should be the primary subject of the function—the object it primarily acts upon, calculates for, or transforms.
+- **Subject vs. Context:** Distinguish between the primary subject and secondary context (e.g., historical data, reference models, or configuration). Secondary context parameters should follow the primary subject.
+- **Mental Model Alignment:** The parameter order should reflect the natural phrasing of the operation (e.g., "calculate commission for $proposed_fill using $order and $history").
+
 # 3. Type Annotations & Signatures
 
 ## 3.1. Modern Typing Rules
@@ -159,10 +165,11 @@ This section covers all developer-facing text: docstrings, comments, logs, and e
 
 **Requirements:**
 - Google-style format: purpose, params, returns, exceptions, types
-- **Simple, conversational English** - avoid complex or very technical jargon
-- Include all important information; explain complex concepts simply
-- Make immediately understandable without research
-- Use concrete examples when helpful
+- **Natural, Simple Phrasing:** Use conversational English. Avoid technical jargon or overly formal wording. Docstrings should read like a natural explanation of "what" and "why".
+- **Identify the Primary Subject:** Clearly state what the function is doing or calculating for, specifically identifying the primary subject.
+- **Explain Parameter Context:** Describe the role of each parameter. Make it clear which parameter is the main subject and which ones provide secondary context or additional data.
+- **Make immediately understandable** without needing to research internal logic.
+- Use concrete examples when helpful.
 
 **Example:**
 ```python
@@ -183,6 +190,11 @@ def calculate_portfolio_value(positions: list) -> Decimal:
     """
     ...
 ```
+
+**Acceptance checks:**
+- [ ] Docstrings use natural, conversational English (no technical jargon or complex wording)
+- [ ] The primary subject of the function is clearly identified in the summary
+- [ ] The role and context of each parameter are clearly explained
 
 ## 4.2. Code Comments (Internal Documentation)
 
@@ -707,7 +719,7 @@ bids: Sequence[tuple[Decimal, Decimal]]
 ## 6.3. If Adding One
 - Prefer `NamedTuple` for read-only shapes
 - Or `@dataclass(frozen=True)` with `__slots__` when validation needed
-- State the justification, invariant(s), or performance reason in the docstring if the reason for the abstraction is not obvious from the context.
+- State the justification, invariant(s) or performance reason in the docstring if the reason for the abstraction is not obvious from the context.
 
 **Example:**
 ```python
