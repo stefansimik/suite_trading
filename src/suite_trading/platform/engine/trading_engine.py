@@ -877,15 +877,6 @@ class TradingEngine:
             ConnectionError: If the broker is not connected.
             ValueError: If the order is invalid or cannot be submitted, or if $order is re-owned.
         """
-        # region Workflow Diagram
-        # submit_order(order, broker, strategy)
-        # ├── [VALIDATE] check re-ownership
-        # └── [ACT]
-        #     ├── Record routing (Strategy -> Broker)
-        #     ├── Transition order to PENDING_SUBMIT
-        #     └── Delegate to broker.submit_order(order)
-        # endregion
-
         # VALIDATE
         # Precondition: do not remap an already submitted order to a different owner
         existing_route = self._routing_by_order.get(order)

@@ -573,7 +573,7 @@ It ensures the implementation is predictable and testable by separating pure der
 
 ### Workflow Visualization (ASCII Diagrams)
 
-**R-4.5.8** For complex workflows, add a compact tree diagram that shows the call sequence and stage boundaries.
+**R-4.5.8** For complex workflows, use a compact tree diagram during the design and proposal phase to show the call sequence and stage boundaries. **Do not include these diagrams in docstrings or comments in the final code.**
 
 **Template (compact):**
 ```text
