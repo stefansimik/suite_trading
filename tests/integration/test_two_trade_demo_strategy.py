@@ -30,8 +30,8 @@ class TwoTradeDemoStrategy(Strategy):
     Behavior:
     - Adds a FixedSequenceEventFeed of 10 rising bar (Step 0)
     - Counts incoming BarEvent(s) as "price events"
-    - On 3rd event: submit SELL Market order abs_quantity=1
-    - On 5th event: submit BUY Market order abs_quantity=1, then stop by closing the feed
+    - On 3rd event: submit SELL Market order abs_qty=1
+    - On 5th event: submit BUY Market order abs_qty=1, then stop by closing the feed
     """
 
     def __init__(self, name: str, broker: Broker) -> None:

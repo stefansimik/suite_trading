@@ -24,7 +24,7 @@ class OrderFill:
 
     Attributes:
         order: Reference to the parent order that was filled.
-        abs_quantity: Filled abs_quantity.
+        abs_quantity: Filled absolute quantity.
         price: Fill price.
         timestamp: When this fill occurred.
         id: Unique fill identifier ("{order.id}-{n}").
@@ -70,7 +70,7 @@ class OrderFill:
         self._id = id
 
         # Normalize values
-        self._signed_quantity = self.instrument.snap_quantity(signed_quantity)
+        self._signed_quantity = self.instrument.snap_qty(signed_quantity)
         self._price = self.instrument.snap_price(price)
 
         # Commission
@@ -198,7 +198,7 @@ class OrderFill:
             raise ValueError(f"Cannot call `OrderFill._validate` because fill sign does not match order sign ($signed_quantity={self._signed_quantity}, order.signed_quantity={self._order.signed_quantity})")
 
         # Precondition: quantity must be snapped
-        expected_quantity = self.instrument.snap_quantity(self._signed_quantity)
+        expected_quantity = self.instrument.snap_qty(self._signed_quantity)
         if expected_quantity != self._signed_quantity:
             raise ValueError(f"Cannot call `OrderFill._validate` because $signed_quantity ({self._signed_quantity}) is not snapped (expected {expected_quantity})")
 
@@ -232,7 +232,7 @@ class OrderFill:
         Returns:
             str: String representation of the fill.
         """
-        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, signed_quantity={self.signed_quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
+        return f"{self.__class__.__name__}(id={self.id}, order_id={self.order.id}, instrument={self.instrument}, signed_qty={self.signed_quantity}, price={self.price}, timestamp={format_dt(self.timestamp)})"
 
     def __eq__(self, other) -> bool:
         """Check equality with another fill.

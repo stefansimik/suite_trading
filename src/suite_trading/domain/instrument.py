@@ -31,7 +31,7 @@ class Instrument:
         name (str): The instrument identifier (e.g., "EURUSD", "6E", "AAPL").
         exchange (str): Venue where the instrument is traded (e.g., "FOREX", "CME").
         price_increment (Decimal): Minimum price tick size.
-        quantity_increment (Decimal): Minimum abs_quantity increment.
+        qty_increment (Decimal): Minimum absolute quantity increment.
         contract_size (Decimal): Underlying amount per contract/lot (e.g., 125000 for 6E).
         contract_unit (str): Unit of the underlying (e.g., "EUR", "share", "barrel", "troy_oz").
         quote_currency (Currency): Currency prices are quoted in (denominator of quote).
@@ -43,7 +43,7 @@ class Instrument:
         "_exchange",
         "_asset_class",
         "_price_increment",
-        "_quantity_increment",
+        "_qty_increment",
         "_contract_size",
         "_contract_unit",
         "_quote_currency",
@@ -56,7 +56,7 @@ class Instrument:
         exchange: str,
         asset_class: AssetClass,
         price_increment: DecimalLike,
-        quantity_increment: DecimalLike,
+        qty_increment: DecimalLike,
         contract_size: DecimalLike,
         contract_unit: str,
         quote_currency: Currency,
@@ -68,7 +68,7 @@ class Instrument:
             name: The instrument identifier (e.g., "6E", "EURUSD", "AAPL").
             exchange: Venue name (e.g., "CME", "FOREX", "NASDAQ").
             price_increment: Minimum price tick size as a Decimal-like scalar.
-            quantity_increment: Minimum abs_quantity increment as a Decimal-like scalar.
+            qty_increment: Minimum absolute quantity increment as a Decimal-like scalar.
             contract_size: Underlying amount per contract/lot (e.g., 125000 for 6E) as a Decimal-like scalar.
             contract_unit: Unit of the underlying (e.g., "EUR", "share", "barrel").
             quote_currency: Currency in which prices are quoted (denominator of the quote). This
@@ -86,7 +86,7 @@ class Instrument:
         self._exchange = exchange
         self._asset_class = asset_class
         self._price_increment = as_decimal(price_increment)
-        self._quantity_increment = as_decimal(quantity_increment)
+        self._qty_increment = as_decimal(qty_increment)
         self._contract_size = as_decimal(contract_size)
         self._contract_unit = contract_unit
 
@@ -102,9 +102,9 @@ class Instrument:
         # Precondition: $price_increment must be positive to define a valid tick size
         if self._price_increment <= 0:
             raise ValueError(f"$price_increment must be positive, but provided value is: {self._price_increment}")
-        # Precondition: $quantity_increment must be positive to define a valid lot size
-        if self._quantity_increment <= 0:
-            raise ValueError(f"$quantity_increment must be positive, but provided value is: {self._quantity_increment}")
+        # Precondition: $qty_increment must be positive to define a valid lot size
+        if self._qty_increment <= 0:
+            raise ValueError(f"$qty_increment must be positive, but provided value is: {self._qty_increment}")
         # Precondition: $contract_size must be positive to define the contract/lot amount
         if self._contract_size <= 0:
             raise ValueError(f"$contract_size must be positive, but provided value is: {self._contract_size}")
@@ -128,9 +128,9 @@ class Instrument:
         return self._price_increment
 
     @property
-    def quantity_increment(self) -> Decimal:
-        """Get the minimum abs_quantity change increment."""
-        return self._quantity_increment
+    def qty_increment(self) -> Decimal:
+        """Get the minimum absolute quantity change increment."""
+        return self._qty_increment
 
     @property
     def contract_size(self) -> Decimal:
@@ -212,8 +212,8 @@ class Instrument:
         ticks = price_delta / self.price_increment
         return int(ticks)
 
-    def quantity_from_lots(self, n: int) -> Decimal:
-        """Return a abs_quantity equal to $n quantity_from_lots (n * $quantity_increment).
+    def qty_from_lots(self, n: int) -> Decimal:
+        """Return an absolute quantity equal to $n lots (n * $qty_increment).
 
         Note: "lot" denotes the standardized minimal tradable unit for the Instrument.
 
@@ -221,22 +221,22 @@ class Instrument:
             n (int): Number of lot units. Must be a positive integer.
 
         Returns:
-            Decimal: Exact abs_quantity as `n * quantity_increment`.
+            Decimal: Exact absolute quantity as `n * qty_increment`.
 
         Raises:
             TypeError: If $n is not an int.
             ValueError: If $n <= 0.
         """
-        # Precondition: enforce integer count of quantity_from_lots for predictable arithmetic
+        # Precondition: enforce integer lot count for predictable arithmetic
         if not isinstance(n, int):
-            raise TypeError("Cannot call `quantity_from_lots` because $n is not int. Pass a positive int for lot count.")
+            raise TypeError("Cannot call `qty_from_lots` because $n is not int. Pass a positive int for lot count.")
 
-        # Precondition: quantity_from_lots must be positive to express a non-zero abs_quantity
+        # Precondition: lot count must be positive to express a non-zero absolute quantity
         if n <= 0:
-            raise ValueError(f"Cannot call `quantity_from_lots` because $n ('{n}') must be > 0.")
+            raise ValueError(f"Cannot call `qty_from_lots` because $n ('{n}') must be > 0.")
 
-        # Return the abs_quantity
-        return self.quantity_increment * n
+        # Return the absolute quantity
+        return self.qty_increment * n
 
     # endregion
 
@@ -267,17 +267,17 @@ class Instrument:
         # Snap to the instrument's price increment (banker's rounding)
         return v.quantize(self.price_increment, rounding=ROUND_HALF_EVEN)
 
-    def snap_quantity(self, value: DecimalLike) -> Decimal:
-        """Return $value snapped to $quantity_increment as an exact Decimal.
+    def snap_qty(self, value: DecimalLike) -> Decimal:
+        """Return $value snapped to $qty_increment as an exact Decimal.
 
         Accepts float safely by converting via `as_decimal` (which uses str(...) for non-Decimal),
-        then quantizes to $quantity_increment using banker’s rounding (ROUND_HALF_EVEN).
+        then quantizes to $qty_increment using banker’s rounding (ROUND_HALF_EVEN).
 
         Args:
             value: Quantity to normalize (Decimal-like scalar).
 
         Returns:
-            Decimal: Quantity snapped to a multiple of $quantity_increment.
+            Decimal: Quantity snapped to a multiple of $qty_increment.
 
         Raises:
             ValueError: If $value is not finite.
@@ -287,10 +287,10 @@ class Instrument:
 
         # Precondition: input must be finite
         if not v.is_finite():
-            raise ValueError(f"Cannot call `snap_quantity` because $value ('{v}') is not finite")
+            raise ValueError(f"Cannot call `snap_qty` because $value ('{v}') is not finite")
 
         # Snap to the instrument's quantity increment (banker's rounding)
-        return v.quantize(self.quantity_increment, rounding=ROUND_HALF_EVEN)
+        return v.quantize(self.qty_increment, rounding=ROUND_HALF_EVEN)
 
     # endregion
 
@@ -305,12 +305,12 @@ class Instrument:
         return f"{self.name}@{self.exchange}"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name}, exchange={self.exchange}, asset_class={self.asset_class.name}, price_increment={self.price_increment}, quantity_increment={self.quantity_increment}, contract_size={self.contract_size}, contract_unit={self.contract_unit}, quote_currency={self.quote_currency.code}, settlement_currency={self.settlement_currency.code})"
+        return f"{self.__class__.__name__}(name={self.name}, exchange={self.exchange}, asset_class={self.asset_class.name}, price_increment={self.price_increment}, qty_increment={self.qty_increment}, contract_size={self.contract_size}, contract_unit={self.contract_unit}, quote_currency={self.quote_currency.code}, settlement_currency={self.settlement_currency.code})"
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, Instrument):
             return False
-        return self.name == other.name and self.exchange == other.exchange and self.asset_class == other.asset_class and self.price_increment == other.price_increment and self.quantity_increment == other.quantity_increment and self.contract_size == other.contract_size and self.contract_unit == other.contract_unit and self.quote_currency == other.quote_currency and self.settlement_currency == other.settlement_currency
+        return self.name == other.name and self.exchange == other.exchange and self.asset_class == other.asset_class and self.price_increment == other.price_increment and self.qty_increment == other.qty_increment and self.contract_size == other.contract_size and self.contract_unit == other.contract_unit and self.quote_currency == other.quote_currency and self.settlement_currency == other.settlement_currency
 
     def __hash__(self) -> int:
         """Return hash value for the instrument.
@@ -326,7 +326,7 @@ class Instrument:
                 self.exchange,
                 self.asset_class.name,
                 self.price_increment,
-                self.quantity_increment,
+                self.qty_increment,
                 self.contract_size,
                 self.contract_unit,
                 self.quote_currency.code,

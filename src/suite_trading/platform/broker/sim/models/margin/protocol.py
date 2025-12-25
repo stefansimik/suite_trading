@@ -13,9 +13,9 @@ class MarginModel(Protocol):
 
     The API is intentionally asymmetric:
 
-    - Initial margin uses trade context ($signed_quantity) because pre-trade
+    - Initial margin uses trade context ($signed_qty) because pre-trade
       checks may depend on order direction and size.
-    - Maintenance margin uses position context ($signed_quantity) because ongoing
+    - Maintenance margin uses position context ($signed_qty) because ongoing
       requirements are based on current exposure, not a prospective order.
 
     Both methods receive the same OrderBook snapshot that the broker uses to match the
@@ -27,14 +27,14 @@ class MarginModel(Protocol):
     Per-fill order_fill and incremental blocking:
 
     - Simulated brokers such as SimBroker call `compute_initial_margin` per proposed fill,
-      not once for the whole order. The $signed_quantity passed in is the additional
-      exposure introduced by the current proposed fill, not the total order abs_quantity.
+      not once for the whole order. The $signed_qty passed in is the additional
+      exposure introduced by the current proposed fill, not the total order abs_qty.
     - Initial margin is therefore blocked incrementally per proposed fill, only when abs
       exposure increases. If a proposed fill reduces exposure or keeps it unchanged, the
       implementation may return a zero $Money amount and no new initial margin is
       blocked.
     - After each proposed fill is executed, the broker recomputes maintenance margin for the new
-      $signed_quantity and converts previously blocked initial margin into
+      $signed_qty and converts previously blocked initial margin into
       maintenance margin.
 
     Currency and cross-currency handling:

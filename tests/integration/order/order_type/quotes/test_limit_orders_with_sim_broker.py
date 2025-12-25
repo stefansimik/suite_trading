@@ -155,7 +155,7 @@ def test_limit_multiple_partial_fills() -> None:
     # Act
     engine.start()
 
-    # Assert: three order_fills with fill_prices following the feed and total abs_quantity 3
+    # Assert: three order_fills with fill_prices following the feed and total abs_qty 3
     assert len(broker.list_active_orders()) == 0
     order_fills = engine.list_order_fills_for_strategy("limit_partials")
     assert len(order_fills) == 3

@@ -30,10 +30,10 @@ class Order:
     Properties:
         id (str): Unique identifier for the order (read-only).
         instrument (Instrument): The financial instrument to trade (read-only).
-        signed_quantity (Decimal): The net quantity to trade. Returns a positive value for buy
+        signed_qty (Decimal): The net quantity to trade. Returns a positive value for buy
             orders and a negative value for sell orders (read-only).
         side (OrderSide): Whether this is a BUY or SELL order (read-only).
-        abs_quantity (Decimal): The total magnitude of the order; always positive (read-only).
+        abs_qty (Decimal): The total magnitude of the order; always positive (read-only).
         time_in_force (TimeInForce): How long the order remains active (read-only).
         good_till_dt (datetime | None): Expiry datetime for GTD orders, or None for non-GTD orders (read-only).
         state (OrderState): Current state of the order from the internal state machine.
@@ -56,7 +56,7 @@ class Order:
         Args:
             instrument (Instrument): The financial instrument to trade.
             signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
-                Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
+                Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
@@ -66,7 +66,7 @@ class Order:
 
         # Trading details (private attributes with public properties)
         self._instrument = instrument
-        self._signed_quantity = instrument.snap_quantity(signed_quantity)
+        self._signed_quantity = instrument.snap_qty(signed_quantity)
 
         # Order lifecycle details (private attributes with public properties)
         self._time_in_force = time_in_force
@@ -200,7 +200,7 @@ class Order:
         """Whether some, but not all, quantity has been filled.
 
         Returns:
-            bool: True if 0 < $abs_filled_quantity < $abs_quantity.
+            bool: True if 0 < $abs_filled_quantity < $abs_qty.
         """
         return Decimal("0") < self.abs_filled_quantity < self.abs_quantity
 
@@ -209,7 +209,7 @@ class Order:
         """Whether the order has been completely filled.
 
         Returns:
-            bool: True if $abs_filled_quantity == $abs_quantity.
+            bool: True if $abs_filled_quantity == $abs_qty.
         """
         return self.abs_filled_quantity == self.abs_quantity
 
@@ -389,11 +389,11 @@ class Order:
         """Validate intrinsic order inputs at construction time.
 
         Raises:
-            ValueError: If $signed_quantity == 0 or if `$time_in_force` and `$good_till_dt` are inconsistent.
+            ValueError: If $signed_qty == 0 or if `$time_in_force` and `$good_till_dt` are inconsistent.
         """
         # Precondition: non-zero order quantity
         if self.signed_quantity == 0:
-            raise ValueError(f"Cannot call `_validate` because $signed_quantity ({self.signed_quantity}) cannot be zero")
+            raise ValueError(f"Cannot call `_validate` because $signed_qty ({self.signed_quantity}) cannot be zero")
 
         # Precondition: GTD must define $good_till_dt
         if self.time_in_force is TimeInForce.GTD and self.good_till_dt is None:
@@ -408,10 +408,10 @@ class Order:
     # region Magic
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, signed_quantity={self.signed_quantity}, state={self.state})"
+        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, signed_qty={self.signed_quantity}, state={self.state})"
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, signed_quantity={self.signed_quantity}, state={self.state})"
+        return f"{self.__class__.__name__}(id={self.id}, instrument={self.instrument}, signed_qty={self.signed_quantity}, state={self.state})"
 
     def __eq__(self, other: object) -> bool:
         """Check equality with another order.
@@ -457,7 +457,7 @@ class MarketOrder(Order):
         Args:
             instrument (Instrument): The financial instrument to trade.
             signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
-                Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
+                Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
@@ -491,7 +491,7 @@ class LimitOrder(Order):
         Args:
             instrument (Instrument): The financial instrument to trade.
             signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
-                Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
+                Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             limit_price (DecimalLike): The limit price for the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
@@ -546,7 +546,7 @@ class StopMarketOrder(Order):
         Args:
             instrument (Instrument): The financial instrument to trade.
             signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
-                Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
+                Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             stop_price (DecimalLike): The stop price for the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
@@ -600,7 +600,7 @@ class StopLimitOrder(Order):
         Args:
             instrument (Instrument): The financial instrument to trade.
             signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
-                Accepts Decimal, str, int, or float. Snapped to $instrument.quantity_increment.
+                Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             stop_price (DecimalLike): The stop price that triggers the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.
             limit_price (DecimalLike): The limit price for the order once triggered.
@@ -645,9 +645,9 @@ class StopLimitOrder(Order):
 
         # Precondition: enforce order-direction relationship between $stop_price and $limit_price for StopLimitOrder
         if self.is_buy and self.limit_price < self.stop_price:
-            raise ValueError(f"Cannot call `_validate` because for BUY StopLimitOrder $limit_price ({self.limit_price}) < $stop_price ({self.stop_price}). Use $limit_price >= $stop_price or change $signed_quantity")
+            raise ValueError(f"Cannot call `_validate` because for BUY StopLimitOrder $limit_price ({self.limit_price}) < $stop_price ({self.stop_price}). Use $limit_price >= $stop_price or change $signed_qty")
         if self.is_sell and self.limit_price > self.stop_price:
-            raise ValueError(f"Cannot call `_validate` because for SELL StopLimitOrder $limit_price ({self.limit_price}) > $stop_price ({self.stop_price}). Use $limit_price <= $stop_price or change $signed_quantity")
+            raise ValueError(f"Cannot call `_validate` because for SELL StopLimitOrder $limit_price ({self.limit_price}) > $stop_price ({self.stop_price}). Use $limit_price <= $stop_price or change $signed_qty")
 
 
 # endregion

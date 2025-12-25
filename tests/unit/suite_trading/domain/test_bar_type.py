@@ -14,7 +14,7 @@ def test_bar_type_string_representation():
         exchange="FOREX",
         asset_class=AssetClass.FX_SPOT,
         price_increment=Decimal("0.00001"),
-        quantity_increment=Decimal("1"),
+        qty_increment=Decimal("1"),
         contract_size=Decimal("100000"),
         contract_unit="EUR",
         quote_currency=USD,

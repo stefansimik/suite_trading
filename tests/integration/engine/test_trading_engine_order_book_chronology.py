@@ -93,7 +93,7 @@ class MockOrderBookDrivenBroker(Broker):
         return None
 
     def get_signed_position_quantity(self, instrument: Instrument) -> Decimal:
-        """No-op get position abs_quantity."""
+        """No-op get position abs_qty."""
         return Decimal("0")
 
     def get_account(self) -> Account:
@@ -125,7 +125,7 @@ def create_test_instrument() -> Instrument:
         exchange="TEST",
         asset_class=AssetClass.FX_SPOT,
         price_increment=Decimal("0.01"),
-        quantity_increment=Decimal("1"),
+        qty_increment=Decimal("1"),
         contract_size=Decimal("1"),
         contract_unit="TEST",
         quote_currency=USD,

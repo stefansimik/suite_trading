@@ -23,22 +23,22 @@ class Position:
 
     Args:
         instrument: The financial instrument for this position.
-        signed_quantity: Net position quantity (positive for buy/long, negative for sell/short).
-        average_price: Average entry price for the current net position.
+        signed_qty: Net position quantity (positive for buy/long, negative for sell/short).
+        avg_price: Average entry price for the current net position.
         unrealized_pnl: Current unrealized profit/loss based on market price.
         realized_pnl: Total realized profit/loss from closed portions.
         last_update: When this position snapshot was last updated (timezone-aware).
 
     Raises:
-        ValueError: If $last_update is not timezone-aware, or if $average_price is
-            not finite while $signed_quantity is non-zero.
+        ValueError: If $last_update is not timezone-aware, or if $avg_price is
+            not finite while $signed_qty is non-zero.
     """
 
     def __init__(
         self,
         instrument: Instrument,
-        signed_quantity: DecimalLike,
-        average_price: DecimalLike,
+        signed_qty: DecimalLike,
+        avg_price: DecimalLike,
         unrealized_pnl: DecimalLike = Decimal("0"),
         realized_pnl: DecimalLike = Decimal("0"),
         last_update: datetime | None = None,
@@ -47,20 +47,20 @@ class Position:
         if last_update is not None and last_update.tzinfo is None:
             raise ValueError(f"Cannot call `__init__` because $last_update ({last_update}) is not timezone-aware")
 
-        signed_quantity_decimal = as_decimal(signed_quantity)
-        average_price_decimal = as_decimal(average_price)
-        unrealized_pnl_decimal = as_decimal(unrealized_pnl)
-        realized_pnl_decimal = as_decimal(realized_pnl)
+        signed_qty = as_decimal(signed_qty)
+        avg_price = as_decimal(avg_price)
+        unrealized_pnl = as_decimal(unrealized_pnl)
+        realized_pnl = as_decimal(realized_pnl)
 
-        # Check: $average_price must be finite when $signed_quantity is non-zero
-        if signed_quantity_decimal != 0 and (average_price_decimal.is_nan() or average_price_decimal.is_infinite()):
-            raise ValueError(f"Cannot call `__init__` because $average_price ({average_price_decimal}) is not a finite Decimal")
+        # Check: $avg_price must be finite when $signed_qty is non-zero
+        if signed_qty != 0 and (avg_price.is_nan() or avg_price.is_infinite()):
+            raise ValueError(f"Cannot call `__init__` because $avg_price ({avg_price}) is not a finite Decimal")
 
         self._instrument = instrument
-        self._signed_quantity = signed_quantity_decimal
-        self._average_price = average_price_decimal
-        self._unrealized_pnl = unrealized_pnl_decimal
-        self._realized_pnl = realized_pnl_decimal
+        self._signed_qty = signed_qty
+        self._avg_price = avg_price
+        self._unrealized_pnl = unrealized_pnl
+        self._realized_pnl = realized_pnl
         self._last_update = last_update
 
     @property
@@ -70,13 +70,13 @@ class Position:
         return self._instrument
 
     @property
-    def signed_quantity(self) -> Decimal:
+    def signed_qty(self) -> Decimal:
         """The net position quantity.
 
         Returns a positive value for buy (long) positions, a negative value for
         sell (short) positions, and zero if flat.
         """
-        return self._signed_quantity
+        return self._signed_qty
 
     @property
     def abs_quantity(self) -> Decimal:
@@ -85,12 +85,12 @@ class Position:
         This value is always positive regardless of whether the position is
         buy (long) or sell (short). It represents the magnitude of the holding.
         """
-        return abs(self.signed_quantity)
+        return abs(self.signed_qty)
 
     @property
-    def average_price(self) -> Decimal:
+    def avg_price(self) -> Decimal:
         """Return the average entry price."""
-        return self._average_price
+        return self._avg_price
 
     @property
     def unrealized_pnl(self) -> Decimal:
@@ -110,17 +110,17 @@ class Position:
     @property
     def is_long(self) -> bool:
         """Return True if this is a long position."""
-        return self.signed_quantity > 0
+        return self.signed_qty > 0
 
     @property
     def is_short(self) -> bool:
         """Return True if this is a short position."""
-        return self.signed_quantity < 0
+        return self.signed_qty < 0
 
     @property
     def is_flat(self) -> bool:
         """Return True if this position is flat."""
-        return self.signed_quantity == 0
+        return self.signed_qty == 0
 
     @property
     def total_pnl(self) -> Decimal:
@@ -134,10 +134,10 @@ class Position:
             current_price: Current market price for $instrument.
 
         Returns:
-            Market value as $signed_quantity * $current_price * $contract_size.
+            Market value as $signed_qty * $current_price * $contract_size.
         """
         current_price_decimal = as_decimal(current_price)
-        return self.signed_quantity * current_price_decimal * self.instrument.contract_size
+        return self.signed_qty * current_price_decimal * self.instrument.contract_size
 
     def update_unrealized_pnl(self, current_price: DecimalLike, *, timestamp: datetime) -> Position:
         """Create a new Position snapshot with updated unrealized P&L.
@@ -161,22 +161,22 @@ class Position:
         if self.is_flat:
             new_unrealized_pnl = Decimal("0")
         else:
-            price_diff = current_price_decimal - self.average_price
-            new_unrealized_pnl = self.signed_quantity * price_diff * self.instrument.contract_size
+            price_diff = current_price_decimal - self.avg_price
+            new_unrealized_pnl = self.signed_qty * price_diff * self.instrument.contract_size
 
-        result = Position(instrument=self.instrument, signed_quantity=self.signed_quantity, average_price=self.average_price, unrealized_pnl=new_unrealized_pnl, realized_pnl=self.realized_pnl, last_update=timestamp)
+        result = Position(instrument=self.instrument, signed_qty=self.signed_qty, avg_price=self.avg_price, unrealized_pnl=new_unrealized_pnl, realized_pnl=self.realized_pnl, last_update=timestamp)
         return result
 
     def __str__(self) -> str:
         side = "LONG" if self.is_long else "SHORT" if self.is_short else "FLAT"
-        return f"{self.__class__.__name__}(side={side}, abs_quantity={abs(self.signed_quantity)}, instrument={self.instrument}, avg_price={self.average_price})"
+        return f"{self.__class__.__name__}(side={side}, abs_quantity={abs(self.signed_qty)}, instrument={self.instrument}, avg_price={self.avg_price})"
 
     def __repr__(self) -> str:
         side = "LONG" if self.is_long else "SHORT" if self.is_short else "FLAT"
         last_update_str = format_dt(self.last_update) if self.last_update is not None else None
-        return f"{self.__class__.__name__}(side={side}, abs_quantity={abs(self.signed_quantity)}, instrument={self.instrument}, avg_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={last_update_str})"
+        return f"{self.__class__.__name__}(side={side}, abs_quantity={abs(self.signed_qty)}, instrument={self.instrument}, avg_price={self.avg_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={last_update_str})"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Position):
             return False
-        return self.instrument == other.instrument and self.signed_quantity == other.signed_quantity and self.average_price == other.average_price and self.unrealized_pnl == other.unrealized_pnl and self.realized_pnl == other.realized_pnl and self.last_update == other.last_update
+        return self.instrument == other.instrument and self.signed_qty == other.signed_qty and self.avg_price == other.avg_price and self.unrealized_pnl == other.unrealized_pnl and self.realized_pnl == other.realized_pnl and self.last_update == other.last_update

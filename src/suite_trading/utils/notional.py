@@ -4,13 +4,13 @@ from decimal import Decimal
 
 
 def compute_notional_value(price: Decimal, signed_quantity: Decimal, contract_size: Decimal) -> Decimal:
-    """Compute abs notional value for $signed_quantity at $price.
+    """Compute abs notional value for $signed_qty at $price.
 
-    Returns the positive magnitude |$price| * |$signed_quantity| * $contract_size.
+    Returns the positive magnitude |$price| * |$signed_qty| * $contract_size.
 
     Args:
         price: Trade price; negative values are allowed in some markets.
-        quantity: Contract/lot abs_quantity; sign indicates direction but is ignored here.
+        quantity: Contract/lot abs_qty; sign indicates direction but is ignored here.
         contract_size: Contracts-to-notional multiplier (must be positive).
 
     Returns:

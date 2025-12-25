@@ -19,7 +19,7 @@ class SimgleLimitOrderStrategy(Strategy):
 
     The strategy attaches an OrderBook-based event-feed on start. When the first
     OrderBookEvent arrives, it submits a BUY Limit order with price 101 and
-    abs_quantity 10 using the provided SimBroker. This setup is intended for
+    abs_qty 10 using the provided SimBroker. This setup is intended for
     debugging how a Limit order interacts with a specific OrderBook snapshot.
     """
 

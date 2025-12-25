@@ -42,10 +42,10 @@ class FixedFeeModel(FeeModel):
         Returns:
             The commission amount as Money.
         """
-        signed_quantity = proposed_fill.signed_quantity
+        signed_qty = proposed_fill.signed_qty
 
-        # Precondition: ensure non-zero $signed_quantity
-        if signed_quantity == 0:
-            raise ValueError(f"Cannot call `compute_commission` because $signed_quantity ({signed_quantity}) is zero for order $id ('{order.id}')")
+        # Precondition: ensure signed quantity is non-zero
+        if signed_qty == 0:
+            raise ValueError(f"Cannot call `compute_commission` because $signed_quantity ({signed_qty}) is zero for order $id ('{order.id}')")
 
-        return self._fee_per_unit * abs(signed_quantity)
+        return self._fee_per_unit * abs(signed_qty)

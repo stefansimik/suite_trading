@@ -85,7 +85,7 @@ class TradingEngine:
         self._timeline_dt: datetime | None = None
 
         # Tracks timestamp of the last processed OrderBook
-        self._last_processed_order_book_timestamp: datetime | None = None
+        self._last_order_book_ts: datetime | None = None
 
         # Brokers
         self._brokers_by_name_bidict: bidict[str, Broker] = bidict()
@@ -605,8 +605,8 @@ class TradingEngine:
                 order_books = self._event_to_order_book_converter.convert_to_order_books(current_event)
                 for order_book in order_books:
                     # Check: ignore stale OrderBook snapshots (defensive)
-                    if (self._last_processed_order_book_timestamp is not None) and (order_book.timestamp < self._last_processed_order_book_timestamp):
-                        logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than last processed OrderBook timestamp {format_dt(self._last_processed_order_book_timestamp)}")
+                    if (self._last_order_book_ts is not None) and (order_book.timestamp < self._last_order_book_ts):
+                        logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than last processed OrderBook timestamp {format_dt(self._last_order_book_ts)}")
                         continue
 
                     # Process OrderBook with valid timestamp
@@ -617,9 +617,9 @@ class TradingEngine:
                         broker.set_timeline_dt(order_book.timestamp)  # Move broker's time by OrderBook
                         broker.process_order_book(order_book)
 
-                    should_update_last_processed_order_book_timestamp = self._last_processed_order_book_timestamp is None or order_book.timestamp > self._last_processed_order_book_timestamp
-                    if should_update_last_processed_order_book_timestamp:
-                        self._last_processed_order_book_timestamp = order_book.timestamp
+                    should_update_last_processed_order_book_ts = self._last_order_book_ts is None or order_book.timestamp > self._last_order_book_ts
+                    if should_update_last_processed_order_book_ts:
+                        self._last_order_book_ts = order_book.timestamp
 
             # Set broker time to Event time
             for broker in simulated_brokers:

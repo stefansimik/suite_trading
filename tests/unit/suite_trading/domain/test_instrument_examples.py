@@ -12,7 +12,7 @@ def test_euro_fx_future_6e() -> None:
         exchange="CME",
         asset_class=AssetClass.FUTURE,
         price_increment=Decimal("0.0001"),
-        quantity_increment=Decimal("1"),
+        qty_increment=Decimal("1"),
         contract_size=Decimal("125000"),  # EUR per contract
         contract_unit="EUR",
         quote_currency=USD,
@@ -30,7 +30,7 @@ def test_eurusd_spot_standard_lot() -> None:
         exchange="FOREX",
         asset_class=AssetClass.FX_SPOT,
         price_increment=Decimal("0.0001"),
-        quantity_increment=Decimal("1"),
+        qty_increment=Decimal("1"),
         contract_size=Decimal("100000"),  # EUR per lot
         contract_unit="EUR",
         quote_currency=USD,
@@ -44,7 +44,7 @@ def test_crude_oil_cl_future() -> None:
         exchange="NYMEX",
         asset_class=AssetClass.FUTURE,
         price_increment=Decimal("0.01"),
-        quantity_increment=Decimal("1"),
+        qty_increment=Decimal("1"),
         contract_size=Decimal("1000"),  # barrels
         contract_unit="barrel",
         quote_currency=USD,
@@ -58,7 +58,7 @@ def test_stock_aapl() -> None:
         exchange="NASDAQ",
         asset_class=AssetClass.EQUITY,
         price_increment=Decimal("0.01"),
-        quantity_increment=Decimal("1"),
+        qty_increment=Decimal("1"),
         contract_size=Decimal("1"),
         contract_unit="share",
         quote_currency=USD,
@@ -73,7 +73,7 @@ def test_gold_xauusd_spot() -> None:
         exchange="OTC",
         asset_class=AssetClass.COMMODITY_SPOT,
         price_increment=Decimal("0.01"),
-        quantity_increment=Decimal("1"),
+        qty_increment=Decimal("1"),
         contract_size=Decimal("1"),  # 1 troy ounce
         contract_unit="XAU",
         quote_currency=USD,
@@ -94,7 +94,7 @@ def test_e_mini_sp500_es_future() -> None:
         exchange="CME",
         asset_class=AssetClass.FUTURE,
         price_increment=Decimal("0.25"),
-        quantity_increment=Decimal("1"),
+        qty_increment=Decimal("1"),
         contract_size=Decimal("50"),  # USD per index point
         contract_unit="index_point",
         quote_currency=USD,

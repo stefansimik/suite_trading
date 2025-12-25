@@ -176,17 +176,17 @@ class DistributionFillModel:
             # Compute adjustment amount from tick size
             adjustment_amount = tick_size * adjustment_ticks
 
-            # Apply adjustment based on fill direction (signed_quantity)
+            # Apply adjustment based on fill direction (signed quantity)
             # BUY (signed > 0): positive adjustment decreases price (better), negative increases price (worse)
             # SELL (signed < 0): positive adjustment increases price (better), negative decreases price (worse)
-            is_buy_fill = proposed_fill.signed_quantity > 0
+            is_buy_fill = proposed_fill.signed_qty > 0
             if is_buy_fill:
                 slipped_price = proposed_fill.price - adjustment_amount
             else:
                 slipped_price = proposed_fill.price + adjustment_amount
 
             slipped_fills.append(
-                ProposedFill(signed_quantity=proposed_fill.signed_quantity, price=slipped_price, timestamp=proposed_fill.timestamp),
+                ProposedFill(signed_qty=proposed_fill.signed_qty, price=slipped_price, timestamp=proposed_fill.timestamp),
             )
 
         return slipped_fills

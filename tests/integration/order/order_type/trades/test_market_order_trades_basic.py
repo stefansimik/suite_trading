@@ -18,7 +18,7 @@ from suite_trading.domain.event import Event
 
 
 def _instr() -> Instrument:
-    return Instrument(name="TEST", exchange="XTST", asset_class=AssetClass.FUTURE, price_increment=Decimal("0.01"), quantity_increment=Decimal("1"), contract_size=Decimal("1"), contract_unit="contract", quote_currency=USD)
+    return Instrument(name="TEST", exchange="XTST", asset_class=AssetClass.FUTURE, price_increment=Decimal("0.01"), qty_increment=Decimal("1"), contract_size=Decimal("1"), contract_unit="contract", quote_currency=USD)
 
 
 def _create_optimistic_sim_broker() -> SimBroker:
