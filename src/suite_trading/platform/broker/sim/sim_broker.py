@@ -729,17 +729,22 @@ class SimBroker(Broker, SimulatedBroker):
         signed_position_quantity: Decimal,
         previous_order_fills: Sequence[OrderFill],
     ) -> tuple[Money, Money, Money]:
-        """Compute absolute commission and margins for a single $proposed_fill.
+        """Calculates the commission and margin requirements for a single proposed fill.
+
+        This determines how much the broker will charge for the $proposed_fill and computes
+        the resulting margin needs. It calculates $initial_margin if the fill increases
+        the absolute position size and derives the total $maintenance_margin required
+        for the entire position after the fill.
 
         Args:
-            proposed_fill: Single ProposedFill to apply.
-            order: Order being filled.
-            order_book: Broker OrderBook snapshot used for matching and margin.
-            signed_position_quantity: Net position signed quantity before applying $proposed_fill.
-            previous_order_fills: History of order fills for commission calculation (e.g. tiered fees).
+            proposed_fill: The specific fill being evaluated for its financial impact.
+            order: The parent order that this fill belongs to.
+            order_book: Market snapshot used to determine current prices and margin requirements.
+            signed_position_quantity: The net position quantity before applying the $proposed_fill.
+            previous_order_fills: Earlier fills for the same order, used to calculate tiered commissions.
 
         Returns:
-            Tuple of (commission, initial_margin, maintenance_margin_after).
+            A tuple containing the calculated $commission, $initial_margin, and total $maintenance_margin.
         """
         # COMPUTE: Next state
         signed_position_quantity_after = signed_position_quantity + proposed_fill.signed_quantity
