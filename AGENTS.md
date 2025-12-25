@@ -589,8 +589,8 @@ function_name(...)
 _process_proposed_fill(order, proposed_fill, order_book)
 ├── [VALIDATE] Check instrument match
 ├── [COMPUTE]
-│   ├── position_before, net_qty_after
-│   ├── commission_and_margins = _compute_commission_and_margins(...)
+│   ├── signed_position_quantity_before, maintenance_margin_before
+│   ├── commission, initial_margin, maintenance_margin_change = _compute_commission_and_margin_changes(...)
 │   └── funds_now = get_funds(...)
 ├── [DECIDE] IF not has_enough_funds(...): handle insufficient funds
 └── [ACT]
