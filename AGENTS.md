@@ -4,118 +4,173 @@
 
 ---
 
+# 0. Rule Priorities & Conflict Resolution
+
+When rules conflict, apply this priority order (highest first):
+
+| Priority | Rule | Overrides |
+|----------|------|-----------|
+| P1 | **One-Line Rule** (R-4.3.1): Logger calls and exception messages on single line | Line length limits |
+| P2 | **Simple Args One-Line** (R-3.3.1): Function calls with simple args on single line | Line length limits |
+| P3 | **≤150 chars** (R-5.3.1): General line length limit | — |
+
+**Example of P1 overriding P3:**
+```python
+# ✅ Correct — One-Line Rule (P1) wins over ≤150 chars (P3)
+logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' in TradingEngine '{engine_name}' was already finished with status '{status}'")
+
+# ❌ Wrong — Breaking line to satisfy ≤150 chars violates One-Line Rule
+logger.debug(
+    f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' "
+    f"in TradingEngine '{engine_name}' was already finished"
+)
+```
+
+---
+
 # 1. Core Principles & Development Philosophy
 
 ## 1.1. Design Principles
-- **KISS (Keep It Simple, Stupid):** Simplest working solution
-- **YAGNI (You Aren't Gonna Need It):** Implement only when actively required
-- **DRY (Don't Repeat Yourself):** No duplication of information, logic, or business rules
-- **Intuitive Domain Model:** Keep objects simple; names/flows match trading mental model
-- **Single Responsibility:** Each class has one distinct purpose
-- **Separation of Concerns:** Divide responsibilities into distinct sections
-- **Principle of Least Surprise:** Behavior aligns with user expectations
-- **User-Centric API:** Design for users, not internal convenience
+- **R-1.1.1 KISS (Keep It Simple, Stupid):** Simplest working solution
+- **R-1.1.2 YAGNI (You Aren't Gonna Need It):** Implement only when actively required
+- **R-1.1.3 DRY (Don't Repeat Yourself):** No duplication of information, logic, or business rules
+- **R-1.1.4 Intuitive Domain Model:** Keep objects simple; names/flows match trading mental model
+- **R-1.1.5 Single Responsibility:** Each class has one distinct purpose
+- **R-1.1.6 Separation of Concerns:** Divide responsibilities into distinct sections
+- **R-1.1.7 Principle of Least Surprise:** Behavior aligns with user expectations
+- **R-1.1.8 User-Centric API:** Design for users, not internal convenience
 
 ## 1.2. Development Mode
-**Breaking changes allowed** during initial development. Backward compatibility is out of scope.
+**R-1.2.1** Breaking changes allowed during initial development. Backward compatibility is out of scope.
 Remove or redesign anything to achieve optimal design.
 
-### 1.2.1. Breaking Changes Policy (No Shims)
-- We intentionally allow breaking API and module changes at any time
-- Do not add deprecation shims, re‑exports, aliases, or compatibility layers.
-- When relocating/renaming modules or classes, update all references in the codebase and documentation in the same
-  change.
-- Leave clear error messages in truly unavoidable stubs only when removal is technically impossible in the tooling;
-  stubs must raise ImportError with a pointer to the new path.
+### Breaking Changes Policy (No Shims)
+- **R-1.2.2** We intentionally allow breaking API and module changes at any time
+- **R-1.2.3** Do not add deprecation shims, re‑exports, aliases, or compatibility layers
+- **R-1.2.4** When relocating/renaming modules or classes, update all references in the codebase and documentation in the same change
+- **R-1.2.5** Leave clear error messages in truly unavoidable stubs only when removal is technically impossible; stubs must raise ImportError with a pointer to the new path
 
 ---
 
 # 2. Naming Conventions & API Design
 
 ## 2.1. General Naming Rules
-Names must be **descriptive, intuitive, self-documenting and with natural English phrasing**.
+**R-2.1.1** Names must be **descriptive, intuitive, self-documenting and with natural English phrasing**.
 Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, but never sacrifice clarity.
 
-- **Functions/Methods:** Use verbs describing the action
-- **Variables/Attributes:** Use nouns describing the data
-- **Domain terms:** Use consistently;
+- **R-2.1.2** Functions/Methods: Use verbs describing the action
+- **R-2.1.3** Variables/Attributes: Use nouns describing the data
+- **R-2.1.4** Domain terms: Use consistently throughout codebase
+
+```python
+# ✅ Good — descriptive, natural English
+def calculate_unrealized_pnl(position: Position, current_price: Decimal) -> Decimal: ...
+def list_open_orders(instrument: Instrument) -> list[Order]: ...
+
+# ❌ Bad — abbreviated, unclear
+def calc_pnl(pos, px): ...
+def get_ords(inst): ...
+```
 
 ## 2.2. Method Naming Patterns
 
-**Resource access and retrieval:**
-- `list_*`: Return collections
-  - Example: `list_active_orders()`, `list_open_positions()`
-- `get_*`: Retrieve existing single resource; **cheap, no modeling, no heavy computation**
-  - Example: `get_account_info()`, `get_order(order_id)`, `get_best_bid()`
-- `build_*` or `create_*`: Construct/model new objects from inputs (signals expensive operation)
-  - Example: `build_order_book(sample)`, `create_snapshot(now)`, `build_position_report()`
-- `compute_*`: Derived numeric metrics requiring calculation
-  - Example: `compute_realized_pnl(trades)`, `compute_sharpe(returns)`
-- `find_*` or `query_*`: Search/filter with partial/empty results (optional, future scope)
+| Pattern | Purpose | Examples |
+|---------|---------|----------|
+| `list_*` | Return collections | `list_active_orders()`, `list_open_positions()` |
+| `get_*` | Retrieve existing single resource (cheap, no modeling) | `get_account_info()`, `get_order(order_id)`, `get_best_bid()` |
+| `build_*` / `create_*` | Construct/model new objects (signals expensive operation) | `build_order_book(sample)`, `create_snapshot(now)` |
+| `compute_*` | Derived numeric metrics requiring calculation | `compute_realized_pnl(trades)`, `compute_sharpe(returns)` |
+| `find_*` / `query_*` | Search/filter with partial/empty results | (optional, future scope) |
+
+```python
+# ✅ Good — correct pattern usage
+orders = broker.list_open_orders()           # Returns collection
+order = broker.get_order(order_id)           # Retrieves single, cheap
+book = builder.build_order_book(ticks)       # Expensive construction
+pnl = analytics.compute_sharpe(returns)      # Calculation
+
+# ❌ Bad — wrong pattern
+orders = broker.get_open_orders()            # Should be list_* for collection
+order = broker.find_order(order_id)          # Should be get_* for direct retrieval
+book = builder.get_order_book(ticks)         # Should be build_* for construction
+```
 
 ## 2.3. Parameter Design & Ordering
+- **R-2.3.1** Order by Importance: Always place the most important parameters first. The first parameter should be the primary subject of the function—the object it primarily acts upon, calculates for, or transforms.
+- **R-2.3.2** Subject vs. Context: Distinguish between the primary subject and secondary context (e.g., historical data, reference models, or configuration). Secondary context parameters should follow the primary subject.
+- **R-2.3.3** Mental Model Alignment: The parameter order should reflect the natural phrasing of the operation (e.g., "calculate commission for $proposed_fill using $order and $history").
 
-- **Order by Importance:** Always place the most important parameters first. The first parameter should be the primary subject of the function—the object it primarily acts upon, calculates for, or transforms.
-- **Subject vs. Context:** Distinguish between the primary subject and secondary context (e.g., historical data, reference models, or configuration). Secondary context parameters should follow the primary subject.
-- **Mental Model Alignment:** The parameter order should reflect the natural phrasing of the operation (e.g., "calculate commission for $proposed_fill using $order and $history").
+```python
+# ✅ Good — primary subject first, then context
+def calculate_commission(proposed_fill: ProposedFill, order: Order, fee_model: FeeModel) -> Money: ...
+#                        ↑ primary subject        ↑ context      ↑ configuration
+
+# ❌ Bad — configuration before subject
+def calculate_commission(fee_model: FeeModel, order: Order, proposed_fill: ProposedFill) -> Money: ...
+```
+
+---
 
 # 3. Type Annotations & Signatures
 
 ## 3.1. Modern Typing Rules
-**Always start modules with:** `from __future__ import annotations`
+**R-3.1.1** Always start modules with: `from __future__ import annotations`
 
 **Required practices:**
-- Use direct type names (no quotes, no `"a.b.Type"` strings)
-- Builtin generics only: `list[T]`, `dict[K, V]`, `set[T]`, `tuple[...]`
-- Use `|` and `| None` instead of `Union`/`Optional`
-- Use `type[T]` for class objects
-- `Callable[[...], R]` with explicit return type
-- Import cross-module types unconditionally. Use `if TYPE_CHECKING:` only when strictly required to avoid circular runtime dependencies.
+- **R-3.1.2** Use direct type names (no quotes, no `"a.b.Type"` strings)
+- **R-3.1.3** Builtin generics only: `list[T]`, `dict[K, V]`, `set[T]`, `tuple[...]`
+- **R-3.1.4** Use `|` and `| None` instead of `Union`/`Optional`
+- **R-3.1.5** Use `type[T]` for class objects
+- **R-3.1.6** `Callable[[...], R]` with explicit return type
+- **R-3.1.7** Import cross-module types unconditionally. Use `if TYPE_CHECKING:` only when strictly required to avoid circular runtime dependencies.
 
-## 3.2. Decimal utilities (DecimalLike, as_decimal)
+```python
+# ✅ Good — modern typing
+from __future__ import annotations
 
-When working with `decimal.Decimal` values (prices, quantities, P&L, ratios, fees), use `suite_trading.utils.decimal_tools`.
+def process(items: list[Order], callback: Callable[[Order], None]) -> dict[str, int] | None: ...
 
-- Prefer `as_decimal(value)` over ad-hoc conversions like `Decimal(str(value))`.
-- Use `DecimalLike` for public inputs that accept a "Decimal-ish" scalar (`Decimal | str | int | float`).
-- Keep computed return types as `Decimal`.
+# ❌ Bad — legacy typing
+from typing import List, Dict, Optional, Union
 
-Default import:
+def process(items: List[Order], callback: Callable) -> Optional[Dict[str, int]]: ...
+```
 
+## 3.2. Decimal Utilities (`DecimalLike`, `as_decimal`)
+
+**R-3.2.1** When working with `decimal.Decimal` values (prices, quantities, P&L, ratios, fees), use `suite_trading.utils.decimal_tools`.
+
+- **R-3.2.2** Prefer `as_decimal(value)` over ad-hoc conversions like `Decimal(str(value))`
+- **R-3.2.3** Use `DecimalLike` for public inputs that accept a "Decimal-ish" scalar (`Decimal | str | int | float`)
+- **R-3.2.4** Keep computed return types as `Decimal`
+
+**Default import:**
 ```python
 from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
 ```
 
-Decimal-heavy modules (many conversions/Decimal operations) may use a local shortcut:
-
+**R-3.2.5** Decimal-heavy modules (many conversions/Decimal operations) may use a local shortcut:
 ```python
 from suite_trading.utils.decimal_tools import as_decimal as D  # D = as_decimal
 ```
 
-Rules:
-- Use `D` only in Decimal-heavy modules.
-
 ## 3.3. Parameter Layout in Calls
 
-When calling functions/methods/constructors, keep simple argument lists on a single line for fast scanning.
+**R-3.3.1** When calling functions/methods/constructors, keep simple argument lists on a single line for fast scanning.
 
 ### One-Line Parameters Rule
-- If arguments are only simple values, keep the entire call on one line — even if >150 chars.
-- "Simple" means: names/attributes (e.g., `qty`, `order.id`), literals (`10`, `"USD"`, `True`, `None`), and simple
-  `key=value` pairs.
-- Do not split such calls across multiple lines just for visual width.
+- **R-3.3.2** If arguments are only simple values, keep the entire call on one line — even if >150 chars
+- **R-3.3.3** "Simple" means: names/attributes (e.g., `qty`, `order.id`), literals (`10`, `"USD"`, `True`, `None`), and simple `key=value` pairs
+- **R-3.3.4** Do not split such calls across multiple lines just for visual width
 
-### When to use multi-line
-- Use multi-line layout only if any argument contains complex logic: nested calls, arithmetic/boolean chains,
-  comprehensions, lambdas, ternary expressions, or long f-strings.
-- In multi-line layout:
-  - Put one argument per line.
-  - Keep a trailing comma and align the closing parenthesis with the start of the call.
+### When to Use Multi-Line
+- **R-3.3.5** Use multi-line layout only if any argument contains complex logic: nested calls, arithmetic/boolean chains, comprehensions, lambdas, ternary expressions, or long f-strings
+- **R-3.3.6** In multi-line layout: put one argument per line, keep a trailing comma and align the closing parenthesis with the start of the call
 
 ### Examples
 ```python
-# ✅ Good — simple arguments kept on one line (fast to read)
-order = Order(instrument, side, quantity, limit_price, tif, reduce_only=False, client_tag="alpha_v1")
+# ✅ Good — simple arguments kept on one line (fast to read), even if >150 chars
+order = Order(instrument, side, quantity, limit_price, tif, reduce_only=False, client_tag="alpha_v1", broker_id="ib_main")
 
 # ❌ Bad — splitting simple arguments without need
 order = Order(
@@ -133,42 +188,37 @@ order = Order(
     instrument,
     compute_qty(signal, position, risk_model),
     side,
-    compute_limit_price(book.best_bid(),
-    slippage=bps_to_price(2, instrument)),
+    compute_limit_price(book.best_bid(), slippage=bps_to_price(2, instrument)),
     client_tag=f"alpha_{now().date()}",
 )
-
-# ✅ Good — method call with only simple params stays on one line
-broker.place_order(strategy_name, instrument, side, quantity, limit_price, tif)
 ```
 
 **Acceptance checks:**
-- [ ] Calls with only simple arguments are written on a single line (even if >150 chars)
-- [ ] Multi-line layout is used only when any argument includes an expression or nested call
-- [ ] Multi-line calls use one-argument-per-line with a trailing comma and aligned closing parenthesis
+- [ ] R-3.3.2: Calls with only simple arguments are written on a single line (even if >150 chars)
+- [ ] R-3.3.5: Multi-line layout is used only when any argument includes an expression or nested call
+- [ ] R-3.3.6: Multi-line calls use one-argument-per-line with a trailing comma and aligned closing parenthesis
 
 ---
 
 # 4. Documentation, Comments & Messaging
 
-This section covers all developer-facing text: docstrings, comments, logs, and exceptions.
-
-**Language policy:** All code, docstrings, comments, logs, and exceptions must be written in English.
+**R-4.0.1** Language policy: All code, docstrings, comments, logs, and exceptions must be written in English.
 
 ## 4.1. Docstrings (Public API Documentation)
 
 **Purpose:** Document public APIs for external developers.
 
-**Requirements:**
-- Google-style format: purpose, params, returns, exceptions, types
-- **Natural, Simple Phrasing:** Use conversational English. Avoid technical jargon or overly formal wording. Docstrings should read like a natural explanation of "what" and "why".
-- **Identify the Primary Subject:** Clearly state what the function is doing or calculating for, specifically identifying the primary subject.
-- **Explain Parameter Context:** Describe the role of each parameter. Make it clear which parameter is the main subject and which ones provide secondary context or additional data.
-- **Make immediately understandable** without needing to research internal logic.
-- Use concrete examples when helpful.
+**R-4.1.1** Format: Google-style (purpose, params, returns, exceptions, types)
 
-**Example:**
+**Requirements:**
+- **R-4.1.2** Natural, Simple Phrasing: Use conversational English. Avoid technical jargon or overly formal wording
+- **R-4.1.3** Identify the Primary Subject: Clearly state what the function is doing or calculating for
+- **R-4.1.4** Explain Parameter Context: Describe the role of each parameter. Make it clear which is the main subject and which provide secondary context
+- **R-4.1.5** Make immediately understandable without needing to research internal logic
+- **R-4.1.6** Use concrete examples when helpful
+
 ```python
+# ✅ Good — natural, identifies subject, explains context
 def calculate_portfolio_value(positions: list) -> Decimal:
     """Calculates the total value of all positions in a portfolio.
 
@@ -185,31 +235,128 @@ def calculate_portfolio_value(positions: list) -> Decimal:
         ValueError: If any position has invalid price data.
     """
     ...
+
+# ❌ Bad — technical jargon, unclear subject
+def calculate_portfolio_value(positions: list) -> Decimal:
+    """Aggregates NAV via position iteration.
+
+    Iterates the position vector and accumulates notional values.
+
+    Args:
+        positions: Position vector.
+
+    Returns:
+        Decimal.
+    """
+    ...
 ```
 
 **Acceptance checks:**
-- [ ] Docstrings use natural, conversational English (no technical jargon or complex wording)
-- [ ] The primary subject of the function is clearly identified in the summary
-- [ ] The role and context of each parameter are clearly explained
+- [ ] R-4.1.2: Docstrings use natural, conversational English
+- [ ] R-4.1.3: The primary subject of the function is clearly identified
+- [ ] R-4.1.4: The role and context of each parameter are explained
 
 ## 4.2. Code Comments (Internal Documentation)
 
 **Purpose:** Explain "why" and "what" of complex logic for maintainers. Reduces mental load and makes AI-assisted refactoring safer.
 
-### Narrative Comments
-- Short "why/what" comment above each logical unit
-- Use domain terms and explicit states
-- Explain business logic and reasoning
-- Use simple conversational English
+### Comment Types
 
-### Inline Line Comments for Code Scan-ability
-- Add short, simple, and intuitive line comments to allow quick scanning of the logic without needing to parse complex code.
-- Keep comments focused on what the next line or tiny block does, in 3–8 simple words.
-- Use natural English phrases that match the trading mental model.
-- Do not explain obvious assignments or one-liners that are already self-explanatory.
+#### Narrative Comments
+- **R-4.2.1** Short "why/what" comment above each logical unit
+- **R-4.2.2** Use domain terms and explicit states
+- **R-4.2.3** Explain business logic and reasoning
+- **R-4.2.4** Use simple conversational English
 
-**Example:**
+#### Inline Line Comments (for Code Scan-ability)
+- **R-4.2.5** Add short, simple, and intuitive line comments to allow quick scanning of the logic
+- **R-4.2.6** Keep comments focused on what the next line or tiny block does, in 3–8 simple words
+- **R-4.2.7** Use natural English phrases that match the trading mental model
+- **R-4.2.8** Do not explain obvious assignments or one-liners that are already self-explanatory
 
+#### Section Header Comments
+- **R-4.2.9** Use ALL CAPS for comments that label a multi-line section
+- **R-4.2.10** Keep a short noun phrase; parentheses optional
+- **R-4.2.11** No trailing period; lines ≤150 chars
+- **R-4.2.12** Scope: from header until the next ALL‑CAPS header at the same indentation or the end of the region
+- **R-4.2.13** Only use when at least two following lines belong to the section
+
+```python
+# ✅ Good — ALL CAPS, no period, groups related code
+# MARGIN CALCULATION
+initial = compute_initial_margin(order, price)
+maintenance = compute_maintenance_margin(position, price)
+
+# ❌ Bad — not ALL CAPS, has period
+# Margin calculation.
+initial = compute_initial_margin(order, price)
+```
+
+### Validation Guards
+
+**Terminology:** Use "Precondition" for guards that raise exceptions, "Guard" for guards that return early or skip.
+
+- **R-4.2.14** Use **`# Precondition:`** prefix for validation guards that raise an exception if the condition is not met
+- **R-4.2.15** Use **`# Guard:`** prefix for validation guards where no exception is raised (e.g., early return, continue, or log and skip)
+- **R-4.2.16** Place **immediately above** validation code
+- **R-4.2.17** Explain what condition is validated and why it matters
+
+```python
+# ✅ Good — correct prefix usage
+# Precondition: $absolute_quantity must be positive to submit order
+if order.absolute_quantity <= 0:
+    raise ValueError(f"Cannot call `submit_order` because $absolute_quantity ({order.absolute_quantity}) <= 0")
+
+# Guard: skip processing if no fills available
+if not fills:
+    return
+
+# ❌ Bad — wrong prefix (raises but uses Guard)
+# Guard: quantity must be positive
+if order.absolute_quantity <= 0:
+    raise ValueError("Invalid quantity")
+
+# ❌ Bad — wrong prefix (returns but uses Precondition)
+# Precondition: must have fills
+if not fills:
+    return
+```
+
+### Code Reference Formatting
+**R-4.2.18** Apply to comments, docstrings, and error messages:
+- **Parameters/attributes/variables:** `$parameter_name`
+- **Functions/methods:** `` `function_name` ``
+
+### Guard Block Spacing
+**R-4.2.19** After a contiguous block of validation guards, insert exactly one empty line before the next block of code that performs actions (assignments, object creation, I/O, state changes)
+
+```python
+# ✅ Good — empty line after guard block
+# Precondition: order must have valid instrument
+if order.instrument is None:
+    raise ValueError("...")
+
+# Precondition: quantity must be positive
+if order.absolute_quantity <= 0:
+    raise ValueError("...")
+
+# Now perform actions (empty line above separates guards from actions)
+self._orders[order.id] = order
+broker.submit(order)
+
+# ❌ Bad — no separation between guards and actions
+# Precondition: order must have valid instrument
+if order.instrument is None:
+    raise ValueError("...")
+# Precondition: quantity must be positive
+if order.absolute_quantity <= 0:
+    raise ValueError("...")
+self._orders[order.id] = order  # Action immediately after guard
+```
+
+### Examples
+
+**Inline comments and sections:**
 ```python
 # ACTIONS
 # Set submission time into order
@@ -234,64 +381,8 @@ if last_order_book is not None:
     self._match_order_against_order_book(order, last_order_book)
 ```
 
-**Acceptance checks:**
-- [ ] Non-trivial lines/blocks have short, intuitive inline comments for fast scanning
-- [ ] Comments allow scanning the logic without "executing" the code in your head
-- [ ] Comments describe what the next line or tiny block does (not restate the code)
-- [ ] Trivial, obvious assignments and one-liners have no extra comments
-
-### Defensive Comments
-- Use **`# Precondition:`** prefix for validation guards that raise an exception if the condition is not met.
-- Use **`# Check:`** prefix for other validation guards where no exception is raised (e.g., early return, continue, or log and skip).
-- Place **immediately above** validation check
-- Explain what condition is validated and why it matters
-
-#### Guard Block Spacing
-- After a contiguous block of validation guards, insert exactly one empty line before the
-  next block of code that performs actions (assignments, object creation, I/O, state changes).
-  This visual separation improves scan-ability and emphasizes the boundary between validation
-  and behavior.
-
-### Code Reference Formatting
-Apply to comments, docstrings, and error messages:
-- **Parameters/attributes/variables:** `$parameter_name`
-- **Functions/methods:** `` `function_name` ``
-
-**Example:**
-
+**Section headers inside regions:**
 ```python
-# Collect fills since last event and net the absolute_quantity
-fills = broker.get_fills_since(self._timeline_dt)
-absolute_quantity = sum(f.absolute_quantity for f in fills)
-
-# Check: ensure we have absolute_quantity to trade before submitting order
-if absolute_quantity == 0:
-  return
-
-# Send order and record submission time
-broker.submit(Order(instrument, side, absolute_quantity))
-self._last_order_time = now()
-```
-
-**Acceptance checks:**
-- [ ] `# Precondition:` or `# Check:` used only for validation guards
-- [ ] Placed immediately above guard
-- [ ] Code reference formatting followed (`$var`, `` `func` ``)
-- [ ] One empty line after a guard block before state-changing code
-
-### Section Header Comments
-
-- Use ALL CAPS for comments that label a multi-line section.
-- Keep a short noun phrase; parentheses optional.
-- No trailing period; lines ≤150 chars.
-- Use to group related API methods or logic inside a region or long function.
-- Scope: from header until the next ALL‑CAPS header at the same indentation or the end of the region.
-- Only use when at least two following lines belong to the section.
-
-Examples:
-```python
-# Short example — group two small sections
-
 # region Interface
 
 # FUNDS
@@ -305,195 +396,141 @@ def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> N
 # endregion
 ```
 
+**Validation guards with spacing:**
 ```python
-# More scenarios — inside a long function
+# Collect fills since last event and net the absolute_quantity
+fills = broker.get_fills_since(self._timeline_dt)
+absolute_quantity = sum(f.absolute_quantity for f in fills)
 
-def place_order(self, order: Order) -> None:
-  # PARAM VALIDATION
-  if order.absolute_quantity <= 0:
-    raise ValueError(f"Cannot call `place_order` because $order.absolute_quantity ({order.absolute_quantity}) <= 0")
+# Guard: skip if no quantity to trade
+if absolute_quantity == 0:
+    return
 
-  # ACTIONS (SIDE EFFECTS)
-  self._state = "SUBMITTED"
-  self._last_order_dt = now()
-  broker.submit(order)
+# Send order and record submission time
+broker.submit(Order(instrument, side, absolute_quantity))
+self._last_order_time = now()
 ```
 
-```python
-# More scenarios — inside a Properties region
-
-# region Properties
-
-# ORDER (IDENTITY)
-@property
-def order_id(self) -> str: ...
-
-@property
-def client_order_id(self) -> str: ...
-
-# PRICES (SNAPSHOT)
-@property
-def last_price(self) -> Money: ...
-
-@property
-def bid_ask(self) -> tuple[Money, Money]: ...
-
-# endregion
-```
-
-```python
-# Anti-examples — do not do this
-
-# Validation.  # Trailing period — wrong
-if qty <= 0: ...
-
-# Validation   # Not ALL CAPS — wrong
-if qty <= 0: ...
-```
-
-Acceptance checks:
-- [ ] Header comments used only for multi-line sections (≥2 following lines)
-- [ ] Headers are ALL CAPS (parentheses optional) and have no trailing period
-- [ ] Scope ends at the next ALL‑CAPS header at the same indentation or region end
-- [ ] Lines ≤150 chars
+**Acceptance checks:**
+- [ ] R-4.2.5: Non-trivial lines/blocks have short, intuitive inline comments
+- [ ] R-4.2.9: Section headers are ALL CAPS with no trailing period
+- [ ] R-4.2.14/R-4.2.15: `# Precondition:` for raises, `# Guard:` for early returns
+- [ ] R-4.2.19: One empty line after guard block before state-changing code
+- [ ] R-4.2.18: Code reference formatting followed (`$var`, `` `func` ``)
 
 ### Validation Scope & Priorities
 
-- Validate only important, common, or risky issues and domain relationships that are likely
-  to go wrong.
-- Focus guards on domain invariants and cross-object relationships (e.g., non-positive
-  order quantity, time ranges with $start_dt > $end_dt, inconsistent $instrument between
-  legs of a spread, unsupported venues for a given $instrument).
-- Do not clutter code with trivial checks that Python and type checkers already cover:
-  types, existence of attributes, or obvious None access that would fail fast on its own.
-  Prefer clear type hints and let errors surface naturally.
-- Keep validations cheap and close to boundaries. Avoid repeating the same guard in hot
-  paths; validate once at the API boundary or where ownership is clear.
-- Use the `# Precondition:` prefix only for meaningful guards as described above; do not use it
-  for type/attribute presence checks.
-
-**Acceptance checks:**
-- [ ] Validation guards focus on important/risky domain invariants and relationships
-- [ ] No guards added for trivial type/attribute existence checks or obvious None access
-
-## 4.3. Logging
-
-**Core rules:** Logs must be **precise, consistent, easy to scan**.
-
-### Formatting Requirements
-- ✅ **Always use f-strings** for interpolation
-- ❌ **Never use** logger format args: `logger.info("msg %s", var)`
-- ❌ **Never use** `.format()`: `"msg {}".format(var)`
-- ❌ **Never use** `%` formatting: `"msg %s" % var`
-
-### **CRITICAL: One-Line Rule**
-**Every logger call must be a single line**, even if >150 chars. Do not wrap logger calls.
+- **R-4.2.20** Validate only important, common, or risky issues and domain relationships that are likely to go wrong
+- **R-4.2.21** Focus guards on domain invariants and cross-object relationships (e.g., non-positive order quantity, time ranges with $start_dt > $end_dt, inconsistent $instrument between legs)
+- **R-4.2.22** Do not clutter code with trivial validations that Python and type checkers already cover: types, existence of attributes, or obvious None access that would fail fast on its own
+- **R-4.2.23** Keep validations cheap and close to boundaries. Avoid repeating the same guard in hot paths; validate once at the API boundary
 
 ```python
-# ❌ WRONG - Wrapped logger call
-logger.debug(
-    f"EventFeed named '{feed_name}' was already finished",
-)
+# ✅ Good — validates domain invariant (quantity sign)
+# Precondition: $absolute_quantity must be positive
+if order.absolute_quantity <= 0:
+    raise ValueError(f"...")
 
-# ✅ CORRECT - Single line
-logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' was already finished")
+# ❌ Bad — trivial type check (Python/mypy handles this)
+# Precondition: order must be Order type
+if not isinstance(order, Order):
+    raise TypeError(f"...")
+
+# ❌ Bad — obvious None that would fail naturally
+# Precondition: instrument must exist
+if order.instrument is None:
+    raise ValueError(f"...")
+# order.instrument.symbol  # Would fail with clear AttributeError anyway
 ```
 
-### Domain Object Identification
-- Strategies/EventFeeds: `"Strategy named '{strategy_name}'"`, `"EventFeed named '{feed_name}'"`
-- Concept/type only: use capitalized class name (`Strategy`, `EventFeed`, `Broker`)
-- Include instance class: `"(class {obj.__class__.__name__})"`
+**Acceptance checks:**
+- [ ] R-4.2.20: Validation guards focus on important/risky domain invariants
+- [ ] R-4.2.22: No guards for trivial type/attribute existence validations
 
-### Message Structure
-- Pattern: `"<Verb> <ClassName> named '{name}' <short context>"`
-- State transitions: `"ClassName named '{name}' transitioned to <STATE>"`
-- Errors: action/context → object → error
+## 4.3. Logging & Exception Messages
 
-### Capitalization & Terminology
-- Capitalize domain class names when used as nouns
-- Use "event-feed" (hyphenated) for generic prose
-- Use `EventFeed` when referring to the class
-- Pluralization: "EventFeed(s)", "Strategy(ies)", "broker(s)"
+### Core Formatting Rules (apply to both)
+- **R-4.3.1 (P1 PRIORITY)** One-Line Rule: Every logger call and exception message must be a single line, even if >150 chars. Do not wrap. This rule overrides the ≤150 char limit.
+- **R-4.3.2** Always use f-strings for interpolation
+- **R-4.3.3** Never use logger format args: `logger.info("msg %s", var)`
+- **R-4.3.4** Never use `.format()`: `"msg {}".format(var)`
+- **R-4.3.5** Never use `%` formatting: `"msg %s" % var`
 
-**Examples:**
+### Logging Specifics
+
+**Domain Object Identification:**
+- **R-4.3.6** Strategies/EventFeeds: `"Strategy named '{strategy_name}'"`, `"EventFeed named '{feed_name}'"`
+- **R-4.3.7** Concept/type only: use capitalized class name (`Strategy`, `EventFeed`, `Broker`)
+- **R-4.3.8** Include instance class: `"(class {obj.__class__.__name__})"`
+
+**Message Structure:**
+- **R-4.3.9** Pattern: `"<Verb> <ClassName> named '{name}' <short context>"`
+- **R-4.3.10** State transitions: `"ClassName named '{name}' transitioned to <STATE>"`
+- **R-4.3.11** Errors: action/context → object → error
+
+**Capitalization & Terminology:**
+- **R-4.3.12** Capitalize domain class names when used as nouns
+- **R-4.3.13** Use "event-feed" (hyphenated) for generic prose
+- **R-4.3.14** Use `EventFeed` when referring to the class
+- **R-4.3.15** Pluralization: "EventFeed(s)", "Strategy(ies)", "broker(s)"
+
 ```python
-# ✅ Good
+# ✅ Good — single line, f-string, correct pattern
 logger.info(f"Started Strategy named '{strategy_name}'")
 logger.debug(f"EventFeed named '{feed_name}' was already finished")
 logger.error(f"Error closing EventFeed named '{feed_name}': {e}")
 
-# ❌ Bad - using format args
-logger.info("Started Strategy '%s'", strategy_name)
+# ✅ Good — long line stays on single line (R-4.3.1 overrides line length)
+logger.debug(f"EventFeed named '{feed_name}' for Strategy named '{strategy_name}' in TradingEngine '{engine_name}' finished with status '{status}'")
 
-# ❌ Bad - wrapped across lines
+# ❌ Bad — wrapped across lines (violates R-4.3.1)
 logger.debug(
     f"EventFeed named '{feed_name}' was already finished",
 )
+
+# ❌ Bad — using format args (violates R-4.3.3)
+logger.info("Started Strategy '%s'", strategy_name)
 ```
 
-**Acceptance checks:**
-- [ ] All logger/exception strings use f-strings (no %, .format, or logger args)
-- [ ] No wrapped logger calls; each is one line
-- [ ] Messages use naming/structure rules above
+### Exception Message Specifics
 
-## 4.4. Exception Messages
-
-**Requirements:**
-- 100% clear, use project terms, guide the fix
-- Include function name in backticks: `` `function_name` ``
-- Identify variables with `$` and real names; include values when helpful
-- **Message must be single line**, regardless of length
-- If the entire `raise` call fits on one line, write it on a single line; do not wrap it across lines
-
-**Short message — Preferred (one line):**
+- **R-4.3.16** 100% clear, use project terms, guide the fix
+- **R-4.3.17** Include function name in backticks: `` `function_name` ``
+- **R-4.3.18** Identify variables with `$` and real names; include values when helpful
+- **R-4.3.19** If the entire `raise` call fits on one line, write it on a single line; do not wrap
 
 ```python
+# ✅ Good — short message on single line
 if self.absolute_quantity <= 0:
-  raise ValueError(f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive")
-```
+    raise ValueError(f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive")
 
-**Short message — Wrong (wrapped unnecessarily):**
-
-```python
-if self.absolute_quantity <= 0:
-  raise ValueError(
-    f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive"
-  )
-```
-
-**Template (long message that doesn't fit on one line):**
-```python
+# ✅ Good — long message that truly doesn't fit uses continuation
 raise ValueError(
     f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. "
     f"Call `reset` or create a new Strategy."
 )
-```
 
-**Example (long message):**
-```python
-raise ValueError(
-    f"Cannot submit Order with $absolute_quantity ({quantity}) <= 0. "
-    f"Provide a positive absolute_quantity or call `cancel_order` instead."
-)
+# ❌ Bad — short message unnecessarily wrapped
+if self.absolute_quantity <= 0:
+    raise ValueError(
+        f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive"
+    )
 ```
 
 **Acceptance checks:**
-- [ ] For short messages, the entire `raise` statement is a single line (not wrapped)
-- [ ] Exception messages use f-strings with project terms and variable markers
-- [ ] Message text itself is a single line even when the `raise` spans multiple lines
+- [ ] R-4.3.1: No wrapped logger calls or short raise statements; each is one line
+- [ ] R-4.3.2: All logger/exception strings use f-strings
+- [ ] R-4.3.9: Messages use naming/structure rules
 
-## 4.5. Readability & Debuggability
+## 4.4. Readability & Debuggability
 
 Keep expressions simple and easy to inspect in a debugger.
 
 ### Rules
-- Avoid long, nested expressions in `return` statements or constructor calls. Extract
-  sub-expressions into well‑named local variables.
-- When constructing a non-trivial return value, assign it to a local variable named
-  `result` and `return result`. Returning a simple name or literal directly is fine.
-- Prefer short, single-purpose statements over clever one‑liners.
+- **R-4.4.1** Avoid long, nested expressions in `return` statements or constructor calls. Extract sub-expressions into well‑named local variables
+- **R-4.4.2** When constructing a non-trivial return value, assign it to a local variable named `result` and `return result`. Returning a simple name or literal directly is fine
+- **R-4.4.3** Prefer short, single-purpose statements over clever one‑liners
 
-### Example
 ```python
 # ❌ Bad — long nested return makes debugging hard
 return Money(
@@ -507,45 +544,38 @@ margin = notional * self._maintenance_ratio
 currency = instrument.settlement_currency
 result = Money(margin, currency)
 return result
+
+# ✅ Good — simple return is fine without `result`
+return self._balance
+
+# ✅ Good — literal return is fine
+return None
 ```
 
 **Acceptance checks:**
-- [ ] No multi-line `return` with nested calls; complex expressions are broken into locals
-- [ ] Non-trivial return values are assigned to `result` before returning
-- [ ] Statements remain ≤150 chars per line where practical (see 8.3)
+- [ ] R-4.4.1: No multi-line `return` with nested calls; complex expressions are broken into locals
+- [ ] R-4.4.2: Non-trivial return values are assigned to `result` before returning
 
-### Workflow decomposition (`Validate` → `Compute` → `Decide` → `Act`)
+## 4.5. Workflow Decomposition (`Validate` → `Compute` → `Decide` → `Act`)
 
-Apply this structure to any logic with non-trivial complexity (functions, pipelines, loops, or multi-step handlers).
+**R-4.5.1** Apply this structure to any logic with non-trivial complexity (functions, pipelines, loops, or multi-step handlers).
 It ensures the implementation is predictable and testable by separating pure derivations from side effects.
 
 **Standard stages (top-to-bottom):**
-- **`Validate`**: Cheap guards and domain invariants (e.g., check `$quantity > 0`). Return early or raise clear errors. No state changes.
-- **`Compute`**: Pure, deterministic derivations (signals, prices, quantities). No I/O, no broker calls, no logging.
-- **`Decide`**: Turn computed data into decisions by building "intent" objects (e.g., `Order` or `Adjustment`). Avoid side effects.
-- **`Act`**: Perform side effects (submit/cancel orders, mutate state, emit logs, write files). Keep this stage small and explicit.
+- **R-4.5.2 `Validate`**: Cheap guards and domain invariants (e.g., check `$quantity > 0`). Return early or raise clear errors. No state changes
+- **R-4.5.3 `Compute`**: Pure, deterministic derivations (signals, prices, quantities). No I/O, no broker calls, no logging
+- **R-4.5.4 `Decide`**: Turn computed data into decisions by building "intent" objects (e.g., `Order` or `Adjustment`). Avoid side effects
+- **R-4.5.5 `Act`**: Perform side effects (submit/cancel orders, mutate state, emit logs, write files). Keep this stage small and explicit
 
 **Flexibility & Variants:**
-- **Merge `Compute` & `Decide`**: In simpler scenarios, these can be merged into a single pure block that transforms input data directly into intent.
-  The key principle remains separating pure logic from side effects.
-- **Strict Boundary**: The most critical separation is between pure logic (`Compute`/`Decide`) and side effects (`Act`).
-  This allows testing the core logic in isolation without mocks or complex setups.
+- **R-4.5.6** Merge `Compute` & `Decide`: In simpler scenarios, these can be merged into a single pure block. The key principle remains separating pure logic from side effects
+- **R-4.5.7** Strict Boundary: The most critical separation is between pure logic (`Compute`/`Decide`) and side effects (`Act`). This allows testing the core logic in isolation
 
-**Acceptance checks:**
-- [ ] Logic reads top-to-bottom as: `Validate` → [`Compute` → `Decide`] → `Act`
-- [ ] Derivations (`Compute` and `Decide`) are pure: no hidden I/O, logging, or state mutations
-- [ ] Side effects happen only in `Act` (easy to review and test)
+### Workflow Visualization (ASCII Diagrams)
 
-### Workflow visualization (ASCII diagrams)
-
-For complex workflows, add a compact tree diagram that shows the call sequence and stage boundaries.
-This is mainly so we can compare the complexity of alternative approaches during refactors.
-
-- **Compute:** pure functions only (no I/O, no logging, no broker/account mutations)
-- **Act:** may have side effects (logging, broker calls, state mutation)
+**R-4.5.8** For complex workflows, add a compact tree diagram that shows the call sequence and stage boundaries.
 
 **Template (compact):**
-
 ```text
 function_name(...)
 ├── [VALIDATE] validate_*()  -> cheap guards, early return / clear error
@@ -554,8 +584,7 @@ function_name(...)
 └── [ACT]      act_*()       -> side effects
 ```
 
-**Example (real workflow, keep it short):**
-
+**Example:**
 ```text
 _process_proposed_fill(order, proposed_fill, order_book)
 ├── [VALIDATE] Check instrument match
@@ -571,27 +600,140 @@ _process_proposed_fill(order, proposed_fill, order_book)
 ```
 
 **Acceptance checks:**
-- [ ] Diagram is compact and helps compare alternative approaches during refactors
-- [ ] Compute steps are pure (no hidden I/O, no logging, no broker/account mutations)
-- [ ] Side effects are confined to Act (logging, broker calls, state mutation)
+- [ ] R-4.5.1: Logic reads top-to-bottom as: `Validate` → [`Compute` → `Decide`] → `Act`
+- [ ] R-4.5.3/R-4.5.4: Derivations are pure: no hidden I/O, logging, or state mutations
+- [ ] R-4.5.5: Side effects happen only in `Act`
 
 ---
 
-# 5. Class Design & Structure
+# 5. Code Organization
 
-## 5.1. Class Usage Guidelines
-- **Standard Classes:** Use for fundamental domain models
-- **Dataclasses/NamedTuples:** Only for simple config or value objects
+## 5.1. Regions
 
-## 5.2. String Representation (`__str__`, `__repr__`)
+**R-5.1.1** Use `# region NAME` / `# endregion` to group related blocks. Regions must contain meaningful multi-line blocks (no tiny regions).
 
-**Always include** `self.__class__.__name__` to make object types clear.
+### Baseline Region Set and Order
+1. **Init** — constructor
+2. **Protocol \<n\>** — protocol API implementation (e.g., `Protocol MarginModel`)
+3. **Main** — public API not in a protocol
+4. **Properties** — property methods
+5. **Utilities** — non-public helpers (standardize on "Utilities", not "Helpers")
+6. **Magic** — dunder methods
 
-**Datetime formatting:** Use utilities from `suite_trading.utils.datetime_tools`:
+**R-5.1.2** These are examples and a strong default, not a hard whitelist. Additional region names are allowed when they materially improve scan-ability.
+
+### Region Rules
+
+**Naming:**
+- **R-5.1.3** Region names must be descriptive and domain-relevant (e.g., `Order matching`, `Account & margin`)
+- **R-5.1.4** Keep region names short and simple (ideally 1–2 words)
+- **R-5.1.5** Use `Protocol <n>` for protocol API. Use `Main` only for public API not in a protocol
+- **R-5.1.6** Standardize on `Utilities` (do not use "Helpers")
+- **R-5.1.7** For large classes, prefer decomposing into `Utilities - <Topic>` (e.g., `Utilities - Orders`)
+- **R-5.1.8** In modules that define a Protocol/interface, you may use a single `Interface` region
+
+**Ordering:**
+- **R-5.1.9** Public-first ordering: public/protocol APIs must appear before helper-only regions
+- **R-5.1.10** Order: `Init` → `Protocol <n>`/`Main` → `Properties` → `Utilities` → `Magic`
+- **R-5.1.11** Do not place protected/private helpers above public API unless there is a strong, documented reason
+- **R-5.1.12** If a class implements a Protocol, group those methods under `Protocol <n>`. If multiple protocols, create one region per protocol
+- **R-5.1.13** Omit `Main` if the class is protocol‑only
+
+**Format:**
+- **R-5.1.14** Mark with `# region NAME` and `# endregion`
+- **R-5.1.15** Keep one empty line after `# region NAME` and before `# endregion`
+- **R-5.1.16** Remove all empty regions
+
+```python
+# ✅ Good — correct naming, ordering, spacing
+# region Init
+
+def __init__(self, ...):
+    ...
+
+# endregion
+
+# region Protocol MarginModel
+
+def calculate_initial_margin(self, ...) -> Money:
+    ...
+
+# endregion
+
+# region Properties
+
+@property
+def margin_ratio(self) -> Decimal:
+    ...
+
+# endregion
+
+# region Utilities - Orders
+
+def _validate_order(self, order: Order) -> None:
+    ...
+
+# endregion
+
+# region Magic
+
+def __str__(self) -> str:
+    ...
+
+# endregion
+
+# ❌ Bad — wrong naming, wrong order
+# region Helpers  # Should be "Utilities"
+
+def _validate_order(self, order: Order) -> None:
+    ...
+
+# endregion
+
+# region Main  # Public API after helpers — violates R-5.1.9
+
+def submit_order(self, order: Order) -> None:
+    ...
+
+# endregion
+```
+
+**Acceptance checks:**
+- [ ] R-5.1.6: No "Helpers" — use "Utilities"
+- [ ] R-5.1.9: Public API appears before protected/private helpers
+- [ ] R-5.1.5: `Protocol <n>` is used instead of `Main` for protocol API
+- [ ] R-5.1.16: No empty regions
+
+## 5.2. Imports & Package Structure
+- **R-5.2.1** Import directly from source modules; **never re-export in `__init__.py`**
+- **R-5.2.2** After changes, remove unused imports and add missing ones
+- **R-5.2.3** Prefer namespace packages
+- **R-5.2.4** Only create `__init__.py` for executable code (e.g., `__version__`)
+
+**Acceptance checks:**
+- [ ] R-5.2.1: No re-exports from `__init__.py`; imports are clean
+
+## 5.3. Markdown Formatting
+**R-5.3.1** Keep all Markdown lines (including code blocks) **≤150 chars**. Break at natural points.
+
+**Note:** This rule has lower priority (P3) than One-Line Rule (P1) and Simple Args One-Line (P2). See Section 0.
+
+---
+
+# 6. Class Design & Structure
+
+## 6.1. Class Usage Guidelines
+- **R-6.1.1** Standard Classes: Use for fundamental domain models
+- **R-6.1.2** Dataclasses/NamedTuples: Only for simple config or value objects
+
+## 6.2. String Representation (`__str__`, `__repr__`)
+
+**R-6.2.1** Always include `self.__class__.__name__` to make object types clear.
+
+**R-6.2.2** Datetime formatting: Use utilities from `suite_trading.utils.datetime_tools`:
 - `format_dt(dt)` for single timestamp
 - `format_range(start_dt, end_dt)` for intervals
 
-**Examples:**
 ```python
 # ✅ Good - using class name and datetime utils
 def __str__(self) -> str:
@@ -607,28 +749,27 @@ def __str__(self) -> str:
 ```
 
 **Acceptance checks:**
-- [ ] `__str__`/`__repr__` use `self.__class__.__name__`
-- [ ] Datetime utils used for timestamp formatting
+- [ ] R-6.2.1: `__str__`/`__repr__` use `self.__class__.__name__`
+- [ ] R-6.2.2: Datetime utils used for timestamp formatting
 
-## 5.3. Memory Optimization (`__slots__`)
+## 6.3. Memory Optimization (`__slots__`)
 
-**Use for:** Classes with high instance counts (Bars, Ticks, Events) to reduce memory and
-improve speed.
+**R-6.3.1** Use for classes with high instance counts (Bars, Ticks, Events) to reduce memory and improve speed.
 
 **When to use:**
 - High instance counts at runtime
 - Fixed attribute schema
 - No reliance on instance `__dict__`
 
-### **Critical Inheritance Rule**
-**If parent defines `__slots__`, every subclass MUST define `__slots__` too:**
+### Critical Inheritance Rule
+**R-6.3.2** If parent defines `__slots__`, every subclass MUST define `__slots__` too:
 - Use `__slots__ = ()` when subclass adds no new fields
 - Otherwise list private attribute names used in `__init__` (e.g., `"_price"`)
 - Do not add `"__weakref__"` unless needed
 - Include `"__dict__"` only when dynamic attrs required
 
-**Example:**
 ```python
+# ✅ Good — proper slots inheritance
 class Event:
     __slots__ = ("_dt_event", "_dt_received")
 
@@ -637,23 +778,29 @@ class BarEvent(Event):
 
 class QuoteTick(Event):
     __slots__ = ("_instrument", "_bid_price", "_ask_price", "_timestamp")
+
+# ❌ Bad — subclass missing __slots__
+class Event:
+    __slots__ = ("_dt_event", "_dt_received")
+
+class BarEvent(Event):
+    pass  # Missing __slots__ = () — breaks memory optimization
 ```
 
 **Acceptance checks:**
-- [ ] `__slots__` defined for high-volume classes
-- [ ] Subclasses of slotted classes define `__slots__` (use `()` when none)
+- [ ] R-6.3.1: `__slots__` defined for high-volume classes
+- [ ] R-6.3.2: Subclasses of slotted classes define `__slots__` (use `()` when none)
 
-## 5.4. Comparison & Sorting (`@total_ordering`)
+## 6.4. Comparison & Sorting (`@total_ordering`)
 
-**For any custom comparable type:** Implement full ordering with `@total_ordering`.
+**R-6.4.1** For any custom comparable type: Implement full ordering with `@total_ordering`.
 
 **Requirements:**
-- Implement `__lt__` and ensure `__eq__` is defined
-- Return `NotImplemented` for different types
-- Single source of truth for ordering (precedence map/key function)
-- Annotate returns as `bool | NotImplementedType`
+- **R-6.4.2** Implement `__lt__` and ensure `__eq__` is defined
+- **R-6.4.3** Return `NotImplemented` for different types
+- **R-6.4.4** Single source of truth for ordering (precedence map/key function)
+- **R-6.4.5** Annotate returns as `bool | NotImplementedType`
 
-**Example:**
 ```python
 from enum import Enum
 from functools import total_ordering
@@ -680,44 +827,46 @@ _PRICE_TYPE_ORDER = {
 ```
 
 **Acceptance checks:**
-- [ ] Class decorated with `@total_ordering`
-- [ ] `__lt__` returns `NotImplemented` for different types
-- [ ] Single precedence map defined once
-- [ ] Return type hints include `NotImplementedType`
-- [ ] Module starts with `from __future__ import annotations`
+- [ ] R-6.4.1: Class decorated with `@total_ordering`
+- [ ] R-6.4.3: `__lt__` returns `NotImplemented` for different types
+- [ ] R-6.4.4: Single precedence map defined once
+- [ ] R-6.4.5: Return type hints include `NotImplementedType`
 
 ---
 
-# 6. Complexity Control & Premature Abstraction
+# 7. Complexity Control & Premature Abstraction
 
-**Core rule:** Do not introduce new types, layers, helpers, or indirection unless gain is
-immediate, material, well-justified, and documented.
+**R-7.0.1** Core rule: Do not introduce new types, layers, helpers, or indirection unless gain is immediate, material, well-justified, and documented.
 
-## 6.1. What This Means Now
-- ❌ **Don't alias simple primitives:** `Price = Decimal`, `Volume = Decimal`
-- ✅ **Use explicit types:** `tuple[Decimal, Decimal]`
-- ❌ **Don't add wrapper classes** for tuples/lists/dicts just to name fields
+## 7.1. What This Means Now
+- **R-7.1.1** Don't alias simple primitives: `Price = Decimal`, `Volume = Decimal`
+- **R-7.1.2** Use explicit types: `tuple[Decimal, Decimal]`
+- **R-7.1.3** Don't add wrapper classes for tuples/lists/dicts just to name fields
 
-**Preferred:**
 ```python
+# ✅ Good — explicit type
 bids: Sequence[tuple[Decimal, Decimal]]
+
+# ❌ Bad — unnecessary alias
+Price = Decimal
+Volume = Decimal
+bids: Sequence[tuple[Price, Volume]]
 ```
 
-## 6.2. When to Add New Value Object
+## 7.2. When to Add New Value Object
 
-**At least ONE must be true:**
+**R-7.2.1** At least ONE must be true:
 - Must enforce invariants/units/validation (currency, tick size, rounding)
 - Attach behavior with data (methods, arithmetic with rounding rules)
 - Measurable performance/memory improvements in hot paths
 - Reused across **3+ call sites/modules** with real maintenance cost
 - Represents external boundary (serialization schema, protocol, storage)
 
-## 6.3. If Adding One
-- Prefer `NamedTuple` for read-only shapes
-- Or `@dataclass(frozen=True)` with `__slots__` when validation needed
-- State the justification, invariant(s) or performance reason in the docstring if the reason for the abstraction is not obvious from the context.
+## 7.3. If Adding One
+- **R-7.3.1** Prefer `NamedTuple` for read-only shapes
+- **R-7.3.2** Or `@dataclass(frozen=True)` with `__slots__` when validation needed
+- **R-7.3.3** State the justification, invariant(s) or performance reason in the docstring if not obvious
 
-**Example:**
 ```python
 class BookLevel(NamedTuple):
     """Represents a single price level in an order book.
@@ -735,213 +884,97 @@ class BookLevel(NamedTuple):
 ```
 
 **Acceptance checks:**
-- [ ] No primitive aliases exposed in public APIs
-- [ ] New abstractions have a clear justification in their docstring if the reason for their existence is not obvious
-- [ ] Signatures use explicit types unless justified value object exists
-- [ ] Utils/wrappers only with 3+ reuse sites or explicit hot-path perf need
+- [ ] R-7.1.1: No primitive aliases exposed in public APIs
+- [ ] R-7.3.3: New abstractions have a clear justification in their docstring if not obvious
+- [ ] R-7.2.1: Utils/wrappers only with 3+ reuse sites or explicit hot-path perf need
 
 ---
 
-# 7. Domain-Specific Rules
+# 8. Domain-Specific Rules
 
-## 7.1. Price Validation
-**Negative prices are allowed** when market supports them. Do not reject negative `$price`
-values in generic validation.
+## 8.1. Price Validation
+**R-8.1.1** Negative prices are allowed when market supports them. Do not reject negative `$price` values in generic validation.
 
-**Why:** Certain markets (electricity, power futures, interest rate instruments) may have
-negative prices.
+**Why:** Certain markets (electricity, power futures, interest rate instruments) may have negative prices.
 
-**Acceptance checks:**
-- [ ] Generic validators allow negative prices where market supports them
+## 8.2. Pricing Terminology
+**R-8.2.1** Do not use the term "mark price" anywhere in this codebase (code, docs, comments, logs, or tests). Use "last price" instead.
 
-## 7.2. Pricing terminology
+```python
+# ✅ Good
+last_price = get_last_price(instrument)
 
-- Do not use the term "mark price" anywhere in this codebase (code, docs, comments, logs,
-  or tests). Use "last price" instead.
+# ❌ Bad
+mark_price = get_mark_price(instrument)
+```
 
-## 7.3. Broker and SimBroker semantics
+## 8.3. Broker and SimBroker Semantics
 
 **Core rules:**
-
-- One `Broker` instance (like `SimBroker`) represents one logical trading account.
-- Account-level data (cash, margin, positions, open orders) must never mix multiple accounts
-  inside a single Broker instance.
-- Multiple accounts are modelled by multiple Broker instances added to a `TradingEngine` via
-  `add_broker(name, broker)`.
+- **R-8.3.1** One `Broker` instance (like `SimBroker`) represents one logical trading account
+- **R-8.3.2** Account-level data (cash, margin, positions, open orders) must never mix multiple accounts inside a single Broker instance
+- **R-8.3.3** Multiple accounts are modelled by multiple Broker instances added to a `TradingEngine` via `add_broker(name, broker)`
 
 **SimBroker usage:**
-
-- A `SimBroker` instance holds state for exactly one simulated account (orders, order fills,
-  positions, account snapshot, last OrderBook per instrument).
-- To simulate multiple accounts you must create multiple `SimBroker` instances (for example,
-  `"sim_portfolio"`, `"sim_A"`, `"sim_B"`) and register them under different names.
-- Strategies that share a `SimBroker` share one simulated account; strategies wired to
-  different `SimBroker` instances are account-isolated.
+- **R-8.3.4** A `SimBroker` instance holds state for exactly one simulated account
+- **R-8.3.5** To simulate multiple accounts, create multiple `SimBroker` instances and register them under different names
+- **R-8.3.6** Strategies that share a `SimBroker` share one simulated account; strategies wired to different `SimBroker` instances are account-isolated
 
 **Responsibilities split:**
-
-- Brokers simulate realistic order lifecycle, order fills, margin, and fee handling for their
-  account.
-- `TradingEngine` records order fills per Strategy and provides the raw data for backtest
-  statistics.
-- Reporting utilities should reconstruct per-Strategy and portfolio metrics from order fills and
-  positions instead of embedding reporting into Broker implementations.
-
-# 8. Code Organization
-
-## 8.1. Regions
-Use `# region NAME` / `# endregion` to group related blocks (no tiny regions).
-
-Preferred baseline set and order:
-1) Init, 2) Protocol <Name>, 3) Main, 4) Properties, 5) Utilities, 6) Magic.
-
-These are **examples and a strong default**, not a hard whitelist.
-It is allowed (and sometimes preferred) to introduce additional region names when it materially improves
-scan-ability for a large class or module.
-
-When adding a custom region name:
-- The region must contain a meaningful multi-line block (no tiny regions).
-- The region name must be descriptive and domain-relevant (e.g., `Order matching`, `Account & margin`, `Default builders`).
-- Keep region names short and simple (ideally 1–2 words).
-- Keep **public-first ordering**: public/protocol APIs must appear before helper-only regions.
-- Keep the baseline regions where they fit (Init first; Magic last).
-
-- Use `Protocol <Name>` for protocol API (see 8.5). Use `Main` only for public API not in a
-  protocol. Standardize on `Utilities` (do not use "Helpers").
-- For large classes, avoid a single giant `Utilities` region. Prefer decomposing helpers into multiple
-  regions named `Utilities - <Topic>` where `<Topic>` is short (for example, `Utilities - Orders`, `Utilities - Positions`).
-- Public‑first order (see 8.4). Remove empty regions.
-
-**Format:**
-- Mark with `# region NAME` and `# endregion`
-- Keep one empty line after `# region NAME` and before `# endregion`
-- Remove all empty regions
-- Follow the ordering rules in 8.4
-
-## 8.2. Imports & Package Structure
-- Import directly from source modules; **never re-export in `__init__.py`**
-- After changes, remove unused imports and add missing ones
-- Prefer namespace packages
-- Only create `__init__.py` for executable code (e.g., `__version__`)
+- **R-8.3.7** Brokers simulate realistic order lifecycle, order fills, margin, and fee handling for their account
+- **R-8.3.8** `TradingEngine` records order fills per Strategy and provides the raw data for backtest statistics
+- **R-8.3.9** Reporting utilities should reconstruct per-Strategy and portfolio metrics from order fills and positions instead of embedding reporting into Broker implementations
 
 **Acceptance checks:**
-- [ ] Regions follow naming/spacing rules; no empty regions
-- [ ] No re-exports from `__init__.py`; imports are clean
-
-## 8.3. Markdown Formatting
-Keep all Markdown lines (including code blocks) **≤150 chars**. Break at natural points.
-
-## 8.4. Method ordering inside classes
-- Order methods by reader importance:
-  1) Init (constructor), 2) Public API ("Main"), 3) Properties,
-     4) Protected/Private helpers ("Utilities"), 5) Magic (dunder).
-- Use regions to mark these blocks: `# region Init`, `# region Main`, `# region Properties`,
-  `# region Utilities` (or `# region Utilities - <Topic>`), `# region Magic`.
-- Do not place protected/private helpers above public API unless there is a strong, documented
-  reason.
-
-Acceptance checks:
-- [ ] Public API appears before protected/private helpers in each class
-- [ ] Regions used and correctly named; no empty regions
-- [ ] Reviews must call out violations explicitly
-
-## 8.5. Region naming for protocol implementations
-- When a class implements a Protocol's public API, name the region `Protocol <Name>` instead of
-  the generic `Main`.
-- Examples:
-  - Use `# region Protocol MarginModel` in a margin model implementation.
-  - Use `# region Protocol FeeModel` in a fee model implementation.
-
-Acceptance checks:
-- [ ] Classes implementing a Protocol use `Protocol <Name>` region for public API
-- [ ] No leftover `Main` region when a protocol name would be clearer
-
-## 8.6. Region naming and order (concise rule)
-- Treat `Init`, `Protocol <Name>`, `Main`, `Properties`, `Utilities`, `Magic` as a preferred baseline
-  and default ordering.
-- Additional region names are allowed when justified and reasonable (see 8.1).
-- Public‑first: `Init` → `Protocol <Name>`/`Main` → the rest. See 8.4 for details.
-- If a class implements a Protocol, group those methods under `Protocol <Name>` (e.g., `Protocol
-  MarginModel`). If multiple protocols, create one region per protocol.
-- Use `Main` only for public API that is not part of any Protocol. Omit `Main` if the class is
-  protocol‑only.
-- Standardize on `Utilities` for non‑public helpers; do not use "Helpers".
-- For large helper surfaces, you may split helpers across multiple regions using the `Utilities - <Topic>`
-  naming convention.
-- In modules that define a Protocol/interface, you may use a single `Interface` region.
-
-Acceptance checks:
-- [ ] `Protocol <Name>` is used instead of `Main` for protocol API (8.5)
-- [ ] Public API appears before helpers (`Init` → `Protocol`/`Main`) (8.4)
-- [ ] Region names are descriptive; the baseline order is respected; no "Helpers"
-- [ ] No empty regions; remove unused headings (8.1)
+- [ ] R-8.1.1: Generic validators allow negative prices where market supports them
 
 ---
 
 # 9. Testing Guidelines
 
-- **Do not automatically run tests**; the maintainer will run tests manually to save tokens/resources
-- **Do not generate tests unless explicitly asked**
-- Use **pytest** (not unittest)
-- Test function names start with `test_` and describe what they test
-- Organize: `tests/unit/` and `tests/integration/`
-- Mirror package structure of code under test
-- Keep only root `tests/__init__.py` file
+- **R-9.0.1** Do not automatically run tests; the maintainer will run tests manually to save tokens/resources
+- **R-9.0.2** Do not generate tests unless explicitly asked
+- **R-9.0.3** Use **pytest** (not unittest)
+- **R-9.0.4** Test function names start with `test_` and describe what they test
+- **R-9.0.5** Organize: `tests/unit/` and `tests/integration/`
+- **R-9.0.6** Mirror package structure of code under test
+- **R-9.0.7** Keep only root `tests/__init__.py` file
 
-## 9.1. Choosing test location and package
+## 9.1. Choosing Test Location and Package
 
-Place new tests based on what they exercise:
+**R-9.1.1** Place new tests based on what they exercise:
 
-- Use `tests/unit/` when the test focuses on a single component or a very small group of
-  closely related functions or classes. These tests should run fast, use simple fixtures,
-  and avoid real I/O, databases, or external services.
-- Use `tests/integration/` when the test covers multiple layers or components working
-  together (for example, broker + engine + event-feed), or when it relies on realistic
-  scenarios, external boundaries, or non-trivial I/O.
+- **`tests/unit/`**: Test focuses on a single component or a very small group of closely related functions or classes. These tests should run fast, use simple fixtures, and avoid real I/O
+- **`tests/integration/`**: Test covers multiple layers or components working together, or relies on realistic scenarios, external boundaries, or non-trivial I/O
 
-In both cases, choose the most specific and representative package under `tests/` so that
-the test path mirrors the production module it covers. For example, tests for
-`suite_trading.broker.simbroker` should live in `tests/unit/broker/` or
-`tests/integration/broker/` with a file name like `test_simbroker.py`. Avoid dumping
-unrelated tests into generic modules such as `tests/unit/test_misc.py`.
+**R-9.1.2** Choose the most specific and representative package under `tests/` so that the test path mirrors the production module it covers.
 
-If in doubt, start in `tests/unit/`. Move or duplicate the scenario into
-`tests/integration/` only when it clearly spans several layers or depends on realistic
-wiring between components.
+**R-9.1.3** Avoid dumping unrelated tests into generic modules such as `tests/unit/test_misc.py`.
 
-## 9.2. Use DataGenerationAssistant (`DGA`) for test data
+**R-9.1.4** If in doubt, start in `tests/unit/`. Move or duplicate the scenario into `tests/integration/` only when it clearly spans several layers.
 
-Use the shared `DataGenerationAssistant` (`DGA`) from
-`suite_trading.utils.data_generation.assistant` for creating common domain objects
-in tests and examples.
+## 9.2. Use DataGenerationAssistant (`DGA`) for Test Data
 
-The `DataGenerationAssistant` is a lightweight, stateless entry point that
-exposes small factory namespaces. Each call creates fresh objects, so there is
-no shared mutable state between tests.
+**R-9.2.1** Use the shared `DataGenerationAssistant` (`DGA`) from `suite_trading.utils.data_generation.assistant` for creating common domain objects in tests and examples.
 
-Currently it provides:
-- `instrument`: Helpers for creating `Instrument` fixtures (for example,
-  realistic futures, FX, or equity instruments).
-- `bar`: Helpers for creating single bars and bar series.
-- `order_book`: Helpers for creating simple `OrderBook` snapshots from
-  numeric tuples or "price@volume" strings.
-- `trade_tick`: Helpers for creating trade ticks and series.
-- `quote_tick`: Helpers for creating quote ticks and series.
-- `pattern`: Helpers for scalar price patterns (linear, sine wave, zig-zag).
+The `DataGenerationAssistant` is a lightweight, stateless entry point that exposes small factory namespaces. Each call creates fresh objects, so there is no shared mutable state between tests.
 
-In new tests you should:
-- Import `DGA` once, and
-- Use its factories instead of manually constructing domain objects.
+**Currently provides:**
+- `instrument`: Helpers for creating `Instrument` fixtures
+- `bar`: Helpers for creating single bars and bar series
+- `order_book`: Helpers for creating simple `OrderBook` snapshots
+- `trade_tick`: Helpers for creating trade ticks and series
+- `quote_tick`: Helpers for creating quote ticks and series
+- `pattern`: Helpers for scalar price patterns (linear, sine wave, zig-zag)
 
-Preferred import pattern:
-
+**Preferred import pattern:**
 ```python
 from suite_trading.utils.data_generation.assistant import DGA
 
 
 def test_example_instrument():
-  instrument = DGA.instrument.future_es()
-  # use $instrument in your test logic here
+    instrument = DGA.instrument.future_es()
+    # use $instrument in your test logic here
 ```
 
 ---
@@ -949,24 +982,23 @@ def test_example_instrument():
 # 10. Git Commit Guidelines
 
 ## 10.1. Critical Rule
-**Never auto-commit:** Do not create commits, tags, or pushes unless explicitly requested by
-user in current message.
+**R-10.1.1** Never auto-commit: Do not create commits, tags, or pushes unless explicitly requested by user in current message.
 
 ## 10.2. Commit Format
-- **Imperative mood** (command form): ✅ "Add user auth"; ❌ "Added user auth"
-- **Subject line:** ≤50 chars, capital letter, no period at end
-- Use present tense imperative verbs: Add, Fix, Remove, Update
-- Be descriptive about what and why
-- For longer commits: add body separated by blank line
+- **R-10.2.1** Imperative mood (command form): ✅ "Add user auth"; ❌ "Added user auth"
+- **R-10.2.2** Subject line: ≤50 chars, capital letter, no period at end
+- **R-10.2.3** Use present tense imperative verbs: Add, Fix, Remove, Update
+- **R-10.2.4** Be descriptive about what and why
+- **R-10.2.5** For longer commits: add body separated by blank line
 
 ---
 
 # 11. Plan & Code Change Visualization
 
-When proposing changes, show per-file Before/After snippets with minimal unique context.
+**R-11.0.1** When proposing changes, show per-file Before/After snippets with minimal unique context.
 Use fenced code blocks, keep lines ≤150 chars, include acceptance checks, update imports.
 
-For workflow/pipeline refactors, also include a `Validate` → `Compute` → `Decide` → `Act` ASCII diagram (see 4.5).
+**R-11.0.2** For workflow/pipeline refactors, also include a `Validate` → `Compute` → `Decide` → `Act` ASCII diagram (see R-4.5.8).
 
 **Template:**
 
