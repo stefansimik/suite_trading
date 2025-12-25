@@ -562,8 +562,8 @@ class SimBroker(Broker, SimulatedBroker):
         signed_position_quantity = self.get_signed_position_quantity(instrument)
 
         commission, initial_margin, maintenance_margin_after = self._compute_commission_and_margins(
-            order=order,
             proposed_fill=proposed_fill,
+            order=order,
             order_book=order_book,
             signed_position_quantity=signed_position_quantity,
             previous_order_fills=self._order_fill_history,
@@ -676,8 +676,8 @@ class SimBroker(Broker, SimulatedBroker):
             signed_position_quantity_after = signed_position_quantity + proposed_fill.signed_quantity
 
             commission, initial_margin, maintenance_margin_after = self._compute_commission_and_margins(
-                order=order,
                 proposed_fill=proposed_fill,
+                order=order,
                 order_book=order_book,
                 signed_position_quantity=signed_position_quantity,
                 previous_order_fills=simulated_order_fill_history,
@@ -723,8 +723,8 @@ class SimBroker(Broker, SimulatedBroker):
     def _compute_commission_and_margins(
         self,
         *,
-        order: Order,
         proposed_fill: ProposedFill,
+        order: Order,
         order_book: OrderBook,
         signed_position_quantity: Decimal,
         previous_order_fills: Sequence[OrderFill],
@@ -732,8 +732,8 @@ class SimBroker(Broker, SimulatedBroker):
         """Compute absolute commission and margins for a single $proposed_fill.
 
         Args:
-            order: Order being filled.
             proposed_fill: Single ProposedFill to apply.
+            order: Order being filled.
             order_book: Broker OrderBook snapshot used for matching and margin.
             signed_position_quantity: Net position signed quantity before applying $proposed_fill.
             previous_order_fills: History of order fills for commission calculation (e.g. tiered fees).
@@ -746,8 +746,8 @@ class SimBroker(Broker, SimulatedBroker):
 
         # COMPUTE: Commission
         commission = self._fee_model.compute_commission(
-            order=order,
             proposed_fill=proposed_fill,
+            order=order,
             previous_order_fills=previous_order_fills,
         )
 

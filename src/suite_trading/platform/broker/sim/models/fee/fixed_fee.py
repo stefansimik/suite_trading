@@ -25,17 +25,18 @@ class FixedFeeModel(FeeModel):
 
     def compute_commission(
         self,
-        order: Order,
         proposed_fill: ProposedFill,
+        order: Order,
         previous_order_fills: Sequence[OrderFill],
     ) -> Money:
-        """Computes the commission for a trade.
+        """Computes the commission for the $proposed_fill.
 
-        This model multiplies the fixed fee by the absolute number of units filled.
+        This model multiplies the fixed fee by the absolute quantity of the
+        $proposed_fill.
 
         Args:
-            order: The order being filled.
-            proposed_fill: The trade price and quantity before fees are added.
+            proposed_fill: The trade data for which the commission is calculated.
+            order: The order being filled. Not used in this model.
             previous_order_fills: The account's previous trades. Not used in this model.
 
         Returns:

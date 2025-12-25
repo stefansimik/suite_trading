@@ -20,18 +20,23 @@ class FeeModel(Protocol):
 
     def compute_commission(
         self,
-        order: Order,
         proposed_fill: ProposedFill,
+        order: Order,
         previous_order_fills: Sequence[OrderFill],
     ) -> Money:
-        """Computes the commission for a single trade.
+        """Computes the commission specifically for the $proposed_fill part of an order.
+
+        The $proposed_fill is the primary subject of the calculation. The $order and
+        $previous_order_fills are provided as secondary context if the model needs
+        instrument details or account history.
 
         Args:
-            order: The order being filled. Use this to access instrument details or
-                other fills for this order.
-            proposed_fill: The trade price and quantity before fees are added.
-            previous_order_fills: The account's previous trades. Use this to handle
-                volume-based discounts.
+            proposed_fill: The specific trade data (price and quantity) for which to
+                calculate the commission.
+            order: The order that generated this fill. Use this for instrument details
+                or to check other trades for the same order.
+            previous_order_fills: The account's history of previous trades. Use this
+                to calculate volume-based tiered fees.
 
         Returns:
             The commission amount as Money.
