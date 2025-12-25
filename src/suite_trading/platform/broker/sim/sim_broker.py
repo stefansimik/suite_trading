@@ -520,16 +520,14 @@ class SimBroker(Broker, SimulatedBroker):
             order: The target Order that receives the fill.
             order_book: Market context used for final pricing and margin calculations.
         """
-        instrument = order_book.instrument
-
         # VALIDATE
         # Precondition: ensure $order.instrument matches $order_book.instrument for pricing and margin
-        if order.instrument != instrument:
-            raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{instrument}')")
+        if order.instrument != order_book.instrument:
+            raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
         # COMPUTE
         # We compute 'before' state to derive final 'after' state later in the ACT stage
-        signed_position_quantity_before = self.get_signed_position_quantity(instrument)
+        signed_position_quantity_before = self.get_signed_position_quantity(order_book.instrument)
         maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_quantity_before)
 
         commission, initial_margin_delta, maintenance_margin_delta = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
@@ -547,7 +545,7 @@ class SimBroker(Broker, SimulatedBroker):
         # Derived values for state commitment
         maintenance_margin_after = maintenance_margin_before + maintenance_margin_delta
 
-        order_fill = self._commit_proposed_fill_and_accounting(order=order, proposed_fill=proposed_fill, instrument=instrument, commission=commission, initial_margin=initial_margin_delta, maintenance_margin_after=maintenance_margin_after)
+        order_fill = self._commit_proposed_fill_and_accounting(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maintenance_margin_after=maintenance_margin_after)
 
         self._handle_order_fill(order_fill)
         self._handle_order_update(order)
@@ -668,7 +666,7 @@ class SimBroker(Broker, SimulatedBroker):
         commission = self._fee_model.compute_commission(proposed_fill=proposed_fill, order=order, previous_order_fills=previous_order_fills)
 
         # 2. COMPUTE: Initial margin
-        # Note: Technically `initial margin delta` is the same as `initial margin` as it is always applied only to new increased part of the position
+        # Note: Technically `initial margin delta` is the same as `initial margin` as it is always applied only to new increased part of the position and not to the full whole position
         initial_margin_delta = Money(0, commission.currency)
         if absolute_position_quantity_change > 0:
             initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_position_quantity_change)
