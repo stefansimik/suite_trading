@@ -491,7 +491,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         # Special case 1: Order of type FOK = Fill all-or-nothing
         if tif == TimeInForce.FOK:
-            has_liquidity = sum(s.absolute_quantity for s in proposed_fills) >= order.absolute_unfilled_quantity
+            has_liquidity = sum(s.abs_quantity for s in proposed_fills) >= order.abs_unfilled_quantity
             if not has_liquidity:
                 return [], True  # Expire full order: insufficient liquidity for FOK
 
@@ -659,8 +659,8 @@ class SimBroker(Broker, SimulatedBroker):
         """
         # Pre-calculate values
         signed_position_quantity_after = signed_position_quantity_before + proposed_fill.signed_quantity
-        absolute_position_quantity_change = max(Decimal("0"), abs(signed_position_quantity_after) - abs(signed_position_quantity_before))
-        signed_position_quantity_change = absolute_position_quantity_change if proposed_fill.signed_quantity > 0 else -absolute_position_quantity_change
+        abs_position_quantity_change = max(Decimal("0"), abs(signed_position_quantity_after) - abs(signed_position_quantity_before))
+        signed_position_quantity_change = abs_position_quantity_change if proposed_fill.signed_quantity > 0 else -abs_position_quantity_change
 
         # 1. COMPUTE: Commission
         commission = self._fee_model.compute_commission(proposed_fill=proposed_fill, order=order, previous_order_fills=previous_order_fills)
@@ -668,7 +668,7 @@ class SimBroker(Broker, SimulatedBroker):
         # 2. COMPUTE: Initial margin
         # Note: Technically `initial margin delta` is the same as `initial margin` as it is always applied only to new increased part of the position and not to the full whole position
         initial_margin_delta = Money(0, commission.currency)
-        if absolute_position_quantity_change > 0:
+        if abs_position_quantity_change > 0:
             initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_position_quantity_change)
 
         # 3. COMPUTE: Maintenance margin
@@ -700,7 +700,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         Appends the provided $order_fill to the broker-maintained order_fill history (account scope),
         not to the `Order` object, then updates the per-instrument Position to reflect the new
-        absolute_quantity and average price.
+        abs_quantity and average price.
         """
         instrument = order_fill.order.instrument
         trade_price: Decimal = Decimal(order_fill.price)

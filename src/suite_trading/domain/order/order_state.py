@@ -19,7 +19,7 @@ class OrderState(State):
     WORKING = "WORKING"  # Order is live on the exchange
     PENDING_UPDATE = "PENDING_UPDATE"  # Update request is in flight; current version still live
     PENDING_CANCEL = "PENDING_CANCEL"  # Cancel request is in flight
-    PARTIALLY_FILLED = "PARTIALLY_FILLED"  # Order filled partially; some absolute_quantity remains unfilled
+    PARTIALLY_FILLED = "PARTIALLY_FILLED"  # Order filled partially; some abs_quantity remains unfilled
     CANCELLED = "CANCELLED"  # Order cancelled; rare late fills may still arrive
 
     # Triggering
@@ -29,7 +29,7 @@ class OrderState(State):
     # Terminal states — final or effectively final
     DENIED = "DENIED"  # Denied before submission to broker (local checks or risk rules)
     REJECTED = "REJECTED"  # Rejected after submission by broker or venue
-    FILLED = "FILLED"  # Filled completely; no absolute_quantity remains
+    FILLED = "FILLED"  # Filled completely; no abs_quantity remains
     EXPIRED = "EXPIRED"  # Expired by time-in-force (Day, IOC, FOK, GTD)
 
     # Communication failure handling
@@ -58,12 +58,12 @@ class OrderAction(Action):
     REJECT = "REJECT"  # Reject the current request after sending (by broker/exchange)
 
     # Modification actions
-    UPDATE = "UPDATE"  # Ask to change price, absolute_quantity, or other order params
+    UPDATE = "UPDATE"  # Ask to change price, abs_quantity, or other order params
     CANCEL = "CANCEL"  # Ask the broker to cancel the order
 
     # Fill actions
-    PARTIAL_FILL = "PARTIAL_FILL"  # Some absolute_quantity just filled; some remains unfilled
-    FILL = "FILL"  # All remaining absolute_quantity just filled; order complete
+    PARTIAL_FILL = "PARTIAL_FILL"  # Some abs_quantity just filled; some remains unfilled
+    FILL = "FILL"  # All remaining abs_quantity just filled; order complete
 
     # System actions
     EXPIRE = "EXPIRE"  # Order expired by its time-in-force

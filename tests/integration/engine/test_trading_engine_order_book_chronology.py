@@ -93,7 +93,7 @@ class MockOrderBookDrivenBroker(Broker):
         return None
 
     def get_signed_position_quantity(self, instrument: Instrument) -> Decimal:
-        """No-op get position absolute_quantity."""
+        """No-op get position abs_quantity."""
         return Decimal("0")
 
     def get_account(self) -> Account:

@@ -31,7 +31,7 @@ class TestOrderBookSimulateFills:
         return datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
 
     def test_buy_consumes_asks_best_first(self):
-        """BUY should consume ask levels best-first until absolute_quantity is met (10@100 then 2@101)."""
+        """BUY should consume ask levels best-first until abs_quantity is met (10@100 then 2@101)."""
         instr = self._instrument()
         ts = self._ts()
         asks = [BookLevel(Decimal("100"), Decimal("10")), BookLevel(Decimal("101"), Decimal("5"))]
@@ -43,7 +43,7 @@ class TestOrderBookSimulateFills:
         assert all(f.timestamp == ts for f in fills)
 
     def test_sell_consumes_bids_best_first(self):
-        """SELL should consume bid levels best-first (4@99 then 1@98 to reach absolute_quantity=5)."""
+        """SELL should consume bid levels best-first (4@99 then 1@98 to reach abs_quantity=5)."""
         instr = self._instrument()
         ts = self._ts()
         bids = [BookLevel(Decimal("99"), Decimal("4")), BookLevel(Decimal("98"), Decimal("7"))]

@@ -155,11 +155,11 @@ def test_limit_multiple_partial_fills() -> None:
     # Act
     engine.start()
 
-    # Assert: three order_fills with fill_prices following the feed and total absolute_quantity 3
+    # Assert: three order_fills with fill_prices following the feed and total abs_quantity 3
     assert len(broker.list_active_orders()) == 0
     order_fills = engine.list_order_fills_for_strategy("limit_partials")
     assert len(order_fills) == 3
-    total_filled_quantity = sum(e.absolute_quantity for e in order_fills)
+    total_filled_quantity = sum(e.abs_quantity for e in order_fills)
     assert total_filled_quantity == Decimal("3")
     fill_prices = [e.price for e in order_fills]
     assert fill_prices == [Decimal("100.00"), Decimal("99.99"), Decimal("99.98")]

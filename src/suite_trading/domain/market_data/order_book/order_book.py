@@ -39,7 +39,7 @@ class ProposedFill(NamedTuple):
     timestamp: datetime
 
     @property
-    def absolute_quantity(self) -> Decimal:
+    def abs_quantity(self) -> Decimal:
         """The absolute amount of filled quantity.
 
         This value is always positive and represents the magnitude of the
@@ -181,10 +181,10 @@ class OrderBook:
                 continue
 
             # Take as much as possible at this price level
-            fill_absolute_quantity = min(price_level.volume, abs(remaining_signed_quantity))
-            if fill_absolute_quantity > 0:
+            fill_abs_quantity = min(price_level.volume, abs(remaining_signed_quantity))
+            if fill_abs_quantity > 0:
                 # Add proposed fill for this price level (signed based on side)
-                fill_signed_quantity = fill_absolute_quantity * side_sign
+                fill_signed_quantity = fill_abs_quantity * side_sign
                 proposed_fill = ProposedFill(signed_quantity=fill_signed_quantity, price=price_level.price, timestamp=self._timestamp)
                 result.append(proposed_fill)
                 # Reduce remaining signed_quantity by the filled amount

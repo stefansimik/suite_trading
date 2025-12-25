@@ -28,8 +28,8 @@ class MarginModel(Protocol):
 
     - Simulated brokers such as SimBroker call `compute_initial_margin` per proposed fill,
       not once for the whole order. The $signed_quantity passed in is the additional
-      exposure introduced by the current proposed fill, not the total order absolute_quantity.
-    - Initial margin is therefore blocked incrementally per proposed fill, only when absolute
+      exposure introduced by the current proposed fill, not the total order abs_quantity.
+    - Initial margin is therefore blocked incrementally per proposed fill, only when abs
       exposure increases. If a proposed fill reduces exposure or keeps it unchanged, the
       implementation may return a zero $Money amount and no new initial margin is
       blocked.

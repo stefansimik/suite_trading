@@ -24,7 +24,7 @@ class OrderFill:
 
     Attributes:
         order: Reference to the parent order that was filled.
-        absolute_quantity: Filled absolute_quantity.
+        abs_quantity: Filled abs_quantity.
         price: Fill price.
         timestamp: When this fill occurred.
         id: Unique fill identifier ("{order.id}-{n}").
@@ -128,7 +128,7 @@ class OrderFill:
         return self._signed_quantity < 0
 
     @property
-    def absolute_quantity(self) -> Decimal:
+    def abs_quantity(self) -> Decimal:
         """The absolute amount of filled quantity.
 
         This value is always positive and represents the magnitude of the
@@ -160,13 +160,13 @@ class OrderFill:
         return self._timestamp
 
     @property
-    def absolute_notional_value(self) -> Money:
+    def abs_notional_value(self) -> Money:
         """Return absolute notional Money in $quote_currency.
 
         Notional value explains the total theoretical value controlled by the fill.
-        Returns the positive magnitude: $absolute_quantity * $contract_size * |$price|.
+        Returns the positive magnitude: $abs_quantity * $contract_size * |$price|.
         """
-        amount = self.absolute_quantity * self.instrument.contract_size * abs(self.price)
+        amount = self.abs_quantity * self.instrument.contract_size * abs(self.price)
         return Money(amount, self.instrument.quote_currency)
 
     @property
@@ -216,8 +216,8 @@ class OrderFill:
             raise ValueError(f"Cannot call `OrderFill._validate` because $commission ({self._commission}) is negative")
 
         # Precondition: a fill must not overfill the order
-        if self.absolute_quantity > self._order.absolute_unfilled_quantity:
-            raise ValueError(f"Cannot call `OrderFill._validate` because $absolute_quantity ({self.absolute_quantity}) exceeds order $unfilled_quantity ({self._order.absolute_unfilled_quantity})")
+        if self.abs_quantity > self._order.abs_unfilled_quantity:
+            raise ValueError(f"Cannot call `OrderFill._validate` because $abs_quantity ({self.abs_quantity}) exceeds order $unfilled_quantity ({self._order.abs_unfilled_quantity})")
 
     # endregion
 

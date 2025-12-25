@@ -58,6 +58,8 @@ Remove or redesign anything to achieve optimal design.
 **R-2.1.1** Names must be **descriptive, intuitive, self-documenting and with natural English phrasing**.
 Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, but never sacrifice clarity.
 
+**Exception:** The shortcut `abs_` is allowed instead of the full word `absolute_` (e.g., `abs_quantity`, `abs_position_quantity_change`).
+
 - **R-2.1.2** Functions/Methods: Use verbs describing the action
 - **R-2.1.3** Variables/Attributes: Use nouns describing the data
 - **R-2.1.4** Domain terms: Use consistently throughout codebase
@@ -223,10 +225,10 @@ def calculate_portfolio_value(positions: list) -> Decimal:
     """Calculates the total value of all positions in a portfolio.
 
     This sums the market value of each position based on current prices.
-    Positions with zero absolute_quantity are excluded from the calculation.
+    Positions with zero abs_quantity are excluded from the calculation.
 
     Args:
-        positions: List of Position objects with instrument and absolute_quantity.
+        positions: List of Position objects with instrument and abs_quantity.
 
     Returns:
         Total portfolio value as a Decimal.
@@ -303,9 +305,9 @@ initial = compute_initial_margin(order, price)
 
 ```python
 # ✅ Good — correct prefix usage
-# Precondition: $absolute_quantity must be positive to submit order
-if order.absolute_quantity <= 0:
-    raise ValueError(f"Cannot call `submit_order` because $absolute_quantity ({order.absolute_quantity}) <= 0")
+# Precondition: $abs_quantity must be positive to submit order
+if order.abs_quantity <= 0:
+    raise ValueError(f"Cannot call `submit_order` because $abs_quantity ({order.abs_quantity}) <= 0")
 
 # Guard: skip processing if no fills available
 if not fills:
@@ -313,7 +315,7 @@ if not fills:
 
 # ❌ Bad — wrong prefix (raises but uses Guard)
 # Guard: quantity must be positive
-if order.absolute_quantity <= 0:
+if order.abs_quantity <= 0:
     raise ValueError("Invalid quantity")
 
 # ❌ Bad — wrong prefix (returns but uses Precondition)
@@ -337,7 +339,7 @@ if order.instrument is None:
     raise ValueError("...")
 
 # Precondition: quantity must be positive
-if order.absolute_quantity <= 0:
+if order.abs_quantity <= 0:
     raise ValueError("...")
 
 # Now perform actions (empty line above separates guards from actions)
@@ -349,7 +351,7 @@ broker.submit(order)
 if order.instrument is None:
     raise ValueError("...")
 # Precondition: quantity must be positive
-if order.absolute_quantity <= 0:
+if order.abs_quantity <= 0:
     raise ValueError("...")
 self._orders[order.id] = order  # Action immediately after guard
 ```
@@ -398,16 +400,16 @@ def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> N
 
 **Validation guards with spacing:**
 ```python
-# Collect fills since last event and net the absolute_quantity
+# Collect fills since last event and net the abs_quantity
 fills = broker.get_fills_since(self._timeline_dt)
-absolute_quantity = sum(f.absolute_quantity for f in fills)
+abs_quantity = sum(f.abs_quantity for f in fills)
 
 # Guard: skip if no quantity to trade
-if absolute_quantity == 0:
+if abs_quantity == 0:
     return
 
 # Send order and record submission time
-broker.submit(Order(instrument, side, absolute_quantity))
+broker.submit(Order(instrument, side, abs_quantity))
 self._last_order_time = now()
 ```
 
@@ -427,8 +429,8 @@ self._last_order_time = now()
 
 ```python
 # ✅ Good — validates domain invariant (quantity sign)
-# Precondition: $absolute_quantity must be positive
-if order.absolute_quantity <= 0:
+# Precondition: $abs_quantity must be positive
+if order.abs_quantity <= 0:
     raise ValueError(f"...")
 
 # ❌ Bad — trivial type check (Python/mypy handles this)
@@ -501,8 +503,8 @@ logger.info("Started Strategy '%s'", strategy_name)
 
 ```python
 # ✅ Good — short message on single line
-if self.absolute_quantity <= 0:
-    raise ValueError(f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive")
+if self.abs_quantity <= 0:
+    raise ValueError(f"Cannot call `_validate` because $abs_quantity ({self.abs_quantity}) is not positive")
 
 # ✅ Good — long message that truly doesn't fit uses continuation
 raise ValueError(
@@ -511,9 +513,9 @@ raise ValueError(
 )
 
 # ❌ Bad — short message unnecessarily wrapped
-if self.absolute_quantity <= 0:
+if self.abs_quantity <= 0:
     raise ValueError(
-        f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive"
+        f"Cannot call `_validate` because $abs_quantity ({self.abs_quantity}) is not positive"
     )
 ```
 

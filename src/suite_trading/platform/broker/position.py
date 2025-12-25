@@ -79,7 +79,7 @@ class Position:
         return self._signed_quantity
 
     @property
-    def absolute_quantity(self) -> Decimal:
+    def abs_quantity(self) -> Decimal:
         """The absolute amount of exposure.
 
         This value is always positive regardless of whether the position is
@@ -169,12 +169,12 @@ class Position:
 
     def __str__(self) -> str:
         side = "LONG" if self.is_long else "SHORT" if self.is_short else "FLAT"
-        return f"{self.__class__.__name__}(side={side}, absolute_quantity={abs(self.signed_quantity)}, instrument={self.instrument}, avg_price={self.average_price})"
+        return f"{self.__class__.__name__}(side={side}, abs_quantity={abs(self.signed_quantity)}, instrument={self.instrument}, avg_price={self.average_price})"
 
     def __repr__(self) -> str:
         side = "LONG" if self.is_long else "SHORT" if self.is_short else "FLAT"
         last_update_str = format_dt(self.last_update) if self.last_update is not None else None
-        return f"{self.__class__.__name__}(side={side}, absolute_quantity={abs(self.signed_quantity)}, instrument={self.instrument}, avg_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={last_update_str})"
+        return f"{self.__class__.__name__}(side={side}, abs_quantity={abs(self.signed_quantity)}, instrument={self.instrument}, avg_price={self.average_price}, unrealized_pnl={self.unrealized_pnl}, realized_pnl={self.realized_pnl}, last_update={last_update_str})"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Position):

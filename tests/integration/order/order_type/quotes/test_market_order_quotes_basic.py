@@ -178,4 +178,4 @@ class TestMarketOrderQuotesBasic:
 
         engine.start()
 
-        assert [(e.absolute_quantity, e.price) for e in s.order_fills] == [(Decimal("1"), Decimal("1.0001")), (Decimal("1"), Decimal("1.0002"))]
+        assert [(e.abs_quantity, e.price) for e in s.order_fills] == [(Decimal("1"), Decimal("1.0001")), (Decimal("1"), Decimal("1.0002"))]

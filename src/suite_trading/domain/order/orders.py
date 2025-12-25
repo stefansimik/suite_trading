@@ -33,7 +33,7 @@ class Order:
         signed_quantity (Decimal): The net quantity to trade. Returns a positive value for buy
             orders and a negative value for sell orders (read-only).
         side (OrderSide): Whether this is a BUY or SELL order (read-only).
-        absolute_quantity (Decimal): The total magnitude of the order; always positive (read-only).
+        abs_quantity (Decimal): The total magnitude of the order; always positive (read-only).
         time_in_force (TimeInForce): How long the order remains active (read-only).
         good_till_dt (datetime | None): Expiry datetime for GTD orders, or None for non-GTD orders (read-only).
         state (OrderState): Current state of the order from the internal state machine.
@@ -130,7 +130,7 @@ class Order:
         return self._signed_quantity < 0
 
     @property
-    def absolute_quantity(self) -> Decimal:
+    def abs_quantity(self) -> Decimal:
         """The absolute size of the order.
 
         This value is always positive and represents the magnitude of the
@@ -147,7 +147,7 @@ class Order:
         return self._signed_quantity
 
     @property
-    def absolute_filled_quantity(self) -> Decimal:
+    def abs_filled_quantity(self) -> Decimal:
         """The total amount of filled quantity.
 
         This value is always positive and represents the magnitude of fills
@@ -155,7 +155,7 @@ class Order:
         """
         total = Decimal("0")
         for e in self._fills:
-            total += e.absolute_quantity
+            total += e.abs_quantity
         return total
 
     @property
@@ -170,13 +170,13 @@ class Order:
         return total
 
     @property
-    def absolute_unfilled_quantity(self) -> Decimal:
+    def abs_unfilled_quantity(self) -> Decimal:
         """The total amount of unfilled quantity.
 
         This value is always positive and represents the magnitude of the
         remaining quantity regardless of whether it is a buy or sell order.
         """
-        return self.absolute_quantity - self.absolute_filled_quantity
+        return self.abs_quantity - self.abs_filled_quantity
 
     @property
     def signed_unfilled_quantity(self) -> Decimal:
@@ -191,27 +191,27 @@ class Order:
         """Whether no quantity has been filled yet.
 
         Returns:
-            bool: True if $absolute_filled_quantity is 0.
+            bool: True if $abs_filled_quantity is 0.
         """
-        return self.absolute_filled_quantity == Decimal("0")
+        return self.abs_filled_quantity == Decimal("0")
 
     @property
     def is_partially_filled(self) -> bool:
         """Whether some, but not all, quantity has been filled.
 
         Returns:
-            bool: True if 0 < $absolute_filled_quantity < $absolute_quantity.
+            bool: True if 0 < $abs_filled_quantity < $abs_quantity.
         """
-        return Decimal("0") < self.absolute_filled_quantity < self.absolute_quantity
+        return Decimal("0") < self.abs_filled_quantity < self.abs_quantity
 
     @property
     def is_fully_filled(self) -> bool:
         """Whether the order has been completely filled.
 
         Returns:
-            bool: True if $absolute_filled_quantity == $absolute_quantity.
+            bool: True if $abs_filled_quantity == $abs_quantity.
         """
-        return self.absolute_filled_quantity == self.absolute_quantity
+        return self.abs_filled_quantity == self.abs_quantity
 
     @property
     def average_fill_price(self) -> Decimal | None:
@@ -224,13 +224,13 @@ class Order:
         Returns:
             Decimal | None: VWAP of fills, or None.
         """
-        filled = self.absolute_filled_quantity
+        filled = self.abs_filled_quantity
         if filled == 0:
             return None
 
         notional = Decimal("0")
         for e in self._fills:
-            notional += e.price * e.absolute_quantity
+            notional += e.price * e.abs_quantity
 
         avg_price = notional / filled
         return avg_price
@@ -335,8 +335,8 @@ class Order:
         fill = OrderFill(order=self, signed_quantity=signed_quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
 
         # Update state of the order (partial or full fill)
-        new_filled_quantity = self.absolute_filled_quantity + fill.absolute_quantity
-        action = OrderAction.FILL if new_filled_quantity == self.absolute_quantity else OrderAction.PARTIAL_FILL
+        new_filled_quantity = self.abs_filled_quantity + fill.abs_quantity
+        action = OrderAction.FILL if new_filled_quantity == self.abs_quantity else OrderAction.PARTIAL_FILL
         self.change_state(action)
 
         # Store fill

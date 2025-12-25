@@ -227,10 +227,10 @@ def calculate_portfolio_value(positions: list) -> Decimal:
     """Calculates the total value of all positions in a portfolio.
 
     This sums the market value of each position based on current prices.
-    Positions with zero absolute_quantity are excluded from the calculation.
+    Positions with zero abs_quantity are excluded from the calculation.
 
     Args:
-        positions: List of Position objects with instrument and absolute_quantity.
+        positions: List of Position objects with instrument and abs_quantity.
 
     Returns:
         Total portfolio value as a Decimal.
@@ -307,23 +307,23 @@ initial = compute_initial_margin(order, price)
 
 ```python
 # ✅ Good — correct prefix usage
-# Precondition: $absolute_quantity must be positive to submit order
-if order.absolute_quantity <= 0:
-    raise ValueError(f"Cannot call `submit_order` because $absolute_quantity ({order.absolute_quantity}) <= 0")
+# Precondition: $abs_quantity must be positive to submit order
+if order.abs_quantity <= 0:
+  raise ValueError(f"Cannot call `submit_order` because $abs_quantity ({order.abs_quantity}) <= 0")
 
 # Guard: skip processing if no fills available
 if not fills:
-    return
+  return
 
 # ❌ Bad — wrong prefix (raises but uses Guard)
 # Guard: quantity must be positive
-if order.absolute_quantity <= 0:
-    raise ValueError("Invalid quantity")
+if order.abs_quantity <= 0:
+  raise ValueError("Invalid quantity")
 
 # ❌ Bad — wrong prefix (returns but uses Precondition)
 # Precondition: must have fills
 if not fills:
-    return
+  return
 ```
 
 ### Code Reference Formatting
@@ -338,11 +338,11 @@ if not fills:
 # ✅ Good — empty line after guard block
 # Precondition: order must have valid instrument
 if order.instrument is None:
-    raise ValueError("...")
+  raise ValueError("...")
 
 # Precondition: quantity must be positive
-if order.absolute_quantity <= 0:
-    raise ValueError("...")
+if order.abs_quantity <= 0:
+  raise ValueError("...")
 
 # Now perform actions (empty line above separates guards from actions)
 self._orders[order.id] = order
@@ -351,10 +351,10 @@ broker.submit(order)
 # ❌ Bad — no separation between guards and actions
 # Precondition: order must have valid instrument
 if order.instrument is None:
-    raise ValueError("...")
+  raise ValueError("...")
 # Precondition: quantity must be positive
-if order.absolute_quantity <= 0:
-    raise ValueError("...")
+if order.abs_quantity <= 0:
+  raise ValueError("...")
 self._orders[order.id] = order  # Action immediately after guard
 ```
 
@@ -401,14 +401,15 @@ def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> N
 ```
 
 **Validation guards with spacing:**
+
 ```python
-# Collect fills since last event and net the absolute_quantity
+# Collect fills since last event and net the abs_quantity
 fills = broker.get_fills_since(self._timeline_dt)
-absolute_quantity = sum(f.absolute_quantity for f in fills)
+absolute_quantity = sum(f.abs_quantity for f in fills)
 
 # Guard: skip if no quantity to trade
 if absolute_quantity == 0:
-    return
+  return
 
 # Send order and record submission time
 broker.submit(Order(instrument, side, absolute_quantity))
@@ -431,19 +432,19 @@ self._last_order_time = now()
 
 ```python
 # ✅ Good — validates domain invariant (quantity sign)
-# Precondition: $absolute_quantity must be positive
-if order.absolute_quantity <= 0:
-    raise ValueError(f"...")
+# Precondition: $abs_quantity must be positive
+if order.abs_quantity <= 0:
+  raise ValueError(f"...")
 
 # ❌ Bad — trivial type check (Python/mypy handles this)
 # Precondition: order must be Order type
 if not isinstance(order, Order):
-    raise TypeError(f"...")
+  raise TypeError(f"...")
 
 # ❌ Bad — obvious None that would fail naturally
 # Precondition: instrument must exist
 if order.instrument is None:
-    raise ValueError(f"...")
+  raise ValueError(f"...")
 # order.instrument.symbol  # Would fail with clear AttributeError anyway
 ```
 
@@ -505,20 +506,20 @@ logger.info("Started Strategy '%s'", strategy_name)
 
 ```python
 # ✅ Good — short message on single line
-if self.absolute_quantity <= 0:
-    raise ValueError(f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive")
+if self.abs_quantity <= 0:
+  raise ValueError(f"Cannot call `_validate` because $abs_quantity ({self.abs_quantity}) is not positive")
 
 # ✅ Good — long message that truly doesn't fit uses continuation
 raise ValueError(
-    f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. "
-    f"Call `reset` or create a new Strategy."
+  f"Cannot call `start_strategy` because $state ('{self.state}') is not NEW. "
+  f"Call `reset` or create a new Strategy."
 )
 
 # ❌ Bad — short message unnecessarily wrapped
-if self.absolute_quantity <= 0:
-    raise ValueError(
-        f"Cannot call `_validate` because $absolute_quantity ({self.absolute_quantity}) is not positive"
-    )
+if self.abs_quantity <= 0:
+  raise ValueError(
+    f"Cannot call `_validate` because $abs_quantity ({self.abs_quantity}) is not positive"
+  )
 ```
 
 **Acceptance checks:**

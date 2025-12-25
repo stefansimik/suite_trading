@@ -30,8 +30,8 @@ class TwoTradeDemoStrategy(Strategy):
     Behavior:
     - Adds a FixedSequenceEventFeed of 10 rising bar (Step 0)
     - Counts incoming BarEvent(s) as "price events"
-    - On 3rd event: submit SELL Market order absolute_quantity=1
-    - On 5th event: submit BUY Market order absolute_quantity=1, then stop by closing the feed
+    - On 3rd event: submit SELL Market order abs_quantity=1
+    - On 5th event: submit BUY Market order abs_quantity=1, then stop by closing the feed
     """
 
     def __init__(self, name: str, broker: Broker) -> None:
@@ -103,8 +103,8 @@ def test_two_trade_demo_strategy_steps_0_and_1():
 
     # First order_fill: SELL
     assert order_fills[0].order.side == OrderSide.SELL
-    assert order_fills[0].absolute_quantity == Decimal("1")
+    assert order_fills[0].abs_quantity == Decimal("1")
 
     # Second order_fill: BUY
     assert order_fills[1].order.side == OrderSide.BUY
-    assert order_fills[1].absolute_quantity == Decimal("1")
+    assert order_fills[1].abs_quantity == Decimal("1")
