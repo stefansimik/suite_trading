@@ -530,6 +530,7 @@ Keep expressions simple and easy to inspect in a debugger.
 - **R-4.4.1** Avoid long, nested expressions in `return` statements or constructor calls. Extract sub-expressions into well‑named local variables
 - **R-4.4.2** When constructing a non-trivial return value, assign it to a local variable named `result` and `return result`. Returning a simple name or literal directly is fine
 - **R-4.4.3** Prefer short, single-purpose statements over clever one‑liners
+- **R-4.4.4** Avoid creating one-time used variables for simple attribute access or trivial expressions (e.g., `currency = upfront_required.currency`). Inline them to keep the code concise unless the variable name provides significant documentation value or is required for breaking down a truly complex expression.
 
 ```python
 # ❌ Bad — long nested return makes debugging hard
@@ -541,8 +542,7 @@ return Money(
 # ✅ Good — extract into locals and return `result`
 notional = compute_notional_value(price, signed_quantity, instrument.contract_size)
 margin = notional * self._maintenance_ratio
-currency = instrument.settlement_currency
-result = Money(margin, currency)
+result = Money(margin, instrument.settlement_currency)
 return result
 
 # ✅ Good — simple return is fine without `result`
