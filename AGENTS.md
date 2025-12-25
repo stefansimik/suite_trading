@@ -61,7 +61,8 @@ Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, bu
 ### Sanctioned Naming Shortcuts
 To balance descriptiveness with code conciseness, the following shortcuts are permitted. Once a shortcut is sanctioned, it **must** be used consistently in all **variable, parameter, and function names**.
 
-**Note on Class Names**: Classes should generally continue to use the **full term** (e.g., `OrderFill`, `Position`, `Instrument`) to maintain clear type identification. Shortcuts are primarily intended for local variables, parameters, properties, and non-class-level functions.
+**Note on Class Names**: Classes should generally continue to use the **full term** (e.g., `OrderFill`, `Position`, `Instrument`) to maintain clear type identification.
+Sanctioned shortcuts **should** be used for class attributes/properties/fields and for public method/constructor parameters when applicable.
 
 **Note on Documentation & Comments**: Sanctioned shortcuts are strictly for code identifiers. Always use the **full term** in docstrings, code comments, and general documentation to ensure maximum readability for humans.
 
