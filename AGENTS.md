@@ -58,20 +58,35 @@ Remove or redesign anything to achieve optimal design.
 **R-2.1.1** Names must be **descriptive, intuitive, self-documenting and with natural English phrasing**.
 Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, but never sacrifice clarity.
 
-**Exception:** The shortcut `abs_` is allowed instead of the full word `absolute_` (e.g., `abs_quantity`, `abs_position_quantity_change`).
+### Sanctioned Naming Shortcuts
+To balance descriptiveness with code conciseness, the following shortcuts are permitted. Once a shortcut is sanctioned, it **must** be used consistently in all **variable, parameter, and function names**.
+
+**Note on Class Names**: Classes should generally continue to use the **full term** (e.g., `OrderFill`, `Position`, `Instrument`) to maintain clear type identification. Shortcuts are primarily intended for local variables, parameters, properties, and non-class-level functions.
+
+**Note on Documentation & Comments**: Sanctioned shortcuts are strictly for code identifiers. Always use the **full term** in docstrings, code comments, and general documentation to ensure maximum readability for humans.
+
+| Full Term | Allowed Shortcut | Example Usage |
+| :--- | :--- | :--- |
+| `absolute` | `abs` | `abs_qty`, `abs_val` |
+| `quantity` | `qty` | `abs_qty`, `filled_qty`, `signed_qty` |
+| `datetime` | `dt` | `event_dt`, `submitted_dt`, `start_dt` |
+| `timestamp` | `ts` | `last_update_ts`, `event_ts` |
+| `average` | `avg` | `avg_price`, `avg_fill_price` |
+| `profit_and_loss` | `pnl` | `realized_pnl`, `unrealized_pnl` |
+| `maintenance_margin` | `maint_margin` | `maint_margin_required_change` |
 
 - **R-2.1.2** Functions/Methods: Use verbs describing the action
 - **R-2.1.3** Variables/Attributes: Use nouns describing the data
 - **R-2.1.4** Domain terms: Use consistently throughout codebase
 
 ```python
-# ✅ Good — descriptive, natural English
-def calculate_unrealized_pnl(position: Position, current_price: Decimal) -> Decimal: ...
+# ✅ Good — descriptive, using sanctioned shortcuts
+def compute_unrealized_pnl(position: Position, current_price: Decimal) -> Decimal: ...
 def list_open_orders(instrument: Instrument) -> list[Order]: ...
 
-# ❌ Bad — abbreviated, unclear
-def calc_pnl(pos, px): ...
-def get_ords(inst): ...
+# ❌ Bad — non-sanctioned abbreviations or full words where shortcuts exist
+def calculate_unrealized_profit_and_loss(...)  # Violation: use 'compute' and 'pnl'
+def get_ords(inst): ...                        # Violation: 'ords' and 'inst' are not sanctioned
 ```
 
 ## 2.2. Method Naming Patterns
@@ -225,10 +240,10 @@ def calculate_portfolio_value(positions: list) -> Decimal:
     """Calculates the total value of all positions in a portfolio.
 
     This sums the market value of each position based on current prices.
-    Positions with zero abs_quantity are excluded from the calculation.
+    Positions with zero abs_qty are excluded from the calculation.
 
     Args:
-        positions: List of Position objects with instrument and abs_quantity.
+        positions: List of Position objects with instrument and abs_qty.
 
     Returns:
         Total portfolio value as a Decimal.
@@ -305,9 +320,9 @@ initial = compute_initial_margin(order, price)
 
 ```python
 # ✅ Good — correct prefix usage
-# Precondition: $abs_quantity must be positive to submit order
-if order.abs_quantity <= 0:
-    raise ValueError(f"Cannot call `submit_order` because $abs_quantity ({order.abs_quantity}) <= 0")
+# Precondition: $abs_qty must be positive to submit order
+if order.abs_qty <= 0:
+    raise ValueError(f"Cannot call `submit_order` because $abs_qty ({order.abs_qty}) <= 0")
 
 # Guard: skip processing if no fills available
 if not fills:
@@ -315,7 +330,7 @@ if not fills:
 
 # ❌ Bad — wrong prefix (raises but uses Guard)
 # Guard: quantity must be positive
-if order.abs_quantity <= 0:
+if order.abs_qty <= 0:
     raise ValueError("Invalid quantity")
 
 # ❌ Bad — wrong prefix (returns but uses Precondition)
@@ -339,7 +354,7 @@ if order.instrument is None:
     raise ValueError("...")
 
 # Precondition: quantity must be positive
-if order.abs_quantity <= 0:
+if order.abs_qty <= 0:
     raise ValueError("...")
 
 # Now perform actions (empty line above separates guards from actions)
@@ -351,7 +366,7 @@ broker.submit(order)
 if order.instrument is None:
     raise ValueError("...")
 # Precondition: quantity must be positive
-if order.abs_quantity <= 0:
+if order.abs_qty <= 0:
     raise ValueError("...")
 self._orders[order.id] = order  # Action immediately after guard
 ```
@@ -399,10 +414,11 @@ def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> N
 ```
 
 **Validation guards with spacing:**
+
 ```python
-# Collect fills since last event and net the abs_quantity
+# Collect fills since last event and net the abs_qty
 fills = broker.get_fills_since(self._timeline_dt)
-abs_quantity = sum(f.abs_quantity for f in fills)
+abs_quantity = sum(f.abs_qty for f in fills)
 
 # Guard: skip if no quantity to trade
 if abs_quantity == 0:
@@ -429,8 +445,8 @@ self._last_order_time = now()
 
 ```python
 # ✅ Good — validates domain invariant (quantity sign)
-# Precondition: $abs_quantity must be positive
-if order.abs_quantity <= 0:
+# Precondition: $abs_qty must be positive
+if order.abs_qty <= 0:
     raise ValueError(f"...")
 
 # ❌ Bad — trivial type check (Python/mypy handles this)
@@ -503,8 +519,8 @@ logger.info("Started Strategy '%s'", strategy_name)
 
 ```python
 # ✅ Good — short message on single line
-if self.abs_quantity <= 0:
-    raise ValueError(f"Cannot call `_validate` because $abs_quantity ({self.abs_quantity}) is not positive")
+if self.abs_qty <= 0:
+    raise ValueError(f"Cannot call `_validate` because $abs_qty ({self.abs_qty}) is not positive")
 
 # ✅ Good — long message that truly doesn't fit uses continuation
 raise ValueError(
@@ -513,9 +529,9 @@ raise ValueError(
 )
 
 # ❌ Bad — short message unnecessarily wrapped
-if self.abs_quantity <= 0:
+if self.abs_qty <= 0:
     raise ValueError(
-        f"Cannot call `_validate` because $abs_quantity ({self.abs_quantity}) is not positive"
+        f"Cannot call `_validate` because $abs_qty ({self.abs_qty}) is not positive"
     )
 ```
 
@@ -739,11 +755,13 @@ def submit_order(self, order: Order) -> None:
 ```python
 # ✅ Good - using class name and datetime utils
 def __str__(self) -> str:
-    return f"{self.__class__.__name__}(id={self.id}, at={format_dt(self.timestamp)})"
+    return f"{self.__class__.__name__}(id={self.id}, at={format_dt(self.ts)})"
+
 
 def __str__(self) -> str:
     dt_str = format_range(self.start_dt, self.end_dt)
     return f"{self.__class__.__name__}(kind={self.kind}, range={dt_str})"
+
 
 # ❌ Bad - hardcoded class name
 def __str__(self) -> str:
