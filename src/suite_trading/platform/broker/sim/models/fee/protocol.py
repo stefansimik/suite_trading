@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, Protocol
+from typing import Protocol, Sequence
 
 from suite_trading.domain.order.orders import Order
 from suite_trading.domain.order.order_fill import OrderFill
@@ -15,26 +15,28 @@ class FeeModel(Protocol):
     """Domain interface for fee modeling used by the simulated broker.
 
     The fee is computed from primitive inputs so that `OrderFill` can be constructed with an
-    already-known $commission. We also pass $previous_order_fills so models can consider cumulative
-    activity (e.g., volume tiers, minimum tickets).
-
-    Args:
-        order: The Order associated with this order_fill.
-        proposed_fill: Pre-fee fill describing how much was filled and at what price.
-            The $timestamp is carried by the $proposed_fill.
-        previous_order_fills: All order fills recorded before this one for context; current
-            $order_fill is NOT included.
-
-    Returns:
-        Commission as Money in the appropriate currency.
+    already-known $commission.
     """
 
     def compute_commission(
         self,
         order: Order,
         proposed_fill: ProposedFill,
-        previous_order_fills: Iterable[OrderFill],
-    ) -> Money: ...
+        previous_order_fills: Sequence[OrderFill],
+    ) -> Money:
+        """Computes the commission for a single trade.
+
+        Args:
+            order: The order being filled. Use this to access instrument details or
+                other fills for this order.
+            proposed_fill: The trade price and quantity before fees are added.
+            previous_order_fills: The account's previous trades. Use this to handle
+                volume-based discounts.
+
+        Returns:
+            The commission amount as Money.
+        """
+        ...
 
 
 # endregion

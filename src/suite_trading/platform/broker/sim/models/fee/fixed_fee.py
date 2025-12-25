@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Sequence
 
 from suite_trading.domain.monetary.money import Money
 from suite_trading.domain.order.orders import Order
@@ -27,8 +27,20 @@ class FixedFeeModel(FeeModel):
         self,
         order: Order,
         proposed_fill: ProposedFill,
-        previous_order_fills: Iterable[OrderFill],
+        previous_order_fills: Sequence[OrderFill],
     ) -> Money:
+        """Computes the commission for a trade.
+
+        This model multiplies the fixed fee by the absolute number of units filled.
+
+        Args:
+            order: The order being filled.
+            proposed_fill: The trade price and quantity before fees are added.
+            previous_order_fills: The account's previous trades. Not used in this model.
+
+        Returns:
+            The commission amount as Money.
+        """
         signed_quantity = proposed_fill.signed_quantity
 
         # Precondition: ensure non-zero $signed_quantity

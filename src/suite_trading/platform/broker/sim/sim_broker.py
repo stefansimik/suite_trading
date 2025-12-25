@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Callable
+from typing import Callable, Sequence
 from decimal import Decimal
 import logging
 
@@ -566,7 +566,7 @@ class SimBroker(Broker, SimulatedBroker):
             proposed_fill=proposed_fill,
             order_book=order_book,
             signed_position_quantity=signed_position_quantity,
-            previous_order_fills=tuple(self._order_fill_history),
+            previous_order_fills=self._order_fill_history,
         )
 
         required_funds = initial_margin + commission
@@ -680,7 +680,7 @@ class SimBroker(Broker, SimulatedBroker):
                 proposed_fill=proposed_fill,
                 order_book=order_book,
                 signed_position_quantity=signed_position_quantity,
-                previous_order_fills=tuple(simulated_order_fill_history),
+                previous_order_fills=simulated_order_fill_history,
             )
 
             # COMPUTE: Total funds required upfront for this specific proposed fill
@@ -727,7 +727,7 @@ class SimBroker(Broker, SimulatedBroker):
         proposed_fill: ProposedFill,
         order_book: OrderBook,
         signed_position_quantity: Decimal,
-        previous_order_fills: tuple[OrderFill, ...],
+        previous_order_fills: Sequence[OrderFill],
     ) -> tuple[Money, Money, Money]:
         """Compute absolute commission and margins for a single $proposed_fill.
 
