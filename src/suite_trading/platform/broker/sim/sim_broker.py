@@ -541,13 +541,7 @@ class SimBroker(Broker, SimulatedBroker):
         signed_position_quantity_before = self.get_signed_position_quantity(instrument)
         maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_quantity_before)
 
-        commission, initial_margin, maintenance_margin_change = self._compute_commission_and_margin_changes(
-            proposed_fill=proposed_fill,
-            order=order,
-            signed_position_quantity_before=signed_position_quantity_before,
-            order_book=order_book,
-            previous_order_fills=self._order_fill_history,
-        )
+        commission, initial_margin, maintenance_margin_change = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
 
         required_upfront = initial_margin + commission
         currency = required_upfront.currency
@@ -650,13 +644,7 @@ class SimBroker(Broker, SimulatedBroker):
             # COMPUTE: Next state and required funding
             signed_position_quantity_after = signed_position_quantity_before + proposed_fill.signed_quantity
 
-            commission, initial_margin, maintenance_margin_change = self._compute_commission_and_margin_changes(
-                proposed_fill=proposed_fill,
-                order=order,
-                signed_position_quantity_before=signed_position_quantity_before,
-                order_book=order_book,
-                previous_order_fills=simulated_order_fill_history,
-            )
+            commission, initial_margin, maintenance_margin_change = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history)
 
             # COMPUTE: Total funds required upfront for this specific proposed fill
             required_upfront = initial_margin + commission
@@ -692,9 +680,9 @@ class SimBroker(Broker, SimulatedBroker):
     def _compute_commission_and_margin_changes(
         self,
         *,
+        signed_position_quantity_before: Decimal,
         proposed_fill: ProposedFill,
         order: Order,
-        signed_position_quantity_before: Decimal,
         order_book: OrderBook,
         previous_order_fills: Sequence[OrderFill],
     ) -> tuple[Money, Money, Money]:
@@ -706,9 +694,9 @@ class SimBroker(Broker, SimulatedBroker):
         ongoing maintenance margin requirement.
 
         Args:
+            signed_position_quantity_before: Net position signed quantity before applying the fill.
             proposed_fill: The specific fill being evaluated for its financial impact.
             order: The parent order that this fill belongs to.
-            signed_position_quantity_before: Net position signed quantity before applying the fill.
             order_book: Market snapshot used for pricing and margin calculations.
             previous_order_fills: Earlier fills for the same order, used for tiered commissions.
 
