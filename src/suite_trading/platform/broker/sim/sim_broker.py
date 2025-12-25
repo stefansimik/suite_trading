@@ -534,22 +534,13 @@ class SimBroker(Broker, SimulatedBroker):
 
         commission, initial_margin_delta, maintenance_margin_delta = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
 
-        upfront_funds_required = initial_margin_delta + commission
-        available_account_funds = self._account.get_funds(upfront_funds_required.currency)
-
         # DECIDE
-        # Check: ensure we have enough funds for initial margin and fees
-        has_enough_funds_for_upfront = self._account.has_enough_funds(upfront_funds_required)
+        # Peak requirement is the commission plus the maximum margin impact (initial or maintenance change)
+        peak_funds_required = max(initial_margin_delta, maintenance_margin_delta) + commission
 
-        # Check: if maintenance requirement increases, do we have the extra buffer available?
-        has_enough_funds_for_maintenance_increase = True
-        if maintenance_margin_delta.value > 0:
-            remaining_funds_after_upfront_costs = available_account_funds.value - upfront_funds_required.value
-            has_enough_funds_for_maintenance_increase = remaining_funds_after_upfront_costs >= maintenance_margin_delta.value
-
-        # Guard: handle insufficient funds by cancelling the order and returning early
-        if not has_enough_funds_for_upfront or not has_enough_funds_for_maintenance_increase:
-            self._handle_insufficient_funds_for_proposed_fill(order=order, proposed_fill=proposed_fill, commission=commission, initial_margin=initial_margin_delta, maintenance_margin_required_change=maintenance_margin_delta, order_book=order_book, available_funds=available_account_funds)
+        # Guard: ensure account has enough funds for the peak requirement
+        if not self._account.has_enough_funds(peak_funds_required):
+            self._handle_insufficient_funds_for_proposed_fill(order=order, proposed_fill=proposed_fill, commission=commission, initial_margin=initial_margin_delta, maintenance_margin_required_change=maintenance_margin_delta, order_book=order_book, available_funds=self._account.get_funds(commission.currency))
             return
 
         # ACT
@@ -619,25 +610,19 @@ class SimBroker(Broker, SimulatedBroker):
             # COMPUTE: Next state and required funding
             signed_position_quantity_after = signed_position_quantity_before + proposed_fill.signed_quantity
 
-            commission, initial_margin, maintenance_margin_required_change = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history)
+            commission, initial_margin_delta, maintenance_margin_delta = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history)
 
-            # COMPUTE: Total funds required upfront for this specific proposed fill
-            upfront_required = initial_margin + commission
-            currency = upfront_required.currency
-            available_funds = funds_by_currency.get(currency, Money(0, currency))
+            # DECIDE: Can we fund the peak usage for this specific proposed fill?
+            peak_funds_required = max(initial_margin_delta, maintenance_margin_delta) + commission
+            available_account_funds = funds_by_currency.get(peak_funds_required.currency, Money(0, peak_funds_required.currency))
 
-            # DECIDE: Can we fund the upfront costs?
-            if available_funds.value < upfront_required.value:
-                return False
-
-            # DECIDE: if maintenance requirement increases, do we have the extra buffer available?
-            if maintenance_margin_required_change.value > 0 and (available_funds.value - upfront_required.value) < maintenance_margin_required_change.value:
+            if available_account_funds < peak_funds_required:
                 return False
 
             # ACT (Simulated): Update tracking for the next proposed fill iteration
             # Subtract commission and adjust for maintenance margin change (increase reduces funds, decrease adds them back)
-            new_funds_value = available_funds.value - commission.value - maintenance_margin_required_change.value
-            funds_by_currency[currency] = Money(new_funds_value, currency)
+            new_funds_value = available_account_funds.value - commission.value - maintenance_margin_delta.value
+            funds_by_currency[peak_funds_required.currency] = Money(new_funds_value, peak_funds_required.currency)
 
             sim_order_fill = OrderFill(order=order, signed_quantity=proposed_fill.signed_quantity, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
             simulated_order_fill_history.append(sim_order_fill)
@@ -707,7 +692,7 @@ class SimBroker(Broker, SimulatedBroker):
         available_funds: Money,
     ) -> None:
         """Cancel $order and log a one-line message with all funding components."""
-        logger.error(f"Reject ProposedFill for Order '{order.id}': $initial_margin={initial_margin}, $commission={commission}, $maintenance_margin_required_change={maintenance_margin_required_change}, $upfront_required={initial_margin + commission}, $available_funds={available_funds}, $best_bid={order_book.best_bid.price}, $best_ask={order_book.best_ask.price}, $quantity={proposed_fill.signed_quantity}, $price={proposed_fill.price}, $timestamp={proposed_fill.timestamp}")
+        logger.error(f"Reject ProposedFill for Order '{order.id}': $initial_margin={initial_margin}, $commission={commission}, $maintenance_margin_required_change={maintenance_margin_required_change}, $peak_funds_required={max(initial_margin, maintenance_margin_required_change) + commission}, $available_funds={available_funds}, $best_bid={order_book.best_bid.price}, $best_ask={order_book.best_ask.price}, $quantity={proposed_fill.signed_quantity}, $price={proposed_fill.price}, $timestamp={proposed_fill.timestamp}")
 
         self._apply_order_action(order, OrderAction.CANCEL)
         self._apply_order_action(order, OrderAction.ACCEPT)
