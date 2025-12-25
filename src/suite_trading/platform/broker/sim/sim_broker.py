@@ -375,7 +375,7 @@ class SimBroker(Broker, SimulatedBroker):
         # Store OrderBook
         self._latest_order_book_by_instrument[instrument] = customized_order_book
 
-        # Single pass per order: trigger stop-like orders, then simulate fills if fillable
+        # Process orders for this instrument
         orders_for_instrument = [order for order in self._orders_by_id.values() if order.instrument == instrument]
         for order in orders_for_instrument:
             self._match_order_against_order_book(order, customized_order_book)
@@ -466,7 +466,7 @@ class SimBroker(Broker, SimulatedBroker):
         # ACT
         # Apply fills
         for proposed_fill in proposed_fills:
-            self._process_proposed_fill(order, proposed_fill, order_book)
+            self._process_proposed_fill(proposed_fill, order, order_book)
 
             # Check: stop if the order was terminalized
             if order.state_category == OrderStateCategory.TERMINAL:
@@ -509,25 +509,16 @@ class SimBroker(Broker, SimulatedBroker):
 
     def _process_proposed_fill(
         self,
-        order: Order,
         proposed_fill: ProposedFill,
+        order: Order,
         order_book: OrderBook,
     ) -> None:
-        """Apply a single $proposed_fill to $order using the broker's OrderBook.
+        """Applies a single $proposed_fill to $order using the broker's OrderBook.
 
-        Workflow visualization:
-        _process_proposed_fill(order, proposed_fill, order_book)
-        ├── [VALIDATE] Check instrument match
-        ├── [COMPUTE]
-        │   ├── signed_position_quantity_before, maintenance_margin_before
-        │   ├── commission, initial_margin, maintenance_margin_required_change = _compute_commission_and_margin_changes(...)
-        │   └── funds_now = get_funds(...)
-        ├── [DECIDE] IF not has_enough_funds(...): handle insufficient funds
-        └── [ACT]
-            ├── maintenance_margin_after = maintenance_margin_before + maintenance_margin_required_change
-            ├── order_fill = _commit_proposed_fill_and_accounting(...)
-            ├── publish order fill callback
-            └── _handle_order_update(order)
+        Args:
+            proposed_fill: The specific fill to be applied to the order.
+            order: The target Order that receives the fill.
+            order_book: Market context used for final pricing and margin calculations.
         """
         instrument = order_book.instrument
 
@@ -543,44 +534,29 @@ class SimBroker(Broker, SimulatedBroker):
 
         commission, initial_margin_delta, maintenance_margin_delta = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
 
-        required_upfront = initial_margin_delta + commission
-        currency = required_upfront.currency
-        funds_now = self._account.get_funds(currency)
+        upfront_funds_required = initial_margin_delta + commission
+        available_account_funds = self._account.get_funds(upfront_funds_required.currency)
 
         # DECIDE
         # Check: ensure we have enough funds for initial margin and fees
-        has_enough_upfront = self._account.has_enough_funds(required_upfront)
+        has_enough_funds_for_upfront = self._account.has_enough_funds(upfront_funds_required)
 
         # Check: if maintenance requirement increases, do we have the extra buffer available?
-        has_enough_for_maintenance_increase = True
+        has_enough_funds_for_maintenance_increase = True
         if maintenance_margin_delta.value > 0:
-            funds_available_after_upfront = funds_now.value - required_upfront.value
-            has_enough_for_maintenance_increase = funds_available_after_upfront >= maintenance_margin_delta.value
+            remaining_funds_after_upfront_costs = available_account_funds.value - upfront_funds_required.value
+            has_enough_funds_for_maintenance_increase = remaining_funds_after_upfront_costs >= maintenance_margin_delta.value
 
-        if not has_enough_upfront or not has_enough_for_maintenance_increase:
-            self._handle_insufficient_funds_for_proposed_fill(
-                order=order,
-                proposed_fill=proposed_fill,
-                commission=commission,
-                initial_margin=initial_margin_delta,
-                maintenance_margin_required_change=maintenance_margin_delta,
-                order_book=order_book,
-                funds_now=funds_now,
-            )
+        # Guard: handle insufficient funds by cancelling the order and returning early
+        if not has_enough_funds_for_upfront or not has_enough_funds_for_maintenance_increase:
+            self._handle_insufficient_funds_for_proposed_fill(order=order, proposed_fill=proposed_fill, commission=commission, initial_margin=initial_margin_delta, maintenance_margin_required_change=maintenance_margin_delta, order_book=order_book, available_funds=available_account_funds)
             return
 
         # ACT
         # Derived values for state commitment
         maintenance_margin_after = maintenance_margin_before + maintenance_margin_delta
 
-        order_fill = self._commit_proposed_fill_and_accounting(
-            order=order,
-            proposed_fill=proposed_fill,
-            instrument=instrument,
-            commission=commission,
-            initial_margin=initial_margin_delta,
-            maintenance_margin_after=maintenance_margin_after,
-        )
+        order_fill = self._commit_proposed_fill_and_accounting(order=order, proposed_fill=proposed_fill, instrument=instrument, commission=commission, initial_margin=initial_margin_delta, maintenance_margin_after=maintenance_margin_after)
 
         self._handle_order_fill(order_fill)
         self._handle_order_update(order)
@@ -633,8 +609,7 @@ class SimBroker(Broker, SimulatedBroker):
     ) -> bool:
         """Evaluate if the account has enough funds for margins and fees for all $proposed_fills (dry-run)."""
         # INITIALIZE STATE
-        instrument = order_book.instrument
-        signed_position_quantity_before = self.get_signed_position_quantity(instrument)
+        signed_position_quantity_before = self.get_signed_position_quantity(order_book.instrument)
 
         simulated_order_fill_history = list(self._order_fill_history)
         funds_by_currency = {curr: money for curr, money in self._account.list_funds_by_currency()}
@@ -644,24 +619,24 @@ class SimBroker(Broker, SimulatedBroker):
             # COMPUTE: Next state and required funding
             signed_position_quantity_after = signed_position_quantity_before + proposed_fill.signed_quantity
 
-            commission, initial_margin_delta, maintenance_margin_delta = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history)
+            commission, initial_margin, maintenance_margin_required_change = self._compute_commission_and_margin_changes(signed_position_quantity_before=signed_position_quantity_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history)
 
             # COMPUTE: Total funds required upfront for this specific proposed fill
-            required_upfront = initial_margin_delta + commission
-            currency = required_upfront.currency
-            funds = funds_by_currency.get(currency, Money(0, currency))
+            upfront_required = initial_margin + commission
+            currency = upfront_required.currency
+            available_funds = funds_by_currency.get(currency, Money(0, currency))
 
             # DECIDE: Can we fund the upfront costs?
-            if funds.value < required_upfront.value:
+            if available_funds.value < upfront_required.value:
                 return False
 
             # DECIDE: if maintenance requirement increases, do we have the extra buffer available?
-            if maintenance_margin_delta.value > 0 and (funds.value - required_upfront.value) < maintenance_margin_delta.value:
+            if maintenance_margin_required_change.value > 0 and (available_funds.value - upfront_required.value) < maintenance_margin_required_change.value:
                 return False
 
             # ACT (Simulated): Update tracking for the next proposed fill iteration
             # Subtract commission and adjust for maintenance margin change (increase reduces funds, decrease adds them back)
-            new_funds_value = funds.value - commission.value - maintenance_margin_delta.value
+            new_funds_value = available_funds.value - commission.value - maintenance_margin_required_change.value
             funds_by_currency[currency] = Money(new_funds_value, currency)
 
             sim_order_fill = OrderFill(order=order, signed_quantity=proposed_fill.signed_quantity, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
@@ -701,16 +676,17 @@ class SimBroker(Broker, SimulatedBroker):
         """
         # Pre-calculate values
         signed_position_quantity_after = signed_position_quantity_before + proposed_fill.signed_quantity
-        abs_position_quantity_delta = max(Decimal("0"), abs(signed_position_quantity_after) - abs(signed_position_quantity_before))
-        signed_position_quantity_delta = abs_position_quantity_delta if proposed_fill.signed_quantity > 0 else -abs_position_quantity_delta
+        absolute_position_quantity_change = max(Decimal("0"), abs(signed_position_quantity_after) - abs(signed_position_quantity_before))
+        signed_position_quantity_change = absolute_position_quantity_change if proposed_fill.signed_quantity > 0 else -absolute_position_quantity_change
 
-        # 1. COMPUTE: Comission
+        # 1. COMPUTE: Commission
         commission = self._fee_model.compute_commission(proposed_fill=proposed_fill, order=order, previous_order_fills=previous_order_fills)
 
         # 2. COMPUTE: Initial margin
+        # Note: Technically `initial margin delta` is the same as `initial margin` as it is always applied only to new increased part of the position
         initial_margin_delta = Money(0, commission.currency)
-        if abs_position_quantity_delta > 0:
-            initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_position_quantity_delta)
+        if absolute_position_quantity_change > 0:
+            initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_position_quantity_change)
 
         # 3. COMPUTE: Maintenance margin
         maintenance_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_quantity_before)
@@ -728,15 +704,10 @@ class SimBroker(Broker, SimulatedBroker):
         initial_margin: Money,
         maintenance_margin_required_change: Money,
         order_book: OrderBook,
-        funds_now: Money,
+        available_funds: Money,
     ) -> None:
         """Cancel $order and log a one-line message with all funding components."""
-        best_bid = order_book.best_bid.price
-        best_ask = order_book.best_ask.price
-
-        required_upfront = initial_margin + commission
-
-        logger.error(f"Reject ProposedFill for Order '{order.id}': initial_margin={initial_margin}, commission={commission}, maintenance_margin_required_change={maintenance_margin_required_change}, required_upfront={required_upfront}, funds_now={funds_now}, best_bid={best_bid}, best_ask={best_ask}, quantity={proposed_fill.signed_quantity}, price={proposed_fill.price}, ts={proposed_fill.timestamp}")
+        logger.error(f"Reject ProposedFill for Order '{order.id}': $initial_margin={initial_margin}, $commission={commission}, $maintenance_margin_required_change={maintenance_margin_required_change}, $upfront_required={initial_margin + commission}, $available_funds={available_funds}, $best_bid={order_book.best_bid.price}, $best_ask={order_book.best_ask.price}, $quantity={proposed_fill.signed_quantity}, $price={proposed_fill.price}, $timestamp={proposed_fill.timestamp}")
 
         self._apply_order_action(order, OrderAction.CANCEL)
         self._apply_order_action(order, OrderAction.ACCEPT)
@@ -748,10 +719,8 @@ class SimBroker(Broker, SimulatedBroker):
         not to the `Order` object, then updates the per-instrument Position to reflect the new
         absolute_quantity and average price.
         """
-        order = order_fill.order
-        instrument = order.instrument
+        instrument = order_fill.order.instrument
         trade_price: Decimal = Decimal(order_fill.price)
-        signed_quantity: Decimal = order_fill.signed_quantity
 
         # Record order_fill to history
         self._order_fill_history.append(order_fill)
@@ -761,7 +730,7 @@ class SimBroker(Broker, SimulatedBroker):
         previous_signed_quantity: Decimal = Decimal("0") if previous_position is None else previous_position.signed_quantity
         previous_average_price: Decimal = Decimal("0") if previous_position is None else previous_position.average_price
 
-        new_signed_quantity, new_average_price = self._compute_new_position_after_trade(previous_signed_quantity=previous_signed_quantity, previous_average_price=previous_average_price, signed_quantity=signed_quantity, trade_price=trade_price)
+        new_signed_quantity, new_average_price = self._compute_new_position_after_trade(previous_signed_quantity=previous_signed_quantity, previous_average_price=previous_average_price, signed_quantity=order_fill.signed_quantity, trade_price=trade_price)
 
         if new_signed_quantity == 0:
             # Flat after this trade → drop stored position to keep list_open_positions() minimal
@@ -779,7 +748,7 @@ class SimBroker(Broker, SimulatedBroker):
                 last_update=order_fill.timestamp,
             )
 
-        logger.debug(f"Appended order_fill to history and updated Position for Instrument '{instrument}' (class {self.__class__.__name__}): prev_quantity={previous_signed_quantity}, new_quantity={new_signed_quantity}, trade_price={trade_price}")
+        logger.debug(f"Appended OrderFill to history and updated Position for Instrument '{instrument}' (class {self.__class__.__name__}): $previous_signed_quantity={previous_signed_quantity}, $new_signed_quantity={new_signed_quantity}, $trade_price={trade_price}")
 
     @staticmethod
     def _compute_new_position_after_trade(
