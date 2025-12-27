@@ -532,7 +532,7 @@ class SimBroker(Broker, SimulatedBroker):
         # DECIDE
         # Skip: reject proposed fill when available funds do not cover the peak requirement
         if not self._account.has_enough_funds(peak_funds_required):
-            self._handle_insufficient_funds_for_proposed_fill(order=order, proposed_fill=proposed_fill, commission=commission, initial_margin=initial_margin_delta, maint_margin_required_change=maint_margin_delta, order_book=order_book, available_funds=self._account.get_funds(commission.currency))
+            self._handle_insufficient_funds_for_proposed_fill(order=order, proposed_fill=proposed_fill, commission=commission, initial_margin=initial_margin_delta, maint_margin_required_change=maint_margin_delta, peak_funds_required=peak_funds_required, order_book=order_book, available_funds=self._account.get_funds(commission.currency))
             return
 
         # ACT
@@ -617,7 +617,12 @@ class SimBroker(Broker, SimulatedBroker):
         maint_margin_after = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_after)
         maint_margin_delta = maint_margin_after - maint_margin_before
 
-        peak_funds_required = self._compute_peak_funds_required(commission=commission, initial_margin_delta=initial_margin_delta, maint_margin_delta=maint_margin_delta)
+        # Raise: peak-funding calculation assumes a single currency
+        if commission.currency != initial_margin_delta.currency or commission.currency != maint_margin_delta.currency:
+            raise ValueError(f"Cannot call `_compute_funding_requirements_for_proposed_fill` because currencies differ: $commission={commission}, $initial_margin_delta={initial_margin_delta}, $maint_margin_delta={maint_margin_delta}")
+
+        peak_margin_delta = max(initial_margin_delta, maint_margin_delta)
+        peak_funds_required = peak_margin_delta + commission
 
         result = commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required
         return result
@@ -659,41 +664,6 @@ class SimBroker(Broker, SimulatedBroker):
 
         return True
 
-    def _compute_peak_funds_required(
-        self,
-        *,
-        commission: Money,
-        initial_margin_delta: Money,
-        maint_margin_delta: Money,
-    ) -> Money:
-        """Compute the peak incremental funds required for a proposed fill.
-
-        The broker must be able to cover commission and whichever margin increase is larger.
-
-        Policy:
-            - Initial margin is blocked temporarily during fill processing and then released.
-            - Maintenance margin change adjusts the ongoing blocked amount.
-            - The peak incremental requirement is therefore the maximum of the two deltas, plus commission.
-
-        Args:
-            commission: Commission charged for the fill.
-            initial_margin_delta: Initial margin change for the fill.
-            maint_margin_delta: Maintenance margin change for the fill.
-
-        Returns:
-            Money: Peak incremental funds required, in the same currency as inputs.
-
-        Raises:
-            ValueError: If the provided Money values are not in the same currency.
-        """
-        # Raise: peak-funding calculation assumes a single currency
-        if commission.currency != initial_margin_delta.currency or commission.currency != maint_margin_delta.currency:
-            raise ValueError(f"Cannot call `_compute_peak_funds_required` because currencies differ: $commission={commission}, $initial_margin_delta={initial_margin_delta}, $maint_margin_delta={maint_margin_delta}")
-
-        peak_margin_delta = max(initial_margin_delta, maint_margin_delta)
-        result = peak_margin_delta + commission
-        return result
-
     def _handle_insufficient_funds_for_proposed_fill(
         self,
         *,
@@ -702,11 +672,11 @@ class SimBroker(Broker, SimulatedBroker):
         commission: Money,
         initial_margin: Money,
         maint_margin_required_change: Money,
+        peak_funds_required: Money,
         order_book: OrderBook,
         available_funds: Money,
     ) -> None:
         """Cancel $order and log a one-line message with all funding components."""
-        peak_funds_required = self._compute_peak_funds_required(commission=commission, initial_margin_delta=initial_margin, maint_margin_delta=maint_margin_required_change)
         logger.error(f"Reject ProposedFill for Order '{order.id}': $initial_margin={initial_margin}, $commission={commission}, $maint_margin_required_change={maint_margin_required_change}, $peak_funds_required={peak_funds_required}, $available_funds={available_funds}, $best_bid={order_book.best_bid.price}, $best_ask={order_book.best_ask.price}, $proposed_fill.signed_qty={proposed_fill.signed_qty}, $price={proposed_fill.price}, $proposed_fill.timestamp={proposed_fill.timestamp}")
 
         self._apply_order_action(order, OrderAction.CANCEL)
