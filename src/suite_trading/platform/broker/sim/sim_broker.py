@@ -528,15 +528,22 @@ class SimBroker(Broker, SimulatedBroker):
         # COMPUTE
         signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
         commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required = self._compute_funding_requirements_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
+        available_funds = self._account.get_funds(peak_funds_required.currency)
 
         # DECIDE
-        # Skip: reject proposed fill when available funds do not cover the peak requirement
-        if not self._account.has_enough_funds(peak_funds_required):
-            self._handle_insufficient_funds_for_proposed_fill(order=order, proposed_fill=proposed_fill, commission=commission, initial_margin=initial_margin_delta, maint_margin_required_change=maint_margin_delta, peak_funds_required=peak_funds_required, order_book=order_book, available_funds=self._account.get_funds(commission.currency))
-            return
+        has_enough_funds = available_funds >= peak_funds_required
 
         # ACT
+        if not has_enough_funds:
+            # Cancel order
+            logger.error(f"Reject ProposedFill for Order '{order.id}': $available_funds={available_funds}, $peak_funds_required={peak_funds_required}, $commission={commission}, $initial_margin_delta={initial_margin_delta}, $maint_margin_delta={maint_margin_delta}, $best_bid={order_book.best_bid.price}, $best_ask={order_book.best_ask.price}, $proposed_fill.signed_qty={proposed_fill.signed_qty}, $price={proposed_fill.price}, $proposed_fill.timestamp={proposed_fill.timestamp}")
+            self._apply_order_action(order, OrderAction.CANCEL)
+            self._apply_order_action(order, OrderAction.ACCEPT)
+            return
+
+        # Commit proposed fill
         order_fill = self._commit_proposed_fill_and_accounting(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maint_margin_after=maint_margin_after)
+        # Publish order-fill + order-update
         self._handle_order_fill(order_fill)
         self._handle_order_update(order)
 
@@ -663,24 +670,6 @@ class SimBroker(Broker, SimulatedBroker):
             signed_position_qty_before = signed_position_qty_after
 
         return True
-
-    def _handle_insufficient_funds_for_proposed_fill(
-        self,
-        *,
-        order: Order,
-        proposed_fill: ProposedFill,
-        commission: Money,
-        initial_margin: Money,
-        maint_margin_required_change: Money,
-        peak_funds_required: Money,
-        order_book: OrderBook,
-        available_funds: Money,
-    ) -> None:
-        """Cancel $order and log a one-line message with all funding components."""
-        logger.error(f"Reject ProposedFill for Order '{order.id}': $initial_margin={initial_margin}, $commission={commission}, $maint_margin_required_change={maint_margin_required_change}, $peak_funds_required={peak_funds_required}, $available_funds={available_funds}, $best_bid={order_book.best_bid.price}, $best_ask={order_book.best_ask.price}, $proposed_fill.signed_qty={proposed_fill.signed_qty}, $price={proposed_fill.price}, $proposed_fill.timestamp={proposed_fill.timestamp}")
-
-        self._apply_order_action(order, OrderAction.CANCEL)
-        self._apply_order_action(order, OrderAction.ACCEPT)
 
     def _append_order_fill_to_history_and_update_position(self, order_fill: OrderFill) -> None:
         """Append $order_fill to order fill history and update Position.

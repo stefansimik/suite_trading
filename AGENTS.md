@@ -588,16 +588,25 @@ return None
 **R-4.5.1** Apply this structure to any logic with non-trivial complexity (functions, pipelines, loops, or multi-step handlers).
 It ensures the implementation is predictable and testable by separating pure derivations from side effects.
 
+**R-4.5.1a Side effects definition:** A "side effect" is any observable I/O or state mutation, including: `logger.*(...)`,
+publishing callbacks/events, changing broker/account/order state, writing files/network, or mutating shared caches.
+
+**R-4.5.1b Read-only query rule:** Read-only queries (typical shapes: `get_*`, `list_*`, `has_*`, `is_*`) may be used in
+`Compute` when needed to build decision metrics. Do not introduce new reads in `Decide`; `Decide` should consume values already
+computed.
+
 **Standard stages (top-to-bottom):**
 - **R-4.5.2 `Validate`**: Only guards and early exits.
   - Allowed: `raise`, early `return`/`continue` for non-error skips, cheap domain invariants and cross-object preconditions
   - Forbidden: logging, mutation, I/O, broker calls, or computing intermediate/decision values for later stages
 - **R-4.5.3 `Compute`**: Only pure, deterministic derivations.
-  - Allowed: calculations and transformations, calling pure pricing/margin/fee logic, building decision metrics compared in `Decide`, precomputing "after" values
-  - Forbidden: path-choosing branching, mutation, logging, I/O, publishing events, or broker/account/order state changes
+  - Allowed: calculations and transformations, calling pure pricing/margin/fee logic, building decision metrics compared in `Decide`,
+    precomputing "after" values, and read-only state queries needed to build decision metrics
+  - Forbidden: path-choosing branching, mutation, logging, I/O, publishing events, or changing broker/account/order state
 - **R-4.5.4 `Decide`**: Only branching and plan selection.
-  - Allowed: `if/elif/else`, early returns, building intent/plan objects and action lists based on computed values
-  - Forbidden: arithmetic/metric construction (decision metrics must come from `Compute`), mutation, logging, I/O, or emitting events
+  - Allowed: assigning `decision_*` variables, building intent/plan objects and action lists based on computed values
+  - Forbidden: arithmetic/metric construction (decision metrics must come from `Compute`), mutation, logging, I/O, emitting events,
+    or introducing new state reads
 - **R-4.5.5 `Act`**: Only side effects.
   - Allowed: mutating domain state, calling side-effectful APIs (broker/account/order), logging, publishing callbacks/events
   - Forbidden: introducing new high-level decisions or complex calculations that determine whether we should act
@@ -626,12 +635,12 @@ _apply_proposed_fill_if_fundable(order, proposed_fill, order_book)
 ├── [COMPUTE]
 │   ├── signed_position_quantity_before
 │   ├── commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required = _compute_funding_requirements_for_proposed_fill(...)
-│   └── peak_funds_required = max(initial_margin_delta, maint_margin_delta) + commission
-├── [DECIDE] IF not has_enough_funds(peak_funds_required): handle insufficient funds
+│   ├── available_funds = account.get_funds(peak_funds_required.currency)
+│   └── has_enough_funds = available_funds >= peak_funds_required
+├── [DECIDE] decision_has_enough_funds = has_enough_funds
 └── [ACT]
-    ├── order_fill = _commit_proposed_fill_and_accounting(...)
-    ├── publish order fill callback
-    └── _handle_order_update(order)
+    ├── IF not decision_has_enough_funds: log + cancel order
+    └── ELSE: commit fill + publish callbacks
 ```
 
 **Strictness Rules (to prevent step drift):**
@@ -639,6 +648,9 @@ _apply_proposed_fill_if_fundable(order, proposed_fill, order_book)
 - **R-4.5.10 Policy formula rule**: If a formula encodes a domain policy (not just arithmetic), keep it in `Compute` and document the assumption next to the formula
 - **R-4.5.11 Extraction threshold**: If the same policy formula appears in 2+ locations, extract a helper (single source of truth)
 - **R-4.5.12 Quick classifier**: `raise`/skip-return → `Validate`, path-choosing branch → `Decide`, mutation/logging/I/O → `Act`, everything else → `Compute`
+
+- **R-4.5.13 Decision-variable pattern**: When both outcomes execute side effects, keep `Decide` as assignments only (e.g.,
+  `decision_has_enough_funds = has_enough_funds`). Put the `if decision_*:` branch that selects the side-effect path in `Act`.
 
 **Acceptance checks:**
 - [ ] R-4.5.1: Logic reads top-to-bottom as: `Validate` → [`Compute` → `Decide`] → `Act`
