@@ -525,15 +525,11 @@ class SimBroker(Broker, SimulatedBroker):
         if order.instrument != order_book.instrument:
             raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
-        # COMPUTE: Reusable values
-        # We compute 'before' state to derive final 'after' state later in the ACT stage
+        # COMPUTE
         signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
         maint_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_before)
-
         commission, initial_margin_delta, maint_margin_delta = self._compute_commission_and_margin_changes(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
-
-        # Peak requirement is the commission + highest margin.
-        # Policy: initial margin is blocked temporarily and then released; maintenance margin persists.
+        maint_margin_after = maint_margin_before + maint_margin_delta
         peak_funds_required = self._compute_peak_funds_required(commission=commission, initial_margin_delta=initial_margin_delta, maint_margin_delta=maint_margin_delta)
 
         # DECIDE
@@ -543,11 +539,7 @@ class SimBroker(Broker, SimulatedBroker):
             return
 
         # ACT
-        # Derived values for state commitment
-        maint_margin_after = maint_margin_before + maint_margin_delta
-
         order_fill = self._commit_proposed_fill_and_accounting(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maint_margin_after=maint_margin_after)
-
         self._handle_order_fill(order_fill)
         self._handle_order_update(order)
 
