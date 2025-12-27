@@ -466,7 +466,7 @@ class SimBroker(Broker, SimulatedBroker):
         # ACT
         # Apply fills
         for proposed_fill in proposed_fills:
-            self._process_proposed_fill(proposed_fill, order, order_book)
+            self._apply_proposed_fill_if_fundable(proposed_fill, order, order_book)
 
             # Skip: stop once the order was terminalized
             if order.state_category == OrderStateCategory.TERMINAL:
@@ -507,7 +507,7 @@ class SimBroker(Broker, SimulatedBroker):
         # Default: Fill all available liquidity (do not expire unfilled part)
         return proposed_fills, False
 
-    def _process_proposed_fill(
+    def _apply_proposed_fill_if_fundable(
         self,
         proposed_fill: ProposedFill,
         order: Order,
@@ -523,14 +523,11 @@ class SimBroker(Broker, SimulatedBroker):
         # VALIDATE
         # Raise: ensure $order.instrument matches $order_book.instrument for pricing and margin
         if order.instrument != order_book.instrument:
-            raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
+            raise ValueError(f"Cannot call `_apply_proposed_fill_if_fundable` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
         # COMPUTE
         signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
-        maint_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_before)
-        commission, initial_margin_delta, maint_margin_delta = self._compute_commission_and_margin_changes(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
-        maint_margin_after = maint_margin_before + maint_margin_delta
-        peak_funds_required = self._compute_peak_funds_required(commission=commission, initial_margin_delta=initial_margin_delta, maint_margin_delta=maint_margin_delta)
+        commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required = self._compute_funding_requirements_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
 
         # DECIDE
         # Skip: reject proposed fill when available funds do not cover the peak requirement
@@ -583,6 +580,48 @@ class SimBroker(Broker, SimulatedBroker):
 
     # FUNDS-CENTRIC VALIDATION
 
+    def _compute_funding_requirements_for_proposed_fill(
+        self,
+        *,
+        signed_position_qty_before: Decimal,
+        proposed_fill: ProposedFill,
+        order: Order,
+        order_book: OrderBook,
+        previous_order_fills: Sequence[OrderFill],
+    ) -> tuple[Money, Money, Money, Money, Money]:
+        """Compute all funding numbers needed to decide and apply one proposed fill.
+
+        This helper is intentionally pure: it does not mutate broker, account, or order state.
+
+        Args:
+            signed_position_qty_before: Net position signed quantity before applying the fill.
+            proposed_fill: The fill being evaluated.
+            order: The parent Order that this fill belongs to.
+            order_book: Market snapshot used for pricing and margin calculations.
+            previous_order_fills: Earlier fills for the same order, used for tiered commissions.
+
+        Returns:
+            Tuple of (commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required).
+        """
+        signed_position_qty_after = signed_position_qty_before + proposed_fill.signed_qty
+        abs_position_qty_change = max(Decimal("0"), abs(signed_position_qty_after) - abs(signed_position_qty_before))
+
+        commission = self._fee_model.compute_commission(proposed_fill=proposed_fill, order=order, previous_order_fills=previous_order_fills)
+
+        initial_margin_delta = Money(0, commission.currency)
+        if abs_position_qty_change > 0:
+            signed_position_qty_change = abs_position_qty_change if proposed_fill.signed_qty > 0 else -abs_position_qty_change
+            initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_position_qty_change)
+
+        maint_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_before)
+        maint_margin_after = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_after)
+        maint_margin_delta = maint_margin_after - maint_margin_before
+
+        peak_funds_required = self._compute_peak_funds_required(commission=commission, initial_margin_delta=initial_margin_delta, maint_margin_delta=maint_margin_delta)
+
+        result = commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required
+        return result
+
     def _has_enough_funds_for_proposed_fills(
         self,
         order: Order,
@@ -601,9 +640,7 @@ class SimBroker(Broker, SimulatedBroker):
             # COMPUTE: Next state and required funding
             signed_position_qty_after = signed_position_qty_before + proposed_fill.signed_qty
 
-            commission, initial_margin_delta, maint_margin_delta = self._compute_commission_and_margin_changes(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history)
-
-            peak_funds_required = self._compute_peak_funds_required(commission=commission, initial_margin_delta=initial_margin_delta, maint_margin_delta=maint_margin_delta)
+            commission, initial_margin_delta, maint_margin_delta, _maint_margin_after, peak_funds_required = self._compute_funding_requirements_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history)
 
             # DECIDE: Can we fund the peak usage for this specific proposed fill?
             available_account_funds = funds_by_currency.get(peak_funds_required.currency, Money(0, peak_funds_required.currency))
@@ -621,56 +658,6 @@ class SimBroker(Broker, SimulatedBroker):
             signed_position_qty_before = signed_position_qty_after
 
         return True
-
-    def _compute_commission_and_margin_changes(
-        self,
-        *,
-        signed_position_qty_before: Decimal,
-        proposed_fill: ProposedFill,
-        order: Order,
-        order_book: OrderBook,
-        previous_order_fills: Sequence[OrderFill],
-    ) -> tuple[Money, Money, Money]:
-        """Calculates the financial impact (changes) caused by a single proposed fill.
-
-        This determines how much the broker will charge for the $proposed_fill and how it
-        impacts margin requirements. It treats the fill as an incremental event that
-        triggers a commission, an upfront initial margin block, and a change in the
-        ongoing maintenance margin requirement.
-
-        Args:
-            signed_position_qty_before: Net position signed quantity before applying the fill.
-            proposed_fill: The specific fill being evaluated for its financial impact.
-            order: The parent order that this fill belongs to.
-            order_book: Market snapshot used for pricing and margin calculations.
-            previous_order_fills: Earlier fills for the same order, used for tiered commissions.
-
-        Returns:
-            A tuple of changes:
-            - commission: The fee charged for this specific fill.
-            - initial_margin: Incremental initial margin to block (only if absolute position increases).
-            - maintenance_margin_required_change: Difference between maintenance margin after and before the fill.
-        """
-        # Pre-calculate values
-        signed_position_qty_after = signed_position_qty_before + proposed_fill.signed_qty
-        abs_position_qty_change = max(Decimal("0"), abs(signed_position_qty_after) - abs(signed_position_qty_before))
-        signed_position_qty_change = abs_position_qty_change if proposed_fill.signed_qty > 0 else -abs_position_qty_change
-
-        # 1. COMPUTE: Commission
-        commission = self._fee_model.compute_commission(proposed_fill=proposed_fill, order=order, previous_order_fills=previous_order_fills)
-
-        # 2. COMPUTE: Initial margin
-        # Note: Technically `initial margin delta` is the same as `initial margin` as it is always applied only to new increased part of the position and not to the full whole position
-        initial_margin_delta = Money(0, commission.currency)
-        if abs_position_qty_change > 0:
-            initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_position_qty_change)
-
-        # 3. COMPUTE: Maintenance margin
-        maint_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_before)
-        maint_margin_after = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_after)
-        maint_margin_delta = maint_margin_after - maint_margin_before
-
-        return commission, initial_margin_delta, maint_margin_delta
 
     def _compute_peak_funds_required(
         self,

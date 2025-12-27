@@ -621,12 +621,12 @@ function_name(...)
 
 **Example:**
 ```text
-_process_proposed_fill(order, proposed_fill, order_book)
+_apply_proposed_fill_if_fundable(order, proposed_fill, order_book)
 ├── [VALIDATE] Check instrument match
 ├── [COMPUTE]
-│   ├── signed_position_quantity_before, maintenance_margin_before
-│   ├── commission, initial_margin, maintenance_margin_change = _compute_commission_and_margin_changes(...)
-│   └── peak_funds_required = max(initial_margin, maintenance_margin_change) + commission
+│   ├── signed_position_quantity_before
+│   ├── commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required = _compute_funding_requirements_for_proposed_fill(...)
+│   └── peak_funds_required = max(initial_margin_delta, maint_margin_delta) + commission
 ├── [DECIDE] IF not has_enough_funds(peak_funds_required): handle insufficient funds
 └── [ACT]
     ├── order_fill = _commit_proposed_fill_and_accounting(...)
