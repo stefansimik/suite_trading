@@ -312,30 +312,38 @@ initial = compute_initial_margin(order, price)
 
 ### Validation Guards
 
-**Terminology:** Use "Precondition" for guards that raise exceptions, "Guard" for guards that return early or skip.
+**Terminology:** Use outcome-first prefixes: "Raise" for raising validations, "Skip" for non-error early exits.
 
-- **R-4.2.14** Use **`# Precondition:`** prefix for validation guards that raise an exception if the condition is not met
-- **R-4.2.15** Use **`# Guard:`** prefix for validation guards where no exception is raised (e.g., early return, continue, or log and skip)
-- **R-4.2.16** Place **immediately above** validation code
-- **R-4.2.17** Explain what condition is validated and why it matters
+- **R-4.2.14** Use **`# Raise:`** prefix **only** immediately above a validation guard that raises an exception
+- **R-4.2.15** Use **`# Skip:`** prefix **only** immediately above a normal early-exit branch (`return` / `continue`) where it is not an error
+- **R-4.2.16** Place **immediately above** the validation / early-exit statement
+- **R-4.2.17** Explain what condition is validated or why we skip, and why it matters. Do not use legacy guard prefixes such as `Precondition`, `Guard`, or `Check`.
 
 ```python
 # ✅ Good — correct prefix usage
-# Precondition: $abs_qty must be positive to submit order
+# Raise: $abs_qty must be positive to submit order
 if order.abs_qty <= 0:
     raise ValueError(f"Cannot call `submit_order` because $abs_qty ({order.abs_qty}) <= 0")
 
-# Guard: skip processing if no fills available
+# Skip: no fills available to process
 if not fills:
     return
 
-# ❌ Bad — wrong prefix (raises but uses Guard)
-# Guard: quantity must be positive
+# ✅ Good — loop skip case
+for fill in fills:
+    # Skip: ignore fills for other instruments
+    if fill.instrument != instrument:
+        continue
+
+    process_fill(fill)
+
+# ❌ Bad — wrong prefix (raises but uses Skip)
+# Skip: quantity must be positive
 if order.abs_qty <= 0:
     raise ValueError("Invalid quantity")
 
-# ❌ Bad — wrong prefix (returns but uses Precondition)
-# Precondition: must have fills
+# ❌ Bad — wrong prefix (returns but uses Raise)
+# Raise: must have fills
 if not fills:
     return
 ```
@@ -350,11 +358,11 @@ if not fills:
 
 ```python
 # ✅ Good — empty line after guard block
-# Precondition: order must have valid instrument
+# Raise: order must have valid instrument
 if order.instrument is None:
     raise ValueError("...")
 
-# Precondition: quantity must be positive
+# Raise: quantity must be positive
 if order.abs_qty <= 0:
     raise ValueError("...")
 
@@ -363,10 +371,10 @@ self._orders[order.id] = order
 broker.submit(order)
 
 # ❌ Bad — no separation between guards and actions
-# Precondition: order must have valid instrument
+# Raise: order must have valid instrument
 if order.instrument is None:
     raise ValueError("...")
-# Precondition: quantity must be positive
+# Raise: quantity must be positive
 if order.abs_qty <= 0:
     raise ValueError("...")
 self._orders[order.id] = order  # Action immediately after guard
@@ -421,7 +429,7 @@ def change_blocked_maint_margin(self, instrument: Instrument, *, delta: Money | 
 fills = broker.get_fills_since(self._timeline_dt)
 abs_quantity = sum(f.abs_qty for f in fills)
 
-# Guard: skip if no quantity to trade
+# Skip: no quantity to trade
 if abs_quantity == 0:
     return
 
@@ -433,7 +441,7 @@ self._last_order_time = now()
 **Acceptance checks:**
 - [ ] R-4.2.5: Non-trivial lines/blocks have short, intuitive inline comments
 - [ ] R-4.2.9: Section headers are ALL CAPS with no trailing period
-- [ ] R-4.2.14/R-4.2.15: `# Precondition:` for raises, `# Guard:` for early returns
+- [ ] R-4.2.14/R-4.2.15: `# Raise:` for raises, `# Skip:` for early returns/continues
 - [ ] R-4.2.19: One empty line after guard block before state-changing code
 - [ ] R-4.2.18: Code reference formatting followed (`$var`, `` `func` ``)
 
@@ -446,17 +454,17 @@ self._last_order_time = now()
 
 ```python
 # ✅ Good — validates domain invariant (quantity sign)
-# Precondition: $abs_qty must be positive
+# Raise: $abs_qty must be positive
 if order.abs_qty <= 0:
     raise ValueError(f"...")
 
 # ❌ Bad — trivial type check (Python/mypy handles this)
-# Precondition: order must be Order type
+# Raise: order must be Order type
 if not isinstance(order, Order):
     raise TypeError(f"...")
 
 # ❌ Bad — obvious None that would fail naturally
-# Precondition: instrument must exist
+# Raise: instrument must exist
 if order.instrument is None:
     raise ValueError(f"...")
 # order.instrument.symbol  # Would fail with clear AttributeError anyway
