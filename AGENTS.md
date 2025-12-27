@@ -589,13 +589,21 @@ return None
 It ensures the implementation is predictable and testable by separating pure derivations from side effects.
 
 **Standard stages (top-to-bottom):**
-- **R-4.5.2 `Validate`**: Cheap guards and domain invariants (e.g., check `$quantity > 0`). Return early or raise clear errors. No state changes
-- **R-4.5.3 `Compute`**: Pure, deterministic derivations (signals, prices, quantities). No I/O, no broker calls, no logging
-- **R-4.5.4 `Decide`**: Turn computed data into decisions by building "intent" objects (e.g., `Order` or `Adjustment`). Avoid side effects
-- **R-4.5.5 `Act`**: Perform side effects (submit/cancel orders, mutate state, emit logs, write files). Keep this stage small and explicit
+- **R-4.5.2 `Validate`**: Only guards and early exits.
+  - Allowed: `raise`, early `return`/`continue` for non-error skips, cheap domain invariants and cross-object preconditions
+  - Forbidden: logging, mutation, I/O, broker calls, or computing intermediate/decision values for later stages
+- **R-4.5.3 `Compute`**: Only pure, deterministic derivations.
+  - Allowed: calculations and transformations, calling pure pricing/margin/fee logic, building decision metrics compared in `Decide`, precomputing "after" values
+  - Forbidden: path-choosing branching, mutation, logging, I/O, publishing events, or broker/account/order state changes
+- **R-4.5.4 `Decide`**: Only branching and plan selection.
+  - Allowed: `if/elif/else`, early returns, building intent/plan objects and action lists based on computed values
+  - Forbidden: arithmetic/metric construction (decision metrics must come from `Compute`), mutation, logging, I/O, or emitting events
+- **R-4.5.5 `Act`**: Only side effects.
+  - Allowed: mutating domain state, calling side-effectful APIs (broker/account/order), logging, publishing callbacks/events
+  - Forbidden: introducing new high-level decisions or complex calculations that determine whether we should act
 
 **Flexibility & Variants:**
-- **R-4.5.6** Merge `Compute` & `Decide`: In simpler scenarios, these can be merged into a single pure block. The key principle remains separating pure logic from side effects
+- **R-4.5.6** Merge `Compute` & `Decide`: You may merge them when it improves readability, but the merged block must remain free of side effects
 - **R-4.5.7** Strict Boundary: The most critical separation is between pure logic (`Compute`/`Decide`) and side effects (`Act`). This allows testing the core logic in isolation
 
 ### Workflow Visualization (ASCII Diagrams)
@@ -618,18 +626,26 @@ _process_proposed_fill(order, proposed_fill, order_book)
 ├── [COMPUTE]
 │   ├── signed_position_quantity_before, maintenance_margin_before
 │   ├── commission, initial_margin, maintenance_margin_change = _compute_commission_and_margin_changes(...)
-│   └── funds_now = get_funds(...)
-├── [DECIDE] IF not has_enough_funds(...): handle insufficient funds
+│   └── peak_funds_required = max(initial_margin, maintenance_margin_change) + commission
+├── [DECIDE] IF not has_enough_funds(peak_funds_required): handle insufficient funds
 └── [ACT]
     ├── order_fill = _commit_proposed_fill_and_accounting(...)
     ├── publish order fill callback
     └── _handle_order_update(order)
 ```
 
+**Strictness Rules (to prevent step drift):**
+- **R-4.5.9 Decision-metric rule**: Any value built primarily for a comparison/check in `Decide` must be computed in `Compute`. `Decide` only consumes it
+- **R-4.5.10 Policy formula rule**: If a formula encodes a domain policy (not just arithmetic), keep it in `Compute` and document the assumption next to the formula
+- **R-4.5.11 Extraction threshold**: If the same policy formula appears in 2+ locations, extract a helper (single source of truth)
+- **R-4.5.12 Quick classifier**: `raise`/skip-return → `Validate`, path-choosing branch → `Decide`, mutation/logging/I/O → `Act`, everything else → `Compute`
+
 **Acceptance checks:**
 - [ ] R-4.5.1: Logic reads top-to-bottom as: `Validate` → [`Compute` → `Decide`] → `Act`
 - [ ] R-4.5.3/R-4.5.4: Derivations are pure: no hidden I/O, logging, or state mutations
 - [ ] R-4.5.5: Side effects happen only in `Act`
+- [ ] R-4.5.9: Decision metrics compared in `Decide` are computed in `Compute`, not built inline in `Decide`
+- [ ] R-4.5.10/R-4.5.11: Reused policy formulas are documented and centralized (single source of truth)
 
 ---
 
