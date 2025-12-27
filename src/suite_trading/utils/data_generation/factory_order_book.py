@@ -287,7 +287,7 @@ def _parse_price_volume_string(raw_level: str) -> tuple[Decimal, Decimal]:
             price or volume cannot be parsed as `Decimal`.
     """
 
-    # Precondition: ensure the level string uses the expected "price@volume" format
+    # Raise: ensure the level string uses the expected "price@volume" format
     if "@" not in raw_level:
         raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') does not contain '@' separator")
 
@@ -295,7 +295,7 @@ def _parse_price_volume_string(raw_level: str) -> tuple[Decimal, Decimal]:
     price_str = price_str.strip()
     volume_str = volume_str.strip()
 
-    # Precondition: ensure both price and volume parts are non-empty after stripping
+    # Raise: ensure both price and volume parts are non-empty after stripping
     if not price_str or not volume_str:
         raise ValueError(f"Cannot call `_parse_price_volume_string` because $raw_level ('{raw_level}') has empty price or volume part")
 

@@ -42,7 +42,7 @@ class _LimitOrderTestStrategy(Strategy):
         self.add_event_feed(self._feed_name, feed, use_for_simulated_fills=True)
 
     def on_event(self, event) -> None:
-        # Check: submit exactly once on the first QuoteTickEvent; use reference presence as the guard
+        # Submit exactly once on the first QuoteTickEvent; use reference presence as the guard
         if isinstance(event, QuoteTickEvent) and self._submitted_order is None:
             order = self._order_factory(event)
             self.submit_order(order, self._broker)

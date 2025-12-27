@@ -122,7 +122,7 @@ def wrap_order_books_to_events(
         dt_received_getter = lambda ob: ob.timestamp  # noqa: E731
 
     for ob in order_books:
-        # Check: ensure dt_received is provided via getter per snapshot for clarity
+        # Build OrderBookEvent with explicit dt_received getter
         yield OrderBookEvent(order_book=ob, dt_received=dt_received_getter(ob), is_historical=is_historical)
 
 

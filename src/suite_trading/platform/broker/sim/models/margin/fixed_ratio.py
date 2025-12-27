@@ -35,7 +35,7 @@ class FixedRatioMarginModel(MarginModel):
         initial_ratio_decimal = as_decimal(initial_ratio)
         maintenance_ratio_decimal = as_decimal(maintenance_ratio)
 
-        # Precondition: ratios in [0, 1]
+        # Raise: ratios in [0, 1]
         if not (Decimal("0") <= initial_ratio_decimal <= Decimal("1")):
             raise ValueError(f"Cannot call `__init__` because $initial_ratio ({initial_ratio_decimal}) is out of [0, 1]")
         if not (Decimal("0") <= maintenance_ratio_decimal <= Decimal("1")):
@@ -97,7 +97,7 @@ class FixedRatioMarginModel(MarginModel):
         best_bid = order_book.best_bid
         best_ask = order_book.best_ask
 
-        # Check: ensure OrderBook has quotes on both sides to compute mid price
+        # Raise: OrderBook must have quotes on both sides to compute mid price
         if best_bid is None or best_ask is None:
             raise ValueError(f"Cannot call `_extract_price_from_order_book` because OrderBook for Instrument '{order_book.instrument}' is empty on one or both sides (bid={best_bid}, ask={best_ask})")
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone, timedelta, tzinfo
 
 # One place to change the visible UTC indicator
@@ -13,11 +15,11 @@ def is_utc(dt: datetime) -> bool:
     Returns:
         bool: True if $dt is aware and its tzinfo is exactly UTC; otherwise False.
     """
-    # Check: datetime must be timezone-aware (not naive)
+    # Skip: datetime is naive (not timezone-aware)
     if dt.tzinfo is None:
         return False
 
-    # Check: timezone must be exactly UTC
+    # Return True only for strict UTC
     return dt.tzinfo is timezone.utc
 
 
@@ -31,7 +33,7 @@ def require_utc(dt: datetime) -> None:
         ValueError: If $dt is not timezone-aware UTC.
     """
     if not is_utc(dt):
-        raise ValueError(f"$dt ('{dt}') is not timezone-aware UTC.")
+        raise ValueError(f"Cannot call `require_utc` because $dt ({dt}) is not timezone-aware UTC")
 
 
 def expect_utc(dt: datetime) -> datetime:
@@ -223,7 +225,7 @@ def format_range(start: datetime, end: datetime) -> str:
         ValueError: If $start or $end is not timezone-aware UTC, or if $end < $start.
     """
 
-    # Precondition: both datetimes must be UTC + have to be chronologically ordered
+    # Raise: both datetimes must be UTC + have to be chronologically ordered
     require_utc(start)
     require_utc(end)
     if end < start:

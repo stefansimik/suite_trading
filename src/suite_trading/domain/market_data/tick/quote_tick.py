@@ -64,13 +64,13 @@ class QuoteTick:
         self._bid_volume = as_decimal(bid_volume)
         self._ask_volume = as_decimal(ask_volume)
 
-        # Precondition: Validate volumes
+        # Raise: Validate volumes
         if self._bid_volume <= 0:
             raise ValueError(f"$bid_volume must be positive, but provided value is: {self._bid_volume}")
         if self._ask_volume <= 0:
             raise ValueError(f"$ask_volume must be positive, but provided value is: {self._ask_volume}")
 
-        # Precondition: Validate prices
+        # Raise: Validate prices
         # Prices may be negative for some instruments. We only enforce the relative ordering between bid and ask.
         if self._bid_price >= self._ask_price:
             raise ValueError(f"$bid_price ({self._bid_price}) must be less than $ask_price ({self._ask_price})")

@@ -43,7 +43,7 @@ class Position:
         realized_pnl: DecimalLike = Decimal("0"),
         last_update: datetime | None = None,
     ) -> None:
-        # Check: $last_update must be timezone-aware for consistent audit ordering
+        # Raise: $last_update must be timezone-aware for consistent audit ordering
         if last_update is not None and last_update.tzinfo is None:
             raise ValueError(f"Cannot call `__init__` because $last_update ({last_update}) is not timezone-aware")
 
@@ -52,7 +52,7 @@ class Position:
         unrealized_pnl = as_decimal(unrealized_pnl)
         realized_pnl = as_decimal(realized_pnl)
 
-        # Check: $avg_price must be finite when $signed_qty is non-zero
+        # Raise: $avg_price must be finite when $signed_qty is non-zero
         if signed_qty != 0 and (avg_price.is_nan() or avg_price.is_infinite()):
             raise ValueError(f"Cannot call `__init__` because $avg_price ({avg_price}) is not a finite Decimal")
 
@@ -152,7 +152,7 @@ class Position:
         Raises:
             ValueError: If $timestamp is not timezone-aware.
         """
-        # Check: $timestamp must be timezone-aware for reliable ordering/audit
+        # Raise: $timestamp must be timezone-aware for reliable ordering/audit
         if timestamp.tzinfo is None:
             raise ValueError(f"Cannot call `update_unrealized_pnl` because $timestamp ({timestamp}) is not timezone-aware")
 

@@ -149,7 +149,7 @@ class TradingEngine:
         Raises:
             ValueError: If an EventFeedProvider with the same $name is already added.
         """
-        # Precondition: provider name must be unique and not already added
+        # Raise: provider name must be unique and not already added
         if name in self._event_feed_providers_by_name_bidict:
             raise ValueError(f"Cannot call `add_event_feed_provider` because EventFeedProvider named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
@@ -165,7 +165,7 @@ class TradingEngine:
         Raises:
             KeyError: If no EventFeedProvider with the given $name exists.
         """
-        # Precondition: provider name must be added before removing
+        # Raise: provider name must be added before removing
         if name not in self._event_feed_providers_by_name_bidict:
             raise KeyError(f"Cannot call `remove_event_feed_provider` because provider name $name ('{name}') is not added to this TradingEngine. Add the provider using `add_event_feed_provider` first.")
 
@@ -212,7 +212,7 @@ class TradingEngine:
         Raises:
             ValueError: If a Broker with the same $name is already added.
         """
-        # Precondition: broker name must be unique and not already added
+        # Raise: broker name must be unique and not already added
         if name in self._brokers_by_name_bidict:
             raise ValueError(f"Cannot call `add_broker` because Broker named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
@@ -231,7 +231,7 @@ class TradingEngine:
         Raises:
             KeyError: If no Broker with the given $name exists.
         """
-        # Precondition: broker name must be added before removing
+        # Raise: broker name must be added before removing
         if name not in self._brokers_by_name_bidict:
             raise KeyError(f"Cannot call `remove_broker` because broker name $name ('{name}') is not added to this TradingEngine. Add the broker using `add_broker` first.")
 
@@ -284,11 +284,11 @@ class TradingEngine:
         """
         name = strategy.name
 
-        # Precondition: strategy name must be unique and not already added
+        # Raise: strategy name must be unique and not already added
         if name in self._strategies_by_name_bidict:
             raise ValueError(f"Cannot call `add_strategy` because Strategy named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
-        # Precondition: strategy must be NEW before attaching
+        # Raise: strategy must be NEW before attaching
         if strategy.state != StrategyState.NEW:
             raise ValueError(f"Cannot call `add_strategy` because $strategy is not NEW. Current $state is {strategy.state.name}. Provide a fresh instance of {strategy.__class__.__name__}.")
 
@@ -316,13 +316,13 @@ class TradingEngine:
             KeyError: If no strategy with the given name exists.
             ValueError: If strategy is not in ADDED state.
         """
-        # Precondition: strategy name must be added before starting
+        # Raise: strategy name must be added before starting
         if name not in self._strategies_by_name_bidict:
             raise KeyError(f"Cannot call `start_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.")
 
         strategy = self._strategies_by_name_bidict[name]
 
-        # Precondition: strategy must be able to start
+        # Raise: strategy must be able to start
         if not strategy._state_machine.can_execute_action(StrategyAction.START_STRATEGY):
             valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot start strategy in state {strategy.state.name}. Valid actions: {valid_actions}")
@@ -347,13 +347,13 @@ class TradingEngine:
             KeyError: If no strategy with the given name exists.
             ValueError: If $state is not RUNNING.
         """
-        # Precondition: strategy name must be added before stopping
+        # Raise: strategy name must be added before stopping
         if name not in self._strategies_by_name_bidict:
             raise KeyError(f"Strategy named '{name}' is unknown.")
 
         strategy = self._strategies_by_name_bidict[name]
 
-        # Precondition: strategy must be able to stop
+        # Raise: strategy must be able to stop
         if not strategy._state_machine.can_execute_action(StrategyAction.STOP_STRATEGY):
             valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot stop strategy in state {strategy.state.name}. Valid actions: {valid_actions}")
@@ -382,13 +382,13 @@ class TradingEngine:
             KeyError: If no strategy with the given name exists.
             ValueError: If strategy is not in terminal state.
         """
-        # Precondition: strategy name must be added before removing
+        # Raise: strategy name must be added before removing
         if name not in self._strategies_by_name_bidict:
             raise KeyError(f"Cannot call `remove_strategy` because strategy name $name ('{name}') is not added to this TradingEngine. Add the strategy using `add_strategy` first.")
 
         strategy = self._strategies_by_name_bidict[name]
 
-        # Precondition: strategy must be in terminal state before removing
+        # Raise: strategy must be in terminal state before removing
         if not strategy._state_machine.is_in_terminal_state():
             valid_actions = [a.value for a in strategy._state_machine.list_valid_actions()]
             raise ValueError(f"Cannot call `remove_strategy` because $state ({strategy.state.name}) is not terminal. Valid actions: {valid_actions}")
@@ -436,7 +436,7 @@ class TradingEngine:
         Raises:
             KeyError: If $strategy_name is not registered in this TradingEngine.
         """
-        # Precondition: ensure $strategy_name exists in this TradingEngine
+        # Raise: ensure $strategy_name exists in this TradingEngine
         if strategy_name not in self._strategies_by_name_bidict:
             raise KeyError(f"Cannot call `list_order_fills_for_strategy` because Strategy named '{strategy_name}' is not registered in this TradingEngine")
 
@@ -452,7 +452,7 @@ class TradingEngine:
 
         Connects in this order: EventFeedProvider(s) -> Brokers first -> then starts all strategies.
         """
-        # Precondition: engine must be in NEW state before starting
+        # Raise: engine must be in NEW state before starting
         if not self._engine_state_machine.can_execute_action(EngineAction.START_ENGINE):
             valid_actions = [a.value for a in self._engine_state_machine.list_valid_actions()]
             raise ValueError(f"Cannot start engine in state {self.state.name}. Valid actions: {valid_actions}")
@@ -497,12 +497,12 @@ class TradingEngine:
         Raises:
             ValueError: If engine is not in RUNNING state.
         """
-        # Check: allow idempotent stop when already STOPPED; otherwise must be able to stop
+        # Skip: allow idempotent `stop` when already STOPPED
         if self.state == EngineState.STOPPED:
             logger.debug("Skip `stop` because engine is already STOPPED")
             return
 
-        # Precondition: engine must be in RUNNING state, when we want to stop it
+        # Raise: engine must be in RUNNING state, when we want to stop it
         if not self._engine_state_machine.can_execute_action(EngineAction.STOP_ENGINE):
             valid_actions = [a.value for a in self._engine_state_machine.list_valid_actions()]
             raise ValueError(f"Cannot stop engine in state {self.state.name}. Valid actions: {valid_actions}")
@@ -566,7 +566,7 @@ class TradingEngine:
         Raises:
             ValueError: If engine is not in RUNNING state.
         """
-        # Precondition: engine must be in RUNNING state
+        # Raise: engine must be in RUNNING state
         if self.state != EngineState.RUNNING:
             raise ValueError(f"Cannot run processing loop because engine is not RUNNING. Current state: {self.state.name}")
 
@@ -587,7 +587,7 @@ class TradingEngine:
             strategy_name = self._get_strategy_name(strategy)
             current_event = event_feed.pop()
 
-            # Check: ensure current_event is not None (should be guaranteed by _find_event_feed_with_earliest_event)
+            # Skip: no current event popped (should be guaranteed by `_find_event_feed_with_earliest_event`)
             if current_event is None:
                 continue
 
@@ -604,7 +604,7 @@ class TradingEngine:
             if simulated_brokers and event_should_drive_simulated_fills and self._event_to_order_book_converter.can_convert(current_event):
                 order_books = self._event_to_order_book_converter.convert_to_order_books(current_event)
                 for order_book in order_books:
-                    # Check: ignore stale OrderBook snapshots (defensive)
+                    # Skip: ignore stale OrderBook snapshots (defensive)
                     if (self._last_order_book_ts is not None) and (order_book.timestamp < self._last_order_book_ts):
                         logger.debug(f"Skipped OrderBook with timestamp {format_dt(order_book.timestamp)} for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}) - older than last processed OrderBook timestamp {format_dt(self._last_order_book_ts)}")
                         continue
@@ -700,11 +700,11 @@ class TradingEngine:
         Raises:
             ValueError: If $strategy is not added to this TradingEngine or $feed_name is duplicate.
         """
-        # Precondition: strategy must be added to this engine
+        # Raise: strategy must be added to this engine
         if strategy not in self._strategies_by_name_bidict.values():
             raise ValueError("Cannot call `add_event_feed_for_strategy` because $strategy ({strategy.__class__.__name__}) is not added to this TradingEngine. Add the strategy using `add_strategy` first.")
 
-        # Precondition: feed_name must be unique per strategy
+        # Raise: feed_name must be unique per strategy
         event_feeds_by_name_dict = self._event_feeds_by_strategy[strategy]
         if feed_name in event_feeds_by_name_dict:
             raise ValueError("Cannot call `add_event_feed_for_strategy` because event-feed with $feed_name ('{feed_name}') is already used for this strategy. Choose a different name.")
@@ -878,7 +878,7 @@ class TradingEngine:
             ValueError: If the order is invalid or cannot be submitted, or if $order is re-owned.
         """
         # VALIDATE
-        # Precondition: do not remap an already submitted order to a different owner
+        # Raise: do not remap an already submitted order to a different owner
         existing_route = self._routing_by_order.get(order)
         if existing_route is not None and existing_route.strategy is not strategy:
             owner_name = self._get_strategy_name(existing_route.strategy)
@@ -906,7 +906,7 @@ class TradingEngine:
             ValueError: If the order cannot be cancelled.
             KeyError: If $order was not submitted through this TradingEngine.
         """
-        # Precondition: order must have been submitted through this engine
+        # Raise: order must have been submitted through this engine
         if order not in self._routing_by_order:
             raise KeyError(f"Cannot call `cancel_order` because $order (id '{order.id}') was not submitted through this TradingEngine")
 
@@ -924,7 +924,7 @@ class TradingEngine:
             ValueError: If the order cannot be modified.
             KeyError: If $order was not submitted through this TradingEngine.
         """
-        # Precondition: order must have been submitted through this engine
+        # Raise: order must have been submitted through this engine
         if order not in self._routing_by_order:
             raise KeyError(f"Cannot call `modify_order` because $order (id '{order.id}') was not submitted through this TradingEngine")
 

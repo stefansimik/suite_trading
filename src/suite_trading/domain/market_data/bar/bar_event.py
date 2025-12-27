@@ -126,7 +126,7 @@ def wrap_bars_to_events(
         dt_received_getter = lambda b: b.end_dt  # noqa: E731
 
     for b in bars:
-        # Check: ensure dt_received is provided via getter per bar for clarity
+        # Build BarEvent with explicit dt_received getter
         yield BarEvent(bar=b, dt_received=dt_received_getter(b), is_historical=is_historical)
 
 

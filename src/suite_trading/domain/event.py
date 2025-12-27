@@ -18,7 +18,7 @@ class Event:
     __slots__ = ("_dt_event", "_dt_received")
 
     def __init__(self, dt_event: datetime, dt_received: datetime) -> None:
-        # Precondition: enforce UTC invariants at the boundary for all events
+        # Enforce UTC invariants at the boundary for all events
         self._dt_event: datetime = expect_utc(dt_event)
         self._dt_received: datetime = expect_utc(dt_received)
 

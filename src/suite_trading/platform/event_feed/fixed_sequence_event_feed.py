@@ -110,7 +110,7 @@ class FixedSequenceEventFeed:
         Raises:
             ValueError: If $cutoff_time is not timezone-aware UTC.
         """
-        # Precondition: enforce UTC cutoff for consistent comparisons
+        # Raise: enforce UTC cutoff for consistent comparisons
         require_utc(cutoff_time)
         if self._closed or not self._event_deque:
             return
@@ -130,10 +130,10 @@ class FixedSequenceEventFeed:
         Raises:
             ValueError: If $key is empty or already registered.
         """
-        # Precondition: ensure $key is non-empty
+        # Raise: ensure $key is non-empty
         if not key:
             raise ValueError("Cannot call `add_listener` because $key is empty")
-        # Precondition: ensure $key is unique among listeners
+        # Raise: ensure $key is unique among listeners
         if key in self._listeners:
             raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
         self._listeners[key] = listener

@@ -56,7 +56,7 @@ class BarAccumulator:
         Raises:
             ValueError: If $bar is not Bar or BarType mismatch vs first bar type.
         """
-        # Precondition: ensure $bar is a Bar instance to maintain type safety
+        # Raise: ensure $bar is a Bar instance to maintain type safety
         if not isinstance(bar, Bar):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.add` because $bar (class '{type(bar).__name__}') is not a Bar")
 
@@ -109,11 +109,11 @@ class BarAccumulator:
         Raises:
             ValueError: If $start_dt or $end_dt is None.
         """
-        # Precondition: require $start_dt and $end_dt to define the output interval
+        # Raise: require $start_dt and $end_dt to define the output interval
         if start_dt is None or end_dt is None:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.build_bar` because $start_dt or $end_dt is None")
 
-        # Precondition: cannot build a bar if no data has been accumulated
+        # Raise: cannot build a bar if no data has been accumulated
         if not self.has_data():
             raise ValueError(f"Cannot call `{self.__class__.__name__}.build_bar` because no data has been accumulated")
 

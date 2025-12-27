@@ -338,9 +338,9 @@ for fill in fills:
     process_fill(fill)
 
 # ❌ Bad — wrong prefix (raises but uses Skip)
-# Skip: quantity must be positive
+# Skip: $abs_qty must be positive to submit order
 if order.abs_qty <= 0:
-    raise ValueError("Invalid quantity")
+    raise ValueError(f"Cannot call `submit_order` because $abs_qty ({order.abs_qty}) <= 0")
 
 # ❌ Bad — wrong prefix (returns but uses Raise)
 # Raise: must have fills
@@ -360,11 +360,11 @@ if not fills:
 # ✅ Good — empty line after guard block
 # Raise: order must have valid instrument
 if order.instrument is None:
-    raise ValueError("...")
+    raise ValueError(f"Cannot call `place_order` because $order.instrument is None")
 
 # Raise: quantity must be positive
 if order.abs_qty <= 0:
-    raise ValueError("...")
+    raise ValueError(f"Cannot call `place_order` because $order.abs_qty ({order.abs_qty}) <= 0")
 
 # Now perform actions (empty line above separates guards from actions)
 self._orders[order.id] = order
@@ -373,10 +373,10 @@ broker.submit(order)
 # ❌ Bad — no separation between guards and actions
 # Raise: order must have valid instrument
 if order.instrument is None:
-    raise ValueError("...")
+    raise ValueError(f"Cannot call `place_order` because $order.instrument is None")
 # Raise: quantity must be positive
 if order.abs_qty <= 0:
-    raise ValueError("...")
+    raise ValueError(f"Cannot call `place_order` because $order.abs_qty ({order.abs_qty}) <= 0")
 self._orders[order.id] = order  # Action immediately after guard
 ```
 

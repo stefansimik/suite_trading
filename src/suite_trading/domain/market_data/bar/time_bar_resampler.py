@@ -38,15 +38,15 @@ class TimeBarResampler:
     # region Init
 
     def __init__(self, *, unit: BarUnit, size: int, on_emit_callback: Callable[[BarEvent], None]) -> None:
-        # Precondition: size must be > 0
+        # Raise: size must be > 0
         if not isinstance(size, int) or size <= 0:
             raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $size ('{size}') is not > 0")
 
-        # Precondition: unit supported
+        # Raise: unit supported
         if unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH}:
             raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, WEEK, or MONTH")
 
-        # Precondition: only size==1 allowed for DAY, WEEK, and MONTH
+        # Raise: only size==1 allowed for DAY, WEEK, and MONTH
         if unit in {BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH} and size != 1:
             raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit is {unit.name} but $size ('{size}') is not 1; only {unit.name.lower()} size=1 is supported")
 
@@ -156,10 +156,10 @@ class TimeBarResampler:
         else:
             # For SECOND/MINUTE/HOUR/DAY/WEEK the window seconds are fixed; MONTH varies and is handled above
             window_seconds = self._window_seconds()
-            # Precondition: output window not finer than input
+            # Raise: output window not finer than input
             if window_seconds < self._input_bar_seconds:
                 raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $output_window_seconds ('{window_seconds}') is < $input_bar_seconds ('{self._input_bar_seconds}')")
-            # Precondition: multiple rule
+            # Raise: multiple rule
             if (window_seconds % self._input_bar_seconds) != 0:
                 raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $output_window_seconds ('{window_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
 

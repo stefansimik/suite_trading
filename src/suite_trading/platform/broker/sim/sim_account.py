@@ -75,7 +75,7 @@ class SimAccount(Account):
         current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
         new_value = current.value - amount.value
 
-        # Check: ensure funds stay non-negative
+        # Raise: ensure funds stay non-negative
         if new_value < 0:
             raise ValueError(f"Cannot call `remove_funds` because resulting $funds ({new_value} {currency}) would be negative")
 
@@ -97,7 +97,7 @@ class SimAccount(Account):
         Raises:
             ValueError: If $amount.value <= 0 or deducting would make $funds negative.
         """
-        # Check: ensure $amount is strictly positive (no rebates for now)
+        # Raise: ensure $amount is strictly positive (no rebates for now)
         if amount.value <= 0:
             raise ValueError(f"Cannot call `pay_fee` because $amount ({amount.value} {amount.currency}) is not positive")
 
@@ -129,7 +129,7 @@ class SimAccount(Account):
         - $delta changes blocked initial margin by a relative amount.
         - $target sets the exact blocked initial margin amount.
         """
-        # Check: require exactly one of $delta or $target
+        # Raise: require exactly one of $delta or $target
         if (delta is None and target is None) or (delta is not None and target is not None):
             raise ValueError("Cannot call `change_blocked_initial_margin` because exactly one of $delta or $target must be provided")
 
@@ -137,11 +137,11 @@ class SimAccount(Account):
         currency = update_amount.currency
         previous_pair = self._get_blocked_margins_for_instrument(instrument)
 
-        # Check: stored blocked margins must use a single currency per $instrument
+        # Raise: stored blocked margins must use a single currency per $instrument
         if previous_pair is not None and previous_pair.initial.currency != previous_pair.maintenance.currency:
             raise ValueError(f"Cannot call `change_blocked_initial_margin` because stored blocked margins have inconsistent currencies for $instrument ({instrument}): $initial.currency ({previous_pair.initial.currency}) != $maintenance.currency ({previous_pair.maintenance.currency})")
 
-        # Check: prevent mixed currencies for this $instrument
+        # Raise: prevent mixed currencies for this $instrument
         if previous_pair is not None and previous_pair.initial.currency != currency:
             if delta is not None:
                 raise ValueError(f"Cannot call `change_blocked_initial_margin` because $delta.currency ({delta.currency}) does not match existing currency ({previous_pair.initial.currency}) for $instrument ({instrument})")
@@ -151,13 +151,13 @@ class SimAccount(Account):
         current_value = pair.initial.value
         target_value = current_value + delta.value if delta is not None else target.value
 
-        # Check: blocked initial margin cannot be negative
+        # Raise: blocked initial margin cannot be negative
         if target_value < 0:
             raise ValueError(f"Cannot call `change_blocked_initial_margin` because resulting blocked initial margin ({target_value} {currency}) would be negative for $instrument ({instrument})")
 
         required_change = target_value - current_value
 
-        # Check: ensure we can reserve required funds for this change
+        # Raise: ensure we can reserve required funds for this change
         if required_change > 0 and not self.has_enough_funds(Money(required_change, currency)):
             raise ValueError(f"Cannot call `change_blocked_initial_margin` because $funds in {currency} is insufficient for $required_change ({required_change}) for $instrument ({instrument})")
 
@@ -181,7 +181,7 @@ class SimAccount(Account):
         - $delta changes blocked maintenance margin by a relative amount.
         - $target sets the exact blocked maintenance margin amount.
         """
-        # Check: require exactly one of $delta or $target
+        # Raise: require exactly one of $delta or $target
         if (delta is None and target is None) or (delta is not None and target is not None):
             raise ValueError("Cannot call `change_blocked_maint_margin` because exactly one of $delta or $target must be provided")
 
@@ -189,11 +189,11 @@ class SimAccount(Account):
         currency = update_amount.currency
         previous_pair = self._get_blocked_margins_for_instrument(instrument)
 
-        # Check: stored blocked margins must use a single currency per $instrument
+        # Raise: stored blocked margins must use a single currency per $instrument
         if previous_pair is not None and previous_pair.initial.currency != previous_pair.maintenance.currency:
             raise ValueError(f"Cannot call `change_blocked_maint_margin` because stored blocked margins have inconsistent currencies for $instrument ({instrument}): $initial.currency ({previous_pair.initial.currency}) != $maintenance.currency ({previous_pair.maintenance.currency})")
 
-        # Check: prevent mixed currencies for this $instrument
+        # Raise: prevent mixed currencies for this $instrument
         if previous_pair is not None and previous_pair.maintenance.currency != currency:
             if delta is not None:
                 raise ValueError(f"Cannot call `change_blocked_maint_margin` because $delta.currency ({delta.currency}) does not match existing currency ({previous_pair.maintenance.currency}) for $instrument ({instrument})")
@@ -203,13 +203,13 @@ class SimAccount(Account):
         current_value = pair.maintenance.value
         target_value = current_value + delta.value if delta is not None else target.value
 
-        # Check: blocked maintenance margin cannot be negative
+        # Raise: blocked maintenance margin cannot be negative
         if target_value < 0:
             raise ValueError(f"Cannot call `change_blocked_maint_margin` because resulting blocked maintenance margin ({target_value} {currency}) would be negative for $instrument ({instrument})")
 
         required_change = target_value - current_value
 
-        # Check: ensure we can reserve required funds for this change
+        # Raise: ensure we can reserve required funds for this change
         if required_change > 0 and not self.has_enough_funds(Money(required_change, currency)):
             raise ValueError(f"Cannot call `change_blocked_maint_margin` because $funds in {currency} is insufficient for $required_change ({required_change}) for $instrument ({instrument})")
 

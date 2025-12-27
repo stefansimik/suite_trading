@@ -90,27 +90,32 @@ class Instrument:
         self._contract_size = as_decimal(contract_size)
         self._contract_unit = contract_unit
 
-        # Precondition: ensure $quote_currency is Currency to keep domain model typed and fail fast during migration
+        # Raise: ensure $quote_currency is Currency to keep domain model typed and fail fast during migration
         if not isinstance(quote_currency, Currency):
-            raise TypeError("Cannot init `Instrument` because $quote_currency is not Currency; use `Currency.from_str` to convert string codes at the boundary")
-        # Precondition: ensure $settlement_currency is Currency when provided (defaults to $quote_currency)
+            raise TypeError(f"Cannot call `Instrument.__init__` because $quote_currency is not Currency (got type '{type(quote_currency).__name__}'). Convert at the boundary using `Currency.from_str`")
+
+        # Raise: ensure $settlement_currency is Currency when provided (defaults to $quote_currency)
         if settlement_currency is not None and not isinstance(settlement_currency, Currency):
-            raise TypeError("Cannot init `Instrument` because $settlement_currency is not Currency; pass None for default or convert at the boundary")
+            raise TypeError(f"Cannot call `Instrument.__init__` because $settlement_currency is not Currency (got type '{type(settlement_currency).__name__}'). Pass None for default or convert at the boundary")
+
         self._quote_currency = quote_currency
         self._settlement_currency = self._quote_currency if settlement_currency is None else settlement_currency
 
-        # Precondition: $price_increment must be positive to define a valid tick size
+        # Raise: $price_increment must be positive to define a valid tick size
         if self._price_increment <= 0:
-            raise ValueError(f"$price_increment must be positive, but provided value is: {self._price_increment}")
-        # Precondition: $qty_increment must be positive to define a valid lot size
+            raise ValueError(f"Cannot call `Instrument.__init__` because $price_increment ({self._price_increment}) <= 0")
+
+        # Raise: $qty_increment must be positive to define a valid lot size
         if self._qty_increment <= 0:
-            raise ValueError(f"$qty_increment must be positive, but provided value is: {self._qty_increment}")
-        # Precondition: $contract_size must be positive to define the contract/lot amount
+            raise ValueError(f"Cannot call `Instrument.__init__` because $qty_increment ({self._qty_increment}) <= 0")
+
+        # Raise: $contract_size must be positive to define the contract/lot amount
         if self._contract_size <= 0:
-            raise ValueError(f"$contract_size must be positive, but provided value is: {self._contract_size}")
-        # Precondition: $contract_unit must be a non-empty string to describe the underlying unit
+            raise ValueError(f"Cannot call `Instrument.__init__` because $contract_size ({self._contract_size}) <= 0")
+
+        # Raise: $contract_unit must be a non-empty string to describe the underlying unit
         if not isinstance(self._contract_unit, str) or not self._contract_unit.strip():
-            raise ValueError("Cannot init `Instrument` because $contract_unit is empty")
+            raise ValueError("Cannot call `Instrument.__init__` because $contract_unit is empty")
 
     @property
     def name(self) -> str:
@@ -176,7 +181,7 @@ class Instrument:
         Raises:
             TypeError: If $tick_count is not an int.
         """
-        # Precondition: enforce integer tick count for predictable arithmetic
+        # Raise: enforce integer tick count for predictable arithmetic
         if not isinstance(tick_count, int):
             raise TypeError("Cannot call `ticks_to_price` because $tick_count is not int. Pass an int for tick count.")
         # Return the price delta; negative and zero are allowed
@@ -197,15 +202,15 @@ class Instrument:
             TypeError: If $price_delta is not Decimal.
             ValueError: If $price_delta is not finite or not a multiple of $price_increment.
         """
-        # Precondition: enforce Decimal input to avoid silent float issues
+        # Raise: enforce Decimal input to avoid silent float issues
         if not isinstance(price_delta, Decimal):
             raise TypeError("Cannot call `price_to_ticks` because $price_delta must be Decimal")
 
-        # Precondition: input must be finite
+        # Raise: input must be finite
         if not price_delta.is_finite():
             raise ValueError(f"Cannot call `price_to_ticks` because $price_delta ('{price_delta}') is not finite")
 
-        # Precondition: price_delta must align to the instrument's tick size
+        # Raise: $price_delta must align to the instrument's tick size
         if price_delta % self.price_increment != 0:
             raise ValueError(f"Cannot call `price_to_ticks` because $price_delta ('{price_delta}') is not a multiple of $price_increment ('{self.price_increment}')")
 
@@ -227,11 +232,11 @@ class Instrument:
             TypeError: If $n is not an int.
             ValueError: If $n <= 0.
         """
-        # Precondition: enforce integer lot count for predictable arithmetic
+        # Raise: enforce integer lot count for predictable arithmetic
         if not isinstance(n, int):
             raise TypeError("Cannot call `qty_from_lots` because $n is not int. Pass a positive int for lot count.")
 
-        # Precondition: lot count must be positive to express a non-zero absolute quantity
+        # Raise: lot count must be positive to express a non-zero absolute quantity
         if n <= 0:
             raise ValueError(f"Cannot call `qty_from_lots` because $n ('{n}') must be > 0.")
 
@@ -260,7 +265,7 @@ class Instrument:
         # Convert safely; avoid binary float artifacts by using str(...) for non-Decimal
         v = as_decimal(value)
 
-        # Precondition: input must be finite; negative prices may be valid in some markets
+        # Raise: input must be finite; negative prices may be valid in some markets
         if not v.is_finite():
             raise ValueError(f"Cannot call `snap_price` because $value ('{v}') is not finite")
 
@@ -285,7 +290,7 @@ class Instrument:
         # Convert safely; avoid binary float artifacts by using str(...) for non-Decimal
         v = as_decimal(value)
 
-        # Precondition: input must be finite
+        # Raise: input must be finite
         if not v.is_finite():
             raise ValueError(f"Cannot call `snap_qty` because $value ('{v}') is not finite")
 

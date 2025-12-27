@@ -189,33 +189,33 @@ class OrderFill:
         Raises:
             ValueError: If fill data is invalid.
         """
-        # Precondition: fill quantity must be non-zero
+        # Raise: fill quantity must be non-zero
         if self._signed_quantity == 0:
             raise ValueError(f"Cannot call `OrderFill._validate` because $signed_quantity ({self._signed_quantity}) cannot be zero")
 
-        # Precondition: fill sign must match order sign
+        # Raise: fill sign must match order sign
         if (self._signed_quantity > 0) != (self._order.signed_quantity > 0):
             raise ValueError(f"Cannot call `OrderFill._validate` because fill sign does not match order sign ($signed_quantity={self._signed_quantity}, order.signed_quantity={self._order.signed_quantity})")
 
-        # Precondition: quantity must be snapped
+        # Raise: quantity must be snapped
         expected_quantity = self.instrument.snap_qty(self._signed_quantity)
         if expected_quantity != self._signed_quantity:
             raise ValueError(f"Cannot call `OrderFill._validate` because $signed_quantity ({self._signed_quantity}) is not snapped (expected {expected_quantity})")
 
-        # Precondition: price must be snapped
+        # Raise: price must be snapped
         expected_price = self.instrument.snap_price(self._price)
         if expected_price != self._price:
             raise ValueError(f"Cannot call `OrderFill._validate` because $price ({self._price}) is not snapped (expected {expected_price})")
 
-        # Precondition: commission must be provided
+        # Raise: commission must be provided
         if self._commission is None:
             raise ValueError(f"Cannot call `OrderFill._validate` because $commission is None for $order.id ('{self._order.id}')")
 
-        # Precondition: commission cannot be negative
+        # Raise: commission cannot be negative
         if self._commission.value < 0:
             raise ValueError(f"Cannot call `OrderFill._validate` because $commission ({self._commission}) is negative")
 
-        # Precondition: a fill must not overfill the order
+        # Raise: a fill must not overfill the order
         if self.abs_quantity > self._order.abs_unfilled_quantity:
             raise ValueError(f"Cannot call `OrderFill._validate` because $abs_quantity ({self.abs_quantity}) exceeds order $unfilled_quantity ({self._order.abs_unfilled_quantity})")
 

@@ -152,28 +152,28 @@ class SimBroker(Broker, SimulatedBroker):
         """
 
         # VALIDATE
-        # Precondition: broker must be connected to accept new orders
+        # Raise: broker must be connected to accept new orders
         if not self._connected:
             raise RuntimeError(f"Cannot call `submit_order` because $connected ({self._connected}) is False")
 
-        # Precondition: enforce unique $id among active orders
+        # Raise: enforce unique $id among active orders
         if order.id in self._orders_by_id:
             raise ValueError(f"Cannot call `submit_order` because $id ('{order.id}') already exists")
 
-        # Precondition: DAY/GTD submission requires broker timeline time
+        # Raise: DAY/GTD submission requires broker timeline time
         if order.time_in_force in (TimeInForce.DAY, TimeInForce.GTD) and self._timeline_dt is None:
             raise ValueError(f"Cannot call `submit_order` because $time_in_force ({order.time_in_force.value}) requires broker time, but $timeline_dt is None")
 
         if order.time_in_force is TimeInForce.GTD:
-            # Precondition: GTD orders must provide timezone-aware UTC $good_till_dt
+            # Raise: GTD orders must provide timezone-aware UTC $good_till_dt
             if order.good_till_dt is None:
                 raise ValueError(f"Cannot call `submit_order` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
 
-            # Precondition: keep time-in-force comparisons deterministic in UTC
+            # Raise: keep time-in-force comparisons deterministic in UTC
             if not is_utc(order.good_till_dt):
                 raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(order.good_till_dt)}) is not timezone-aware UTC for GTD Order $id ('{order.id}')")
 
-            # Precondition: GTD deadline must not be earlier than broker $timeline_dt at submission
+            # Raise: GTD deadline must not be earlier than broker $timeline_dt at submission
             if order.good_till_dt < self._timeline_dt:
                 raise ValueError(f"Cannot call `submit_order` because $good_till_dt ({format_dt(order.good_till_dt)}) is earlier than broker $timeline_dt ({format_dt(self._timeline_dt)}) for GTD Order $id ('{order.id}')")
 
@@ -209,16 +209,16 @@ class SimBroker(Broker, SimulatedBroker):
         Request cancellation of a tracked $order. If the order is already in a terminal
         category, log a warning and return without emitting transitions.
         """
-        # Precondition: broker must be connected to act on orders
+        # Raise: broker must be connected to act on orders
         if not self._connected:
             raise RuntimeError(f"Cannot call `cancel_order` because $connected ({self._connected}) is False")
 
-        # Precondition: order must be known to the broker
+        # Raise: order must be known to the broker
         tracked_order = self.get_order(order.id)
         if tracked_order is None:
             raise ValueError(f"Cannot call `cancel_order` because $id ('{order.id}') is not tracked")
 
-        # Check: If order is already in terminal state (e.g., FILLED, CANCELLED, REJECTED), warn and do nothing
+        # Skip: order is already in terminal state; warn and return
         if tracked_order.state_category == OrderStateCategory.TERMINAL:
             logger.warning(f"Bad logic: Ignoring `cancel_order` for terminal Order $id ('{order.id}') with $state_category ({tracked_order.state_category.name})")
             return
@@ -236,20 +236,20 @@ class SimBroker(Broker, SimulatedBroker):
         category, and that immutable fields ($instrument) have not changed. Emits UPDATE → ACCEPT
         transitions via the centralized notifier.
         """
-        # Precondition: broker must be connected to act on orders
+        # Raise: broker must be connected to act on orders
         if not self._connected:
             raise RuntimeError(f"Cannot call `modify_order` because $connected ({self._connected}) is False")
 
-        # Precondition: order must be known to the broker
+        # Raise: order must be known to the broker
         tracked_order = self.get_order(order.id)
         if tracked_order is None:
             raise ValueError(f"Cannot call `modify_order` because $id ('{order.id}') is not tracked")
 
-        # Precondition: terminal orders cannot be modified
+        # Raise: terminal orders cannot be modified
         if tracked_order.state_category == OrderStateCategory.TERMINAL:
             raise ValueError(f"Cannot call `modify_order` because Order $state_category ({tracked_order.state_category.name}) is terminal.")
 
-        # Precondition: instrument cannot be changed via modification
+        # Raise: instrument cannot be changed via modification
         if tracked_order.instrument != order.instrument:
             raise ValueError(f"Cannot call `modify_order` because $instrument changed from '{tracked_order.instrument}' to '{order.instrument}' for Order $id ('{order.id}')")
 
@@ -344,10 +344,10 @@ class SimBroker(Broker, SimulatedBroker):
         Args:
             dt: Simulated time for the current engine event (timezone-aware UTC).
         """
-        # Precondition: broker timeline $dt must be timezone-aware UTC
+        # Raise: broker timeline $dt must be timezone-aware UTC
         if not is_utc(dt):
             raise ValueError(f"Cannot call `set_timeline_dt` because $dt ({dt}) is not timezone-aware UTC")
-        # Precondition: broker timeline $dt cannot move backwards
+        # Raise: broker timeline $dt cannot move backwards
         if self._timeline_dt is not None and dt < self._timeline_dt:
             raise ValueError(f"Cannot call `set_timeline_dt` because new $dt ({format_dt(dt)}) is earlier than current $timeline_dt ({format_dt(self._timeline_dt)})")
 
@@ -360,10 +360,10 @@ class SimBroker(Broker, SimulatedBroker):
 
     def process_order_book(self, order_book: OrderBook) -> None:
         """Process OrderBook that drives order-fills and order-updates."""
-        # Precondition: ensure engine set broker time before processing this snapshot
+        # Raise: TradingEngine must set broker time before processing this snapshot
         if self._timeline_dt is None:
             raise ValueError(f"Cannot call `process_order_book` because $timeline_dt is None. TradingEngine must call `set_timeline_dt(order_book.timestamp)` immediately before calling `process_order_book` (got $order_book.timestamp={format_dt(order_book.timestamp)})")
-        # Precondition: ensure broker time matches the snapshot time exactly
+        # Raise: broker time must match the snapshot time exactly
         if self._timeline_dt != order_book.timestamp:
             raise ValueError(f"Cannot call `process_order_book` because $timeline_dt ({format_dt(self._timeline_dt)}) does not match $order_book.timestamp ({format_dt(order_book.timestamp)}). TradingEngine must call `set_timeline_dt(order_book.timestamp)` immediately before calling `process_order_book`")
 
@@ -397,7 +397,7 @@ class SimBroker(Broker, SimulatedBroker):
             order_book: Customized OrderBook snapshot for matching.
         """
         # VALIDATE
-        # Precondition: avoid cross-instrument processing bugs
+        # Raise: avoid cross-instrument processing bugs
         if order.instrument != order_book.instrument:
             raise ValueError(f"Cannot call `_match_order_against_order_book` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
@@ -426,7 +426,7 @@ class SimBroker(Broker, SimulatedBroker):
         if not is_trigger_pending:
             return
 
-        # Precondition: TRIGGER_PENDING is valid only for stop-like orders
+        # Raise: TRIGGER_PENDING is valid only for stop-like orders
         if not isinstance(order, (StopMarketOrder, StopLimitOrder)):
             raise ValueError(f"Cannot call `_maybe_trigger_stop_order` because $order.state is TRIGGER_PENDING, which is valid only for StopMarketOrder and StopLimitOrder (got '{order.__class__.__name__}', $id='{order.id}')")
 
@@ -468,7 +468,7 @@ class SimBroker(Broker, SimulatedBroker):
         for proposed_fill in proposed_fills:
             self._process_proposed_fill(proposed_fill, order, order_book)
 
-            # Check: stop if the order was terminalized
+            # Skip: stop once the order was terminalized
             if order.state_category == OrderStateCategory.TERMINAL:
                 return
 
@@ -521,7 +521,7 @@ class SimBroker(Broker, SimulatedBroker):
             order_book: Market context used for final pricing and margin calculations.
         """
         # VALIDATE
-        # Precondition: ensure $order.instrument matches $order_book.instrument for pricing and margin
+        # Raise: ensure $order.instrument matches $order_book.instrument for pricing and margin
         if order.instrument != order_book.instrument:
             raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
@@ -536,7 +536,7 @@ class SimBroker(Broker, SimulatedBroker):
         # Peak requirement is the commission + highest margin
         peak_funds_required = max(initial_margin_delta, maint_margin_delta) + commission
 
-        # Guard: ensure account has enough available funds for the peak requirement
+        # Skip: reject proposed fill when available funds do not cover the peak requirement
         if not self._account.has_enough_funds(peak_funds_required):
             self._handle_insufficient_funds_for_proposed_fill(order=order, proposed_fill=proposed_fill, commission=commission, initial_margin=initial_margin_delta, maint_margin_required_change=maint_margin_delta, order_book=order_book, available_funds=self._account.get_funds(commission.currency))
             return
@@ -719,7 +719,7 @@ class SimBroker(Broker, SimulatedBroker):
             # Flat after this trade → drop stored position to keep list_open_positions() minimal
             self._position_by_instrument.pop(instrument, None)
         else:
-            # Precondition: if $new_signed_qty is non-zero, we must have a $new_avg_price
+            # Raise: if $new_signed_qty is non-zero, we must have a $new_avg_price
             if new_avg_price is None:
                 raise RuntimeError(f"Cannot call `_append_order_fill_to_history_and_update_position` because $new_signed_qty ({new_signed_qty}) != 0 but $new_avg_price is None")
 
@@ -787,7 +787,7 @@ class SimBroker(Broker, SimulatedBroker):
         # GTD
         if time_in_force == TimeInForce.GTD:
             good_till_dt = order.good_till_dt
-            # Precondition: GTD orders must provide $good_till_dt
+            # Raise: GTD orders must provide $good_till_dt
             if good_till_dt is None:
                 raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is GTD but $good_till_dt is None for Order $id ('{order.id}')")
 
@@ -796,7 +796,7 @@ class SimBroker(Broker, SimulatedBroker):
         # DAY
         if time_in_force == TimeInForce.DAY:
             submitted_dt = order.submitted_dt
-            # Precondition: DAY orders must have a $submitted_dt to define the DAY boundary
+            # Raise: DAY orders must have a $submitted_dt to define the DAY boundary
             if submitted_dt is None:
                 raise ValueError(f"Cannot call `_should_expire_order_now` because $time_in_force is DAY but $submitted_dt is None for Order $id ('{order.id}')")
 

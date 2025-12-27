@@ -55,7 +55,7 @@ class Strategy(ABC):
             TypeError: If $name is not a str.
             ValueError: If $name is empty or whitespace only.
         """
-        # Precondition: validate $name is a non-empty str
+        # Raise: validate $name is a non-empty str
         if not isinstance(name, str):
             raise TypeError(f"Strategy could not be instantiated because $name must be a str (got type '{type(name).__name__}') in `Strategy.__init__`.")
         if name.strip() == "":
@@ -76,17 +76,12 @@ class Strategy(ABC):
         Raises:
             RuntimeError: If $_trading_engine is already set or $state of Strategy is not NEW.
         """
-        # Precondition: if TradingEngine is not already set in this Strategy - because we want to set it now
+        # Raise: $_trading_engine must not be already set
         if self._trading_engine is not None:
-            raise RuntimeError(
-                "Cannot call `_set_trading_engine` because $_trading_engine is already set.",
-            )
-
-        # Precondition: Strategy must be in $state NEW, when we want to set TradingEngine to this Strategy
+            raise RuntimeError("Cannot call `set_trading_engine` because $_trading_engine is already set")
+        # Raise: Strategy must be in $state NEW to attach a TradingEngine
         if self.state != StrategyState.NEW:
-            raise RuntimeError(
-                (f"Cannot call `_set_trading_engine` because $state ({self.state.name}) is not NEW. Provide a fresh instance."),
-            )
+            raise RuntimeError(f"Cannot call `set_trading_engine` because $state ({self.state.name}) is not NEW. Provide a fresh instance")
 
         # Set TradingEngine to this Strategy
         self._trading_engine = trading_engine
@@ -118,9 +113,9 @@ class Strategy(ABC):
          Raises:
              RuntimeError: If $_trading_engine is None
         """
-        # Precondition: TradingEngine must be attached to this Strategy
+        # Raise: TradingEngine must be attached to this Strategy
         if self._trading_engine is None:
-            raise RuntimeError("Cannot proceed because $_trading_engine is None. Add the Strategy to a TradingEngine using `add_strategy` first.")
+            raise RuntimeError("Cannot call `_require_trading_engine` because $_trading_engine is None. Add the Strategy to a TradingEngine using `add_strategy` first")
         return self._trading_engine
 
     # endregion
@@ -241,7 +236,7 @@ class Strategy(ABC):
         """
         engine = self._require_trading_engine()
 
-        # Precondition: Strategy must be in $state, where adding feeds make sense (only in states ADDED or RUNNING)
+        # Raise: Strategy must be in $state ADDED or RUNNING to add feeds
         if not (self._state_machine.can_execute_action(StrategyAction.START_STRATEGY) or self.state == StrategyState.RUNNING):
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `add_event_feed` because $state ({self.state.name}) does not allow adding feeds. Valid actions: {valid_actions}. Call it from `on_start` or when the strategy is RUNNING.")
@@ -273,7 +268,7 @@ class Strategy(ABC):
         """
         engine = self._require_trading_engine()
 
-        # Precondition: state must be RUNNING to remove feeds
+        # Raise: state must be RUNNING to remove feeds
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `remove_event_feed` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
@@ -331,9 +326,9 @@ class Strategy(ABC):
         """
         engine = self._require_trading_engine()
 
-        # Precondition: broker name must be present in the attached TradingEngine
+        # Raise: broker name must be present in the attached TradingEngine
         if name not in engine.brokers:
-            raise KeyError(f"Cannot call `get_broker` because Broker named '{name}' is not registered in the attached TradingEngine. Add the broker using `add_broker` first.")
+            raise KeyError(f"Cannot call `get_broker` because Broker named $name ('{name}') is not registered in the attached TradingEngine. Add the broker using `add_broker` first")
 
         result = engine.brokers[name]
         return result
@@ -356,7 +351,7 @@ class Strategy(ABC):
         """
         engine = self._require_trading_engine()
 
-        # Precondition: state must be RUNNING to submit orders
+        # Raise: state must be RUNNING to submit orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `submit_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
@@ -377,7 +372,7 @@ class Strategy(ABC):
         """
         engine = self._require_trading_engine()
 
-        # Precondition: state must be RUNNING to cancel orders
+        # Raise: state must be RUNNING to cancel orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `cancel_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
@@ -398,7 +393,7 @@ class Strategy(ABC):
         """
         engine = self._require_trading_engine()
 
-        # Precondition: state must be RUNNING to modify orders
+        # Raise: state must be RUNNING to modify orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
             raise RuntimeError(f"Cannot call `modify_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")

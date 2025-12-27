@@ -48,7 +48,7 @@ def test_market_order_negative_adjustment_buy_gets_worse_price(instrument, order
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: BUY with -1 tick adjustment gets price increased by 1 tick (0.0001)
+    # Assert: BUY with -1 tick adjustment gets price increased by 1 tick (0.0001)
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.1001")
     assert actual_fills[0].signed_qty == Decimal("10")
@@ -62,7 +62,7 @@ def test_market_order_negative_adjustment_sell_gets_worse_price(instrument, orde
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: SELL with -1 tick adjustment gets price decreased by 1 tick (0.0001)
+    # Assert: SELL with -1 tick adjustment gets price decreased by 1 tick (0.0001)
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.0994")
     assert actual_fills[0].signed_qty == Decimal("-10")
@@ -76,7 +76,7 @@ def test_market_order_positive_adjustment_buy_gets_better_price(instrument, orde
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: BUY with +2 ticks adjustment gets price decreased by 2 ticks (0.0002)
+    # Assert: BUY with +2 ticks adjustment gets price decreased by 2 ticks (0.0002)
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.0998")
     assert actual_fills[0].signed_qty == Decimal("10")
@@ -90,7 +90,7 @@ def test_market_order_positive_adjustment_sell_gets_better_price(instrument, ord
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: SELL with +3 ticks adjustment gets price increased by 3 ticks (0.0003)
+    # Assert: SELL with +3 ticks adjustment gets price increased by 3 ticks (0.0003)
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.0998")
     assert actual_fills[0].signed_qty == Decimal("-10")
@@ -115,7 +115,7 @@ def test_market_order_per_fill_independence(instrument, order_book):
         if actual_fills[0].price != actual_fills[1].price:
             different_outcomes_count += 1
 
-    # Check: proposed fills should get different outcomes in at least some trials
+    # Assert: proposed fills should get different outcomes in at least some trials
     assert different_outcomes_count > 0
 
 
@@ -127,7 +127,7 @@ def test_stop_market_order_uses_fill_adjustment_distribution(instrument, order_b
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: StopMarketOrder gets fill adjustment applied
+    # Assert: StopMarketOrder gets fill adjustment applied
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.0999")
 
@@ -140,7 +140,7 @@ def test_market_order_default_distribution_when_none(instrument, order_book):
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: default distribution applied (should have some slippage with seed 42)
+    # Assert: default distribution applied (should have some slippage with seed 42)
     assert len(actual_fills) == 1
     # Don't check exact price (depends on RNG), just verify it executed
 
@@ -158,7 +158,7 @@ def test_limit_order_on_touch_probability_zero_skips_on_touch_fill(instrument, o
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: on-touch proposed fill is always skipped when probability is 0
+    # Assert: on-touch proposed fill is always skipped when probability is 0
     assert actual_fills == []
 
 
@@ -170,7 +170,7 @@ def test_limit_order_on_touch_probability_one_fills_on_touch_proposed_fill(instr
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: on-touch proposed fill is always accepted when probability is 1
+    # Assert: on-touch proposed fill is always accepted when probability is 1
     assert actual_fills == proposed_fills
 
 
@@ -183,7 +183,7 @@ def test_limit_order_crossed_proposed_fill_always_fills(instrument, order_book):
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: crossed proposed fill is always accepted even when probability is 0
+    # Assert: crossed proposed fill is always accepted even when probability is 0
     assert actual_fills == proposed_fills
 
 
@@ -206,7 +206,7 @@ def test_limit_order_per_fill_independence(instrument, order_book):
             some_partial_fills = True
             break
 
-    # Check: should get partial fills in some trials
+    # Assert: should get partial fills in some trials
     assert some_partial_fills
 
 
@@ -218,7 +218,7 @@ def test_stop_limit_order_uses_on_touch_probability(instrument, order_book):
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: StopLimitOrder fills on-touch proposed fill when probability is 1
+    # Assert: StopLimitOrder fills on-touch proposed fill when probability is 1
     assert len(actual_fills) == 1
     assert actual_fills[0].price == Decimal("1.1000")
 
@@ -231,7 +231,7 @@ def test_limit_order_default_on_touch_probability_when_none(instrument, order_bo
 
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
-    # Check: default probability applied (may or may not fill depending on RNG)
+    # Assert: default probability applied (may or may not fill depending on RNG)
     # Just verify it executed without error
     assert isinstance(actual_fills, list)
 
@@ -258,7 +258,7 @@ def test_reproducibility_same_seed_identical_sequences(instrument, order_book):
         results1.append(fills1[0].price)
         results2.append(fills2[0].price)
 
-    # Check: same seed produces identical results
+    # Assert: same seed produces identical results
     assert results1 == results2
 
 
@@ -279,7 +279,7 @@ def test_reproducibility_different_seeds_different_sequences(instrument, order_b
         results1.append(fills1[0].price)
         results2.append(fills2[0].price)
 
-    # Check: different seeds produce different results
+    # Assert: different seeds produce different results
     assert results1 != results2
 
 
@@ -324,7 +324,7 @@ def test_multiple_fills_processed_correctly(instrument, order_book):
     actual_fills = model.apply_fill_policy(order, order_book, proposed_fills)
 
     assert len(actual_fills) == 3
-    # Check: all proposed fills present with correct quantities
+    # Assert: all proposed fills present with correct quantities
     assert sum(f.signed_qty for f in actual_fills) == Decimal("30")
 
 

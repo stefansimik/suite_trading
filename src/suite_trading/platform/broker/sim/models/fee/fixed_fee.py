@@ -44,7 +44,7 @@ class FixedFeeModel(FeeModel):
         """
         signed_qty = proposed_fill.signed_qty
 
-        # Precondition: ensure signed quantity is non-zero
+        # Raise: ensure signed quantity is non-zero
         if signed_qty == 0:
             raise ValueError(f"Cannot call `compute_commission` because $signed_quantity ({signed_qty}) is zero for order $id ('{order.id}')")
 

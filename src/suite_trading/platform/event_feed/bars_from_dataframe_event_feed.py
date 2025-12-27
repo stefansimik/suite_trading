@@ -56,11 +56,11 @@ class BarsFromDataFrameEventFeed:
           $source_tz is None, a ValueError is raised.
         """
 
-        # Precondition: $df must be a pandas DataFrame
+        # Raise: $df must be a pandas DataFrame
         if not isinstance(df, pd.DataFrame):
             raise ValueError(f"Expected a pandas DataFrame, but received {type(df).__name__}. Please provide your data as a pandas DataFrame.")
 
-        # Precondition: required columns present (volume is optional)
+        # Raise: required columns present (volume is optional)
         expected = {"start_dt", "end_dt", "open", "high", "low", "close"}
         missing = [c for c in expected if c not in df.columns]
         if missing:
@@ -82,7 +82,7 @@ class BarsFromDataFrameEventFeed:
                 df[col] = s.dt.tz_localize(source_tz).dt.tz_convert("UTC")
                 logger.debug(f"Localized column '{col}' from '{source_tz}' and converted to UTC in BarsFromDataFrameEventFeed")
 
-        # Check: $end_dt must be sorted ascending (monotonic non-decreasing)
+        # Ensure $end_dt is sorted ascending (monotonic non-decreasing)
         end_dt_series = df["end_dt"]
         if not end_dt_series.is_monotonic_increasing:
             if auto_sort:
