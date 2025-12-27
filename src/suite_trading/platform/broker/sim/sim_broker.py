@@ -542,12 +542,12 @@ class SimBroker(Broker, SimulatedBroker):
             return
 
         # Commit proposed fill
-        order_fill = self._commit_proposed_fill_and_accounting(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maint_margin_after=maint_margin_after)
+        order_fill = self._apply_proposed_fill_to_order_and_account(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maint_margin_after=maint_margin_after)
         # Publish order-fill + order-update
         self._handle_order_fill(order_fill)
         self._handle_order_update(order)
 
-    def _commit_proposed_fill_and_accounting(
+    def _apply_proposed_fill_to_order_and_account(
         self,
         *,
         order: Order,
