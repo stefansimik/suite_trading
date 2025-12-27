@@ -563,11 +563,11 @@ class SimBroker(Broker, SimulatedBroker):
         """Commit one proposed fill to broker state and account state.
 
         This method is intentionally side-effectful and contains the exact mutation order:
-        block initial (if any) → record order fill and update position/history → unblock initial → set maintenance → pay commission.
+        change blocked initial margin (if any) → record order fill and update position/history → release initial margin → set maintenance margin → pay commission.
         """
         can_block_initial_margin = initial_margin.value > 0
         if can_block_initial_margin:
-            self._account.block_initial_margin(instrument, initial_margin)
+            self._account.change_blocked_initial_margin(instrument, delta=initial_margin)
 
         order_fill = order.add_fill(
             signed_quantity=proposed_fill.signed_qty,
@@ -578,9 +578,9 @@ class SimBroker(Broker, SimulatedBroker):
         self._append_order_fill_to_history_and_update_position(order_fill)
 
         if can_block_initial_margin:
-            self._account.unblock_initial_margin(instrument, initial_margin)
+            self._account.change_blocked_initial_margin(instrument, delta=Money(-initial_margin.value, initial_margin.currency))
 
-        self._account.set_blocked_maintenance_margin(instrument, maint_margin_after)
+        self._account.change_blocked_maint_margin(instrument, target=maint_margin_after)
 
         if order_fill.commission.value > 0:
             fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {order_fill.signed_quantity} Order ID / OrderFill ID: {order_fill.order.id} / {order_fill.id}"

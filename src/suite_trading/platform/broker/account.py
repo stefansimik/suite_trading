@@ -55,10 +55,23 @@ class Account(Protocol):
     def list_paid_fees(self) -> Sequence[PaidFee]: ...
 
     # MARGIN (PER-INSTRUMENT)
-    def block_initial_margin(self, instrument: Instrument, amount: Money) -> None: ...
+    # Provide exactly one of $delta or $target:
+    # - $delta changes blocked margin by a relative amount (positive blocks more, negative releases).
+    # - $target sets the exact blocked margin amount and applies the implied funds movement.
+    def change_blocked_initial_margin(
+        self,
+        instrument: Instrument,
+        *,
+        delta: Money | None = None,
+        target: Money | None = None,
+    ) -> None: ...
 
-    def unblock_initial_margin(self, instrument: Instrument, amount: Money) -> None: ...
-
-    def set_blocked_maintenance_margin(self, instrument: Instrument, blocked_maintenance_margin_amount: Money) -> None: ...
+    def change_blocked_maint_margin(
+        self,
+        instrument: Instrument,
+        *,
+        delta: Money | None = None,
+        target: Money | None = None,
+    ) -> None: ...
 
     # endregion
