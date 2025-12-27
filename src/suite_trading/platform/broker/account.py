@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Protocol, NamedTuple
 
@@ -8,8 +9,8 @@ from suite_trading.domain.monetary.currency import Currency
 from suite_trading.domain.monetary.money import Money
 
 
-class MarginRequirements(NamedTuple):
-    """Read-only container for per-instrument margin amounts."""
+class BlockedMargins(NamedTuple):
+    """Read-only container for per-instrument blocked margin amounts."""
 
     initial: Money
     maintenance: Money
@@ -26,6 +27,8 @@ class PaidFee(NamedTuple):
 class Account(Protocol):
     """Protocol for broker account state and funds/margin operations.
 
+    Funds always mean available/free money. Blocked money is tracked as blocked margins.
+
     Implementations should be side-effect free except for updating internal state. Monetary moves are same-currency.
     """
 
@@ -36,7 +39,7 @@ class Account(Protocol):
     def id(self) -> str: ...
 
     # FUNDS
-    def list_funds_by_currency(self) -> list[tuple[Currency, Money]]: ...
+    def get_all_funds(self) -> Mapping[Currency, Money]: ...
 
     def get_funds(self, currency: Currency) -> Money: ...
 
@@ -44,20 +47,18 @@ class Account(Protocol):
 
     def add_funds(self, amount: Money) -> None: ...
 
-    def subtract_funds(self, amount: Money) -> None: ...
+    def remove_funds(self, amount: Money) -> None: ...
 
     # FEES
     def pay_fee(self, timestamp: datetime, amount: Money, description: str) -> None: ...
 
-    def list_paid_fees(self) -> list[PaidFee]: ...
+    def list_paid_fees(self) -> Sequence[PaidFee]: ...
 
     # MARGIN (PER-INSTRUMENT)
-    def block_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None: ...
+    def block_initial_margin(self, instrument: Instrument, amount: Money) -> None: ...
 
-    def unblock_initial_margin_for_instrument(self, instrument: Instrument, amount: Money) -> None: ...
+    def unblock_initial_margin(self, instrument: Instrument, amount: Money) -> None: ...
 
-    def unblock_all_initial_margin_for_instrument(self, instrument: Instrument) -> None: ...
-
-    def set_maintenance_margin_for_instrument_position(self, instrument: Instrument, maintenance_margin_amount: Money) -> None: ...
+    def set_blocked_maintenance_margin(self, instrument: Instrument, blocked_maintenance_margin_amount: Money) -> None: ...
 
     # endregion

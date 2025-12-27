@@ -525,7 +525,7 @@ class SimBroker(Broker, SimulatedBroker):
         if order.instrument != order_book.instrument:
             raise ValueError(f"Cannot call `_process_proposed_fill` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
-        # COMPUTE
+        # COMPUTE: Reusable values
         # We compute 'before' state to derive final 'after' state later in the ACT stage
         signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
         maint_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_before)
@@ -533,10 +533,10 @@ class SimBroker(Broker, SimulatedBroker):
         commission, initial_margin_delta, maint_margin_delta = self._compute_commission_and_margin_changes(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
 
         # DECIDE
-        # Peak requirement is the commission plus the maximum margin impact (initial or maintenance change)
+        # Peak requirement is the commission + highest margin
         peak_funds_required = max(initial_margin_delta, maint_margin_delta) + commission
 
-        # Guard: ensure account has enough funds for the peak requirement
+        # Guard: ensure account has enough available funds for the peak requirement
         if not self._account.has_enough_funds(peak_funds_required):
             self._handle_insufficient_funds_for_proposed_fill(order=order, proposed_fill=proposed_fill, commission=commission, initial_margin=initial_margin_delta, maint_margin_required_change=maint_margin_delta, order_book=order_book, available_funds=self._account.get_funds(commission.currency))
             return
@@ -567,7 +567,7 @@ class SimBroker(Broker, SimulatedBroker):
         """
         can_block_initial_margin = initial_margin.value > 0
         if can_block_initial_margin:
-            self._account.block_initial_margin_for_instrument(instrument, initial_margin)
+            self._account.block_initial_margin(instrument, initial_margin)
 
         order_fill = order.add_fill(
             signed_quantity=proposed_fill.signed_qty,
@@ -578,9 +578,9 @@ class SimBroker(Broker, SimulatedBroker):
         self._append_order_fill_to_history_and_update_position(order_fill)
 
         if can_block_initial_margin:
-            self._account.unblock_initial_margin_for_instrument(instrument, initial_margin)
+            self._account.unblock_initial_margin(instrument, initial_margin)
 
-        self._account.set_maintenance_margin_for_instrument_position(instrument, maint_margin_after)
+        self._account.set_blocked_maintenance_margin(instrument, maint_margin_after)
 
         if order_fill.commission.value > 0:
             fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {order_fill.signed_quantity} Order ID / OrderFill ID: {order_fill.order.id} / {order_fill.id}"
@@ -601,7 +601,7 @@ class SimBroker(Broker, SimulatedBroker):
         signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
 
         simulated_order_fill_history = list(self._order_fill_history)
-        funds_by_currency = {curr: money for curr, money in self._account.list_funds_by_currency()}
+        funds_by_currency = dict(self._account.get_all_funds())
 
         # PROCESS PROPOSED FILLS
         for i, proposed_fill in enumerate(proposed_fills):
