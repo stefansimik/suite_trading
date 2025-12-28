@@ -318,8 +318,8 @@ class SimBroker(Broker, SimulatedBroker):
         """
         return self._position_by_instrument.get(instrument)
 
-    def get_signed_position_quantity(self, instrument: Instrument) -> Decimal:
-        """Implements: Broker.get_signed_position_quantity
+    def get_signed_position_qty(self, instrument: Instrument) -> Decimal:
+        """Implements: Broker.get_signed_position_qty
 
         Retrieve the net position quantity for $instrument.
 
@@ -495,7 +495,7 @@ class SimBroker(Broker, SimulatedBroker):
         # ACT
         # Apply fills
         for proposed_fill in proposed_fills:
-            signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
+            signed_position_qty_before = self.get_signed_position_qty(order_book.instrument)
             commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required, available_funds, has_enough_funds = self._compute_funding_requirements_and_available_funds_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
 
             # Cancel order
@@ -701,7 +701,7 @@ class SimBroker(Broker, SimulatedBroker):
     ) -> bool:
         """Evaluate if the account has enough funds for margins and fees for all $proposed_fills (dry-run)."""
         # INITIALIZE STATE
-        signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
+        signed_position_qty_before = self.get_signed_position_qty(order_book.instrument)
 
         simulated_order_fill_history = list(self._order_fill_history)
         funds_by_currency = dict(self._account.get_all_funds())

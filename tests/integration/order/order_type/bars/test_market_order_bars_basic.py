@@ -161,7 +161,7 @@ class TestMarketOrderBarsBasic:
         engine.add_strategy(s_close)
         engine.start()
         assert len(s_close.order_fills) == 2
-        assert broker.get_signed_position_quantity(s_close.order_fills[0].order.instrument) == Decimal("0")
+        assert broker.get_signed_position_qty(s_close.order_fills[0].order.instrument) == Decimal("0")
 
         # Reverse path
         engine2 = TradingEngine()
@@ -171,4 +171,4 @@ class TestMarketOrderBarsBasic:
         engine2.add_strategy(s_rev)
         engine2.start()
         # After BUY 1 then SELL 2, final position should be short 1
-        assert broker2.get_signed_position_quantity(s_rev.order_fills[0].order.instrument) == Decimal("-1")
+        assert broker2.get_signed_position_qty(s_rev.order_fills[0].order.instrument) == Decimal("-1")

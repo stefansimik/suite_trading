@@ -211,7 +211,7 @@ class Broker(Protocol):
         """
         ...
 
-    def get_signed_position_quantity(self, instrument: Instrument) -> Decimal:
+    def get_signed_position_qty(self, instrument: Instrument) -> Decimal:
         """Retrieve the net position quantity for $instrument.
 
         Returns a positive value for buy (long) positions, a negative value for
