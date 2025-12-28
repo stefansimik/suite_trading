@@ -542,12 +542,12 @@ class SimBroker(Broker, SimulatedBroker):
             return
 
         # Commit proposed fill
-        order_fill = self._apply_proposed_fill_to_order_and_account(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maint_margin_after=maint_margin_after)
+        order_fill = self._commit_proposed_fill_to_order_and_account(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maint_margin_after=maint_margin_after)
         # Publish order-fill + order-update
         self._handle_order_fill(order_fill)
-        self._handle_order_update(order)
+        self._handle_order_update(order_fill.order)
 
-    def _apply_proposed_fill_to_order_and_account(
+    def _commit_proposed_fill_to_order_and_account(
         self,
         *,
         order: Order,
@@ -560,36 +560,38 @@ class SimBroker(Broker, SimulatedBroker):
         """Commit one proposed fill to broker state and account state.
 
         This method is intentionally side-effectful and contains the exact mutation order:
-        change blocked initial margin (if any) → record order fill and update position/history → release initial margin → set maintenance margin → pay commission.
-        """
-        # Decide whether $initial_margin needs blocking
-        can_block_initial_margin = initial_margin.value > 0
-        if can_block_initial_margin:
-            # Block initial margin before fill
-            self._account.change_blocked_initial_margin(instrument, delta=initial_margin)
+        block initial margin (if any) → record order fill and update position/history → pay commission → release initial margin → set maintenance margin.
 
-        # Record this fill on $order
-        order_fill = order.add_fill(
-            signed_quantity=proposed_fill.signed_qty,
-            price=proposed_fill.price,
-            timestamp=proposed_fill.timestamp,
-            commission=commission,
-        )
+        This order imitates a conservative live broker flow: reserve the peak funds before booking the execution, book the execution into order/position state,
+        settle the execution cost (commission), release the temporary peak-funds reservation, and finally apply the post-trade maintenance margin requirement.
+
+        Applying maintenance margin after releasing the temporary initial-margin reservation avoids a short-lived state where both margin buckets are reserved
+        at once (initial + maintenance), which would be stricter than the peak-funds decision based on `max(...)`.
+        """
+        # Block initial margin
+        was_blocked_initial_margin = False
+        if initial_margin.value > 0:
+            self._account.change_blocked_initial_margin(instrument, delta=initial_margin)
+            was_blocked_initial_margin = True
+
+        # Create OrderFill
+        order_fill = order.add_fill(signed_quantity=proposed_fill.signed_qty, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission)
         # Update fill history and $position
         self._append_order_fill_to_history_and_update_position(order_fill)
 
-        if can_block_initial_margin:
-            # Release blocked initial margin
-            self._account.change_blocked_initial_margin(instrument, delta=Money(-initial_margin.value, initial_margin.currency))
-
-        # Set blocked maintenance margin target
-        self._account.change_blocked_maint_margin(instrument, target=maint_margin_after)
-
+        # Pay commission
         if order_fill.commission.value > 0:
-            # Build fee description for ledger
             fee_description = f"Commission for Instrument: {instrument.name} | Quantity: {order_fill.signed_quantity} Order ID / OrderFill ID: {order_fill.order.id} / {order_fill.id}"
             # Pay commission from $account funds
             self._account.pay_fee(order_fill.timestamp, order_fill.commission, fee_description)
+
+        # Unblock initial margin
+        if was_blocked_initial_margin:
+            initial_margin_release = Money(-initial_margin.value, initial_margin.currency)
+            self._account.change_blocked_initial_margin(instrument, delta=initial_margin_release)
+
+        # Block maintenance margin
+        self._account.change_blocked_maint_margin(instrument, target=maint_margin_after)
 
         return order_fill
 
