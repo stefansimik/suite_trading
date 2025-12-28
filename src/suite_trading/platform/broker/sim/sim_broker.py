@@ -8,6 +8,7 @@ import logging
 from suite_trading.platform.broker.account import Account
 from suite_trading.platform.broker.sim.models.fill.distribution import DistributionFillModel
 from suite_trading.platform.broker.sim.sim_account import SimAccount
+from suite_trading.domain.monetary.currency import Currency
 from suite_trading.domain.monetary.currency_registry import USD
 from suite_trading.domain.order.orders import Order, StopMarketOrder, StopLimitOrder
 from suite_trading.domain.order.order_enums import TimeInForce
@@ -403,7 +404,7 @@ class SimBroker(Broker, SimulatedBroker):
 
         # ACT
         self._maybe_trigger_stop_order(order, order_book)
-        self._simulate_and_apply_fills_for_order_with_order_book(order, order_book)
+        self._try_fill_order_against_order_book(order, order_book)
 
     def _maybe_trigger_stop_order(self, order: Order, order_book: OrderBook) -> None:
         """Trigger a stop-like $order if its stop condition is met.
@@ -446,7 +447,7 @@ class SimBroker(Broker, SimulatedBroker):
         for action in stop_actions_to_apply:
             self._apply_order_action(order, action)
 
-    def _simulate_and_apply_fills_for_order_with_order_book(self, order: Order, order_book: OrderBook) -> None:
+    def _try_fill_order_against_order_book(self, order: Order, order_book: OrderBook) -> None:
         """Simulate and apply fills for a single $order using the broker's OrderBook.
 
         Flow: Validate → Compute → Decide → Act
@@ -455,25 +456,44 @@ class SimBroker(Broker, SimulatedBroker):
         if order.state_category != OrderStateCategory.FILLABLE:
             return
 
+        # Raise: ensure $order.instrument matches $order_book.instrument for pricing and margin
+        if order.instrument != order_book.instrument:
+            raise ValueError(f"Cannot call `_simulate_and_apply_fills_for_order_with_order_book` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
+
         # COMPUTE
         simulate_fn = select_simulate_fills_function_for_order(order)
         proposed_fills_raw = simulate_fn(order, order_book)
         actual_fills = self._fill_model.apply_fill_policy(order, order_book, proposed_fills_raw)
 
         # DECIDE
-        proposed_fills, expire_remainder = self._decide_fill_plan(order, actual_fills, order_book)
+        proposed_fills, should_expire_unfilled_order_quantity = self._decide_fill_plan(order, actual_fills, order_book)
 
         # ACT
         # Apply fills
         for proposed_fill in proposed_fills:
-            self._apply_proposed_fill_if_fundable_or_cancel_order(proposed_fill, order, order_book)
+            signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
+            commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required, available_funds, has_enough_funds = self._compute_funding_requirements_and_available_funds_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
+
+            # Cancel order
+            if not has_enough_funds:
+                logger.error(f"Reject ProposedFill for Order '{order.id}': $available_funds={available_funds}, $peak_funds_required={peak_funds_required}, $commission={commission}, $initial_margin_delta={initial_margin_delta}, $maint_margin_delta={maint_margin_delta}, $best_bid={order_book.best_bid.price}, $best_ask={order_book.best_ask.price}, $proposed_fill.signed_qty={proposed_fill.signed_qty}, $price={proposed_fill.price}, $proposed_fill.timestamp={proposed_fill.timestamp}")
+                self._apply_order_action(order, OrderAction.CANCEL)
+                self._apply_order_action(order, OrderAction.ACCEPT)
+                return
+
+            # Fill order
+            order_fill = self._commit_proposed_fill_to_order_and_account(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maint_margin_after=maint_margin_after)
+
+            # Handle (publish) new events
+            self._handle_order_fill(order_fill)
+            self._handle_order_update(order_fill.order)
 
             # Skip: stop once the order was terminalized
             if order.state_category == OrderStateCategory.TERMINAL:
                 return
 
         # Handle expiration for orders of type IOC/FOK
-        if expire_remainder:
+        if should_expire_unfilled_order_quantity:
             self._apply_order_action(order, OrderAction.EXPIRE)
 
     def _decide_fill_plan(
@@ -484,8 +504,10 @@ class SimBroker(Broker, SimulatedBroker):
     ) -> tuple[list[ProposedFill], bool]:
         """Determines the fill application decision based on TIF rules and required funds.
 
+        The returned boolean indicates whether the remaining unfilled quantity of $order should be expired after applying the returned $proposed_fills.
+
         Returns:
-            tuple: (proposed_fills: list[ProposedFill], expire_remainder: bool)
+            tuple: (proposed_fills: list[ProposedFill], should_expire_unfilled_order_quantity: bool)
         """
         tif = order.time_in_force
 
@@ -502,50 +524,10 @@ class SimBroker(Broker, SimulatedBroker):
 
         # Special case 2: Order of type IOC: Fill what is possible, then expire unfilled part
         if tif == TimeInForce.IOC:
-            return proposed_fills, True  # IOC: fill available proposed fills and expire remainder
+            return proposed_fills, True  # IOC: fill available proposed fills and expire unfilled order quantity
 
         # Default: Fill all available liquidity (do not expire unfilled part)
         return proposed_fills, False
-
-    def _apply_proposed_fill_if_fundable_or_cancel_order(
-        self,
-        proposed_fill: ProposedFill,
-        order: Order,
-        order_book: OrderBook,
-    ) -> None:
-        """Applies a single $proposed_fill to $order using the broker's OrderBook.
-
-        Args:
-            proposed_fill: The specific fill to be applied to the order.
-            order: The target Order that receives the fill.
-            order_book: Market context used for final pricing and margin calculations.
-        """
-        # VALIDATE
-        # Raise: ensure $order.instrument matches $order_book.instrument for pricing and margin
-        if order.instrument != order_book.instrument:
-            raise ValueError(f"Cannot call `_apply_proposed_fill_if_fundable_or_cancel_order` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
-
-        # COMPUTE
-        signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
-        commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required = self._compute_funding_requirements_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=self._order_fill_history)
-        available_funds = self._account.get_funds(peak_funds_required.currency)
-
-        # DECIDE
-        has_enough_funds = available_funds >= peak_funds_required
-
-        # ACT
-        if not has_enough_funds:
-            # Cancel order
-            logger.error(f"Reject ProposedFill for Order '{order.id}': $available_funds={available_funds}, $peak_funds_required={peak_funds_required}, $commission={commission}, $initial_margin_delta={initial_margin_delta}, $maint_margin_delta={maint_margin_delta}, $best_bid={order_book.best_bid.price}, $best_ask={order_book.best_ask.price}, $proposed_fill.signed_qty={proposed_fill.signed_qty}, $price={proposed_fill.price}, $proposed_fill.timestamp={proposed_fill.timestamp}")
-            self._apply_order_action(order, OrderAction.CANCEL)
-            self._apply_order_action(order, OrderAction.ACCEPT)
-            return
-
-        # Commit proposed fill
-        order_fill = self._commit_proposed_fill_to_order_and_account(order=order, proposed_fill=proposed_fill, instrument=order_book.instrument, commission=commission, initial_margin=initial_margin_delta, maint_margin_after=maint_margin_after)
-        # Publish order-fill + order-update
-        self._handle_order_fill(order_fill)
-        self._handle_order_update(order_fill.order)
 
     def _commit_proposed_fill_to_order_and_account(
         self,
@@ -644,6 +626,49 @@ class SimBroker(Broker, SimulatedBroker):
         result = commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required
         return result
 
+    def _compute_funding_requirements_and_available_funds_for_proposed_fill(
+        self,
+        *,
+        signed_position_qty_before: Decimal,
+        proposed_fill: ProposedFill,
+        order: Order,
+        order_book: OrderBook,
+        previous_order_fills: Sequence[OrderFill],
+        available_funds_by_currency: dict[Currency, Money] | None = None,
+    ) -> tuple[Money, Money, Money, Money, Money, Money, bool]:
+        """Compute funding requirements and available funds for one $proposed_fill.
+
+        This helper is intentionally pure with respect to broker/account state: it does not mutate anything.
+        It exists to avoid funding recomputation drift between the apply loop and the FOK dry-run.
+
+        Args:
+            signed_position_qty_before: Net position signed quantity before applying the fill.
+            proposed_fill: The fill being evaluated.
+            order: The parent Order that this fill belongs to.
+            order_book: Market snapshot used for pricing and margin calculations.
+            previous_order_fills: Earlier fills for the same order, used for tiered commissions.
+            available_funds_by_currency: Optional mapping used by dry-run flows to provide simulated funds.
+
+        Returns:
+            Tuple of (commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required, available_funds, has_enough_funds).
+        """
+        commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required = self._compute_funding_requirements_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=previous_order_fills)
+        currency = peak_funds_required.currency
+
+        if available_funds_by_currency is None:
+            available_funds = self._account.get_funds(currency)
+        else:
+            available_funds = available_funds_by_currency.get(currency, Money(0, currency))
+
+        # Raise: ensure $available_funds is in the same currency as $peak_funds_required
+        if available_funds.currency != currency:
+            raise ValueError(f"Cannot call `_compute_funding_requirements_and_available_funds_for_proposed_fill` because $available_funds.currency ('{available_funds.currency}') does not match $peak_funds_required.currency ('{currency}')")
+
+        has_enough_funds = available_funds >= peak_funds_required
+
+        result = commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required, available_funds, has_enough_funds
+        return result
+
     def _has_enough_funds_for_proposed_fills(
         self,
         order: Order,
@@ -662,12 +687,9 @@ class SimBroker(Broker, SimulatedBroker):
             # COMPUTE: Next state and required funding
             signed_position_qty_after = signed_position_qty_before + proposed_fill.signed_qty
 
-            commission, initial_margin_delta, maint_margin_delta, _maint_margin_after, peak_funds_required = self._compute_funding_requirements_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history)
+            commission, _initial_margin_delta, maint_margin_delta, _maint_margin_after, peak_funds_required, available_account_funds, has_enough_funds = self._compute_funding_requirements_and_available_funds_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history, available_funds_by_currency=funds_by_currency)
 
-            # DECIDE: Can we fund the peak usage for this specific proposed fill?
-            available_account_funds = funds_by_currency.get(peak_funds_required.currency, Money(0, peak_funds_required.currency))
-
-            if available_account_funds < peak_funds_required:
+            if not has_enough_funds:
                 return False
 
             # ACT (Simulated): Update tracking for the next proposed fill iteration
