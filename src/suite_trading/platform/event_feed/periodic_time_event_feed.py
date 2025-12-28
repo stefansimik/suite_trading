@@ -132,7 +132,9 @@ class FixedIntervalEventFeed:
     # region EventFeed protocol
 
     def peek(self) -> Event | None:
-        """Return the next event if ready, else None.
+        """Implements: EventFeed.peek
+
+        Return the next event if ready, else None.
 
         Non-blocking readiness check. When `datetime.now(UTC) >= $next_tick`, a TimeTickEvent is
         created and cached until consumed with `pop()`.
@@ -157,7 +159,9 @@ class FixedIntervalEventFeed:
         return self._next_event
 
     def pop(self) -> Event | None:
-        """Return the next event and advance the schedule, or None if not ready.
+        """Implements: EventFeed.pop
+
+        Return the next event and advance the schedule, or None if not ready.
 
         Advancing increments $next_tick by $interval. If an inclusive $end_datetime is set and
         the next scheduled tick moves beyond it, the feed is marked finished.
@@ -183,7 +187,9 @@ class FixedIntervalEventFeed:
         return event
 
     def is_finished(self) -> bool:
-        """True when the feed will not produce any more events.
+        """Implements: EventFeed.is_finished
+
+        True when the feed will not produce any more events.
 
         This is True after the inclusive $end_datetime has been passed or after `close()`.
 
@@ -193,13 +199,18 @@ class FixedIntervalEventFeed:
         return self._finished or self._closed
 
     def close(self) -> None:
-        """Release resources used by this feed (idempotent, non-blocking)."""
+        """Implements: EventFeed.close
+
+        Release resources used by this feed (idempotent, non-blocking).
+        """
         self._next_event = None
         self._finished = True
         self._closed = True
 
     def remove_events_before(self, cutoff_time: datetime) -> None:
-        """Advance internal schedule to the first tick >= $cutoff_time.
+        """Implements: EventFeed.remove_events_before
+
+        Advance internal schedule to the first tick >= $cutoff_time.
 
         For bounded feeds with an inclusive $end_datetime, advancing beyond the end marks the
         feed finished.
@@ -241,7 +252,9 @@ class FixedIntervalEventFeed:
     # region Observe consumed events
 
     def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key. Called after each successful `pop`.
+        """Implements: EventFeed.add_listener
+
+        Register $listener under $key. Called after each successful `pop`.
 
         Args:
             key: Unique, non-empty identifier for this listener.
@@ -259,7 +272,9 @@ class FixedIntervalEventFeed:
         self._listeners[key] = listener
 
     def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key.
+        """Implements: EventFeed.remove_listener
+
+        Unregister listener under $key.
 
         Args:
             key: Identifier of the listener to remove.
@@ -273,6 +288,10 @@ class FixedIntervalEventFeed:
         del self._listeners[key]
 
     def list_listeners(self) -> list[Callable[[Event], None]]:
+        """Implements: EventFeed.list_listeners
+
+        Return all registered listeners.
+        """
         return list(self._listeners.values())
 
     # endregion

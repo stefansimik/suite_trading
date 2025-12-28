@@ -25,7 +25,9 @@ class DefaultEventToOrderBookConverter(EventToOrderBookConverter):
     """
 
     def can_convert(self, event: Event) -> bool:
-        """Check if $event can be converted to OrderBook snapshot(s).
+        """Implements: EventToOrderBookConverter.can_convert
+
+        Check if $event can be converted to OrderBook snapshot(s).
 
         Args:
             event: Event to check.
@@ -36,7 +38,9 @@ class DefaultEventToOrderBookConverter(EventToOrderBookConverter):
         return isinstance(event, (BarEvent, TradeTickEvent, QuoteTickEvent, OrderBookEvent))
 
     def convert_to_order_books(self, event: Event) -> list[OrderBook]:
-        """Convert $event to OrderBook snapshot(s).
+        """Implements: EventToOrderBookConverter.convert_to_order_books
+
+        Convert $event to OrderBook snapshot(s).
 
         Args:
             event: Event to convert.

@@ -141,7 +141,10 @@ class DistributionFillModel:
         order_book: OrderBook,
         proposed_fills: list[ProposedFill],
     ) -> list[ProposedFill]:
-        """Apply fill policy based on order type: slippage for market orders, probability for limit orders."""
+        """Implements: FillModel.apply_fill_policy
+
+        Apply fill policy based on $order type: slippage for market-like orders and on-touch probability for limit-like orders.
+        """
         # Pass through empty list immediately
         if not proposed_fills:
             return []

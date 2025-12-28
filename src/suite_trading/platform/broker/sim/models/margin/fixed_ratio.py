@@ -53,6 +53,10 @@ class FixedRatioMarginModel(MarginModel):
         order_book: OrderBook,
         signed_quantity: DecimalLike,
     ) -> Money:
+        """Implements: MarginModel.compute_initial_margin
+
+        Compute initial margin for a position change of $signed_quantity using the current $order_book.
+        """
         signed_quantity = as_decimal(signed_quantity)
         instrument = order_book.instrument
         price = self._extract_price_from_order_book(order_book)
@@ -67,6 +71,10 @@ class FixedRatioMarginModel(MarginModel):
         order_book: OrderBook,
         signed_quantity: DecimalLike,
     ) -> Money:
+        """Implements: MarginModel.compute_maintenance_margin
+
+        Compute maintenance margin for a net position of $signed_quantity using the current $order_book.
+        """
         signed_quantity = as_decimal(signed_quantity)
         instrument = order_book.instrument
         price = self._extract_price_from_order_book(order_book)

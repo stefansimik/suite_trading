@@ -23,7 +23,9 @@ class PassThroughMarketDepthModel(MarketDepthModel):
     __slots__ = ()
 
     def customize_matching_liquidity(self, order_book: OrderBook) -> OrderBook:
-        """Return the provided OrderBook unchanged (pass-through).
+        """Implements: MarketDepthModel.customize_matching_liquidity
+
+        Return the provided OrderBook unchanged (pass-through).
 
         Args:
             order_book: OrderBook snapshot from the converter.

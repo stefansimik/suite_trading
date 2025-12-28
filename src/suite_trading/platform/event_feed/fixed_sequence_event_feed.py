@@ -62,7 +62,9 @@ class FixedSequenceEventFeed:
     # region EventFeed protocol
 
     def peek(self) -> Event | None:
-        """Return the next event without consuming it.
+        """Implements: EventFeed.peek
+
+        Return the next event without consuming it.
 
         Returns:
             Event | None: The next event, or None if no event is available or the feed is closed.
@@ -72,7 +74,9 @@ class FixedSequenceEventFeed:
         return self._event_deque[0]
 
     def pop(self) -> Event | None:
-        """Return the next event and advance the feed.
+        """Implements: EventFeed.pop
+
+        Return the next event and advance the feed.
 
         Returns:
             Event | None: The next event, or None if no event is available or the feed is closed.
@@ -86,11 +90,16 @@ class FixedSequenceEventFeed:
         return event
 
     def is_finished(self) -> bool:
-        """Return True when this feed will not produce any more events."""
+        """Implements: EventFeed.is_finished
+
+        Return True when this feed will not produce any more events.
+        """
         return self._closed or not self._event_deque
 
     def close(self) -> None:
-        """Release resources used by this feed.
+        """Implements: EventFeed.close
+
+        Release resources used by this feed.
 
         Requirements:
         - Idempotent: Safe to call multiple times.
@@ -102,7 +111,9 @@ class FixedSequenceEventFeed:
         self._closed = True
 
     def remove_events_before(self, cutoff_time: datetime) -> None:
-        """Remove all events with $dt_event < $cutoff_time.
+        """Implements: EventFeed.remove_events_before
+
+        Remove all events with $dt_event < $cutoff_time.
 
         Args:
             cutoff_time (datetime): Inclusive lower bound (UTC); events older than this are removed.
@@ -118,7 +129,9 @@ class FixedSequenceEventFeed:
         self._event_deque = deque(ev for ev in self._event_deque if ev.dt_event >= cutoff_time)
 
     def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register a listener for events consumed from this feed.
+        """Implements: EventFeed.add_listener
+
+        Register a listener for events consumed from this feed.
 
         Notes:
             Listeners are invoked by TradingEngine after each successful pop() from this feed.
@@ -139,7 +152,9 @@ class FixedSequenceEventFeed:
         self._listeners[key] = listener
 
     def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key.
+        """Implements: EventFeed.remove_listener
+
+        Unregister listener under $key.
 
         Args:
             key (str): Key of the listener to remove.
@@ -153,7 +168,9 @@ class FixedSequenceEventFeed:
         del self._listeners[key]
 
     def list_listeners(self) -> list[Callable[[Event], None]]:
-        """Return listeners in registration order.
+        """Implements: EventFeed.list_listeners
+
+        Return listeners in registration order.
 
         Returns:
             list[Callable[[Event], None]]: Registered listeners in registration order.

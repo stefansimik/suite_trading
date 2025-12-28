@@ -29,10 +29,11 @@ class FixedFeeModel(FeeModel):
         order: Order,
         previous_order_fills: Sequence[OrderFill],
     ) -> Money:
-        """Computes the commission for the $proposed_fill.
+        """Implements: FeeModel.compute_commission
 
-        This model multiplies the fixed fee by the absolute quantity of the
-        $proposed_fill.
+        Compute the commission for the $proposed_fill.
+
+        This model multiplies the fixed fee by the absolute quantity of the $proposed_fill.
 
         Args:
             proposed_fill: The trade data for which the commission is calculated.

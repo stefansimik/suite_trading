@@ -43,34 +43,62 @@ class SimAccount(Account):
 
     @property
     def id(self) -> str:
+        """Implements: Account.id
+
+        Return the account identifier.
+        """
         return self._id
 
     # FUNDS
 
     def get_all_funds(self) -> Mapping[Currency, Money]:
+        """Implements: Account.get_all_funds
+
+        Return all funds by currency.
+
+        Returns:
+            Mapping[Currency, Money]: Current funds per currency.
+        """
         result: dict[Currency, Money] = {}
         for currency in sorted(self._funds_by_currency.keys(), key=lambda c: c.code):
             result[currency] = self._funds_by_currency[currency]
         return result
 
     def get_funds(self, currency: Currency) -> Money:
-        """Return current funds for the given $currency.
+        """Implements: Account.get_funds
+
+        Return current funds for the given $currency.
 
         This is a cheap read with no side effects.
         """
         return self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
 
     def has_enough_funds(self, required_amount: Money) -> bool:
+        """Implements: Account.has_enough_funds
+
+        Return True if the account has at least $required_amount available as funds.
+        """
         currency = required_amount.currency
         current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
         return current.value >= required_amount.value
 
     def add_funds(self, amount: Money) -> None:
+        """Implements: Account.add_funds
+
+        Add $amount to funds.
+        """
         currency = amount.currency
         current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
         self._funds_by_currency[currency] = current + amount
 
     def remove_funds(self, amount: Money) -> None:
+        """Implements: Account.remove_funds
+
+        Remove $amount from funds.
+
+        Raises:
+            ValueError: If deducting would make funds negative.
+        """
         currency = amount.currency
         current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
         new_value = current.value - amount.value
@@ -84,7 +112,9 @@ class SimAccount(Account):
     # FEES
 
     def pay_fee(self, timestamp: datetime, amount: Money, description: str) -> None:
-        """Pay a fee and record it.
+        """Implements: Account.pay_fee
+
+        Pay a fee and record it.
 
         This is a high-level operation that subtracts from $funds and stores a
         `PaidFee` record. Only strictly positive $amount is allowed.
@@ -108,7 +138,9 @@ class SimAccount(Account):
         self._paid_fees.append(PaidFee(timestamp=timestamp, amount=amount, description=description))
 
     def list_paid_fees(self) -> Sequence[PaidFee]:
-        """Return all paid fee records (most recent last).
+        """Implements: Account.list_paid_fees
+
+        Return all paid fee records (most recent last).
 
         The returned sequence is read-only by convention.
         """
@@ -123,7 +155,9 @@ class SimAccount(Account):
         delta: Money | None = None,
         target: Money | None = None,
     ) -> None:
-        """Change blocked initial margin for the given $instrument.
+        """Implements: Account.change_blocked_initial_margin
+
+        Change blocked initial margin for the given $instrument.
 
         Provide exactly one of $delta or $target:
         - $delta changes blocked initial margin by a relative amount.
@@ -175,7 +209,9 @@ class SimAccount(Account):
         delta: Money | None = None,
         target: Money | None = None,
     ) -> None:
-        """Change blocked maintenance margin for the given $instrument.
+        """Implements: Account.change_blocked_maint_margin
+
+        Change blocked maintenance margin for the given $instrument.
 
         Provide exactly one of $delta or $target:
         - $delta changes blocked maintenance margin by a relative amount.

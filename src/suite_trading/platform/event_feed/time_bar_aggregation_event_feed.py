@@ -119,7 +119,10 @@ class TimeBarAggregationEventFeed:
     # region EventFeed protocol
 
     def peek(self) -> Event | None:
-        """Return the next aggregated event without consuming it, or None if none is ready."""
+        """Implements: EventFeed.peek
+
+        Return the next aggregated event without consuming it, or None if none is ready.
+        """
         # If queue is empty, return None
         if not self._aggregated_event_queue:
             return None
@@ -128,7 +131,10 @@ class TimeBarAggregationEventFeed:
         return self._aggregated_event_queue[0]
 
     def pop(self) -> Event | None:
-        """Return the next aggregated event, or None if none is ready."""
+        """Implements: EventFeed.pop
+
+        Return the next aggregated event, or None if none is ready.
+        """
         # If queue is empty, return None
         if not self._aggregated_event_queue:
             return None
@@ -139,7 +145,10 @@ class TimeBarAggregationEventFeed:
         return next_event
 
     def is_finished(self) -> bool:
-        """True when source is finished and no aggregated events remain to be emitted."""
+        """Implements: EventFeed.is_finished
+
+        True when source is finished and no aggregated events remain to be emitted.
+        """
         source_feed_is_finished = self._source_feed.is_finished()
         no_aggregated_bars_remain = len(self._aggregated_event_queue) == 0
 
@@ -147,7 +156,10 @@ class TimeBarAggregationEventFeed:
         return this_feed_is_finished
 
     def close(self) -> None:
-        """Release resources and unsubscribe. Idempotent."""
+        """Implements: EventFeed.close
+
+        Release resources and unsubscribe. Idempotent.
+        """
         if self._closed:
             return
 
@@ -161,7 +173,10 @@ class TimeBarAggregationEventFeed:
         self._closed = True
 
     def remove_events_before(self, cutoff_time: datetime) -> None:
-        """Remove all aggregated events before $cutoff_time and drop obsolete accumulator."""
+        """Implements: EventFeed.remove_events_before
+
+        Remove all aggregated events before $cutoff_time and drop obsolete accumulator.
+        """
         require_utc(cutoff_time)
 
         # Remove events older than cutoff
@@ -170,7 +185,9 @@ class TimeBarAggregationEventFeed:
                 self._aggregated_event_queue.popleft()
 
     def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key.
+        """Implements: EventFeed.add_listener
+
+        Register $listener under $key.
 
         Notes:
             Listeners are invoked by TradingEngine after each successful pop() from this feed.
@@ -187,13 +204,20 @@ class TimeBarAggregationEventFeed:
         self._listeners[key] = listener
 
     def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key. Log warning if $key is unknown."""
+        """Implements: EventFeed.remove_listener
+
+        Unregister listener under $key. Log warning if $key is unknown.
+        """
         if key not in self._listeners:
             logger.warning(f"Attempted to remove unknown listener $key ('{key}') from EventFeed (class {self.__class__.__name__})")
             return
         del self._listeners[key]
 
     def list_listeners(self) -> list[Callable[[Event], None]]:
+        """Implements: EventFeed.list_listeners
+
+        Return all registered listeners.
+        """
         return list(self._listeners.values())
 
     # endregion

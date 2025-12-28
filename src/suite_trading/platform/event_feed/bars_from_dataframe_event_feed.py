@@ -108,7 +108,10 @@ class BarsFromDataFrameEventFeed:
     # region EventFeed protocol
 
     def peek(self) -> Event | None:
-        """Return the next event without consuming it, or None if none is ready."""
+        """Implements: EventFeed.peek
+
+        Return the next event without consuming it, or None if none is ready.
+        """
         if self._df is None:
             return None
         if self._next_bar_event is not None:
@@ -121,7 +124,10 @@ class BarsFromDataFrameEventFeed:
         return self._next_bar_event
 
     def pop(self) -> Event | None:
-        """Return the next event and advance the feed, or None if none is ready."""
+        """Implements: EventFeed.pop
+
+        Return the next event and advance the feed, or None if none is ready.
+        """
         event = self.peek()
         if event is None:
             return None
@@ -131,7 +137,10 @@ class BarsFromDataFrameEventFeed:
         return event
 
     def is_finished(self) -> bool:
-        """Return True when this feed is at the end and will not produce any more events."""
+        """Implements: EventFeed.is_finished
+
+        Return True when this feed is at the end and will not produce any more events.
+        """
         if self._df is None:
             return True
 
@@ -143,7 +152,10 @@ class BarsFromDataFrameEventFeed:
         return row_index_is_at_end_of_dataframe
 
     def close(self) -> None:
-        """Release resources used by this feed. Idempotent and non-blocking."""
+        """Implements: EventFeed.close
+
+        Release resources used by this feed. Idempotent and non-blocking.
+        """
         # Idempotent: safe to call multiple times
         if self._df is None:
             return
@@ -153,7 +165,10 @@ class BarsFromDataFrameEventFeed:
         # Leave _row_index_of_next_event and other fields intact for debugging/str()
 
     def remove_events_before(self, cutoff_time: datetime) -> None:
-        """Remove all events before $cutoff_time from this event feed."""
+        """Implements: EventFeed.remove_events_before
+
+        Remove all events before $cutoff_time from this event feed.
+        """
         if self._df is None:
             return
 
@@ -170,7 +185,9 @@ class BarsFromDataFrameEventFeed:
         self._next_bar_event = None
 
     def add_listener(self, key: str, listener: Callable[[Event], None]) -> None:
-        """Register $listener under $key.
+        """Implements: EventFeed.add_listener
+
+        Register $listener under $key.
 
         Notes:
             Listeners are invoked by TradingEngine after each successful pop() from this feed.
@@ -187,13 +204,20 @@ class BarsFromDataFrameEventFeed:
         self._listeners[key] = listener
 
     def remove_listener(self, key: str) -> None:
-        """Unregister listener under $key. Log warning if $key is unknown."""
+        """Implements: EventFeed.remove_listener
+
+        Unregister listener under $key. Log warning if $key is unknown.
+        """
         if key not in self._listeners:
             logger.warning(f"Attempted to remove unknown listener $key ('{key}') from EventFeed (class {self.__class__.__name__})")
             return
         del self._listeners[key]
 
     def list_listeners(self) -> list[Callable[[Event], None]]:
+        """Implements: EventFeed.list_listeners
+
+        Return all registered listeners.
+        """
         return list(self._listeners.values())
 
     # endregion
