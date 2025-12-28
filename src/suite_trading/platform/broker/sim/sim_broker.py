@@ -466,7 +466,7 @@ class SimBroker(Broker, SimulatedBroker):
         # ACT
         # Apply fills
         for proposed_fill in proposed_fills:
-            self._apply_proposed_fill_if_fundable(proposed_fill, order, order_book)
+            self._apply_proposed_fill_if_fundable_or_cancel_order(proposed_fill, order, order_book)
 
             # Skip: stop once the order was terminalized
             if order.state_category == OrderStateCategory.TERMINAL:
@@ -507,7 +507,7 @@ class SimBroker(Broker, SimulatedBroker):
         # Default: Fill all available liquidity (do not expire unfilled part)
         return proposed_fills, False
 
-    def _apply_proposed_fill_if_fundable(
+    def _apply_proposed_fill_if_fundable_or_cancel_order(
         self,
         proposed_fill: ProposedFill,
         order: Order,
@@ -523,7 +523,7 @@ class SimBroker(Broker, SimulatedBroker):
         # VALIDATE
         # Raise: ensure $order.instrument matches $order_book.instrument for pricing and margin
         if order.instrument != order_book.instrument:
-            raise ValueError(f"Cannot call `_apply_proposed_fill_if_fundable` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
+            raise ValueError(f"Cannot call `_apply_proposed_fill_if_fundable_or_cancel_order` because $order.instrument ('{order.instrument}') does not match $order_book.instrument ('{order_book.instrument}')")
 
         # COMPUTE
         signed_position_qty_before = self.get_signed_position_quantity(order_book.instrument)
