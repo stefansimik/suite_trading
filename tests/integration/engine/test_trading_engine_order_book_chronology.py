@@ -68,7 +68,7 @@ class MockOrderBookDrivenBroker(Broker):
         """No-op connection status."""
         return True
 
-    def set_callbacks(
+    def register_order_event_callbacks(
         self,
         on_order_fill: Callable[[OrderFill], None],
         on_order_state_update: Callable[[Order], None],

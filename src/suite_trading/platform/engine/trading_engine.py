@@ -217,7 +217,7 @@ class TradingEngine:
             raise ValueError(f"Cannot call `add_broker` because Broker named ('{name}') is already added to this TradingEngine. Choose a different name.")
 
         self._brokers_by_name_bidict[name] = broker
-        broker.set_callbacks(self._route_order_fill_to_strategy, self._route_order_update_to_strategy)
+        broker.register_order_event_callbacks(self._route_order_fill_to_strategy, self._route_order_update_to_strategy)
         logger.debug(f"TradingEngine added Broker named '{name}' (class {broker.__class__.__name__})")
 
         # No special registration for price-sample processing; capability is checked at use-site

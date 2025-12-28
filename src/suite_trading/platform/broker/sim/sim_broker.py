@@ -137,12 +137,12 @@ class SimBroker(Broker, SimulatedBroker):
         """
         return self._connected
 
-    def set_callbacks(
+    def register_order_event_callbacks(
         self,
         on_order_fill: Callable[[OrderFill], None],
         on_order_state_update: Callable[[Order], None],
     ) -> None:
-        """Implements: Broker.set_callbacks
+        """Implements: Broker.register_order_event_callbacks
 
         Register TradingEngine callbacks for broker events.
 
