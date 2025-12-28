@@ -279,16 +279,16 @@ class SimBroker(Broker, SimulatedBroker):
         # Since we clean up terminal orders immediately, _orders_by_id contains only active ones.
         return list(self._orders_by_id.values())
 
-    def get_order(self, id: str) -> Order | None:
+    def get_order(self, order_id: str) -> Order | None:
         """Implements: Broker.get_order
 
         Args:
-            id: Identifier of the order to retrieve.
+            order_id: Identifier of the order to retrieve.
 
         Returns:
             Order | None: The matching order, or None if this broker does not track it.
         """
-        return self._orders_by_id.get(id)
+        return self._orders_by_id.get(order_id)
 
     def list_open_positions(self) -> list[Position]:
         """Implements: Broker.list_open_positions
