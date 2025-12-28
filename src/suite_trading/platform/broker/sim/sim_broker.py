@@ -142,7 +142,14 @@ class SimBroker(Broker, SimulatedBroker):
         on_order_fill: Callable[[OrderFill], None],
         on_order_state_update: Callable[[Order], None],
     ) -> None:
-        """Register Engine callbacks for broker events."""
+        """Implements: Broker.set_callbacks
+
+        Register TradingEngine callbacks for broker events.
+
+        Args:
+            on_order_fill: Callback invoked when an OrderFill is emitted.
+            on_order_state_update: Callback invoked when an Order state changes.
+        """
         self._order_fill_callback = on_order_fill
         self._order_state_update_callback = on_order_state_update
 
@@ -205,7 +212,7 @@ class SimBroker(Broker, SimulatedBroker):
             self._match_order_against_order_book(order, last_order_book)
 
     def cancel_order(self, order: Order) -> None:
-        """Implements: Broker.cancel_order.
+        """Implements: Broker.cancel_order
 
         Request cancellation of a tracked $order. If the order is already in a terminal
         category, log a warning and return without emitting transitions.
@@ -259,12 +266,21 @@ class SimBroker(Broker, SimulatedBroker):
         self._apply_order_action(tracked_order, OrderAction.ACCEPT)
 
     def list_active_orders(self) -> list[Order]:
-        """Implements: `Broker.list_active_orders`."""
+        """Implements: Broker.list_active_orders
+
+        List active orders tracked by this simulated account.
+
+        Since this SimBroker removes terminal orders immediately, the returned list contains
+        only non-terminal orders.
+
+        Returns:
+            list[Order]: Active orders tracked by this broker.
+        """
         # Since we clean up terminal orders immediately, _orders_by_id contains only active ones.
         return list(self._orders_by_id.values())
 
     def get_order(self, id: str) -> Order | None:
-        """Implements: `Broker.get_order`.
+        """Implements: Broker.get_order
 
         Args:
             id: Identifier of the order to retrieve.
@@ -336,7 +352,9 @@ class SimBroker(Broker, SimulatedBroker):
     # region Protocol SimulatedBroker
 
     def set_timeline_dt(self, dt: datetime) -> None:
-        """Set broker simulated time.
+        """Implements: SimulatedBroker.set_timeline_dt
+
+        Set broker simulated time.
 
         The `TradingEngine` injects `$dt` before Strategy callbacks and before routing
         derived OrderBook snapshots so order lifecycle decisions can be deterministic
@@ -360,7 +378,13 @@ class SimBroker(Broker, SimulatedBroker):
                 self._apply_order_action(order, OrderAction.EXPIRE)
 
     def process_order_book(self, order_book: OrderBook) -> None:
-        """Process OrderBook that drives order-fills and order-updates."""
+        """Implements: SimulatedBroker.process_order_book
+
+        Process an OrderBook snapshot that drives order fills and order state updates.
+
+        Args:
+            order_book: OrderBook snapshot to process.
+        """
         # Raise: TradingEngine must set broker time before processing this snapshot
         if self._timeline_dt is None:
             raise ValueError(f"Cannot call `process_order_book` because $timeline_dt is None. TradingEngine must call `set_timeline_dt(order_book.timestamp)` immediately before calling `process_order_book` (got $order_book.timestamp={format_dt(order_book.timestamp)})")
