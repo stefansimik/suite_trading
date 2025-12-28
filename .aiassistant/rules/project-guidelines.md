@@ -238,6 +238,7 @@ order = Order(
 - **R-4.1.4** Explain Parameter Context: Describe the role of each parameter. Make it clear which is the main subject and which provide secondary context
 - **R-4.1.5** Make immediately understandable without needing to research internal logic
 - **R-4.1.6** Use concrete examples when helpful
+- **R-4.1.7** Protocol implementation marker: When a method implements a Protocol API (typically grouped under `# region Protocol <Name>`), the docstring must start with `Implements: <ProtocolName>.<method_name>` as the very first line, followed by a blank line, then the normal docstring
 
 ```python
 # ✅ Good — natural, identifies subject, explains context
@@ -277,6 +278,8 @@ def calculate_portfolio_value(positions: list) -> Decimal:
 - [ ] R-4.1.2: Docstrings use natural, conversational English
 - [ ] R-4.1.3: The primary subject of the function is clearly identified
 - [ ] R-4.1.4: The role and context of each parameter are explained
+- [ ] R-4.1.7: Protocol methods start docstrings with `Implements: <Protocol>.<method>` as the first line and a blank line after it
+- [ ] R-4.1.7: Non-protocol methods do not add the `Implements:` header
 
 ## 4.2. Code Comments (Internal Documentation)
 
