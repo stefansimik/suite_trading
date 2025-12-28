@@ -913,23 +913,23 @@ class TradingEngine:
         strategy, broker = self.get_routing_for_order(order)
         broker.cancel_order(order)
 
-    def modify_order(self, order: Order) -> None:
+    def update_order(self, order: Order) -> None:
         """Change an order with your broker.
 
         Args:
-            order: The order to modify with updated parameters.
+            order: The order to update with new parameters.
 
         Raises:
             ConnectionError: If the broker is not connected.
-            ValueError: If the order cannot be modified.
+            ValueError: If the order cannot be updated.
             KeyError: If $order was not submitted through this TradingEngine.
         """
         # Raise: order must have been submitted through this engine
         if order not in self._routing_by_order:
-            raise KeyError(f"Cannot call `modify_order` because $order (id '{order.id}') was not submitted through this TradingEngine")
+            raise KeyError(f"Cannot call `update_order` because $order (id '{order.id}') was not submitted through this TradingEngine")
 
         strategy, broker = self.get_routing_for_order(order)
-        broker.modify_order(order)
+        broker.update_order(order)
 
     def get_routing_for_order(self, order: Order) -> StrategyBrokerPair:
         """Get routing information for an order.

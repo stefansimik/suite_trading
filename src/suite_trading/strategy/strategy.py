@@ -379,13 +379,13 @@ class Strategy(ABC):
 
         engine.cancel_order(order)
 
-    def modify_order(self, order: Order) -> None:
-        """Modify an existing order.
+    def update_order(self, order: Order) -> None:
+        """Update an existing order.
 
         Allowed only when the strategy is RUNNING.
 
         Args:
-            order (Order): The order to modify with updated parameters.
+            order (Order): The order to update with new parameters.
 
         Raises:
             RuntimeError: If $trading_engine is None or $state is not RUNNING.
@@ -393,12 +393,12 @@ class Strategy(ABC):
         """
         engine = self._require_trading_engine()
 
-        # Raise: state must be RUNNING to modify orders
+        # Raise: state must be RUNNING to update orders
         if self.state != StrategyState.RUNNING:
             valid_actions = [a.value for a in self._state_machine.list_valid_actions()]
-            raise RuntimeError(f"Cannot call `modify_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
+            raise RuntimeError(f"Cannot call `update_order` because $state ({self.state.name}) is not RUNNING. Valid actions: {valid_actions}")
 
-        engine.modify_order(order)
+        engine.update_order(order)
 
     # endregion
 

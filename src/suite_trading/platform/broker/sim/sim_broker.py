@@ -235,8 +235,8 @@ class SimBroker(Broker, SimulatedBroker):
         if tracked_order.state == OrderState.PENDING_CANCEL:
             self._apply_order_action(tracked_order, OrderAction.ACCEPT)  # PENDING_CANCEL + ACCEPT = CANCELLED
 
-    def modify_order(self, order: Order) -> None:
-        """Implements: Broker.modify_order
+    def update_order(self, order: Order) -> None:
+        """Implements: Broker.update_order
 
         Request modification of an existing order.
 
@@ -246,20 +246,20 @@ class SimBroker(Broker, SimulatedBroker):
         """
         # Raise: broker must be connected to act on orders
         if not self._connected:
-            raise RuntimeError(f"Cannot call `modify_order` because $connected ({self._connected}) is False")
+            raise RuntimeError(f"Cannot call `update_order` because $connected ({self._connected}) is False")
 
         # Raise: order must be known to the broker
         tracked_order = self.get_order(order.id)
         if tracked_order is None:
-            raise ValueError(f"Cannot call `modify_order` because $id ('{order.id}') is not tracked")
+            raise ValueError(f"Cannot call `update_order` because $id ('{order.id}') is not tracked")
 
         # Raise: terminal orders cannot be modified
         if tracked_order.state_category == OrderStateCategory.TERMINAL:
-            raise ValueError(f"Cannot call `modify_order` because Order $state_category ({tracked_order.state_category.name}) is terminal.")
+            raise ValueError(f"Cannot call `update_order` because Order $state_category ({tracked_order.state_category.name}) is terminal.")
 
         # Raise: instrument cannot be changed via modification
         if tracked_order.instrument != order.instrument:
-            raise ValueError(f"Cannot call `modify_order` because $instrument changed from '{tracked_order.instrument}' to '{order.instrument}' for Order $id ('{order.id}')")
+            raise ValueError(f"Cannot call `update_order` because $instrument changed from '{tracked_order.instrument}' to '{order.instrument}' for Order $id ('{order.id}')")
 
         # Transitions: UPDATE → ACCEPT
         self._apply_order_action(tracked_order, OrderAction.UPDATE)

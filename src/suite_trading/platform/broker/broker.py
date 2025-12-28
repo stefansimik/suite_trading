@@ -136,11 +136,11 @@ class Broker(Protocol):
         """
         ...
 
-    def modify_order(self, order: Order) -> None:
-        """Modify an existing order in place.
+    def update_order(self, order: Order) -> None:
+        """Update an existing order in place.
 
         The following fields are immutable and must not change between the tracked order
-        and the modified order: $id, $instrument. Implementations must validate these
+        and the updated order: $id, $instrument. Implementations must validate these
         constraints and raise ValueError if violated.
 
         Args:
@@ -149,7 +149,7 @@ class Broker(Protocol):
         Raises:
             ConnectionError: If not connected to broker.
             ValueError: If $order is not tracked, order is terminal, or immutable fields ($id, $instrument) have changed.
-            NotSupportedError: If the broker does not support order modification.
+            NotSupportedError: If the broker does not support order updates.
         """
         ...
 

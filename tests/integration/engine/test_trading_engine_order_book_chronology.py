@@ -60,7 +60,7 @@ class MockOrderBookDrivenBroker(Broker):
         """No-op order cancellation."""
         pass
 
-    def modify_order(self, order: Order) -> None:
+    def update_order(self, order: Order) -> None:
         """No-op order modification."""
         pass
 
