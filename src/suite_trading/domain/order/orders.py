@@ -332,17 +332,17 @@ class Order:
 
         # Create fill
         child_id = f"{self.id}-{len(self._fills) + 1}"
-        fill = OrderFill(order=self, signed_quantity=signed_quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
+        order_fill = OrderFill(order=self, signed_quantity=signed_quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
 
         # Update state of the order (partial or full fill)
-        new_filled_quantity = self.abs_filled_quantity + fill.abs_quantity
+        new_filled_quantity = self.abs_filled_quantity + order_fill.abs_quantity
         action = OrderAction.FILL if new_filled_quantity == self.abs_quantity else OrderAction.PARTIAL_FILL
         self.change_state(action)
 
         # Store fill
-        self._fills.append(fill)
+        self._fills.append(order_fill)
 
-        return fill
+        return order_fill
 
     def list_fills(self) -> tuple[OrderFill, ...]:
         """Return fills in chronological order as an immutable tuple.
