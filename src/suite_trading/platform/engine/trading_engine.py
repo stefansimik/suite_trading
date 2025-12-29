@@ -25,39 +25,6 @@ from suite_trading.domain.order.order_fill import OrderFill
 
 logger = logging.getLogger(__name__)
 
-# region Helper classes
-
-
-class StrategyBrokerPair(NamedTuple):
-    """Pairs a Strategy with a Broker for order routing.
-
-    Attributes:
-        strategy: Strategy that owns the order and receives callbacks.
-        broker: Broker that executes the order.
-    """
-
-    strategy: Strategy
-    broker: Broker
-
-
-class EventFeedRegistration(NamedTuple):
-    """Internal registration record for a Strategy's EventFeed.
-
-    Attributes:
-        feed: The EventFeed instance managed by the engine.
-        callback: Strategy callback that receives each Event from this feed.
-        fill_event_filter: Callable that decides which Event(s) from this feed
-            should drive simulated fills in simulated brokers
-            Returns True to enable fill processing for the Event, False to skip it.
-    """
-
-    feed: EventFeed
-    callback: Callable[[Event], None]
-    fill_event_filter: Callable[[Event], bool]
-
-
-# endregion
-
 
 class TradingEngine:
     """Runs multiple trading strategies over a single shared timeline.
@@ -109,20 +76,9 @@ class TradingEngine:
 
     # endregion
 
-    # region State
-
-    @property
-    def state(self) -> EngineState:
-        """Get the current engine state.
-
-        Returns:
-            EngineState: Current state (NEW, RUNNING, or STOPPED).
-        """
-        return self._engine_state_machine.current_state
-
-    # endregion
-
     # region Main
+
+    # region CONFIGURATION
 
     def set_order_book_converter(self, converter: EventToOrderBookConverter) -> None:
         """Replace the Event→OrderBook converter used by the engine.
@@ -137,7 +93,7 @@ class TradingEngine:
 
     # endregion
 
-    # region EventFeedProvider(s)
+    # region EVENT FEED PROVIDERS
 
     def add_event_feed_provider(self, name: str, provider: EventFeedProvider) -> None:
         """Add an EventFeedProvider by name (one unique name per engine).
@@ -172,22 +128,13 @@ class TradingEngine:
         del self._event_feed_providers_by_name_bidict[name]
         logger.debug(f"Removed EventFeedProvider named '{name}'")
 
-    @property
-    def event_feed_providers(self) -> bidict[str, EventFeedProvider]:
-        """Get all EventFeedProvider(s) keyed by name.
-
-        Returns:
-            bidict[str, EventFeedProvider]: Bi-directional mapping from provider name to instance.
-        """
-        return self._event_feed_providers_by_name_bidict
-
     def list_event_feed_provider_names(self) -> list[str]:
         """List names of all registered EventFeedProvider(s) in registration order."""
         return list(self._event_feed_providers_by_name_bidict.keys())
 
     # endregion
 
-    # region Brokers
+    # region BROKERS
 
     def add_broker(self, name: str, broker: Broker) -> None:
         """Add a Broker by name (one unique name per engine).
@@ -238,26 +185,6 @@ class TradingEngine:
         del self._brokers_by_name_bidict[name]
         logger.debug(f"Removed Broker named '{name}'")
 
-    @property
-    def brokers(self) -> bidict[str, Broker]:
-        """Get all Brokers keyed by name.
-
-        The returned bi-directional mapping exposes the engine's Broker
-        registry:
-
-        - Keys are broker names as passed to `add_broker`.
-        - Values are Broker instances, each representing one logical account.
-
-        This mapping is intended for inspection and advanced wiring. Most
-        strategies should receive concrete Broker instances via configuration
-        (for example, constructor arguments) rather than relying on global
-        lookups.
-
-        Returns:
-            bidict[str, Broker]: Bi-directional mapping from broker name to instance.
-        """
-        return self._brokers_by_name_bidict
-
     def list_broker_names(self) -> list[str]:
         """List names of all registered Brokers in registration order.
 
@@ -268,7 +195,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Strategies
+    # region STRATEGIES
 
     def add_strategy(self, strategy: Strategy) -> None:
         """Add a Strategy to this TradingEngine using its required name.
@@ -407,15 +334,6 @@ class TradingEngine:
         strategy._clear_trading_engine()
         logger.debug(f"Removed Strategy named '{name}' (class {strategy.__class__.__name__})")
 
-    @property
-    def strategies(self) -> bidict[str, Strategy]:
-        """Get all strategies.
-
-        Returns:
-            Dictionary mapping strategy names to strategy instances.
-        """
-        return self._strategies_by_name_bidict
-
     def list_strategy_names(self) -> list[str]:
         """Returns names of all registered strategies.
 
@@ -445,7 +363,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Lifecycle
+    # region LIFECYCLE
 
     def start(self):
         """Start the engine and all your strategies.
@@ -666,7 +584,7 @@ class TradingEngine:
 
     # endregion
 
-    # region EventFeeds
+    # region EVENT FEEDS
 
     def add_event_feed_for_strategy(
         self,
@@ -766,104 +684,7 @@ class TradingEngine:
 
     # endregion
 
-    # region Lookup utils
-
-    def _get_strategy_name(self, strategy: Strategy) -> str:
-        try:
-            return self._strategies_by_name_bidict.inv[strategy]
-        except KeyError:
-            raise KeyError(f"Cannot call `_get_strategy_name` because $strategy (class {strategy.__class__.__name__}) is not registered in this TradingEngine")
-
-    def _get_broker_name(self, broker: Broker) -> str:
-        try:
-            return self._brokers_by_name_bidict.inv[broker]
-        except KeyError:
-            raise KeyError(f"Cannot call `_get_broker_name` because $broker (class {broker.__class__.__name__}) is not registered in this TradingEngine")
-
-    def _get_event_feed_provider_name(self, provider: EventFeedProvider) -> str:
-        try:
-            return self._event_feed_providers_by_name_bidict.inv[provider]
-        except KeyError:
-            raise KeyError(f"Cannot call `_get_event_feed_provider_name` because $provider (class {provider.__class__.__name__}) is not registered in this TradingEngine")
-
-    def _list_simulated_brokers(self) -> list[SimulatedBroker]:
-        """Return list of all simulated brokers
-
-        Returns:
-            list[SimulatedBroker]: list of simulated Brokers that require OrderBook snapshots
-            to drive simulated order-price matching and fills.
-        """
-        return [broker for broker in self._brokers_by_name_bidict.values() if isinstance(broker, SimulatedBroker)]
-
-    # endregion
-
-    # region EventFeeds utils
-
-    def _any_active_event_feeds_exist_for_strategy(self, strategy: Strategy):
-        strategy_has_at_least_one_active_event_feed = any(not t.feed.is_finished() for t in self._event_feeds_by_strategy.get(strategy, {}).values())
-        return strategy_has_at_least_one_active_event_feed
-
-    def _any_active_event_feeds_exist(self) -> bool:
-        """Check if any event feeds across all strategies are still active (not finished)."""
-        # Check each strategy's event feeds
-        for strategy_event_feeds in self._event_feeds_by_strategy.values():
-            # Check each feed for this strategy
-            for feed_entry in strategy_event_feeds.values():
-                if not feed_entry.feed.is_finished():
-                    return True
-        return False
-
-    def _find_event_feed_with_earliest_event(self) -> tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None:
-        """Return the next (Strategy, feed, callback) pair with the globally earliest Event.
-
-        This scans all EventFeed(s) for strategies currently known to the engine and
-        selects the earliest available Event using the Event ordering (`dt_event`,
-        then `dt_received`). Strategies that are not in RUNNING state are ignored.
-
-        Returns:
-            tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None: The owning
-            Strategy, feed name, EventFeed, and callback for the earliest Event, or None
-            if no Event is currently available across active feeds.
-        """
-        oldest_event: Event | None = None
-        result: tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None = None
-
-        for strategy, event_feeds_by_name_dict in self._event_feeds_by_strategy.items():
-            if strategy.state != StrategyState.RUNNING:
-                continue
-
-            for event_feed_name, registration in event_feeds_by_name_dict.items():
-                event_feed = registration.feed
-                callback = registration.callback
-                peeked_event = event_feed.peek()
-                if peeked_event is None:
-                    continue
-
-                if oldest_event is None or peeked_event < oldest_event:
-                    oldest_event = peeked_event
-                    result = (strategy, event_feed_name, event_feed, callback)
-
-        return result
-
-    def _close_and_remove_all_feeds_for_strategy(self, strategy: Strategy) -> None:
-        strategy_name = self._get_strategy_name(strategy)
-
-        # Close all feeds for this Strategy. Use reversed (LIFO) order to ensure that
-        # dependent feeds (like aggregators) are closed before their source feeds.
-        event_feeds_by_name_dict = self._event_feeds_by_strategy[strategy]
-        for name, registration in reversed(list(event_feeds_by_name_dict.items())):
-            try:
-                feed = registration.feed
-                feed.close()
-            except Exception as e:
-                logger.error(f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")
-
-        # Remove all feeds for this Strategy
-        event_feeds_by_name_dict.clear()
-
-    # endregion
-
-    # region Orders
+    # region ORDERS
 
     def submit_order(self, order: Order, broker: Broker, strategy: Strategy) -> None:
         """Send an order to your broker on behalf of $strategy.
@@ -944,7 +765,65 @@ class TradingEngine:
         route: StrategyBrokerPair = self._routing_by_order[order]
         return route
 
-    # Broker → Engine callbacks
+    # endregion
+
+    # endregion
+
+    # region Properties
+
+    @property
+    def state(self) -> EngineState:
+        """Get the current engine state.
+
+        Returns:
+            EngineState: Current state (NEW, RUNNING, or STOPPED).
+        """
+        return self._engine_state_machine.current_state
+
+    @property
+    def event_feed_providers(self) -> bidict[str, EventFeedProvider]:
+        """Get all EventFeedProvider(s) keyed by name.
+
+        Returns:
+            bidict[str, EventFeedProvider]: Bi-directional mapping from provider name to instance.
+        """
+        return self._event_feed_providers_by_name_bidict
+
+    @property
+    def brokers(self) -> bidict[str, Broker]:
+        """Get all Brokers keyed by name.
+
+        The returned bi-directional mapping exposes the engine's Broker
+        registry:
+
+        - Keys are broker names as passed to `add_broker`.
+        - Values are Broker instances, each representing one logical account.
+
+        This mapping is intended for inspection and advanced wiring. Most
+        strategies should receive concrete Broker instances via configuration
+        (for example, constructor arguments) rather than relying on global
+        lookups.
+
+        Returns:
+            bidict[str, Broker]: Bi-directional mapping from broker name to instance.
+        """
+        return self._brokers_by_name_bidict
+
+    @property
+    def strategies(self) -> bidict[str, Strategy]:
+        """Get all strategies.
+
+        Returns:
+            Dictionary mapping strategy names to strategy instances.
+        """
+        return self._strategies_by_name_bidict
+
+    # endregion
+
+    # region Utilities
+
+    # region ROUTING (BROKER CALLBACKS)
+
     def _route_order_fill_to_strategy(self, order_fill: OrderFill) -> None:
         """Route order_fill update to originating Strategy."""
         strategy, broker = self.get_routing_for_order(order_fill.order)
@@ -985,3 +864,136 @@ class TradingEngine:
                 logger.error(f"Error in `Strategy.on_error` for Strategy named '{strategy.name}' (class {strategy.__class__.__name__}): {inner}")
 
     # endregion
+
+    # region LOOKUP
+
+    def _get_strategy_name(self, strategy: Strategy) -> str:
+        try:
+            return self._strategies_by_name_bidict.inv[strategy]
+        except KeyError:
+            raise KeyError(f"Cannot call `_get_strategy_name` because $strategy (class {strategy.__class__.__name__}) is not registered in this TradingEngine")
+
+    def _get_broker_name(self, broker: Broker) -> str:
+        try:
+            return self._brokers_by_name_bidict.inv[broker]
+        except KeyError:
+            raise KeyError(f"Cannot call `_get_broker_name` because $broker (class {broker.__class__.__name__}) is not registered in this TradingEngine")
+
+    def _get_event_feed_provider_name(self, provider: EventFeedProvider) -> str:
+        try:
+            return self._event_feed_providers_by_name_bidict.inv[provider]
+        except KeyError:
+            raise KeyError(f"Cannot call `_get_event_feed_provider_name` because $provider (class {provider.__class__.__name__}) is not registered in this TradingEngine")
+
+    def _list_simulated_brokers(self) -> list[SimulatedBroker]:
+        """Return list of all simulated brokers
+
+        Returns:
+            list[SimulatedBroker]: list of simulated Brokers that require OrderBook snapshots
+            to drive simulated order-price matching and fills.
+        """
+        return [broker for broker in self._brokers_by_name_bidict.values() if isinstance(broker, SimulatedBroker)]
+
+    # endregion
+
+    # region EVENT FEEDS (UTILS)
+
+    def _any_active_event_feeds_exist_for_strategy(self, strategy: Strategy):
+        strategy_has_at_least_one_active_event_feed = any(not t.feed.is_finished() for t in self._event_feeds_by_strategy.get(strategy, {}).values())
+        return strategy_has_at_least_one_active_event_feed
+
+    def _any_active_event_feeds_exist(self) -> bool:
+        """Check if any event feeds across all strategies are still active (not finished)."""
+        # Check each strategy's event feeds
+        for strategy_event_feeds in self._event_feeds_by_strategy.values():
+            # Check each feed for this strategy
+            for feed_entry in strategy_event_feeds.values():
+                if not feed_entry.feed.is_finished():
+                    return True
+        return False
+
+    def _find_event_feed_with_earliest_event(self) -> tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None:
+        """Return the next (Strategy, feed, callback) pair with the globally earliest Event.
+
+        This scans all EventFeed(s) for strategies currently known to the engine and
+        selects the earliest available Event using the Event ordering (`dt_event`,
+        then `dt_received`). Strategies that are not in RUNNING state are ignored.
+
+        Returns:
+            tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None: The owning
+            Strategy, feed name, EventFeed, and callback for the earliest Event, or None
+            if no Event is currently available across active feeds.
+        """
+        oldest_event: Event | None = None
+        result: tuple[Strategy, str, EventFeed, Callable[[Event], None]] | None = None
+
+        for strategy, event_feeds_by_name_dict in self._event_feeds_by_strategy.items():
+            if strategy.state != StrategyState.RUNNING:
+                continue
+
+            for event_feed_name, registration in event_feeds_by_name_dict.items():
+                event_feed = registration.feed
+                callback = registration.callback
+                peeked_event = event_feed.peek()
+                if peeked_event is None:
+                    continue
+
+                if oldest_event is None or peeked_event < oldest_event:
+                    oldest_event = peeked_event
+                    result = (strategy, event_feed_name, event_feed, callback)
+
+        return result
+
+    def _close_and_remove_all_feeds_for_strategy(self, strategy: Strategy) -> None:
+        strategy_name = self._get_strategy_name(strategy)
+
+        # Close all feeds for this Strategy. Use reversed (LIFO) order to ensure that
+        # dependent feeds (like aggregators) are closed before their source feeds.
+        event_feeds_by_name_dict = self._event_feeds_by_strategy[strategy]
+        for name, registration in reversed(list(event_feeds_by_name_dict.items())):
+            try:
+                feed = registration.feed
+                feed.close()
+            except Exception as e:
+                logger.error(f"Error closing EventFeed named '{name}' for Strategy named '{strategy_name}' (class {strategy.__class__.__name__}): {e}")
+
+        # Remove all feeds for this Strategy
+        event_feeds_by_name_dict.clear()
+
+    # endregion
+
+    # endregion
+
+
+# region Helper classes
+
+
+class StrategyBrokerPair(NamedTuple):
+    """Pairs a Strategy with a Broker for order routing.
+
+    Attributes:
+        strategy: Strategy that owns the order and receives callbacks.
+        broker: Broker that executes the order.
+    """
+
+    strategy: Strategy
+    broker: Broker
+
+
+class EventFeedRegistration(NamedTuple):
+    """Internal registration record for a Strategy's EventFeed.
+
+    Attributes:
+        feed: The EventFeed instance managed by the engine.
+        callback: Strategy callback that receives each Event from this feed.
+        fill_event_filter: Callable that decides which Event(s) from this feed
+            should drive simulated fills in simulated brokers
+            Returns True to enable fill processing for the Event, False to skip it.
+    """
+
+    feed: EventFeed
+    callback: Callable[[Event], None]
+    fill_event_filter: Callable[[Event], bool]
+
+
+# endregion
