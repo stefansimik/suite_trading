@@ -667,12 +667,12 @@ Keep expressions simple and easy to inspect in a debugger.
 ```python
 # ❌ Bad — long nested return makes debugging hard
 return Money(
-  compute_notional_value(price, signed_quantity, instrument.contract_size) * self._maint_margin_ratio,
+  compute_notional_value(price, signed_qty, instrument.contract_size) * self._maint_margin_ratio,
   instrument.settlement_currency,
 )
 
 # ✅ Good — extract into locals and return `result`
-notional = compute_notional_value(price, signed_quantity, instrument.contract_size)
+notional = compute_notional_value(price, signed_qty, instrument.contract_size)
 margin = notional * self._maint_margin_ratio
 result = Money(margin, instrument.settlement_currency)
 return result
