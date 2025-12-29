@@ -46,7 +46,7 @@ class Order:
     def __init__(
         self,
         instrument: Instrument,
-        signed_quantity: DecimalLike,
+        signed_qty: DecimalLike,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         good_till_dt: datetime | None = None,
@@ -55,7 +55,7 @@ class Order:
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
+            signed_qty (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
@@ -66,7 +66,7 @@ class Order:
 
         # Trading details (private attributes with public properties)
         self._instrument = instrument
-        self._signed_quantity = instrument.snap_qty(signed_quantity)
+        self._signed_qty = instrument.snap_qty(signed_qty)
 
         # Order lifecycle details (private attributes with public properties)
         self._time_in_force = time_in_force
@@ -109,7 +109,7 @@ class Order:
         Returns:
             OrderSide: The order side.
         """
-        return OrderSide.BUY if self._signed_quantity > 0 else OrderSide.SELL
+        return OrderSide.BUY if self._signed_qty > 0 else OrderSide.SELL
 
     @property
     def is_buy(self) -> bool:
@@ -118,7 +118,7 @@ class Order:
         Returns:
             bool: True if this is a buy order.
         """
-        return self._signed_quantity > 0
+        return self._signed_qty > 0
 
     @property
     def is_sell(self) -> bool:
@@ -127,7 +127,7 @@ class Order:
         Returns:
             bool: True if this is a sell order.
         """
-        return self._signed_quantity < 0
+        return self._signed_qty < 0
 
     @property
     def abs_quantity(self) -> Decimal:
@@ -136,7 +136,7 @@ class Order:
         This value is always positive and represents the magnitude of the
         order quantity, regardless of whether it is a buy or sell.
         """
-        return abs(self._signed_quantity)
+        return abs(self._signed_qty)
 
     @property
     def signed_quantity(self) -> Decimal:
@@ -144,7 +144,7 @@ class Order:
 
         Returns a positive value for buy orders and a negative value for sell orders.
         """
-        return self._signed_quantity
+        return self._signed_qty
 
     @property
     def abs_filled_quantity(self) -> Decimal:
@@ -293,7 +293,7 @@ class Order:
 
     def add_fill(
         self,
-        signed_quantity: Decimal,
+        signed_qty: Decimal,
         price: Decimal,
         timestamp: datetime,
         commission: Money,
@@ -311,7 +311,7 @@ class Order:
         `self.state` or `self.state_category` after the call if they need the latest state.
 
         Args:
-            signed_quantity: The net filled quantity. Returns a positive value for buy fills
+            signed_qty: The net filled quantity. Returns a positive value for buy fills
                 and a negative value for sell fills.
             price: Fill price.
             timestamp: When the fill occurred.
@@ -332,7 +332,7 @@ class Order:
 
         # Create fill
         child_id = f"{self.id}-{len(self._fills) + 1}"
-        order_fill = OrderFill(order=self, signed_quantity=signed_quantity, price=price, timestamp=timestamp, commission=commission, id=child_id)
+        order_fill = OrderFill(order=self, signed_qty=signed_qty, price=price, timestamp=timestamp, commission=commission, id=child_id)
 
         # Update state of the order (partial or full fill)
         new_filled_quantity = self.abs_filled_quantity + order_fill.abs_quantity
@@ -447,7 +447,7 @@ class MarketOrder(Order):
     def __init__(
         self,
         instrument: Instrument,
-        signed_quantity: DecimalLike,
+        signed_qty: DecimalLike,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
         good_till_dt: datetime | None = None,
@@ -456,13 +456,13 @@ class MarketOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
+            signed_qty (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             id (str, optional): Unique identifier for the order. If None, generates a new ID.
             time_in_force (TimeInForce, optional): How long the order remains active. Defaults to GTC.
             good_till_dt (datetime, optional): Expiry datetime for GTD orders. Must be provided only when $time_in_force is `TimeInForce.GTD` and must be None otherwise.
         """
-        super().__init__(instrument, signed_quantity, id, time_in_force, good_till_dt)
+        super().__init__(instrument, signed_qty, id, time_in_force, good_till_dt)
 
 
 class LimitOrder(Order):
@@ -480,7 +480,7 @@ class LimitOrder(Order):
     def __init__(
         self,
         instrument: Instrument,
-        signed_quantity: DecimalLike,
+        signed_qty: DecimalLike,
         limit_price: DecimalLike,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
@@ -490,7 +490,7 @@ class LimitOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
+            signed_qty (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             limit_price (DecimalLike): The limit price for the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.
@@ -502,7 +502,7 @@ class LimitOrder(Order):
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, signed_quantity, id, time_in_force, good_till_dt)
+        super().__init__(instrument, signed_qty, id, time_in_force, good_till_dt)
 
     @property
     def limit_price(self) -> Decimal:
@@ -535,7 +535,7 @@ class StopMarketOrder(Order):
     def __init__(
         self,
         instrument: Instrument,
-        signed_quantity: DecimalLike,
+        signed_qty: DecimalLike,
         stop_price: DecimalLike,
         id: str | None = None,
         time_in_force: TimeInForce = TimeInForce.GTC,
@@ -545,7 +545,7 @@ class StopMarketOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
+            signed_qty (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             stop_price (DecimalLike): The stop price for the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.
@@ -557,7 +557,7 @@ class StopMarketOrder(Order):
         self._stop_price = instrument.snap_price(stop_price)
 
         # Call parent constructor
-        super().__init__(instrument, signed_quantity, id, time_in_force, good_till_dt)
+        super().__init__(instrument, signed_qty, id, time_in_force, good_till_dt)
 
     @property
     def stop_price(self) -> Decimal:
@@ -588,7 +588,7 @@ class StopLimitOrder(Order):
     def __init__(
         self,
         instrument: Instrument,
-        signed_quantity: DecimalLike,
+        signed_qty: DecimalLike,
         stop_price: DecimalLike,
         limit_price: DecimalLike,
         id: str | None = None,
@@ -599,7 +599,7 @@ class StopLimitOrder(Order):
 
         Args:
             instrument (Instrument): The financial instrument to trade.
-            signed_quantity (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
+            signed_qty (DecimalLike): The net quantity to trade (positive for buy orders, negative for sell orders).
                 Accepts Decimal, str, int, or float. Snapped to $instrument.qty_increment.
             stop_price (DecimalLike): The stop price that triggers the order.
                 Accepts Decimal, str, int, or float. Snapped to $instrument.price_increment.
@@ -614,7 +614,7 @@ class StopLimitOrder(Order):
         self._limit_price = instrument.snap_price(limit_price)
 
         # Call parent constructor
-        super().__init__(instrument, signed_quantity, id, time_in_force, good_till_dt)
+        super().__init__(instrument, signed_qty, id, time_in_force, good_till_dt)
 
     @property
     def stop_price(self) -> Decimal:

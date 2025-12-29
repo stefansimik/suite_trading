@@ -45,7 +45,7 @@ class SimgleLimitOrderStrategy(Strategy):
 
             # Submit the Limit order only once, on the first OrderBookEvent
             if self.submitted_order is None:
-                order = LimitOrder(instrument=self._instrument, signed_quantity=10, limit_price=101)
+                order = LimitOrder(instrument=self._instrument, signed_qty=10, limit_price=101)
                 self.submitted_order = order
                 self.submit_order(order, self._broker)
 

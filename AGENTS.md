@@ -62,9 +62,35 @@ Use Python `snake_case`. Avoid abbreviations. If possible, try to be concise, bu
 To balance descriptiveness with code conciseness, the following shortcuts are permitted. Once a shortcut is sanctioned, it **must** be used consistently in all **variable, parameter, and function names**.
 
 **Note on Class Names**: Classes should generally continue to use the **full term** (e.g., `OrderFill`, `Position`, `Instrument`) to maintain clear type identification.
-Sanctioned shortcuts **should** be used for class attributes/properties/fields and for public method/constructor parameters when applicable.
 
-**Note on Documentation & Comments**: Sanctioned shortcuts are strictly for code identifiers. Always use the **full term** in docstrings, code comments, and general documentation to ensure maximum readability for humans.
+**Shortcut scope (must):** If a shortcut applies to an identifier, apply it consistently across:
+- Public parameters (including constructor kwargs)
+- Keyword call sites
+- Local variables
+- Private fields (`self._...`) and `__slots__`
+- Public properties/attributes when they represent the same concept
+
+**Canonical domain term requirement:** If a concept has a canonical full term in the shortcut table,
+the identifier must include that canonical term before applying shortcuts.
+
+Example:
+- ✅ `maintenance_margin_ratio` → `maint_margin_ratio`
+- ❌ `maintenance_ratio` (ambiguous; missing `_margin_`)
+
+**Token-based shortcut application:** Apply shortcuts only to whole underscore-delimited tokens.
+Do not rewrite partial substrings inside a token.
+
+**Docstrings, comments, documentation:**
+- In narrative prose, prefer the full domain term (e.g., “maintenance margin”).
+- In `Args:` / `Returns:` / `Raises:`, parameter names must match the real code identifiers
+  (including sanctioned shortcuts).
+- When referencing a variable/parameter in reference-style text or error messages, use the real
+  identifier (for example `$signed_qty`).
+
+**Shortcut rename checklist (must):**
+1) Search the repo for the old identifier (including tests and README).
+2) Rename: signature → call sites → private fields → `__slots__` → logs/errors.
+3) Re-search to confirm zero hits for the old identifier.
 
 | Full Term | Allowed Shortcut | Example Usage |
 | :--- | :--- | :--- |
@@ -74,7 +100,7 @@ Sanctioned shortcuts **should** be used for class attributes/properties/fields a
 | `timestamp` | `ts` | `last_update_ts`, `event_ts` |
 | `average` | `avg` | `avg_price`, `avg_fill_price` |
 | `profit_and_loss` | `pnl` | `realized_pnl`, `unrealized_pnl` |
-| `maintenance_margin` | `maint_margin` | `maint_margin_required_change` |
+| `maintenance` | `maint` | `maint_margin_required_change` |
 
 - **R-2.1.2** Functions/Methods: Use verbs describing the action
 - **R-2.1.3** Variables/Attributes: Use nouns describing the data
@@ -641,13 +667,13 @@ Keep expressions simple and easy to inspect in a debugger.
 ```python
 # ❌ Bad — long nested return makes debugging hard
 return Money(
-    compute_notional_value(price, signed_quantity, instrument.contract_size) * self._maintenance_ratio,
-    instrument.settlement_currency,
+  compute_notional_value(price, signed_quantity, instrument.contract_size) * self._maint_margin_ratio,
+  instrument.settlement_currency,
 )
 
 # ✅ Good — extract into locals and return `result`
 notional = compute_notional_value(price, signed_quantity, instrument.contract_size)
-margin = notional * self._maintenance_ratio
+margin = notional * self._maint_margin_ratio
 result = Money(margin, instrument.settlement_currency)
 return result
 

@@ -17,17 +17,17 @@ def round_to_increment(price: DecimalLike, increment: DecimalLike) -> Decimal:
         The price rounded to the nearest increment
     """
     # Convert to Decimal for precise arithmetic
-    price_decimal = as_decimal(price)
-    increment_decimal = as_decimal(increment)
+    price = as_decimal(price)
+    increment = as_decimal(increment)
 
     # Calculate how many increments fit into the price
-    increments = price_decimal / increment_decimal
+    increments = price / increment
 
     # Round to the nearest whole number of increments
     rounded_increments = increments.quantize(Decimal("1"))
 
     # Convert back to price by multiplying by increment
-    return rounded_increments * increment_decimal
+    return rounded_increments * increment
 
 
 def ceil_to_multiple(n: int, m: int) -> int:

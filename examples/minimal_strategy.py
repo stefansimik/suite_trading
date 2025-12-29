@@ -50,14 +50,14 @@ class DemoStrategy(Strategy):
         # Open position on 1st bar
         if self._bar_count == 1:
             # Create and submit market order (open position)
-            order = MarketOrder(instrument=bar.instrument, signed_quantity=1)
+            order = MarketOrder(instrument=bar.instrument, signed_qty=1)
             self.submit_order(order, self._broker)
             return
 
         # Close position on 6th bar
         if self._bar_count == 6:
             # Create and submit market order (close position)
-            order = MarketOrder(instrument=bar.instrument, signed_quantity=-1)
+            order = MarketOrder(instrument=bar.instrument, signed_qty=-1)
             self.submit_order(order, self._broker)
 
     # Invoked once when the Strategy is stopped
@@ -82,4 +82,5 @@ def run() -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     run()

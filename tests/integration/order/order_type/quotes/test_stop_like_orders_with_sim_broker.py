@@ -105,7 +105,7 @@ def test_stop_market_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
     ]
 
     def create_order() -> Order:
-        return StopMarketOrder(instrument=instrument, signed_quantity=1, stop_price=stop_price)
+        return StopMarketOrder(instrument=instrument, signed_qty=1, stop_price=stop_price)
 
     strategy = _StopLikeOrderLifecycleStrategy(name="stop_market_order_lifecycle", broker=broker, feed_name="quotes", quote_tick_events=quote_tick_events, order_factory=create_order)
     engine.add_strategy(strategy)
@@ -149,7 +149,7 @@ def test_stop_limit_order_arms_triggers_and_fills_on_next_quote_tick() -> None:
     ]
 
     def create_order() -> Order:
-        return StopLimitOrder(instrument=instrument, signed_quantity=1, stop_price=stop_price, limit_price=limit_price)
+        return StopLimitOrder(instrument=instrument, signed_qty=1, stop_price=stop_price, limit_price=limit_price)
 
     strategy = _StopLikeOrderLifecycleStrategy(name="stop_limit_order_lifecycle", broker=broker, feed_name="quotes", quote_tick_events=quote_tick_events, order_factory=create_order)
     engine.add_strategy(strategy)

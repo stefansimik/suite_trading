@@ -583,7 +583,7 @@ class SimBroker(Broker, SimulatedBroker):
             was_blocked_initial_margin = True
 
         # Add OrderFill to order + update context
-        order_fill = order.add_fill(signed_quantity=proposed_fill.signed_qty, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission)
+        order_fill = order.add_fill(signed_qty=proposed_fill.signed_qty, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission)
         # Update fill history and $position
         self._append_order_fill_to_history_and_update_position(order_fill)
 
@@ -639,11 +639,11 @@ class SimBroker(Broker, SimulatedBroker):
         initial_margin_delta = Money(0, commission.currency)
         if abs_position_qty_change > 0:
             signed_position_qty_change = abs_position_qty_change if proposed_fill.signed_qty > 0 else -abs_position_qty_change
-            initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_position_qty_change)
+            initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_qty=signed_position_qty_change)
 
         # Compute maintenance margin delta
-        maint_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_before)
-        maint_margin_after = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_after)
+        maint_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_qty=signed_position_qty_before)
+        maint_margin_after = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_qty=signed_position_qty_after)
         maint_margin_delta = maint_margin_after - maint_margin_before
 
         # Raise: peak-funding calculation assumes a single currency
@@ -728,7 +728,7 @@ class SimBroker(Broker, SimulatedBroker):
             funds_by_currency[peak_funds_required.currency] = Money(new_funds_value, peak_funds_required.currency)
 
             # Append synthetic fill and advance state
-            sim_order_fill = OrderFill(order=order, signed_quantity=proposed_fill.signed_qty, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
+            sim_order_fill = OrderFill(order=order, signed_qty=proposed_fill.signed_qty, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
             simulated_order_fill_history.append(sim_order_fill)
             signed_position_qty_before = signed_position_qty_after
 
@@ -916,7 +916,7 @@ class SimBroker(Broker, SimulatedBroker):
         Returns:
             A MarginModel instance with zero ratios to keep behavior stable unless configured.
         """
-        return FixedRatioMarginModel(initial_ratio=Decimal("0"), maintenance_ratio=Decimal("0"))
+        return FixedRatioMarginModel(initial_margin_ratio=Decimal("0"), maint_margin_ratio=Decimal("0"))
 
     def _build_default_fee_model(self) -> FeeModel:
         """Build the default FeeModel used by this broker instance.

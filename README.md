@@ -4,7 +4,7 @@ SUITE stands for: **S**imple, **U**nderstandable, **I**ntuitive **T**rading **E*
 
 SUITE Trading is a **modern Python framework for algorithmic trading** that provides a unified, event-driven architecture for backtesting, paper trading, and live trading. It's designed to help you go from idea to execution quickly and confidently.
 
-![Python Version](https://img.shields.io/badge/python-3.13%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stefansimik/suite_trading)
+![Python Version](https://img.shields.io/badge/python-3.13.x-blue) ![License](https://img.shields.io/badge/license-MIT-green) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stefansimik/suite_trading)
 
 > ⚠️ **Work in progress:** SUITE Trading is under active development. Breaking changes may happen while the API stabilizes.
 
@@ -45,7 +45,7 @@ flowchart LR
 | **Smart components with clear jobs** | Each piece has one responsibility and they connect explicitly |
 | **Realistic simulation** | SimBroker supports MARKET, LIMIT, STOP, STOP_LIMIT orders plus margin, fees, slippage |
 | **Extensible by design** | Plug in new data sources, broker adapters, and event types with minimal code |
-| **Modern Python** | Typed Python 3.13+ for strong IDE support and safe refactoring |
+| **Modern Python** | Typed Python 3.13.x for strong IDE support and safe refactoring |
 
 ---
 
@@ -120,12 +120,13 @@ class DemoStrategy(Strategy):
 
         # Buy on bar 1
         if self._bar_count == 1:
-            order = MarketOrder(instrument=bar.instrument, side=OrderSide.BUY, abs_quantity=Decimal("1"))
+            order = MarketOrder(instrument=bar.instrument, signed_qty=1)
             self.submit_order(order, self._broker)
+            return
 
         # Sell on bar 6
         if self._bar_count == 6:
-            order = MarketOrder(instrument=bar.instrument, side=OrderSide.SELL, abs_quantity=Decimal("1"))
+            order = MarketOrder(instrument=bar.instrument, signed_qty=-1)
             self.submit_order(order, self._broker)
 
     def on_stop(self) -> None:
@@ -298,14 +299,12 @@ class MyStrategy(Strategy):
 ```python
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
 from suite_trading.domain.order.orders import MarketOrder
-from suite_trading.domain.order.order_enums import OrderSide
-from decimal import Decimal
 
 # For backtesting and paper trading
 sim_broker = SimBroker()
 
 # Submit an order
-order = MarketOrder(instrument=instrument, side=OrderSide.BUY, abs_quantity=Decimal("1"))
+order = MarketOrder(instrument=instrument, signed_qty=1)
 self.submit_order(order, sim_broker)
 ```
 
@@ -556,7 +555,8 @@ flowchart LR
 
 Have data in CSV, Parquet, a database, or a live websocket? Create a custom EventFeed:
 
-1. **Implement the `EventFeed` protocol:** `peek()`, `pop()`, `is_finished()`, `close()`
+1. **Implement the `EventFeed` protocol:** `peek()`, `pop()`, `is_finished()`, `close()`, `remove_events_before()`
+   plus `add_listener()`, `remove_listener()`, `list_listeners()`
 2. **Convert your data** into domain objects (bars, ticks, etc.)
 3. **Wrap them in `Event` objects** with proper timestamps
 4. **Attach in `Strategy.on_start()`** via `add_event_feed(...)`
@@ -630,7 +630,7 @@ uv run pytest
 
 ## Roadmap
 
-**Last updated:** 2025-12-17
+**Last updated:** TBD
 
 SUITE Trading is in active development with approximately **70% of core functionality** implemented.
 
@@ -644,6 +644,7 @@ SUITE Trading is in active development with approximately **70% of core function
 | **Strategy** | Strategy framework (`on_start`, `on_stop`, `on_error`, `on_event`) with lifecycle management |
 | **Domain** | Domain models: Event, Bar, Order, Instrument, Money, Position, Account |
 | **Data** | EventFeed system with timeline filtering (skip/trim past events) |
+| **Data** | DataFrame-based historical bars feed (`BarsFromDataFrameEventFeed`) |
 | **Simulation** | SimBroker order lifecycle (MARKET/LIMIT/STOP/STOP_LIMIT; cancel/modify) |
 | **Simulation** | Event → OrderBook conversion for order matching |
 | **Simulation** | Realism layer (margin, fees, slippage, liquidity models) |
@@ -659,13 +660,13 @@ SUITE Trading is in active development with approximately **70% of core function
 | **Accounting** | Account correctness review (cash, margin, position lifecycle) | TBD |
 | **Orders** | Order relationships (OCO; define OUO semantics) | TBD |
 | **Orders** | OrderBuilder (safe, ergonomic order creation) | TBD |
-| **Data** | CSV/Parquet event-feeds for high-performance data loading | Q2 2026 |
+| **Data** | CSV/Parquet loaders that produce DataFrames for `BarsFromDataFrameEventFeed` | TBD |
 | **Indicators** | Indicators framework (SMA, EMA, RSI, MACD, ...) | TBD |
 | **Reporting** | Performance statistics per Strategy + backtest reports | TBD |
 | **UI** | Streamlit export (bars, order fills, equity curve, results) | TBD |
-| **UI** | Dashboard for monitoring and controls | Q4 2026 |
+| **UI** | Dashboard for monitoring and controls | TBD |
 | **Strategy** | Strategy regression / extensibility review | TBD |
-| **Live** | First live broker adapter: Interactive Brokers (IBKR) | Q3 2026 |
+| **Live** | First live broker adapter: Interactive Brokers (IBKR) | TBD |
 
 ### Legend
 

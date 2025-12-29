@@ -122,13 +122,13 @@ class DistributionFillModel:
         if limit_on_touch_fill_probability is None:
             limit_on_touch_fill_probability = Decimal("0.30")
 
-        limit_on_touch_fill_probability_decimal = as_decimal(limit_on_touch_fill_probability)
+        limit_on_touch_fill_probability = as_decimal(limit_on_touch_fill_probability)
 
-        if limit_on_touch_fill_probability_decimal < Decimal("0") or limit_on_touch_fill_probability_decimal > Decimal("1"):
-            raise ValueError(f"Cannot create `DistributionFillModel` because $limit_on_touch_fill_probability ({limit_on_touch_fill_probability_decimal}) is outside [0, 1]")
+        if limit_on_touch_fill_probability < Decimal("0") or limit_on_touch_fill_probability > Decimal("1"):
+            raise ValueError(f"Cannot create `DistributionFillModel` because $limit_on_touch_fill_probability ({limit_on_touch_fill_probability}) is outside [0, 1]")
 
         self._market_fill_adjustment_distribution = market_fill_adjustment_distribution
-        self._limit_on_touch_fill_probability = limit_on_touch_fill_probability_decimal
+        self._limit_on_touch_fill_probability = limit_on_touch_fill_probability
         self._rng = random.Random(rng_seed)
 
     # endregion

@@ -37,12 +37,12 @@ class OrderFill:
         is_sell: True if this is a sell-side fill.
     """
 
-    __slots__ = ("_order", "_signed_quantity", "_price", "_timestamp", "_commission", "_id")
+    __slots__ = ("_order", "_signed_qty", "_price", "_timestamp", "_commission", "_id")
 
     def __init__(
         self,
         order: Order,
-        signed_quantity: DecimalLike,
+        signed_qty: DecimalLike,
         price: DecimalLike,
         timestamp: datetime,
         commission: Money,
@@ -52,7 +52,7 @@ class OrderFill:
 
         Args:
             order: Reference to the parent order that was filled.
-            signed_quantity: The net filled quantity. Returns a positive value for buy fills
+            signed_qty: The net filled quantity. Returns a positive value for buy fills
                 and a negative value for sell fills.
             price: Fill price.
             timestamp: When this fill occurred.
@@ -70,7 +70,7 @@ class OrderFill:
         self._id = id
 
         # Normalize values
-        self._signed_quantity = self.instrument.snap_qty(signed_quantity)
+        self._signed_qty = self.instrument.snap_qty(signed_qty)
         self._price = self.instrument.snap_price(price)
 
         # Commission
@@ -116,7 +116,7 @@ class OrderFill:
         Returns:
             bool: True if this is a buy-side fill.
         """
-        return self._signed_quantity > 0
+        return self._signed_qty > 0
 
     @property
     def is_sell(self) -> bool:
@@ -125,7 +125,7 @@ class OrderFill:
         Returns:
             bool: True if this is a sell-side fill.
         """
-        return self._signed_quantity < 0
+        return self._signed_qty < 0
 
     @property
     def abs_quantity(self) -> Decimal:
@@ -134,7 +134,7 @@ class OrderFill:
         This value is always positive and represents the magnitude of the
         filled quantity, regardless of whether it is a buy or sell.
         """
-        return abs(self._signed_quantity)
+        return abs(self._signed_qty)
 
     @property
     def signed_quantity(self) -> Decimal:
@@ -142,7 +142,7 @@ class OrderFill:
 
         Returns a positive value for buy fills and a negative value for sell fills.
         """
-        return self._signed_quantity
+        return self._signed_qty
 
     @property
     def price(self) -> Decimal:
@@ -173,7 +173,7 @@ class OrderFill:
     def signed_notional_value(self) -> Money:
         """Return signed notional Money in $quote_currency.
 
-        Returns: $signed_quantity * $contract_size * $price.
+        Returns: $signed_qty * $contract_size * $price.
         Positive for BUY, negative for SELL (assuming positive price).
         """
         amount = self.signed_quantity * self.instrument.contract_size * self.price
@@ -190,17 +190,17 @@ class OrderFill:
             ValueError: If fill data is invalid.
         """
         # Raise: fill quantity must be non-zero
-        if self._signed_quantity == 0:
-            raise ValueError(f"Cannot call `OrderFill._validate` because $signed_quantity ({self._signed_quantity}) cannot be zero")
+        if self._signed_qty == 0:
+            raise ValueError(f"Cannot call `OrderFill._validate` because $signed_qty ({self._signed_qty}) cannot be zero")
 
         # Raise: fill sign must match order sign
-        if (self._signed_quantity > 0) != (self._order.signed_quantity > 0):
-            raise ValueError(f"Cannot call `OrderFill._validate` because fill sign does not match order sign ($signed_quantity={self._signed_quantity}, order.signed_quantity={self._order.signed_quantity})")
+        if (self._signed_qty > 0) != (self._order.signed_quantity > 0):
+            raise ValueError(f"Cannot call `OrderFill._validate` because fill sign does not match order sign ($signed_qty={self._signed_qty}, order.signed_qty={self._order.signed_quantity})")
 
         # Raise: quantity must be snapped
-        expected_quantity = self.instrument.snap_qty(self._signed_quantity)
-        if expected_quantity != self._signed_quantity:
-            raise ValueError(f"Cannot call `OrderFill._validate` because $signed_quantity ({self._signed_quantity}) is not snapped (expected {expected_quantity})")
+        expected_quantity = self.instrument.snap_qty(self._signed_qty)
+        if expected_quantity != self._signed_qty:
+            raise ValueError(f"Cannot call `OrderFill._validate` because $signed_qty ({self._signed_qty}) is not snapped (expected {expected_quantity})")
 
         # Raise: price must be snapped
         expected_price = self.instrument.snap_price(self._price)

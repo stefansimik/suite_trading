@@ -18,31 +18,31 @@ class FixedRatioMarginModel(MarginModel):
 
     def __init__(
         self,
-        initial_ratio: DecimalLike,
-        maintenance_ratio: DecimalLike,
+        initial_margin_ratio: DecimalLike,
+        maint_margin_ratio: DecimalLike,
     ) -> None:
         """Create a fixed-ratio margin model.
 
         Args:
-            initial_ratio: Fraction in [0, 1] applied to notional value to compute initial margin.
+            initial_margin_ratio: Fraction in [0, 1] applied to notional value to compute initial margin.
                 Accepts Decimal-like scalar.
-            maintenance_ratio: Fraction in [0, 1] applied to notional value to compute maintenance margin.
+            maint_margin_ratio: Fraction in [0, 1] applied to notional value to compute maintenance margin.
                 Accepts Decimal-like scalar.
 
         Raises:
-            ValueError: If $initial_ratio or $maintenance_ratio is outside [0, 1].
+            ValueError: If $initial_margin_ratio or $maint_margin_ratio is outside [0, 1].
         """
-        initial_ratio_decimal = as_decimal(initial_ratio)
-        maintenance_ratio_decimal = as_decimal(maintenance_ratio)
+        initial_margin_ratio = as_decimal(initial_margin_ratio)
+        maint_margin_ratio = as_decimal(maint_margin_ratio)
 
         # Raise: ratios in [0, 1]
-        if not (Decimal("0") <= initial_ratio_decimal <= Decimal("1")):
-            raise ValueError(f"Cannot call `__init__` because $initial_ratio ({initial_ratio_decimal}) is out of [0, 1]")
-        if not (Decimal("0") <= maintenance_ratio_decimal <= Decimal("1")):
-            raise ValueError(f"Cannot call `__init__` because $maintenance_ratio ({maintenance_ratio_decimal}) is out of [0, 1]")
+        if not (Decimal("0") <= initial_margin_ratio <= Decimal("1")):
+            raise ValueError(f"Cannot call `__init__` because $initial_margin_ratio ({initial_margin_ratio}) is out of [0, 1]")
+        if not (Decimal("0") <= maint_margin_ratio <= Decimal("1")):
+            raise ValueError(f"Cannot call `__init__` because $maint_margin_ratio ({maint_margin_ratio}) is out of [0, 1]")
 
-        self._initial_ratio = initial_ratio_decimal
-        self._maintenance_ratio = maintenance_ratio_decimal
+        self._initial_margin_ratio = initial_margin_ratio
+        self._maint_margin_ratio = maint_margin_ratio
 
     # endregion
 
@@ -51,17 +51,17 @@ class FixedRatioMarginModel(MarginModel):
     def compute_initial_margin(
         self,
         order_book: OrderBook,
-        signed_quantity: DecimalLike,
+        signed_qty: DecimalLike,
     ) -> Money:
         """Implements: MarginModel.compute_initial_margin
 
-        Compute initial margin for a position change of $signed_quantity using the current $order_book.
+        Compute initial margin for a position change of $signed_qty using the current $order_book.
         """
-        signed_quantity = as_decimal(signed_quantity)
+        signed_qty = as_decimal(signed_qty)
         instrument = order_book.instrument
         price = self._extract_price_from_order_book(order_book)
-        notional_value = compute_notional_value(price, signed_quantity, instrument.contract_size)
-        margin_value = notional_value * self._initial_ratio
+        notional_value = compute_notional_value(price, signed_qty, instrument.contract_size)
+        margin_value = notional_value * self._initial_margin_ratio
         currency = instrument.settlement_currency
         result = Money(margin_value, currency)
         return result
@@ -69,17 +69,17 @@ class FixedRatioMarginModel(MarginModel):
     def compute_maintenance_margin(
         self,
         order_book: OrderBook,
-        signed_quantity: DecimalLike,
+        signed_qty: DecimalLike,
     ) -> Money:
         """Implements: MarginModel.compute_maintenance_margin
 
-        Compute maintenance margin for a net position of $signed_quantity using the current $order_book.
+        Compute maintenance margin for a net position of $signed_qty using the current $order_book.
         """
-        signed_quantity = as_decimal(signed_quantity)
+        signed_qty = as_decimal(signed_qty)
         instrument = order_book.instrument
         price = self._extract_price_from_order_book(order_book)
-        notional_value = compute_notional_value(price, signed_quantity, instrument.contract_size)
-        margin_value = notional_value * self._maintenance_ratio
+        notional_value = compute_notional_value(price, signed_qty, instrument.contract_size)
+        margin_value = notional_value * self._maint_margin_ratio
         currency = instrument.settlement_currency
         result = Money(margin_value, currency)
         return result
