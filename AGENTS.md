@@ -754,16 +754,26 @@ _apply_proposed_fill_if_fundable(order, proposed_fill, order_book)
 5. **Utilities** — non-public helpers (standardize on "Utilities", not "Helpers")
 6. **Magic** — dunder methods
 
-**R-5.1.2** These are examples and a strong default, not a hard whitelist. Additional region names are allowed when they materially improve scan-ability.
+**R-5.1.2** Top-level regions are the project’s contract structure.
+Top-level region names must use only the baseline set above (in that order when present):
+`Init` → `Protocol <n>`/`Main` → `Properties` → `Utilities` → `Magic`.
+
+Additional region names are allowed only as **nested sub-regions** inside a top-level region when they preserve foldable structure
+or materially improve navigation.
 
 ### Region Rules
 
 **Naming:**
-- **R-5.1.3** Region names must be descriptive and domain-relevant (e.g., `Order matching`, `Account & margin`)
-- **R-5.1.4** Keep region names short and simple (ideally 1–2 words)
+- **R-5.1.3** Sub-region names must be descriptive and domain-relevant (e.g., `ORDER MATCHING`, `ACCOUNT & MARGIN`)
+- **R-5.1.4** Keep sub-region names short and simple (ideally 1–3 words)
 - **R-5.1.5** Use `Protocol <n>` for protocol API. Use `Main` only for public API not in a protocol
 - **R-5.1.6** Standardize on `Utilities` (do not use "Helpers")
-- **R-5.1.7** For large classes, prefer decomposing into `Utilities - <Topic>` (e.g., `Utilities - Orders`)
+- **R-5.1.7** Two-level region system (preserves JetBrains folding/preview and keeps region lists scannable):
+  - Level 1 (top-level): Use only the baseline regions.
+  - Level 2 (nested): If you need multiple foldable groups inside a top-level region, use nested `# region <TOPIC>` blocks.
+  - Casing rule: Level 1 region names use Title Case exactly as written above; Level 2 topic regions use ALL CAPS noun phrases.
+  - Naming rule: Level 2 topic regions are topic-only (high-signal first words). Do not prefix them with `Utilities -`.
+  - Structure rule: Each class should have at most one top-level `# region Utilities` block; do not scatter multiple `Utilities` blocks.
 - **R-5.1.8** In modules that define a Protocol/interface, you may use a single `Interface` region
 
 **Ordering:**
@@ -802,10 +812,14 @@ def margin_ratio(self) -> Decimal:
 
 # endregion
 
-# region Utilities - Orders
+# region Utilities
+
+# region ORDERS
 
 def _validate_order(self, order: Order) -> None:
     ...
+
+# endregion
 
 # endregion
 
@@ -830,12 +844,24 @@ def submit_order(self, order: Order) -> None:
     ...
 
 # endregion
+
+# ❌ Bad — low-signal prefix pattern (hard to scan in region lists)
+# region Utilities - Orders
+
+def _validate_order(self, order: Order) -> None:
+    ...
+
+# endregion
 ```
 
 **Acceptance checks:**
 - [ ] R-5.1.6: No "Helpers" — use "Utilities"
 - [ ] R-5.1.9: Public API appears before protected/private helpers
 - [ ] R-5.1.5: `Protocol <n>` is used instead of `Main` for protocol API
+- [ ] R-5.1.2/R-5.1.7: Top-level regions use only the baseline set and order; additional names appear only as nested topic regions
+- [ ] R-5.1.7: Level 1 region names use Title Case; Level 2 topic regions use ALL CAPS
+- [ ] R-5.1.7: No regions are named `Utilities - <Topic>`
+- [ ] R-5.1.7: Each class has at most one top-level `# region Utilities` block
 - [ ] R-5.1.16: No empty regions
 
 ## 5.2. Imports & Package Structure
