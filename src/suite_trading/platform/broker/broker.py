@@ -35,7 +35,7 @@ class Broker(Protocol):
     - Connection management (connect, disconnect, status checking).
     - Order lifecycle (submitting, canceling, modifying, and listing orders).
     - Position tracking (listing and retrieving open positions).
-    - Account snapshots (current balances, margin, and related info).
+    - Account handles (current balances, margin, and related info).
 
     Account semantics:
 
@@ -233,15 +233,17 @@ class Broker(Protocol):
     # region Account
 
     def get_account(self) -> Account:
-        """Return current account information (balances, margins, etc.).
+        """Return a mutable handle to this Broker's account state.
 
-        The returned `Account` snapshot describes the single logical trading
-        account represented by this Broker instance. To inspect multiple
-        accounts, query multiple Broker instances instead of passing account
-        identifiers into this method.
+        The returned `Account` represents the single logical trading account behind
+        this Broker instance. Mutations on the returned object immediately affect
+        this Broker's account state.
+
+        To inspect multiple accounts, query multiple Broker instances instead of
+        passing account identifiers into this method.
 
         Returns:
-            Account: Snapshot of this Broker's account state.
+            Account: Mutable handle to this Broker's account state.
 
         Raises:
             ConnectionError: If not connected (for live brokers).

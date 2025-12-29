@@ -338,7 +338,11 @@ class SimBroker(Broker, SimulatedBroker):
     def get_account(self) -> Account:
         """Implements: Broker.get_account
 
-        Return account snapshot for this simulated account.
+        Return a mutable handle to the account state for this simulated account.
+
+        The returned `Account` is a live object owned by this `SimBroker` instance.
+        Mutations on the returned object immediately affect this broker's account
+        state.
 
         The returned `Account` describes the single logical trading account
         represented by this `SimBroker` instance. To simulate multiple accounts,

@@ -55,6 +55,10 @@ class Account(Protocol):
     def list_paid_fees(self) -> Sequence[PaidFee]: ...
 
     # MARGIN (PER-INSTRUMENT)
+    def get_blocked_margins(self, instrument: Instrument) -> BlockedMargins | None: ...
+
+    def list_blocked_margins(self) -> Mapping[Instrument, BlockedMargins]: ...
+
     # Provide exactly one of $delta or $target:
     # - $delta changes blocked margin by a relative amount (positive blocks more, negative releases).
     # - $target sets the exact blocked margin amount and applies the implied funds movement.

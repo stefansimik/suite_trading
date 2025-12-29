@@ -87,6 +87,10 @@ class SimAccount(Account):
 
         Add $amount to funds.
         """
+        # Raise: deposits must be strictly positive
+        if amount.value <= 0:
+            raise ValueError(f"Cannot call `add_funds` because $amount ({amount.value} {amount.currency}) is not positive")
+
         currency = amount.currency
         current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
         self._funds_by_currency[currency] = current + amount
@@ -99,6 +103,10 @@ class SimAccount(Account):
         Raises:
             ValueError: If deducting would make funds negative.
         """
+        # Raise: withdrawals must be strictly positive
+        if amount.value <= 0:
+            raise ValueError(f"Cannot call `remove_funds` because $amount ({amount.value} {amount.currency}) is not positive")
+
         currency = amount.currency
         current = self._funds_by_currency.get(currency, Money(Decimal("0"), currency))
         new_value = current.value - amount.value
@@ -142,11 +150,30 @@ class SimAccount(Account):
 
         Return all paid fee records (most recent last).
 
-        The returned sequence is read-only by convention.
+        The returned sequence is an immutable view.
         """
-        return self._paid_fees
+        return tuple(self._paid_fees)
 
     # MARGIN (PER-INSTRUMENT)
+
+    def get_blocked_margins(self, instrument: Instrument) -> BlockedMargins | None:
+        """Implements: Account.get_blocked_margins
+
+        Return blocked margins for $instrument, or None if there is no margin record.
+
+        This is a cheap read with no side effects.
+        """
+        return self._blocked_margins_by_instrument.get(instrument)
+
+    def list_blocked_margins(self) -> Mapping[Instrument, BlockedMargins]:
+        """Implements: Account.list_blocked_margins
+
+        Return a snapshot of all blocked margins by instrument.
+
+        The returned mapping is a copy, so callers can safely iterate or transform it
+        without mutating internal account state.
+        """
+        return dict(self._blocked_margins_by_instrument)
 
     def change_blocked_initial_margin(
         self,
@@ -200,7 +227,8 @@ class SimAccount(Account):
         elif required_change < 0:
             self.add_funds(Money(-required_change, currency))
 
-        self._blocked_margins_by_instrument[instrument] = BlockedMargins(initial=Money(target_value, currency), maintenance=pair.maintenance)
+        updated_pair = BlockedMargins(initial=Money(target_value, currency), maintenance=pair.maintenance)
+        self._set_blocked_margins_for_instrument(instrument, updated_pair)
 
     def change_blocked_maint_margin(
         self,
@@ -254,7 +282,8 @@ class SimAccount(Account):
         elif required_change < 0:
             self.add_funds(Money(-required_change, currency))
 
-        self._blocked_margins_by_instrument[instrument] = BlockedMargins(initial=pair.initial, maintenance=Money(target_value, currency))
+        updated_pair = BlockedMargins(initial=pair.initial, maintenance=Money(target_value, currency))
+        self._set_blocked_margins_for_instrument(instrument, updated_pair)
 
     # endregion
 
@@ -262,6 +291,14 @@ class SimAccount(Account):
 
     def _get_blocked_margins_for_instrument(self, instrument: Instrument) -> BlockedMargins | None:
         return self._blocked_margins_by_instrument.get(instrument)
+
+    def _set_blocked_margins_for_instrument(self, instrument: Instrument, margins: BlockedMargins) -> None:
+        # Skip: remove the record once both blocked margins are zero
+        if margins.initial.value == 0 and margins.maintenance.value == 0:
+            self._blocked_margins_by_instrument.pop(instrument, None)
+            return
+
+        self._blocked_margins_by_instrument[instrument] = margins
 
     # endregion
 

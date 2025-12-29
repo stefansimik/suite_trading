@@ -660,6 +660,7 @@ Live broker adapters and richer reporting/indicators are planned.
 | **Simulation** | Event → OrderBook conversion for order matching |
 | **Simulation** | Realism layer (margin, fees, slippage, liquidity models) |
 | **Simulation** | Time-in-force semantics (IOC, FOK, DAY, GTD, GTC) |
+| **Accounting** | Account correctness review (funds invariants, margin reads, fee audit safety) |
 | **Accounting** | Per-instrument position tracking |
 | **Engine** | Per-strategy order fill history (via `TradingEngine`) |
 | **Productivity** | Data generation utilities for testing |
@@ -668,7 +669,6 @@ Live broker adapters and richer reporting/indicators are planned.
 
 | Area | Feature | Timeline |
 |------|---------|----------|
-| **Accounting** | Account correctness review (cash, margin, position lifecycle) | TBD |
 | **Orders** | Order relationships (OCO; define OUO semantics) | TBD |
 | **Orders** | OrderBuilder (safe, ergonomic order creation) | TBD |
 | **Data** | CSV/Parquet loaders that produce DataFrames for `BarsFromDataFrameEventFeed` | TBD |
