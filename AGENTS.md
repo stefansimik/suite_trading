@@ -295,6 +295,82 @@ def calculate_portfolio_value(positions: list) -> Decimal:
 - **R-4.2.7** Use natural English phrases that match the trading mental model
 - **R-4.2.8** Do not explain obvious assignments or one-liners that are already self-explanatory
 
+##### Grouped “scan comments” for logical blocks
+
+Use short inline comments to make non-trivial code easy to *scan*, but comment **blocks**, not every line.
+
+- **R-4.2.8a** Add **one short comment** (3–8 words) immediately above a **small, cohesive block** of related lines that together do one conceptual step.
+- **R-4.2.8b** Prefer comments that describe the *intent of the block* in domain terms.
+  For example, “compute peak funds required”, “apply fill side effects”.
+- **R-4.2.8c** Do **not** add per-line comments for obvious assignments, trivially named intermediate values,
+  or single-step arithmetic where the name already explains it.
+- **R-4.2.8d** A block deserves a comment when a reader would otherwise need to “execute the code in their head”
+  to understand why it exists.
+
+**Common block shapes that should usually get exactly one scan comment:**
+- Create an object **and then store/emit it** (two+ lines that are one conceptual action)
+- Iterate over items and apply the same operation (loop block)
+- “Compute → then use” clusters where several lines together produce one decision metric
+- Mini-workflow steps that map to `Validate` / `Compute` / `Decide` / `Act`
+
+**Common cases that should usually NOT get scan comments:**
+- Single assignments with self-explanatory names (for example, `currency = peak_funds_required.currency`)
+- Simple derived values that are obvious from the expression and name
+- Comments that merely restate the code (“set currency”, “get value”, “add 1”)
+
+**Preferred phrasing:**
+- Start with a verb (“Compute…”, “Select…”, “Store…”, “Publish…”, “Advance…”)
+- Keep it short and concrete
+- Use domain terms
+- If the block is a guard, use `# Raise:` / `# Skip:` rules instead
+
+**Examples:**
+
+Good (one comment per conceptual block):
+```python
+# Compute required funding numbers
+commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required = compute_funding_requirements(...)
+
+# Select available funds source
+available_funds = self._account.get_funds(peak_funds_required.currency)
+
+# Decide if funds cover peak requirement
+has_enough_funds = available_funds >= peak_funds_required
+```
+
+Good (create + store is one conceptual action):
+```python
+# Store updated Position
+self._position_by_instrument[instrument] = Position(...)
+logger.debug(f"Updated Position for Instrument '{instrument}'")
+```
+
+Good (loop block gets one guiding comment, not line-by-line narration):
+```python
+# Iterate proposed fills (dry-run)
+for proposed_fill in proposed_fills:
+    ...
+```
+
+Bad (commenting every obvious line):
+```python
+# Set currency
+currency = peak_funds_required.currency
+
+# Get funds
+available_funds = self._account.get_funds(currency)
+
+# Compare
+has_enough_funds = available_funds >= peak_funds_required
+```
+
+**Acceptance checks:**
+- [ ] Each non-trivial function can be scanned by reading mostly the comments and key statements
+- [ ] Scan comments are added per **conceptual block** (typically 2–8 lines), not per simple line
+- [ ] No comments restate obvious assignments or clearly named intermediate values
+- [ ] Loops, “create + store/emit” sequences, and decision-metric computations have a single guiding comment
+- [ ] Guard lines use `# Raise:` / `# Skip:` instead of generic scan comments
+
 #### Section Header Comments
 - **R-4.2.9** Use ALL CAPS for comments that label a multi-line section
 - **R-4.2.10** Keep a short noun phrase; parentheses optional
