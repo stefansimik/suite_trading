@@ -580,7 +580,7 @@ class SimBroker(Broker, SimulatedBroker):
             self._account.change_blocked_initial_margin(instrument, delta=initial_margin)
             was_blocked_initial_margin = True
 
-        # Create OrderFill
+        # Add OrderFill to order + update context
         order_fill = order.add_fill(signed_quantity=proposed_fill.signed_qty, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission)
         # Update fill history and $position
         self._append_order_fill_to_history_and_update_position(order_fill)
@@ -626,16 +626,20 @@ class SimBroker(Broker, SimulatedBroker):
         Returns:
             Tuple of (commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required).
         """
+        # Compute position delta
         signed_position_qty_after = signed_position_qty_before + proposed_fill.signed_qty
         abs_position_qty_change = max(Decimal("0"), abs(signed_position_qty_after) - abs(signed_position_qty_before))
 
+        # Compute commission
         commission = self._fee_model.compute_commission(proposed_fill=proposed_fill, order=order, previous_order_fills=previous_order_fills)
 
+        # Compute initial margin for size increase
         initial_margin_delta = Money(0, commission.currency)
         if abs_position_qty_change > 0:
             signed_position_qty_change = abs_position_qty_change if proposed_fill.signed_qty > 0 else -abs_position_qty_change
             initial_margin_delta = self._margin_model.compute_initial_margin(order_book=order_book, signed_quantity=signed_position_qty_change)
 
+        # Compute maintenance margin delta
         maint_margin_before = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_before)
         maint_margin_after = self._margin_model.compute_maintenance_margin(order_book=order_book, signed_quantity=signed_position_qty_after)
         maint_margin_delta = maint_margin_after - maint_margin_before
@@ -644,6 +648,7 @@ class SimBroker(Broker, SimulatedBroker):
         if commission.currency != initial_margin_delta.currency or commission.currency != maint_margin_delta.currency:
             raise ValueError(f"Cannot call `_compute_funding_requirements_for_proposed_fill` because currencies differ: $commission={commission}, $initial_margin_delta={initial_margin_delta}, $maint_margin_delta={maint_margin_delta}")
 
+        # Compute peak funds required
         peak_margin_delta = max(initial_margin_delta, maint_margin_delta)
         peak_funds_required = peak_margin_delta + commission
 
@@ -676,9 +681,11 @@ class SimBroker(Broker, SimulatedBroker):
         Returns:
             Tuple of (commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required, available_funds, has_enough_funds).
         """
+        # Compute required funding numbers
         commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required = self._compute_funding_requirements_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=previous_order_fills)
         currency = peak_funds_required.currency
 
+        # Select available funds source
         if available_funds_by_currency is None:
             available_funds = self._account.get_funds(currency)
         else:
@@ -688,6 +695,7 @@ class SimBroker(Broker, SimulatedBroker):
         if available_funds.currency != currency:
             raise ValueError(f"Cannot call `_compute_funding_requirements_and_available_funds_for_proposed_fill` because $available_funds.currency ('{available_funds.currency}') does not match $peak_funds_required.currency ('{currency}')")
 
+        # Decide if funds cover peak requirement
         has_enough_funds = available_funds >= peak_funds_required
 
         result = commission, initial_margin_delta, maint_margin_delta, maint_margin_after, peak_funds_required, available_funds, has_enough_funds
@@ -700,27 +708,24 @@ class SimBroker(Broker, SimulatedBroker):
         order_book: OrderBook,
     ) -> bool:
         """Evaluate if the account has enough funds for margins and fees for all $proposed_fills (dry-run)."""
-        # INITIALIZE STATE
+        # Initialize dry-run state
         signed_position_qty_before = self.get_signed_position_qty(order_book.instrument)
-
         simulated_order_fill_history = list(self._order_fill_history)
         funds_by_currency = dict(self._account.get_all_funds())
 
-        # PROCESS PROPOSED FILLS
+        # Iterate proposed fills
         for i, proposed_fill in enumerate(proposed_fills):
-            # COMPUTE: Next state and required funding
+            # Compute required funding for this fill
             signed_position_qty_after = signed_position_qty_before + proposed_fill.signed_qty
-
             commission, _initial_margin_delta, maint_margin_delta, _maint_margin_after, peak_funds_required, available_account_funds, has_enough_funds = self._compute_funding_requirements_and_available_funds_for_proposed_fill(signed_position_qty_before=signed_position_qty_before, proposed_fill=proposed_fill, order=order, order_book=order_book, previous_order_fills=simulated_order_fill_history, available_funds_by_currency=funds_by_currency)
-
             if not has_enough_funds:
                 return False
 
-            # ACT (Simulated): Update tracking for the next proposed fill iteration
-            # Subtract commission and adjust for maintenance margin change (increase reduces funds, decrease adds them back)
+            # Simulate cash and maint margin impact
             new_funds_value = available_account_funds.value - commission.value - maint_margin_delta.value
             funds_by_currency[peak_funds_required.currency] = Money(new_funds_value, peak_funds_required.currency)
 
+            # Append synthetic fill and advance state
             sim_order_fill = OrderFill(order=order, signed_quantity=proposed_fill.signed_qty, price=proposed_fill.price, timestamp=proposed_fill.timestamp, commission=commission, id=f"FOK_DRY_RUN_{order.id}_{i}")
             simulated_order_fill_history.append(sim_order_fill)
             signed_position_qty_before = signed_position_qty_after
@@ -737,25 +742,26 @@ class SimBroker(Broker, SimulatedBroker):
         instrument = order_fill.order.instrument
         trade_price: Decimal = Decimal(order_fill.price)
 
-        # Record $order_fill into history
+        # Record $order_fill in history
         self._order_fill_history.append(order_fill)
 
-        # Update position for this instrument
+        # Read previous position
         previous_position = self.get_position(instrument)
         previous_signed_qty: Decimal = Decimal("0") if previous_position is None else previous_position.signed_qty
         previous_avg_price: Decimal = Decimal("0") if previous_position is None else previous_position.avg_price
 
+        # Compute new net position
         new_signed_qty, new_avg_price = self._compute_new_position_after_trade(previous_signed_qty=previous_signed_qty, previous_avg_price=previous_avg_price, signed_qty=order_fill.signed_quantity, trade_price=trade_price)
 
         if new_signed_qty == 0:
-            # Flat after this trade → drop stored position to keep list_open_positions() minimal
+            # Drop position when flat
             self._position_by_instrument.pop(instrument, None)
         else:
             # Raise: if $new_signed_qty is non-zero, we must have a $new_avg_price
             if new_avg_price is None:
                 raise RuntimeError(f"Cannot call `_append_order_fill_to_history_and_update_position` because $new_signed_qty ({new_signed_qty}) != 0 but $new_avg_price is None")
 
-            # Commit the new/updated Position for this instrument
+            # Store updated Position
             self._position_by_instrument[instrument] = Position(
                 instrument=instrument,
                 signed_qty=new_signed_qty,
@@ -785,10 +791,13 @@ class SimBroker(Broker, SimulatedBroker):
             Tuple of (new signed quantity, new average price).
             If the new signed quantity is 0, the new average price is None.
         """
+        # Apply trade quantity
         new_signed_qty = previous_signed_qty + signed_qty
         if new_signed_qty == 0:
+            # Return flat position result
             return new_signed_qty, None
 
+        # Compute new average price
         remains_on_same_side = (previous_signed_qty == 0) or (previous_signed_qty > 0 and new_signed_qty > 0) or (previous_signed_qty < 0 and new_signed_qty < 0)
         if remains_on_same_side and previous_signed_qty != 0:
             new_avg_price = (abs(previous_signed_qty) * previous_avg_price + abs(signed_qty) * trade_price) / abs(new_signed_qty)
