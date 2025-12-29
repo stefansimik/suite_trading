@@ -669,15 +669,13 @@ Live broker adapters and richer reporting/indicators are planned.
 
 | Area | Feature | Timeline |
 |------|---------|----------|
+| **Indicators** | Indicators framework (SMA, EMA, RSI, MACD, ...) | TBD |
+| **Reporting** | Performance statistics per Strategy + backtest reports | TBD |
+| **UI** | Streamlit export (bars, order fills, equity curve, results) | TBD
+| **Live** | First live broker adapter: Interactive Brokers (IBKR) | TBD |
 | **Orders** | Order relationships (OCO; define OUO semantics) | TBD |
 | **Orders** | OrderBuilder (safe, ergonomic order creation) | TBD |
 | **Data** | CSV/Parquet loaders that produce DataFrames for `BarsFromDataFrameEventFeed` | TBD |
-| **Indicators** | Indicators framework (SMA, EMA, RSI, MACD, ...) | TBD |
-| **Reporting** | Performance statistics per Strategy + backtest reports | TBD |
-| **UI** | Streamlit export (bars, order fills, equity curve, results) | TBD |
-| **UI** | Dashboard for monitoring and controls | TBD |
-| **Strategy** | Strategy regression / extensibility review | TBD |
-| **Live** | First live broker adapter: Interactive Brokers (IBKR) | TBD |
 
 ### Legend
 
