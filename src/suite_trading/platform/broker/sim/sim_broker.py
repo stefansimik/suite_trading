@@ -407,7 +407,9 @@ class SimBroker(Broker, SimulatedBroker):
 
     # endregion
 
-    # region Utilities - Order simulation
+    # region Utilities
+
+    # region ORDER SIMULATION
 
     def _match_order_against_order_book(self, order: Order, order_book: OrderBook) -> None:
         """Apply the per-order pipeline for a single OrderBook
@@ -810,7 +812,7 @@ class SimBroker(Broker, SimulatedBroker):
 
     # endregion
 
-    # region Utilities - Order lifecycle
+    # region ORDER LIFECYCLE
 
     # TIME IN FORCE (EXPIRATION)
 
@@ -898,7 +900,7 @@ class SimBroker(Broker, SimulatedBroker):
 
     # endregion
 
-    # region Utilities - Defaults
+    # region DEFAULTS
 
     def _build_default_market_depth_model(self) -> MarketDepthModel:
         """Build the default MarketDepthModel used by this broker instance.
@@ -937,5 +939,7 @@ class SimBroker(Broker, SimulatedBroker):
             limit_on_touch_fill_probability=Decimal("0"),
             rng_seed=None,
         )
+
+    # endregion
 
     # endregion
