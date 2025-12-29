@@ -2,9 +2,13 @@
 
 SUITE stands for: **S**imple, **U**nderstandable, **I**ntuitive **T**rading **E**ngine
 
-SUITE Trading is a **modern Python framework for algorithmic trading** that provides a unified, event-driven architecture for backtesting, paper trading, and live trading. It's designed to help you go from idea to execution quickly and confidently.
+SUITE Trading is a **modern Python framework for algorithmic trading** that provides a unified, event-driven architecture for
+backtesting and simulation.
+The same Strategy API is designed to support paper and live trading via broker adapters (not shipped yet).
 
-![Python Version](https://img.shields.io/badge/python-3.13.x-blue) ![License](https://img.shields.io/badge/license-MIT-green) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stefansimik/suite_trading)
+![Python Version](https://img.shields.io/badge/python-3.13.x-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/stefansimik/suite_trading)
 
 > ⚠️ **Work in progress:** SUITE Trading is under active development. Breaking changes may happen while the API stabilizes.
 
@@ -13,11 +17,12 @@ SUITE Trading is a **modern Python framework for algorithmic trading** that prov
 ## What Can You Do with SUITE Trading?
 
 - **Backtest your trading ideas** — Test strategies on historical data before risking real funds
-- **Paper trade** — Run strategies in real-time with simulated funds to validate your approach
-- **Go live** — Deploy the same strategy code to real brokers when you're ready
+- **Paper trade** — Run strategies in real-time with simulated funds using `SimBroker` (you provide a real-time `EventFeed`)
+- **Go live** — Deploy the same strategy code to real brokers via broker adapters (planned; not shipped yet)
 - **Run multiple strategies together** — Test how strategies interact when sharing the same timeline
 
-**Who is this for?** Developers and traders who want a clean, understandable framework without hidden magic. If you've been frustrated by complex trading libraries where you can't follow what's happening, SUITE Trading is for you.
+**Who is this for?** Developers and traders who want a clean, understandable framework without hidden magic.
+If you've been frustrated by complex trading libraries where you can't follow what's happening, SUITE Trading is for you.
 
 ```mermaid
 flowchart LR
@@ -39,7 +44,7 @@ flowchart LR
 
 | Feature | Description |
 |---------|-------------|
-| **One codebase, multiple modes** | Same strategy code runs in backtesting, paper trading, and live trading |
+| **One codebase, multiple modes** | Same strategy code runs in backtesting and simulation today; paper/live require broker adapters (planned) |
 | **Shared timeline simulation** | Multiple strategies run together on one shared clock with predictable event ordering |
 | **Simple, intuitive API** | Domain model matches how traders think — `Order`, `Position`, `Bar`, `OrderBook` behave as expected |
 | **Smart components with clear jobs** | Each piece has one responsibility and they connect explicitly |
@@ -236,7 +241,9 @@ Now that you've seen a working example, let's understand each piece better.
 
 **What it is:** The central coordinator that runs your strategies on a shared timeline.
 
-**Why it matters:** When you run multiple strategies together, they all see events in the same order. Strategy A can't accidentally see "future" data that Strategy B hasn't seen yet. This is crucial for realistic backtesting.
+**Why it matters:** When you run multiple strategies together, they all see events in the same order.
+Strategy A can't accidentally see "future" data that Strategy B hasn't seen yet.
+This is crucial for realistic backtesting.
 
 ```python
 from suite_trading.platform.engine.trading_engine import TradingEngine
@@ -294,7 +301,8 @@ class MyStrategy(Strategy):
 
 **What it is:** The interface between your strategy and the market.
 
-**Why it matters:** `SimBroker` lets you test strategies without real funds. When you're ready to go live, you swap it for a real broker adapter — your strategy code stays the same.
+**Why it matters:** `SimBroker` lets you test strategies without real funds.
+When you're ready to go live, you swap it for a live broker adapter (planned; not shipped yet) — your strategy code stays the same.
 
 ```python
 from suite_trading.platform.broker.sim.sim_broker import SimBroker
@@ -338,8 +346,9 @@ def on_start(self) -> None:
 ```
 
 **The `use_for_simulated_fills` parameter:**
-- `True` — This data drives order matching in SimBroker (use for your main price data)
-- `False` — Data goes to your strategy only (useful for signals, indicators, or reference data that shouldn't affect fills)
+- `True` — Events are delivered to your Strategy and also drive simulated fills in SimBroker (use for your main price data)
+- `False` — Events are delivered to your Strategy but do not drive simulated fills (useful for signals, indicators, or reference data)
+- `Callable[[Event], bool]` — Events are delivered to your Strategy; only events where the callable returns True drive simulated fills
 
 ### Event — Data Wrapper
 
@@ -489,7 +498,8 @@ sequenceDiagram
 - **Primary sort:** `dt_event` (when it happened in the market)
 - **Secondary sort:** `dt_received` (when it entered the system) — this makes ordering predictable when two events share the same market timestamp
 
-> ⚠️ **Important:** The engine can only be as "time-ordered" as the feeds. For realistic runs, each EventFeed should emit events in non-decreasing `dt_event` order.
+> ⚠️ **Important:** The engine can only be as "time-ordered" as the feeds.
+> For realistic runs, each EventFeed should emit events in non-decreasing `dt_event` order.
 
 ### Lifecycle States
 
@@ -630,9 +640,10 @@ uv run pytest
 
 ## Roadmap
 
-**Last updated:** TBD
+**Last updated:** 2025-12-29
 
-SUITE Trading is in active development with approximately **70% of core functionality** implemented.
+SUITE Trading is in active development. Core engine + SimBroker simulation are implemented.
+Live broker adapters and richer reporting/indicators are planned.
 
 ### ✅ Completed
 
@@ -645,12 +656,12 @@ SUITE Trading is in active development with approximately **70% of core function
 | **Domain** | Domain models: Event, Bar, Order, Instrument, Money, Position, Account |
 | **Data** | EventFeed system with timeline filtering (skip/trim past events) |
 | **Data** | DataFrame-based historical bars feed (`BarsFromDataFrameEventFeed`) |
-| **Simulation** | SimBroker order lifecycle (MARKET/LIMIT/STOP/STOP_LIMIT; cancel/modify) |
+| **Simulation** | SimBroker order lifecycle (MARKET/LIMIT/STOP/STOP_LIMIT; cancel/update (`update_order`)) |
 | **Simulation** | Event → OrderBook conversion for order matching |
 | **Simulation** | Realism layer (margin, fees, slippage, liquidity models) |
 | **Simulation** | Time-in-force semantics (IOC, FOK, DAY, GTD, GTC) |
 | **Accounting** | Per-instrument position tracking |
-| **Reporting** | Per-strategy order fill history |
+| **Engine** | Per-strategy order fill history (via `TradingEngine`) |
 | **Productivity** | Data generation utilities for testing |
 
 ### 🗓️ Planned
