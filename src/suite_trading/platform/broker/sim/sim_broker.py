@@ -510,9 +510,9 @@ class SimBroker(Broker, SimulatedBroker):
 
             # Handle (publish) new events
             self._handle_order_fill(order_fill)
-            self._handle_order_update(order_fill.order)
+            self._publish_order_update_and_cleanup_if_terminal(order_fill.order)
 
-            # Skip: stop once the order was terminalized
+            # Skip: stop here if order was terminalized
             if order.state_category == OrderStateCategory.TERMINAL:
                 return
 
@@ -842,7 +842,7 @@ class SimBroker(Broker, SimulatedBroker):
 
     # ORDER UPDATES
 
-    def _handle_order_update(self, order: Order) -> None:
+    def _publish_order_update_and_cleanup_if_terminal(self, order: Order) -> None:
         """Orchestrate all side effects of an order state update.
 
         This is the single entry point for all post-transition logic.
@@ -871,7 +871,7 @@ class SimBroker(Broker, SimulatedBroker):
         new_state = order.state
 
         if new_state != previous_state:
-            self._handle_order_update(order)
+            self._publish_order_update_and_cleanup_if_terminal(order)
 
     def _publish_order_update(self, order: Order) -> None:
         """Notify listeners of order update."""
