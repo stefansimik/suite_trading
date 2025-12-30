@@ -454,8 +454,19 @@ if not fills:
 ```
 
 ### Code Reference Formatting
-**R-4.2.18** Apply to comments, docstrings, and error messages:
-- **Parameters/attributes/variables:** `$parameter_name`
+**R-4.2.18** Use the **`$variable`** prefix for parameters, attributes, and variables only when they appear in **narrative text** (sentences in docstrings, comments, or error messages).
+**Do NOT** use the `$` prefix for identifiers in the structural definitions of docstrings (e.g., the names at the start of `Args:`, `Returns:`, `Raises:`, or `Attributes:` list items).
+
+**Correct Example:**
+```python
+def calculate_commission(proposed_fill: ProposedFill, order: Order) -> Money:
+    """Calculates commission for the $proposed_fill based on the $order.
+
+    Args:
+        proposed_fill: The fill being evaluated.
+        order: The parent order for context.
+    """
+```
 - **Functions/methods:** `` `function_name` ``
 
 ### Guard Block Spacing
