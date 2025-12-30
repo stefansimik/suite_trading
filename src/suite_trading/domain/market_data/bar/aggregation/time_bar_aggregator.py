@@ -7,11 +7,10 @@ from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.utils.datetime_tools import require_utc
 from suite_trading.utils.math import ceil_to_multiple
-from suite_trading.domain.market_data.bar.new_bar_event_accumulator import NewBarEventAccumulator
+from .bar_accumulator import BarEventAccumulator
 
 
-#
-class TimeBarResampler:
+class TimeBarAggregator:
     """Resample time-based Bars into right-closed windows of (unit,size).
 
     Purpose:
@@ -40,15 +39,15 @@ class TimeBarResampler:
     def __init__(self, *, unit: BarUnit, size: int, on_emit_callback: Callable[[BarEvent], None]) -> None:
         # Raise: size must be > 0
         if not isinstance(size, int) or size <= 0:
-            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $size ('{size}') is not > 0")
+            raise ValueError(f"Cannot call `TimeBarAggregator.__init__` because $size ('{size}') is not > 0")
 
         # Raise: unit supported
         if unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH}:
-            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, WEEK, or MONTH")
+            raise ValueError(f"Cannot call `TimeBarAggregator.__init__` because $unit ('{unit}') is not supported; use SECOND, MINUTE, HOUR, DAY, WEEK, or MONTH")
 
         # Raise: only size==1 allowed for DAY, WEEK, and MONTH
         if unit in {BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH} and size != 1:
-            raise ValueError(f"Cannot call `TimeBarResampler.__init__` because $unit is {unit.name} but $size ('{size}') is not 1; only {unit.name.lower()} size=1 is supported")
+            raise ValueError(f"Cannot call `TimeBarAggregator.__init__` because $unit is {unit.name} but $size ('{size}') is not 1; only {unit.name.lower()} size=1 is supported")
 
         self._unit = unit
         self._size = size
@@ -60,14 +59,14 @@ class TimeBarResampler:
         self._input_bar_seconds: int | None = None
 
         # Per-window accumulator
-        self._event_accumulator = NewBarEventAccumulator()
+        self._event_accumulator = BarEventAccumulator()
 
         # Public counters
         self.emitted_bar_count: int = 0
 
     # endregion
 
-    # region Main logic
+    # region Main
 
     def add_event(self, event: BarEvent) -> None:
         """Consume a `BarEvent` and resample it into aggregated time bar.
@@ -123,49 +122,45 @@ class TimeBarResampler:
 
     # endregion
 
-    # region Validations
+    # region Utilities
 
     def _validate_event_and_ordering(self, event: BarEvent) -> None:
         if not isinstance(event, BarEvent):
-            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $event (class '{type(event).__name__}') is not a BarEvent")
+            raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $event (class '{type(event).__name__}') is not a BarEvent")
 
         bar = event.bar
         if self._last_bar_end_dt is not None and bar.end_dt < self._last_bar_end_dt:
-            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $bar.end_dt ('{bar.end_dt}') is older than previous input ('{self._last_bar_end_dt}')")
+            raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $bar.end_dt ('{bar.end_dt}') is older than previous input ('{self._last_bar_end_dt}')")
 
     def _validate_first_source_and_compatibility(self, event: BarEvent) -> None:
         # Require time-based bar
         bar = event.bar
         if bar.unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY}:
-            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $bar.unit ('{bar.unit}') is not a supported time unit; only SECOND, MINUTE, HOUR, DAY are supported")
+            raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $bar.unit ('{bar.unit}') is not a supported time unit; only SECOND, MINUTE, HOUR, DAY are supported")
 
         # Infer input bar size in seconds
         self._input_bar_seconds = int((bar.end_dt - bar.start_dt).total_seconds())
         if self._input_bar_seconds <= 0:
-            raise ValueError(f"Cannot call `TimeBarResampler.add_event` because inferred $input_bar_seconds ('{self._input_bar_seconds}') must be > 0")
+            raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because inferred $input_bar_seconds ('{self._input_bar_seconds}') must be > 0")
 
         if self._unit == BarUnit.MONTH:
             # For monthly aggregation: input must evenly divide a day (86400 seconds)
             if 86400 % self._input_bar_seconds != 0:
-                raise ValueError(f"Cannot call `TimeBarResampler.add_event` because monthly aggregation requires $input_bar_seconds to divide 86400; got '{self._input_bar_seconds}'")
+                raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because monthly aggregation requires $input_bar_seconds to divide 86400; got '{self._input_bar_seconds}'")
             # Validate current month window is multiple of input size
             window_start, window_end = self._compute_window_bounds(bar.end_dt)
             month_seconds = int((window_end - window_start).total_seconds())
             if (month_seconds % self._input_bar_seconds) != 0:
-                raise ValueError(f"Cannot call `TimeBarResampler.add_event` because current month length in seconds ('{month_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
+                raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because current month length in seconds ('{month_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
         else:
             # For SECOND/MINUTE/HOUR/DAY/WEEK the window seconds are fixed; MONTH varies and is handled above
             window_seconds = self._window_seconds()
             # Raise: output window not finer than input
             if window_seconds < self._input_bar_seconds:
-                raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $output_window_seconds ('{window_seconds}') is < $input_bar_seconds ('{self._input_bar_seconds}')")
+                raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $output_window_seconds ('{window_seconds}') is < $input_bar_seconds ('{self._input_bar_seconds}')")
             # Raise: multiple rule
             if (window_seconds % self._input_bar_seconds) != 0:
-                raise ValueError(f"Cannot call `TimeBarResampler.add_event` because $output_window_seconds ('{window_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
-
-    # endregion
-
-    # region Internal
+                raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $output_window_seconds ('{window_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
 
     def _unit_seconds(self) -> int:
         match self._unit:
@@ -180,7 +175,7 @@ class TimeBarResampler:
             case BarUnit.WEEK:
                 return 604800
             case _:
-                raise ValueError(f"Cannot call `TimeBarResampler._unit_seconds` because $unit ('{self._unit}') is not a fixed-length time unit")
+                raise ValueError(f"Cannot call `TimeBarAggregator._unit_seconds` because $unit ('{self._unit}') is not a fixed-length time unit")
 
     def _window_seconds(self) -> int:
         return self._size * self._unit_seconds()

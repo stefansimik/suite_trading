@@ -9,21 +9,21 @@ from suite_trading.domain.event import Event
 from suite_trading.domain.market_data.bar.bar_event import BarEvent
 from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.utils.datetime_tools import require_utc
-from suite_trading.domain.market_data.bar.time_bar_resampler import TimeBarResampler
+from suite_trading.domain.market_data.bar.aggregation.time_bar_aggregator import TimeBarAggregator
 
 
 logger = logging.getLogger(__name__)
 
 
 class TimeBarAggregationEventFeed:
-    """Aggregate time-based bar from a source EventFeed using `TimeBarResampler`.
+    """Aggregate time-based bar from a source EventFeed using `TimeBarAggregator`.
 
     Receive source bar path:
       - `on_source_event`: receives NewBarEvent(s) from $source_feed and forwards to the
-        resampler.
+        aggregator.
 
     Aggregation path:
-      - `on_aggregated_event`: invoked by `TimeBarResampler` when a window closes or updates;
+      - `on_aggregated_event`: invoked by `TimeBarAggregator` when a window closes or updates;
         applies partial-bar policy and enqueues resulting events.
 
     Consumers pull aggregated events via `peek`/`pop`. External listeners registered with
@@ -62,8 +62,8 @@ class TimeBarAggregationEventFeed:
         self._listener_key: str = f"time-agg-{self._unit.name.lower()}-{self._size}-{id(self):x}"
         self._source_feed.add_listener(self._listener_key, self.on_source_event)
 
-        # RESAMPLER: This object generates aggregated events
-        self._resampler = TimeBarResampler(unit=self._unit, size=self._size, on_emit_callback=self.on_aggregated_event)
+        # AGGREGATOR: This object generates aggregated events
+        self._aggregator = TimeBarAggregator(unit=self._unit, size=self._size, on_emit_callback=self.on_aggregated_event)
 
         # AGGREGATED EVENTS
         self._aggregated_event_queue: deque[BarEvent] = deque()  # Aggregated bar events are stored in this queue
@@ -74,7 +74,7 @@ class TimeBarAggregationEventFeed:
     # region Listener
 
     def on_source_event(self, event: Event) -> None:
-        """Ingest a BarEvent from $source_feed and forward to `TimeBarResampler`.
+        """Ingest a BarEvent from $source_feed and forward to `TimeBarAggregator`.
 
         Args:
             event (Event): Must be a BarEvent; otherwise a ValueError is raised.
@@ -87,18 +87,18 @@ class TimeBarAggregationEventFeed:
         if not isinstance(event, BarEvent):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $event (class '{type(event).__name__}') is not a BarEvent. Register this feed on an EventFeed that produces BarEvent(s).")
 
-        # Delegate to resampler which will invoke `on_aggregated_event` on window emissions
-        self._resampler.add_event(event)
+        # Delegate to aggregator which will invoke `on_aggregated_event` on window emissions
+        self._aggregator.add_event(event)
 
     # endregion
 
-    # region Resampler callback
+    # region Aggregator callback
 
     def on_aggregated_event(self, evt: BarEvent) -> None:
-        """Handle aggregated bar from `TimeBarResampler` and apply partial-bar policy.
+        """Handle aggregated bar from `TimeBarAggregator` and apply partial-bar policy.
 
         Purpose:
-            - Aggregation path: the resampler emits a BarEvent for the configured
+            - Aggregation path: the aggregator emits a BarEvent for the configured
               (unit,size) window, and this feed decides whether to enqueue it.
 
         Args:
