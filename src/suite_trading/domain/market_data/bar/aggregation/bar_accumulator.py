@@ -57,31 +57,30 @@ class BarAccumulator:
         Raises:
             ValueError: If $bar is not Bar or BarType mismatch vs first bar type.
         """
-        # Raise: ensure $bar is a Bar instance to maintain type safety
         if not isinstance(bar, Bar):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.add` because $bar (class '{type(bar).__name__}') is not a Bar")
 
-        # Enforce consistent BarType across the window
+        # Raise: all bars in an aggregation window must have the same type
         if self._first_bar_type is None:
             self._first_bar_type = bar.bar_type
         elif self._first_bar_type != bar.bar_type:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.add` because $bar.bar_type ('{bar.bar_type}') differs from the first bar type ('{self._first_bar_type}')")
 
-        # Initialize on first element
         if self._count == 0:
+            # Initialize on first element
             self._open = bar.open
             self._high = bar.high
             self._low = bar.low
             self._close = bar.close
-            self._volume += bar.volume if bar.volume is not None else Decimal("0")
+            self._volume += bar.volume or Decimal("0")
         else:
             # Update OHLCV (Open fixed from first)
-            if bar.high > (self._high if self._high is not None else bar.high):
+            if bar.high > self._high:
                 self._high = bar.high
-            if bar.low < (self._low if self._low is not None else bar.low):
+            if bar.low < self._low:
                 self._low = bar.low
             self._close = bar.close
-            self._volume += bar.volume if bar.volume is not None else Decimal("0")
+            self._volume += bar.volume or Decimal("0")
 
         self._count += 1
 
@@ -107,18 +106,15 @@ class BarAccumulator:
         Raises:
             ValueError: If $start_dt or $end_dt is None.
         """
-        # Raise: require $start_dt and $end_dt to define the output interval
         if start_dt is None or end_dt is None:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.build_bar` because $start_dt or $end_dt is None")
 
-        # Raise: cannot build a bar if no data has been accumulated
+        # Raise: cannot build a bar without any data
         if not self.has_data():
             raise ValueError(f"Cannot call `{self.__class__.__name__}.build_bar` because no data has been accumulated")
 
-        # DECIDE
+        # Create and return aggregated bar
         result = Bar(out_bar_type, start_dt, end_dt, self._open, self._high, self._low, self._close, self._volume, is_partial=is_partial)
-
-        # ACT
         return result
 
     # endregion
@@ -176,7 +172,6 @@ class BarEventAccumulator:
         Args:
             event (BarEvent): Input event to accumulate.
         """
-        # Raise: ensure $event is a BarEvent instance to maintain type safety
         if not isinstance(event, BarEvent):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.add` because $event (class '{type(event).__name__}') is not a BarEvent")
 
@@ -205,7 +200,7 @@ class BarEventAccumulator:
         """
         bar = self._bar_accumulator.build_bar(out_bar_type, start_dt, end_dt, is_partial=is_partial)
 
-        # Raise: require $last_dt_received and $last_is_historical to be present to build an event
+        # Raise: cannot build event without received metadata
         if self._last_dt_received is None or self._last_is_historical is None:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.build_event` because missing metadata: $last_dt_received ('{self._last_dt_received}'), $last_is_historical ('{self._last_is_historical}')")
 

@@ -319,7 +319,7 @@ def calculate_portfolio_value(positions: list) -> Decimal:
 - **R-4.2.5** Add short, simple, and intuitive line comments to allow quick scanning of the logic
 - **R-4.2.6** Keep comments focused on what the next line or tiny block does, in 3–8 simple words
 - **R-4.2.7** Use natural English phrases that match the trading mental model
-- **R-4.2.8** Do not explain obvious assignments or one-liners that are already self-explanatory
+- **R-4.2.8** Do not explain obvious assignments or one-liners that are already self-explanatory (including `return` statements)
 
 ##### Grouped “scan comments” for logical blocks
 
@@ -332,6 +332,7 @@ Use short inline comments to make non-trivial code easy to *scan*, but comment *
   or single-step arithmetic where the name already explains it.
 - **R-4.2.8d** A block deserves a comment when a reader would otherwise need to “execute the code in their head”
   to understand why it exists.
+- **R-4.2.8e** The `result = ...; return result` pattern (from R-4.4.2) is a single conceptual block. Add **exactly one** comment above the assignment line; do not add a second comment above the `return` line.
 
 **Common block shapes that should usually get exactly one scan comment:**
 - Create an object **and then store/emit it** (two+ lines that are one conceptual action)
@@ -568,6 +569,8 @@ self._last_order_time = now()
 - **R-4.2.22** Do not clutter code with trivial validations that Python and type checkers already cover: types, existence of attributes, or obvious None access that would fail fast on its own
 - **R-4.2.23** Keep validations cheap and close to boundaries. Avoid repeating the same guard in hot paths; validate once at the API boundary
 
+- **R-4.2.24** Do not add comments above `return` statements that merely restate the return (e.g., `# Return result`). Only comment a `return` if it represents a complex early-exit logic not covered by a preceding guard comment.
+
 ```python
 # ✅ Good — validates domain invariant (quantity sign)
 # Raise: $abs_qty must be positive
@@ -671,7 +674,7 @@ Keep expressions simple and easy to inspect in a debugger.
 
 ### Rules
 - **R-4.4.1** Avoid long, nested expressions in `return` statements or constructor calls. Extract sub-expressions into well‑named local variables
-- **R-4.4.2** When constructing a non-trivial return value, assign it to a local variable named `result` and `return result`. Returning a simple name or literal directly is fine
+- **R-4.4.2** When constructing a non-trivial return value, assign it to a local variable named `result` and `return result`. Returning a simple name or literal directly is fine. See R-4.2.8e for commenting rules.
 - **R-4.4.3** Prefer short, single-purpose statements over clever one‑liners
 - **R-4.4.4** Avoid creating one-time used variables for simple attribute access or trivial expressions (e.g., `currency = upfront_required.currency`). Inline them to keep the code concise unless the variable name provides significant documentation value or is required for breaking down a truly complex expression.
 

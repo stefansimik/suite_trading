@@ -207,7 +207,7 @@ class Money:
             self._check_same_currency(other)
             if other.value == 0:
                 raise ZeroDivisionError("Cannot divide by zero Money")
-            return self.value / other.value  # Returns Decimal ratio
+            return self.value / other.value
         else:
             try:
                 divisor = as_decimal(other)
@@ -222,15 +222,12 @@ class Money:
         return NotImplemented
 
     def __neg__(self):
-        """Return negative Money."""
         return Money(-self.value, self.currency)
 
     def __pos__(self):
-        """Return positive Money (copy)."""
         return Money(self.value, self.currency)
 
     def __abs__(self):
-        """Return absolute Money."""
         return Money(abs(self.value), self.currency)
 
     # String representations

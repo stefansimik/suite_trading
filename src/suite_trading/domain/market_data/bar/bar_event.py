@@ -108,12 +108,12 @@ def wrap_bars_to_events(
     is_historical: bool = True,
     dt_received_getter: Callable[[Bar], datetime] | None = None,
 ) -> Iterator[BarEvent]:
-    """Wrap $bar into $BarEvent(s) with predictable $dt_received defaults.
+    """Wrap Bar(s) into BarEvent(s) with predictable $dt_received defaults.
 
     Args:
-        bars: Iterable of $Bar instances to wrap.
-        is_historical: Whether produced $BarEvent(s) represent historical data.
-        dt_received_getter: Function mapping a $Bar to its $dt_received timestamp.
+        bars: Iterable of Bar instances to wrap.
+        is_historical: Whether produced BarEvent(s) represent historical data.
+        dt_received_getter: Function mapping a Bar to its $dt_received timestamp.
             Defaults to bar.end_dt for deterministic historical usage.
 
     Returns:

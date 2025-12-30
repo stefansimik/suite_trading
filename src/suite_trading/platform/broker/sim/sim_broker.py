@@ -797,10 +797,8 @@ class SimBroker(Broker, SimulatedBroker):
             Tuple of (new signed quantity, new average price).
             If the new signed quantity is 0, the new average price is None.
         """
-        # Apply trade quantity
         new_signed_qty = previous_signed_qty + signed_qty
         if new_signed_qty == 0:
-            # Return flat position result
             return new_signed_qty, None
 
         # Compute new average price

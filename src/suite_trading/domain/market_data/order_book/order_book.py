@@ -151,11 +151,10 @@ class OrderBook:
         Returns:
             List of `ProposedFill(signed_qty, price, timestamp)`.
         """
-        # Choose (asks | bids) based on target signed quantity sign
         is_buy = target_signed_qty > 0
         order_book_levels = self._asks if is_buy else self._bids
 
-        # Return early if there is no depth or nothing to fill
+        # Skip: no depth or nothing to fill
         if not order_book_levels or target_signed_qty == 0:
             return []
 

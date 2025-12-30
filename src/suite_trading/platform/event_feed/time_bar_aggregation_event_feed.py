@@ -32,8 +32,26 @@ class TimeBarAggregationEventFeed:
 
     # region Init
 
-    def __init__(self, source_feed, unit: BarUnit, size: int, emit_first_partial_bar: bool = True, emit_later_partial_bars: bool = True):
-        # SET INPUT PARAMETERS
+    def __init__(
+        self,
+        source_feed: any,
+        unit: BarUnit,
+        size: int,
+        emit_first_partial_bar: bool = True,
+        emit_later_partial_bars: bool = True,
+    ) -> None:
+        """Initialize the aggregation feed.
+
+        Args:
+            source_feed: Source event-feed to aggregate bars from.
+            unit (BarUnit): Target aggregation unit.
+            size (int): Target aggregation size.
+            emit_first_partial_bar: Whether to emit the first (possibly incomplete)
+                aggregated bar.
+            emit_later_partial_bars: Whether to emit subsequent partial bars (e.g., on
+                closing).
+        """
+        # INPUT PARAMETERS
         self._source_feed = source_feed
         self._unit = unit
         self._size = size
@@ -52,26 +70,26 @@ class TimeBarAggregationEventFeed:
         if self._unit in {BarUnit.DAY, BarUnit.WEEK, BarUnit.MONTH} and self._size != 1:
             raise ValueError(f"Cannot call `{self.__class__.__name__}.__init__` because $size ('{self._size}') must be 1 when $unit is {self._unit.name}")
 
-        # LISTENERS OF THIS FEED (who want to be notified about aggregated bar)
+        # Listeners of this feed (who want to be notified about aggregated bar)
         self._listeners: dict[str, Callable[[Event], None]] = {}
 
-        # LIFECYCLE
+        # Lifecycle
         self._closed: bool = False
 
-        # LISTEN TO SOURCE FEED: This way we listen to receive input events from source-feed
+        # LISTEN TO SOURCE FEED
         self._listener_key: str = f"time-agg-{self._unit.name.lower()}-{self._size}-{id(self):x}"
         self._source_feed.add_listener(self._listener_key, self.on_source_event)
 
-        # AGGREGATOR: This object generates aggregated events
+        # Aggregator generates aggregated events
         self._aggregator = TimeBarAggregator(unit=self._unit, size=self._size, on_emit_callback=self.on_aggregated_event)
 
         # AGGREGATED EVENTS
-        self._aggregated_event_queue: deque[BarEvent] = deque()  # Aggregated bar events are stored in this queue
+        self._aggregated_event_queue: deque[BarEvent] = deque()
         self.emitted_event_count: int = 0
 
     # endregion
 
-    # region Listener
+    # region Main
 
     def on_source_event(self, event: Event) -> None:
         """Ingest a BarEvent from $source_feed and forward to `TimeBarAggregator`.
@@ -83,16 +101,12 @@ class TimeBarAggregationEventFeed:
         if self._closed:
             return
 
-        # Raise: We are processing BarEvent(s). Other events are not expected
+        # we are processing BarEvent(s); other events are not expected
         if not isinstance(event, BarEvent):
             raise ValueError(f"Cannot call `{self.__class__.__name__}.on_source_event` because $event (class '{type(event).__name__}') is not a BarEvent. Register this feed on an EventFeed that produces BarEvent(s).")
 
         # Delegate to aggregator which will invoke `on_aggregated_event` on window emissions
         self._aggregator.add_event(event)
-
-    # endregion
-
-    # region Aggregator callback
 
     def on_aggregated_event(self, evt: BarEvent) -> None:
         """Handle aggregated bar from `TimeBarAggregator` and apply partial-bar policy.
@@ -107,6 +121,7 @@ class TimeBarAggregationEventFeed:
         is_partial = evt.bar.is_partial
         is_first = self.emitted_event_count == 0
 
+        # Skip: decide whether to emit based on partial-bar policy
         should_emit = (not is_partial) or (is_partial and is_first and self._emit_first_partial_bar) or (is_partial and (not is_first) and self._emit_later_partial_bars)
         if not should_emit:
             return
@@ -116,7 +131,7 @@ class TimeBarAggregationEventFeed:
 
     # endregion
 
-    # region EventFeed protocol
+    # region Protocol EventFeed
 
     def peek(self) -> Event | None:
         """Implements: EventFeed.peek
@@ -127,7 +142,6 @@ class TimeBarAggregationEventFeed:
         if not self._aggregated_event_queue:
             return None
 
-        # Return leftmost value without consuming it
         return self._aggregated_event_queue[0]
 
     def pop(self) -> Event | None:
@@ -139,9 +153,8 @@ class TimeBarAggregationEventFeed:
         if not self._aggregated_event_queue:
             return None
 
-        # Consume leftmost value
+        # Consume and return leftmost value
         next_event = self._aggregated_event_queue.popleft()
-
         return next_event
 
     def is_finished(self) -> bool:
@@ -175,7 +188,7 @@ class TimeBarAggregationEventFeed:
     def remove_events_before(self, cutoff_time: datetime) -> None:
         """Implements: EventFeed.remove_events_before
 
-        Remove all aggregated events before $cutoff_time and drop obsolete accumulator.
+        Remove all aggregated events before $cutoff_time and drop obsolete aggregator.
         """
         require_utc(cutoff_time)
 
@@ -190,14 +203,16 @@ class TimeBarAggregationEventFeed:
         Register $listener under $key.
 
         Notes:
-            Listeners are invoked by TradingEngine after each successful pop() from this feed.
+            Listeners are invoked by TradingEngine after each successful `pop` from this feed.
 
         Raises:
             ValueError: If $key is empty or already registered.
         """
+        # Raise: key must be provided
         if not key:
             raise ValueError("Cannot call `add_listener` because $key is empty")
 
+        # Raise: key must be unique
         if key in self._listeners:
             raise ValueError(f"Cannot call `add_listener` because $key ('{key}') already exists. Use a unique key or call `remove_listener` first.")
 
@@ -222,7 +237,7 @@ class TimeBarAggregationEventFeed:
 
     # endregion
 
-    # region String representations
+    # region Magic
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}(unit={self._unit.name}, size={self._size}, queued={len(self._aggregated_event_queue)}, closed={self._closed}, emitted_event_count={self.emitted_event_count})"

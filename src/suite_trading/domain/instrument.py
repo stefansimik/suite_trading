@@ -184,7 +184,7 @@ class Instrument:
         # Raise: enforce integer tick count for predictable arithmetic
         if not isinstance(tick_count, int):
             raise TypeError("Cannot call `ticks_to_price` because $tick_count is not int. Pass an int for tick count.")
-        # Return the price delta; negative and zero are allowed
+
         return self.price_increment * tick_count
 
     def price_to_ticks(self, price_delta: Decimal) -> int:
@@ -240,7 +240,6 @@ class Instrument:
         if n <= 0:
             raise ValueError(f"Cannot call `qty_from_lots` because $n ('{n}') must be > 0.")
 
-        # Return the absolute quantity
         return self.qty_increment * n
 
     # endregion

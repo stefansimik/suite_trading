@@ -28,9 +28,9 @@ class TimeBarAggregator:
         - Alignment is anchored to midnight UTC using total seconds since day start.
 
     Args:
-        $unit (BarUnit): Target time unit (SECOND, MINUTE, HOUR, DAY).
-        $size (int): Positive integer window size in $unit.
-        $on_emit_callback (Callable[[BarEvent], None]): Callback invoked with aggregated
+        unit (BarUnit): Target time unit (SECOND, MINUTE, HOUR, DAY).
+        size (int): Positive integer window size in $unit.
+        on_emit_callback (Callable[[BarEvent], None]): Callback invoked with aggregated
             bar events.
     """
 
@@ -81,7 +81,7 @@ class TimeBarAggregator:
         - If the current Bar ends exactly at $window_end, emit aggregated window (including current).
 
         Args:
-            $event (BarEvent): Input event carrying a time-based Bar.
+            event (BarEvent): Input event carrying a time-based Bar.
         """
         self._validate_event_and_ordering(event)
         if self._input_bar_seconds is None:
@@ -129,36 +129,46 @@ class TimeBarAggregator:
             raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $event (class '{type(event).__name__}') is not a BarEvent")
 
         bar = event.bar
+        # Raise: ensure bars are added in chronological order
         if self._last_bar_end_dt is not None and bar.end_dt < self._last_bar_end_dt:
             raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $bar.end_dt ('{bar.end_dt}') is older than previous input ('{self._last_bar_end_dt}')")
 
     def _validate_first_source_and_compatibility(self, event: BarEvent) -> None:
         # Require time-based bar
         bar = event.bar
+        # Raise: only time-based bars can be aggregated by this component
         if bar.unit not in {BarUnit.SECOND, BarUnit.MINUTE, BarUnit.HOUR, BarUnit.DAY}:
             raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $bar.unit ('{bar.unit}') is not a supported time unit; only SECOND, MINUTE, HOUR, DAY are supported")
 
         # Infer input bar size in seconds
-        self._input_bar_seconds = int((bar.end_dt - bar.start_dt).total_seconds())
+        duration = bar.end_dt - bar.start_dt
+        self._input_bar_seconds = int(duration.total_seconds())
+
+        # Raise: input bar must have a positive duration
         if self._input_bar_seconds <= 0:
             raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because inferred $input_bar_seconds ('{self._input_bar_seconds}') must be > 0")
 
         if self._unit == BarUnit.MONTH:
-            # For monthly aggregation: input must evenly divide a day (86400 seconds)
+            # Raise: input duration must evenly divide a day for monthly aggregation
             if 86400 % self._input_bar_seconds != 0:
                 raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because monthly aggregation requires $input_bar_seconds to divide 86400; got '{self._input_bar_seconds}'")
+
             # Validate current month window is multiple of input size
             window_start, window_end = self._compute_window_bounds(bar.end_dt)
             month_seconds = int((window_end - window_start).total_seconds())
+
+            # Raise: month length must be a multiple of input bar duration
             if (month_seconds % self._input_bar_seconds) != 0:
                 raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because current month length in seconds ('{month_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
         else:
             # For SECOND/MINUTE/HOUR/DAY/WEEK the window seconds are fixed; MONTH varies and is handled above
             window_seconds = self._window_seconds()
-            # Raise: output window not finer than input
+
+            # Raise: output window cannot be smaller than input bar
             if window_seconds < self._input_bar_seconds:
                 raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $output_window_seconds ('{window_seconds}') is < $input_bar_seconds ('{self._input_bar_seconds}')")
-            # Raise: multiple rule
+
+            # Raise: output window must be a multiple of input bar duration
             if (window_seconds % self._input_bar_seconds) != 0:
                 raise ValueError(f"Cannot call `TimeBarAggregator.add_event` because $output_window_seconds ('{window_seconds}') is not a multiple of $input_bar_seconds ('{self._input_bar_seconds}')")
 
@@ -175,6 +185,7 @@ class TimeBarAggregator:
             case BarUnit.WEEK:
                 return 604800
             case _:
+                # Raise: unsupported or non-fixed time unit
                 raise ValueError(f"Cannot call `TimeBarAggregator._unit_seconds` because $unit ('{self._unit}') is not a fixed-length time unit")
 
     def _window_seconds(self) -> int:
@@ -201,12 +212,7 @@ class TimeBarAggregator:
             is_partial = self._is_partial()
 
         # Build aggregated event from the accumulator's current state
-        aggregated_event = self._event_accumulator.build_event(
-            output_bar_type,
-            window_start,
-            window_end,
-            is_partial=is_partial,
-        )
+        aggregated_event = self._event_accumulator.build_event(output_bar_type, window_start, window_end, is_partial=is_partial)
 
         # Emit, update counters, and reset accumulator
         self._on_emit(aggregated_event)
@@ -229,7 +235,7 @@ class TimeBarAggregator:
 
         if self._unit == BarUnit.MONTH:
             # Compute month window where end is the smallest 1st-of-month 00:00 >= $dt.
-            # Subtract 1 microsecond so dt at exact month start maps to previous month.
+            # Subtract 1 microsecond so $dt at exact month start maps to previous month.
             dt_adjusted = dt - timedelta(microseconds=1)
             day_start = dt_adjusted.replace(hour=0, minute=0, second=0, microsecond=0)
             month_start = day_start.replace(day=1)
@@ -238,11 +244,13 @@ class TimeBarAggregator:
                 next_month_start = month_start.replace(year=month_start.year + 1, month=1)
             else:
                 next_month_start = month_start.replace(month=month_start.month + 1)
-            return month_start, next_month_start
+
+            result = (month_start, next_month_start)
+            return result
 
         if self._unit == BarUnit.WEEK:
             # Compute week window where end is the smallest Monday 00:00 >= $dt.
-            # We subtract 1 microsecond so that dt exactly at Monday 00:00 maps to the previous
+            # We subtract 1 microsecond so that $dt exactly at Monday 00:00 maps to the previous
             # week's start when we floor to Monday, making the end equal to the current Monday.
             dt_adjusted = dt - timedelta(microseconds=1)
             day_start = dt_adjusted.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -250,7 +258,9 @@ class TimeBarAggregator:
             week_start = day_start - timedelta(days=weekday)
             window_start = week_start
             window_end = week_start + timedelta(days=7)
-            return window_start, window_end
+
+            result = (window_start, window_end)
+            return result
 
         # Default path for SECOND/MINUTE/HOUR and DAY (size=1)
         day_start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -259,7 +269,9 @@ class TimeBarAggregator:
         rounded_seconds = ceil_to_multiple(seconds_since_day_start, window_seconds)
         window_end = day_start + timedelta(seconds=rounded_seconds)
         window_start = window_end - timedelta(seconds=window_seconds)
-        return window_start, window_end
+
+        result = (window_start, window_end)
+        return result
 
     # endregion
 
