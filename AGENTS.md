@@ -105,15 +105,22 @@ Do not rewrite partial substrings inside a token.
 - **R-2.1.2** Functions/Methods: Use verbs describing the action
 - **R-2.1.3** Variables/Attributes: Use nouns describing the data
 - **R-2.1.4** Domain terms: Use consistently throughout codebase
+- **R-2.1.5 Idiomatic Protocol Naming:** When implementing standard Python protocols (e.g., `__getitem__`, `__setitem__`, `__contains__`), use standard, idiomatic parameter names like `key`, `index`, `other`, or `value`. Do not over-describe them (e.g., avoid `index_or_key`). Rely on type hints for specificity.
 
 ```python
 # ✅ Good — descriptive, using sanctioned shortcuts
 def compute_unrealized_pnl(position: Position, current_price: Decimal) -> Decimal: ...
 def list_open_orders(instrument: Instrument) -> list[Order]: ...
 
+# ✅ Good — idiomatic and clean
+def __getitem__(self, key: int | str) -> Any: ...
+
 # ❌ Bad — non-sanctioned abbreviations or full words where shortcuts exist
 def calculate_unrealized_profit_and_loss(...)  # Violation: use 'compute' and 'pnl'
 def get_ords(inst): ...                        # Violation: 'ords' and 'inst' are not sanctioned
+
+# ❌ Bad — redundant and non-standard
+def __getitem__(self, index_or_key: int | str) -> Any: ...
 ```
 
 ## 2.2. Method Naming Patterns
@@ -166,7 +173,8 @@ def calculate_commission(fee_model: FeeModel, order: Order, proposed_fill: Propo
 - **R-3.1.4** Use `|` and `| None` instead of `Union`/`Optional`
 - **R-3.1.5** Use `type[T]` for class objects
 - **R-3.1.6** `Callable[[...], R]` with explicit return type
-- **R-3.1.7** Import cross-module types unconditionally. Use `if TYPE_CHECKING:` only when strictly required to avoid circular runtime dependencies.
+- **R-3.1.7** Import cross-module types unconditionally. Direct imports are preferred for all domain objects (Bar, Instrument, Order).
+- **R-3.1.8** Use `if TYPE_CHECKING:` only as a last resort to break a verified circular runtime dependency. Do not use it "just in case" or for aesthetic reasons.
 
 ```python
 # ✅ Good — modern typing
@@ -178,6 +186,10 @@ def process(items: list[Order], callback: Callable[[Order], None]) -> dict[str, 
 from typing import List, Dict, Optional, Union
 
 def process(items: List[Order], callback: Callable) -> Optional[Dict[str, int]]: ...
+
+# ❌ Bad — Useless guard for standard domain objects
+if TYPE_CHECKING:
+    from suite_trading.domain.market_data.bar.bar import Bar
 ```
 
 ## 3.2. Decimal Utilities (`DecimalLike`, `as_decimal`)
@@ -959,9 +971,14 @@ def __str__(self) -> str:
 **R-6.3.1** Use for classes with high instance counts (Bars, Ticks, Events) to reduce memory and improve speed.
 
 **When to use:**
-- High instance counts at runtime
+- High instance counts at runtime (e.g., millions of Bars, Ticks, or Events)
 - Fixed attribute schema
 - No reliance on instance `__dict__`
+
+**When NOT to use (Avoid over-optimization):**
+- Classes with low instance counts (Strategies, Engines, Brokers, Indicators, Models).
+- Base classes where subclasses need flexibility (e.g., `BaseIndicator`).
+- When the inheritance maintenance cost (R-6.3.2) outweighs the negligible memory savings.
 
 ### Critical Inheritance Rule
 **R-6.3.2** If parent defines `__slots__`, every subclass MUST define `__slots__` too:
