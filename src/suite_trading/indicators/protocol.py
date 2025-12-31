@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any, Protocol, runtime_checkable
+
+from suite_trading.utils.float_tools import FloatLike
 
 
 @runtime_checkable
@@ -27,8 +28,12 @@ class Indicator(Protocol):
         """Return True if the indicator has processed enough data."""
         ...
 
-    def update(self, value: Decimal) -> None:
-        """Update the indicator with a new numeric value."""
+    def update(self, value: FloatLike) -> None:
+        """Update the indicator with a new numeric value.
+
+        Args:
+            value: The latest numeric value (price, volume, etc.).
+        """
         ...
 
     def reset(self) -> None:

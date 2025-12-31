@@ -12,7 +12,7 @@ def test_bollinger_bands_calculation():
     bb = BollingerBands(period=2, std_dev=2.0)
 
     # Update 1: [10] -> not ready
-    bb.update(Decimal("10"))
+    bb.update(10.0)
     assert bb.value is None
 
     # Update 2: [10, 20] -> ready
@@ -23,38 +23,38 @@ def test_bollinger_bands_calculation():
     # Lower: 15 - 2*5 = 5
     bb.update(Decimal("20"))
 
-    assert bb.middle == Decimal("15")
-    assert bb.upper == Decimal("25")
-    assert bb.lower == Decimal("5")
-    assert bb.value.upper == Decimal("25")
+    assert bb.middle == 15.0
+    assert bb.upper == 25.0
+    assert bb.lower == 5.0
+    assert bb.value.upper == 25.0
 
 
 def test_bollinger_bands_indexing():
     """Verify that Bollinger Bands supports indexing for components."""
     bb = BollingerBands(period=2)
-    bb.update(Decimal("10"))
-    bb.update(Decimal("20"))
+    bb.update(10.0)
+    bb.update(20.0)
 
     # Access components via string keys
-    assert bb["middle"] == Decimal("15")
-    assert bb["upper"] == Decimal("25")
-    assert bb["lower"] == Decimal("5")
+    assert bb["middle"] == 15.0
+    assert bb["upper"] == 25.0
+    assert bb["lower"] == 5.0
 
     # Access components via attributes
-    assert bb.middle == Decimal("15")
+    assert bb.middle == 15.0
 
 
 def test_bollinger_bands_reset():
     """Verify that Bollinger Bands can be reset."""
     bb = BollingerBands(period=2)
-    bb.update(Decimal("10"))
-    bb.update(Decimal("20"))
+    bb.update(10.0)
+    bb.update(20.0)
     assert bb.value is not None
 
     bb.reset()
     assert bb.value is None
     assert bb.middle is None
 
-    bb.update(Decimal("10"))
-    bb.update(Decimal("20"))
-    assert bb.middle == Decimal("15")
+    bb.update(10.0)
+    bb.update(20.0)
+    assert bb.middle == 15.0

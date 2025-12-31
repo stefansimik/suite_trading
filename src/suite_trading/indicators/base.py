@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections import deque
-from decimal import Decimal
 from typing import Any
 
 from suite_trading.indicators.protocol import Indicator
+from suite_trading.utils.float_tools import FloatLike
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +54,14 @@ class BaseIndicator(Indicator, ABC):
     def is_warmed_up(self) -> bool:
         return self._update_count >= self._compute_warmup_period()
 
-    def update(self, value: Decimal) -> None:
-        """Implements: Indicator.update"""
-        # Compute new value
-        result = self._calculate(value)
+    def update(self, value: FloatLike) -> None:
+        """Implements: Indicator.update
+
+        Updates the indicator with a new numeric value.
+        """
+        # Performance Boundary: Convert to primitive float once at the entry point
+        val_as_float = float(value)
+        result = self._calculate(val_as_float)
 
         # Store result if ready; [0] is always the latest
         if result is not None:
@@ -67,13 +71,19 @@ class BaseIndicator(Indicator, ABC):
         logger.debug(f"Updated Indicator named '{self.name}' (count={self._update_count}, val={result})")
 
     def reset(self) -> None:
-        """Implements: Indicator.reset"""
+        """Implements: Indicator.reset
+
+        Resets the indicator to its initial state.
+        """
         self._values.clear()
         self._update_count = 0
         logger.info(f"Reset Indicator named '{self.name}'")
 
     def __getitem__(self, key: int | str) -> Any | None:
-        """Implements: Indicator.__getitem__"""
+        """Implements: Indicator.__getitem__
+
+        Accesses previous values by index or components by name.
+        """
         if isinstance(key, int):
             # Skip: index out of range
             if key < 0 or key >= len(self._values):
@@ -102,7 +112,7 @@ class BaseIndicator(Indicator, ABC):
     # region Utilities
 
     @abstractmethod
-    def _calculate(self, value: Decimal) -> Any | None:
+    def _calculate(self, value: float) -> Any | None:
         """Computes the core indicator value from the latest numeric $value."""
 
     def _build_name(self) -> str:

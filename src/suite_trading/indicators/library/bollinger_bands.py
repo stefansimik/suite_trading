@@ -1,28 +1,39 @@
 from __future__ import annotations
 
+import math
 from collections import deque
-from decimal import Decimal
 from typing import NamedTuple
 
 from suite_trading.indicators.base import BaseIndicator
 
 
-# Justification: Group related band values for cleaner access and attribute naming
 class BollingerBandsValues(NamedTuple):
-    """Container for Bollinger Bands output components."""
+    """Container for Bollinger Bands output components.
 
-    upper: Decimal
-    middle: Decimal
-    lower: Decimal
+    Justification: Group related band values for cleaner access and attribute naming.
+    """
+
+    upper: float
+    middle: float
+    lower: float
 
 
 class BollingerBands(BaseIndicator):
-    """Calculates Bollinger Bands (Upper, Middle, Lower)."""
+    """Calculates Bollinger Bands (Upper, Middle, Lower).
+
+    Uses float primitives for maximum performance during calculations.
+    """
 
     # region Init
 
     def __init__(self, period: int = 20, std_dev: float = 2.0, max_values_to_keep: int = 100):
-        """Initializes Bollinger Bands with period and standard deviation."""
+        """Initializes Bollinger Bands with period and standard deviation.
+
+        Args:
+            period: Lookback period for the average and standard deviation.
+            std_dev: Multiplier for the standard deviation to set band width.
+            max_values_to_keep: Number of recent results to store.
+        """
         # Raise: period must be positive
         if period < 1:
             raise ValueError(f"Cannot create `BollingerBands` because $period ({period}) < 1")
@@ -30,14 +41,18 @@ class BollingerBands(BaseIndicator):
         super().__init__(max_values_to_keep)
 
         self._period = period
-        self._std_dev_multiplier = Decimal(str(std_dev))
-        self._prices: deque[Decimal] = deque(maxlen=period)
+        self._std_dev_multiplier = float(std_dev)
+        self._prices: deque[float] = deque(maxlen=period)
 
     # endregion
 
     # region Protocol Indicator
 
     def reset(self) -> None:
+        """Implements: Indicator.reset
+
+        Resets the price history and base indicator state.
+        """
         super().reset()
         self._prices.clear()
 
@@ -50,17 +65,17 @@ class BollingerBands(BaseIndicator):
         return self._period
 
     @property
-    def upper(self) -> Decimal | None:
+    def upper(self) -> float | None:
         result = self.value.upper if self.value else None
         return result
 
     @property
-    def middle(self) -> Decimal | None:
+    def middle(self) -> float | None:
         result = self.value.middle if self.value else None
         return result
 
     @property
-    def lower(self) -> Decimal | None:
+    def lower(self) -> float | None:
         result = self.value.lower if self.value else None
         return result
 
@@ -68,7 +83,7 @@ class BollingerBands(BaseIndicator):
 
     # region Utilities
 
-    def _calculate(self, value: Decimal) -> BollingerBandsValues | None:
+    def _calculate(self, value: float) -> BollingerBandsValues | None:
         """Computes bands based on a sliding window of values."""
         self._prices.append(value)
 
@@ -81,7 +96,7 @@ class BollingerBands(BaseIndicator):
 
         # Calculate Population Standard Deviation
         variance = sum((p - middle) ** 2 for p in self._prices) / self._period
-        std_dev = variance.sqrt()
+        std_dev = math.sqrt(variance)
 
         # Calculate Bands
         upper = middle + (std_dev * self._std_dev_multiplier)

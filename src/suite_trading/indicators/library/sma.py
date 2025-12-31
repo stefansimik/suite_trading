@@ -1,18 +1,27 @@
 from __future__ import annotations
 
 from collections import deque
-from decimal import Decimal
 
 from suite_trading.indicators.base import BaseIndicator
 
 
 class SimpleMovingAverage(BaseIndicator):
-    """Calculates the arithmetic mean of the last $period values."""
+    """Calculates the arithmetic mean of the last $period values.
+
+    This implementation uses a running sum to maintain O(1) performance
+    regardless of the lookback period. Calculations use float primitives
+    for maximum speed during backtesting.
+    """
 
     # region Init
 
     def __init__(self, period: int, max_values_to_keep: int = 100):
-        """Initializes the SMA with a specific lookback period."""
+        """Initializes the SMA with a specific lookback period.
+
+        Args:
+            period: Lookback period for the average calculation.
+            max_values_to_keep: Number of recent results to store.
+        """
         # Raise: period must be positive
         if period < 1:
             raise ValueError(f"Cannot create `SimpleMovingAverage` because $period ({period}) < 1")
@@ -20,15 +29,21 @@ class SimpleMovingAverage(BaseIndicator):
         super().__init__(max_values_to_keep)
 
         self._period = period
-        self._prices: deque[Decimal] = deque(maxlen=period)
+        self._sum = 0.0
+        self._prices: deque[float] = deque(maxlen=period)
 
     # endregion
 
     # region Protocol Indicator
 
     def reset(self) -> None:
+        """Implements: Indicator.reset
+
+        Resets the sum and price history.
+        """
         super().reset()
         self._prices.clear()
+        self._sum = 0.0
 
     # endregion
 
@@ -42,15 +57,22 @@ class SimpleMovingAverage(BaseIndicator):
 
     # region Utilities
 
-    def _calculate(self, value: Decimal) -> Decimal | None:
-        """Computes the latest average using a sliding window of values."""
+    def _calculate(self, value: float) -> float | None:
+        """Computes the latest average using a running sum."""
+        # Remove oldest value from sum if the window is full
+        if len(self._prices) == self._period:
+            self._sum -= self._prices[0]
+
+        # Update sum and price history
+        self._sum += value
         self._prices.append(value)
 
         # Skip: not enough values for the average
         if len(self._prices) < self._period:
             return None
 
-        result = sum(self._prices) / self._period
+        # Compute the simple moving average
+        result = self._sum / self._period
         return result
 
     def _build_name(self) -> str:
