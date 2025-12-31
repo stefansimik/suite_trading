@@ -5,7 +5,7 @@ from typing import Any, NamedTuple
 from suite_trading.indicators.base import BaseIndicator
 
 
-class DirectionalMovementValues(NamedTuple):
+class DMValues(NamedTuple):
     """Container for Directional Movement output components."""
 
     adx: float
@@ -13,8 +13,8 @@ class DirectionalMovementValues(NamedTuple):
     di_minus: float
 
 
-class DirectionalMovement(BaseIndicator):
-    """Calculates Directional Movement (ADX, +DI, -DI).
+class DM(BaseIndicator):
+    """Calculates Directional Movement (DM).
 
     This indicator provides the Average Directional Index (ADX) along with
     the Plus and Minus Directional Indicators (+DI and -DI).
@@ -24,7 +24,7 @@ class DirectionalMovement(BaseIndicator):
     # region Init
 
     def __init__(self, period: int = 14, max_history: int = 100):
-        """Initializes DirectionalMovement with a specific lookback period.
+        """Initializes DM with a specific lookback period.
 
         Args:
             period: Lookback period for the smoothing (default is 14).
@@ -32,7 +32,7 @@ class DirectionalMovement(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `DirectionalMovement` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `DM` because $period ({period}) < 1")
 
         super().__init__(max_history)
 
@@ -112,7 +112,7 @@ class DirectionalMovement(BaseIndicator):
 
         # Store result and increment count
         if self._update_count >= self._period - 1:
-            result = DirectionalMovementValues(adx=self._last_adx, di_plus=di_plus, di_minus=di_minus)
+            result = DMValues(adx=self._last_adx, di_plus=di_plus, di_minus=di_minus)
             self._values.appendleft(result)
 
         self._update_count += 1

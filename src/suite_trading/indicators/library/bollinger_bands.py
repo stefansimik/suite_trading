@@ -113,7 +113,7 @@ class BollingerBands(BaseIndicator):
         return result
 
     def _build_name(self) -> str:
-        result = f"BB({self._period}, {self._std_dev_multiplier})"
+        result = f"BollingerBands({self._period}, {self._std_dev_multiplier})"
         return result
 
     # endregion

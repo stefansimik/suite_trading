@@ -6,8 +6,8 @@ from typing import Any
 from suite_trading.indicators.base import BaseIndicator
 
 
-class ParabolicSAR(BaseIndicator):
-    """Calculates the Parabolic Stop and Reverse (SAR).
+class PSAR(BaseIndicator):
+    """Calculates the Parabolic Stop and Reverse (PSAR).
 
     Parabolic SAR is a trend-following indicator used to determine price
     direction and potential reversals. It uses an acceleration factor that
@@ -23,7 +23,7 @@ class ParabolicSAR(BaseIndicator):
         Args:
             acceleration: Initial acceleration factor (default 0.02).
             acceleration_step: Increment for acceleration factor (default 0.02).
-            acceleration_max: Maximum acceleration factor (default 0.2).
+            acceleration_max: MAX acceleration factor (default 0.2).
             max_history: Number of last calculated values stored.
         """
         super().__init__(max_history)
@@ -163,7 +163,7 @@ class ParabolicSAR(BaseIndicator):
         return None
 
     def _build_name(self) -> str:
-        result = f"ParabolicSAR({self._accel_init}, {self._accel_step}, {self._accel_max})"
+        result = f"PSAR({self._accel_init}, {self._accel_step}, {self._accel_max})"
         return result
 
     def _compute_warmup_period(self) -> int:

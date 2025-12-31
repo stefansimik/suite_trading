@@ -5,8 +5,8 @@ from collections import deque
 from suite_trading.indicators.base import BaseIndicator
 
 
-class SimpleMovingAverage(BaseIndicator):
-    """Calculates the arithmetic mean of the last $period values.
+class SMA(BaseIndicator):
+    """Calculates the Simple Moving Average (SMA) of the last $period values.
 
     This implementation uses a running sum to maintain O(1) performance
     regardless of the lookback period. Calculations use float primitives
@@ -24,7 +24,7 @@ class SimpleMovingAverage(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `SimpleMovingAverage` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `SMA` because $period ({period}) < 1")
 
         super().__init__(max_history)
 

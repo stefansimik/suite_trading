@@ -5,7 +5,7 @@ from typing import Any
 from suite_trading.indicators.base import BaseIndicator
 
 
-class AverageTrueRange(BaseIndicator):
+class ATR(BaseIndicator):
     """Calculates the Average True Range (ATR).
 
     ATR is a measure of volatility. This implementation uses Wilder's
@@ -24,7 +24,7 @@ class AverageTrueRange(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `AverageTrueRange` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `ATR` because $period ({period}) < 1")
 
         super().__init__(max_history)
 

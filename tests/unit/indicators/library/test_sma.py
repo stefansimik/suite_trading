@@ -4,12 +4,12 @@ from decimal import Decimal
 
 import pytest
 
-from suite_trading.indicators.library.sma import SimpleMovingAverage
+from suite_trading.indicators.library.sma import SMA
 
 
 def test_sma_calculation():
     """Verify that SMA correctly calculates the arithmetic mean."""
-    sma = SimpleMovingAverage(period=3)
+    sma = SMA(period=3)
 
     # Update 1: [10] -> not ready
     sma.update(10.0)
@@ -32,7 +32,7 @@ def test_sma_calculation():
 
 def test_sma_indexing():
     """Verify that SMA supports indexing to access historical values."""
-    sma = SimpleMovingAverage(period=2, max_history=5)
+    sma = SMA(period=2, max_history=5)
 
     sma.update(10.0)
     sma.update(20.0)  # Val: (10+20)/2 = 15
@@ -48,7 +48,7 @@ def test_sma_indexing():
 
 def test_sma_reset():
     """Verify that SMA can be reset to its initial state."""
-    sma = SimpleMovingAverage(period=2)
+    sma = SMA(period=2)
     sma.update(10.0)
     sma.update(20.0)
     assert sma.value == 15.0
@@ -66,4 +66,4 @@ def test_sma_reset():
 def test_sma_invalid_period():
     """Verify that SMA raises ValueError for invalid period."""
     with pytest.raises(ValueError, match="period.*< 1"):
-        SimpleMovingAverage(period=0)
+        SMA(period=0)

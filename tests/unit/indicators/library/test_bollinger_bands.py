@@ -6,8 +6,8 @@ from decimal import Decimal
 from suite_trading.indicators.library.bollinger_bands import BollingerBands
 
 
-def test_bollinger_bands_calculation():
-    """Verify that Bollinger Bands correctly calculates bands."""
+def test_bb_calculation():
+    """Verify that BollingerBands correctly calculates bands."""
     # Period 2, StdDev 2.0
     bb = BollingerBands(period=2, std_dev=2.0)
 
@@ -29,8 +29,8 @@ def test_bollinger_bands_calculation():
     assert bb.value.upper == 25.0
 
 
-def test_bollinger_bands_indexing():
-    """Verify that Bollinger Bands supports indexing for components."""
+def test_bb_indexing():
+    """Verify that BollingerBands supports indexing for components."""
     bb = BollingerBands(period=2)
     bb.update(10.0)
     bb.update(20.0)
@@ -44,8 +44,8 @@ def test_bollinger_bands_indexing():
     assert bb.middle == 15.0
 
 
-def test_bollinger_bands_reset():
-    """Verify that Bollinger Bands can be reset."""
+def test_bb_reset():
+    """Verify that BollingerBands can be reset."""
     bb = BollingerBands(period=2)
     bb.update(10.0)
     bb.update(20.0)

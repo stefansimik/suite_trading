@@ -5,7 +5,7 @@ from collections import deque
 from suite_trading.indicators.base import BaseIndicator
 
 
-class RateOfChange(BaseIndicator):
+class ROC(BaseIndicator):
     """Calculates the Rate of Change (ROC) indicator.
 
     ROC is the percentage change between the current price and the price $period bars ago.
@@ -23,7 +23,7 @@ class RateOfChange(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `RateOfChange` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `ROC` because $period ({period}) < 1")
 
         super().__init__(max_history)
 

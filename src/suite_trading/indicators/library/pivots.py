@@ -5,7 +5,7 @@ from typing import Any, NamedTuple
 from suite_trading.indicators.base import BaseIndicator
 
 
-class PivotPointsValues(NamedTuple):
+class PivotsValues(NamedTuple):
     """Container for Pivot Points output components."""
 
     pp: float
@@ -17,8 +17,8 @@ class PivotPointsValues(NamedTuple):
     s3: float
 
 
-class PivotPoints(BaseIndicator):
-    """Calculates Standard Pivot Points.
+class Pivots(BaseIndicator):
+    """Calculates Standard Pivot Points (Pivots).
 
     Pivot points are calculated based on the High, Low, and Close prices
     of a previous period (typically a Day, Week, or Month).
@@ -28,7 +28,7 @@ class PivotPoints(BaseIndicator):
     # region Init
 
     def __init__(self, max_history: int = 100):
-        """Initializes PivotPoints.
+        """Initializes Pivots.
 
         Args:
             max_history: Number of last calculated values stored.
@@ -62,7 +62,7 @@ class PivotPoints(BaseIndicator):
         r3 = high + (2.0 * (pp - low))
         s3 = low - (2.0 * (high - pp))
 
-        result = PivotPointsValues(pp=pp, r1=r1, s1=s1, r2=r2, s2=s2, r3=r3, s3=s3)
+        result = PivotsValues(pp=pp, r1=r1, s1=s1, r2=r2, s2=s2, r3=r3, s3=s3)
 
         # Store result and increment count (manual implementation to bypass float(value) in base)
         self._values.appendleft(result)

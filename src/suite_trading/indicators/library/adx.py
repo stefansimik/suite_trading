@@ -5,7 +5,7 @@ from typing import Any
 from suite_trading.indicators.base import BaseIndicator
 
 
-class AverageDirectionalIndex(BaseIndicator):
+class ADX(BaseIndicator):
     """Calculates the Average Directional Index (ADX).
 
     ADX measures the strength of a prevailing trend. It uses Wilder's
@@ -24,7 +24,7 @@ class AverageDirectionalIndex(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `AverageDirectionalIndex` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `ADX` because $period ({period}) < 1")
 
         super().__init__(max_history)
 

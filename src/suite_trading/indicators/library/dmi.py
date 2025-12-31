@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from suite_trading.indicators.base import BaseIndicator
-from suite_trading.indicators.library.sma import SimpleMovingAverage
+from suite_trading.indicators.library.sma import SMA
 
 
-class DirectionalMovementIndex(BaseIndicator):
+class DMI(BaseIndicator):
     """Calculates the Directional Movement Index (DMI).
 
     DMI measures the trend strength and direction. Unlike ADX which uses
@@ -26,7 +26,7 @@ class DirectionalMovementIndex(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `DirectionalMovementIndex` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `DMI` because $period ({period}) < 1")
 
         super().__init__(max_history)
 
@@ -35,9 +35,9 @@ class DirectionalMovementIndex(BaseIndicator):
         self._last_low: float | None = None
         self._last_close: float | None = None
 
-        self._sma_tr = SimpleMovingAverage(period)
-        self._sma_dm_plus = SimpleMovingAverage(period)
-        self._sma_dm_minus = SimpleMovingAverage(period)
+        self._sma_tr = SMA(period)
+        self._sma_dm_plus = SMA(period)
+        self._sma_dm_minus = SMA(period)
 
     # endregion
 

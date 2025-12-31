@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from suite_trading.indicators.base import BaseIndicator
-from suite_trading.indicators.library.ema import ExponentialMovingAverage
-from suite_trading.indicators.library.rsi import RelativeStrengthIndex
-from suite_trading.indicators.library.sma import SimpleMovingAverage
+from suite_trading.indicators.library.ema import EMA
+from suite_trading.indicators.library.rsi import RSI
+from suite_trading.indicators.library.sma import SMA
 
 
-class RelativeSpreadStrength(BaseIndicator):
+class RSS(BaseIndicator):
     """Calculates the Relative Spread Strength (RSS).
 
     RSS is the Relative Strength Index (RSI) of the spread between two
@@ -28,7 +28,7 @@ class RelativeSpreadStrength(BaseIndicator):
         """
         # Raise: periods must be positive
         if ema1_period < 1 or ema2_period < 1 or rsi_period < 1 or sma_period < 1:
-            raise ValueError("Cannot create `RelativeSpreadStrength` because all periods must be positive")
+            raise ValueError("Cannot create `RSS` because all periods must be positive")
 
         super().__init__(max_history)
 
@@ -37,10 +37,10 @@ class RelativeSpreadStrength(BaseIndicator):
         self._rsi_period = rsi_period
         self._sma_period = sma_period
 
-        self._ema1 = ExponentialMovingAverage(ema1_period)
-        self._ema2 = ExponentialMovingAverage(ema2_period)
-        self._rsi = RelativeStrengthIndex(rsi_period)
-        self._sma = SimpleMovingAverage(sma_period)
+        self._ema1 = EMA(ema1_period)
+        self._ema2 = EMA(ema2_period)
+        self._rsi = RSI(rsi_period)
+        self._sma = SMA(sma_period)
 
     # endregion
 

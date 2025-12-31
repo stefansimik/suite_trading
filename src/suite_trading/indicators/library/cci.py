@@ -5,7 +5,7 @@ from collections import deque
 from suite_trading.indicators.base import BaseIndicator
 
 
-class CommodityChannelIndex(BaseIndicator):
+class CCI(BaseIndicator):
     """Calculates the Commodity Channel Index (CCI).
 
     CCI measures the variation of a security's price from its statistical mean.
@@ -25,7 +25,7 @@ class CommodityChannelIndex(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `CommodityChannelIndex` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `CCI` because $period ({period}) < 1")
 
         super().__init__(max_history)
 

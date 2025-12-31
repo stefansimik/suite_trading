@@ -3,7 +3,7 @@ from __future__ import annotations
 from suite_trading.indicators.base import BaseIndicator
 
 
-class RelativeStrengthIndex(BaseIndicator):
+class RSI(BaseIndicator):
     """Calculates the Relative Strength Index (RSI).
 
     RSI is a momentum oscillator that measures the speed and change of price movements.
@@ -22,7 +22,7 @@ class RelativeStrengthIndex(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `RelativeStrengthIndex` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `RSI` because $period ({period}) < 1")
 
         super().__init__(max_history)
 

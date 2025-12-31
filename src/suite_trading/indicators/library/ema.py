@@ -3,7 +3,7 @@ from __future__ import annotations
 from suite_trading.indicators.base import BaseIndicator
 
 
-class ExponentialMovingAverage(BaseIndicator):
+class EMA(BaseIndicator):
     """Calculates the Exponential Moving Average (EMA).
 
     The EMA applies more weight to recent prices than the SMA.
@@ -22,7 +22,7 @@ class ExponentialMovingAverage(BaseIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `ExponentialMovingAverage` because $period ({period}) < 1")
+            raise ValueError(f"Cannot create `EMA` because $period ({period}) < 1")
 
         super().__init__(max_history)
 
