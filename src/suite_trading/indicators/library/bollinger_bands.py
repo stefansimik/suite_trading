@@ -26,19 +26,19 @@ class BollingerBands(BaseIndicator):
 
     # region Init
 
-    def __init__(self, period: int = 20, std_dev: float = 2.0, max_values_to_keep: int = 100):
+    def __init__(self, period: int = 20, std_dev: float = 2.0, max_history: int = 100):
         """Initializes Bollinger Bands with period and standard deviation.
 
         Args:
             period: Lookback period for the average and standard deviation.
             std_dev: Multiplier for the standard deviation to set band width.
-            max_values_to_keep: Number of recent results to store.
+            max_history: Number of recent results to store.
         """
         # Raise: period must be positive
         if period < 1:
             raise ValueError(f"Cannot create `BollingerBands` because $period ({period}) < 1")
 
-        super().__init__(max_values_to_keep)
+        super().__init__(max_history)
 
         self._period = period
         self._std_dev_multiplier = float(std_dev)

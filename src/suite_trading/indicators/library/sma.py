@@ -15,18 +15,18 @@ class SimpleMovingAverage(BaseIndicator):
 
     # region Init
 
-    def __init__(self, period: int, max_values_to_keep: int = 100):
+    def __init__(self, period: int, max_history: int = 100):
         """Initializes the SMA with a specific lookback period.
 
         Args:
             period: Lookback period for the average calculation.
-            max_values_to_keep: Number of recent results to store.
+            max_history: Number of last calculated values stored
         """
         # Raise: period must be positive
         if period < 1:
             raise ValueError(f"Cannot create `SimpleMovingAverage` because $period ({period}) < 1")
 
-        super().__init__(max_values_to_keep)
+        super().__init__(max_history)
 
         self._period = period
         self._sum = 0.0

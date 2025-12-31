@@ -17,20 +17,22 @@ class BaseIndicator(Indicator, ABC):
     Handles result history, warmup tracking, and naming.
     """
 
+    __slots__ = ("_max_history", "_values", "_update_count")
+
     # region Init
 
-    def __init__(self, max_values_to_keep: int = 100):
+    def __init__(self, max_history: int = 100):
         """Initializes the base indicator.
 
         Args:
-            max_values_to_keep: Number of recent results to store.
+            max_history: Number of recent results to store.
         """
-        # Raise: max_values_to_keep must be positive
-        if max_values_to_keep < 1:
-            raise ValueError(f"Cannot create `{self.__class__.__name__}` with $max_values_to_keep ({max_values_to_keep}) < 1")
+        # Raise: max_history must be positive
+        if max_history < 1:
+            raise ValueError(f"Cannot create `{self.__class__.__name__}` with $max_history ({max_history}) < 1")
 
-        self._max_values_to_keep = max_values_to_keep
-        self._values: deque[Any] = deque(maxlen=max_values_to_keep)
+        self._max_history = max_history
+        self._values: deque[Any] = deque(maxlen=max_history)  # cache last calculated indicator values here
         self._update_count = 0
 
     # endregion

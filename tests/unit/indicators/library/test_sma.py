@@ -32,7 +32,7 @@ def test_sma_calculation():
 
 def test_sma_indexing():
     """Verify that SMA supports indexing to access historical values."""
-    sma = SimpleMovingAverage(period=2, max_values_to_keep=5)
+    sma = SimpleMovingAverage(period=2, max_history=5)
 
     sma.update(10.0)
     sma.update(20.0)  # Val: (10+20)/2 = 15
