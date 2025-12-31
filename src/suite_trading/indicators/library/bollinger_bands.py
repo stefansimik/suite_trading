@@ -8,10 +8,7 @@ from suite_trading.indicators.base import BaseIndicator
 
 
 class BollingerBandsValues(NamedTuple):
-    """Container for Bollinger Bands output components.
-
-    Justification: Group related band values for cleaner access and attribute naming.
-    """
+    """Container for Bollinger Bands output components."""
 
     upper: float
     middle: float
@@ -19,10 +16,7 @@ class BollingerBandsValues(NamedTuple):
 
 
 class BollingerBands(BaseIndicator):
-    """Calculates Bollinger Bands (Upper, Middle, Lower).
-
-    Uses float primitives for maximum performance during calculations.
-    """
+    """Calculates Bollinger Bands (Upper, Middle, Lower)."""
 
     # region Init
 
@@ -43,6 +37,8 @@ class BollingerBands(BaseIndicator):
         self._period = period
         self._std_dev_multiplier = float(std_dev)
         self._prices: deque[float] = deque(maxlen=period)
+        self._sum_x = 0.0
+        self._sum_x2 = 0.0
 
     # endregion
 
@@ -55,6 +51,8 @@ class BollingerBands(BaseIndicator):
         """
         super().reset()
         self._prices.clear()
+        self._sum_x = 0.0
+        self._sum_x2 = 0.0
 
     # endregion
 
@@ -85,20 +83,29 @@ class BollingerBands(BaseIndicator):
 
     def _calculate(self, value: float) -> BollingerBandsValues | None:
         """Computes bands based on a sliding window of values."""
+        # ROLLING UPDATES (SMA & VAR)
+        if len(self._prices) == self._period:
+            old_value = self._prices[0]
+            self._sum_x -= old_value
+            self._sum_x2 -= old_value * old_value
+
+        self._sum_x += value
+        self._sum_x2 += value * value
         self._prices.append(value)
 
         # Skip: not enough values for the calculation
         if len(self._prices) < self._period:
             return None
 
-        # Calculate Middle Band (SMA)
-        middle = sum(self._prices) / self._period
+        # BAND COMPUTATION (SMA & STD DEV)
+        # Middle band is a Simple Moving Average (SMA).
+        middle = self._sum_x / self._period
 
-        # Calculate Population Standard Deviation
-        variance = sum((p - middle) ** 2 for p in self._prices) / self._period
+        # We use the identity Var(X) = E[X^2] - E[X]^2 for O(1) performance.
+        # Max is used to prevent tiny negative variance from precision drift.
+        variance = max(0.0, (self._sum_x2 / self._period) - (middle * middle))
         std_dev = math.sqrt(variance)
 
-        # Calculate Bands
         upper = middle + (std_dev * self._std_dev_multiplier)
         lower = middle - (std_dev * self._std_dev_multiplier)
 

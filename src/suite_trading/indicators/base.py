@@ -17,8 +17,6 @@ class BaseIndicator(Indicator, ABC):
     Handles result history, warmup tracking, and naming.
     """
 
-    __slots__ = ("_max_history", "_values", "_update_count")
-
     # region Init
 
     def __init__(self, max_history: int = 100):
