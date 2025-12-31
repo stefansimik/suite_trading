@@ -265,6 +265,7 @@ order = Order(
 **Purpose:** Document public APIs for external developers.
 
 **R-4.1.1** Format: Google-style (purpose, params, returns, exceptions, types)
+- **R-4.1.1a** Document Constructors: Always document `__init__` if it has non-trivial parameters, domain logic, or configuration requirements.
 
 **Requirements:**
 - **R-4.1.2** Natural, Simple Phrasing: Use conversational English. Avoid technical jargon or overly formal wording
@@ -273,6 +274,8 @@ order = Order(
 - **R-4.1.5** Make immediately understandable without needing to research internal logic
 - **R-4.1.6** Use concrete examples when helpful
 - **R-4.1.7** Protocol implementation marker: When a method implements a Protocol API (typically grouped under `# region Protocol <Name>`), the docstring must start with `Implements: <ProtocolName>.<method_name>` as the very first line, followed by a blank line, then the normal docstring
+- **R-4.1.8 Avoid Trivial Docstrings:** Do not add docstrings to simple properties, attributes, or methods that are self-explanatory or merely return a local value. Skip documentation for members where the name alone fully conveys the purpose (e.g., `name`, `period`, `reset`, `update_count`). Focus documentation effort on constructors, complex domain logic, and methods with non-obvious side effects.
+- **R-4.1.9 Trivial Protocol Implementations:** For trivial implementations of Protocol members (e.g., a simple property returning a private field), you may skip the docstring and the `Implements:` marker entirely.
 
 ```python
 # ✅ Good — natural, identifies subject, explains context
@@ -314,6 +317,8 @@ def calculate_portfolio_value(positions: list) -> Decimal:
 - [ ] R-4.1.4: The role and context of each parameter are explained
 - [ ] R-4.1.7: Protocol methods start docstrings with `Implements: <Protocol>.<method>` as the first line and a blank line after it
 - [ ] R-4.1.7: Non-protocol methods do not add the `Implements:` header
+- [ ] R-4.1.8: No docstrings for trivial properties, simple getters, or self-explanatory methods
+- [ ] R-4.1.1a: Constructors with parameters or non-trivial configuration are documented
 
 ## 4.2. Code Comments (Internal Documentation)
 
