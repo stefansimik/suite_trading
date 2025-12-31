@@ -4,7 +4,7 @@ from decimal import Decimal, ROUND_HALF_EVEN
 from enum import Enum
 from suite_trading.domain.monetary.currency import Currency
 from suite_trading.domain.monetary.money import Money
-from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+from suite_trading.utils.numeric_tools import DecimalLike, as_decimal
 
 
 class AssetClass(Enum):

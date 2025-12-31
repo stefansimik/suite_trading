@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from suite_trading.utils.decimal_tools import DecimalLike
+from suite_trading.utils.numeric_tools import DecimalLike
 
 from suite_trading.domain.monetary.money import Money
 from suite_trading.domain.market_data.order_book.order_book import OrderBook

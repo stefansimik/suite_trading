@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+from suite_trading.utils.numeric_tools import DecimalLike, as_decimal
 
 
 def round_to_increment(price: DecimalLike, increment: DecimalLike) -> Decimal:

@@ -11,7 +11,7 @@ from suite_trading.domain.order.orders import (
     StopLimitOrder,
 )
 from suite_trading.domain.market_data.order_book.order_book import OrderBook, ProposedFill
-from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+from suite_trading.utils.numeric_tools import DecimalLike, as_decimal
 
 
 class DistributionFillModel:

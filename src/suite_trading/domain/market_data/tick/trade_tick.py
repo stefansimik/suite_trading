@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from suite_trading.domain.instrument import Instrument
 from suite_trading.utils.datetime_tools import format_dt, expect_utc
-from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+from suite_trading.utils.numeric_tools import DecimalLike, as_decimal
 
 
 class TradeTick:

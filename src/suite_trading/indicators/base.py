@@ -6,7 +6,7 @@ from collections import deque
 from typing import Any
 
 from suite_trading.indicators.protocol import Indicator
-from suite_trading.utils.float_tools import FloatLike
+from suite_trading.utils.numeric_tools import FloatLike
 
 logger = logging.getLogger(__name__)
 

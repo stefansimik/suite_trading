@@ -8,7 +8,7 @@ from suite_trading.domain.market_data.bar.bar_unit import BarUnit
 from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.market_data.price_type import PriceType
 from suite_trading.utils.datetime_tools import format_range, expect_utc
-from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+from suite_trading.utils.numeric_tools import DecimalLike, as_decimal
 
 
 class Bar:

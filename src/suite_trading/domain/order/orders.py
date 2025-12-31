@@ -15,7 +15,7 @@ from suite_trading.domain.order.order_state import (
 )
 from suite_trading.utils.id_generator import get_next_id
 from suite_trading.utils.state_machine import StateMachine
-from suite_trading.utils.decimal_tools import DecimalLike
+from suite_trading.utils.numeric_tools import DecimalLike
 
 
 # region Orders

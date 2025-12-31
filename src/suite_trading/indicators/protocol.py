@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from suite_trading.utils.float_tools import FloatLike
+from suite_trading.utils.numeric_tools import FloatLike
 
 
 @runtime_checkable

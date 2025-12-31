@@ -9,7 +9,7 @@ from suite_trading.domain.market_data.order_book.order_book import BookLevel, Or
 from suite_trading.utils.data_generation import factory_instrument
 from suite_trading.utils.data_generation.price_patterns import zig_zag
 from suite_trading.utils.math import round_to_increment
-from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+from suite_trading.utils.numeric_tools import DecimalLike, as_decimal
 
 
 def create(

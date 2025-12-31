@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, getcontext, InvalidOperation
 
 from suite_trading.domain.monetary.currency import Currency
-from suite_trading.utils.decimal_tools import DecimalLike, as_decimal
+from suite_trading.utils.numeric_tools import DecimalLike, as_decimal
 
 # Set high precision for financial calculations
 getcontext().prec = 28

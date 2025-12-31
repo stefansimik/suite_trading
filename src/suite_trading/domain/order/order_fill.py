@@ -13,7 +13,7 @@ from suite_trading.domain.instrument import Instrument
 from suite_trading.domain.order.order_enums import OrderSide
 from suite_trading.domain.monetary.money import Money
 from suite_trading.utils.datetime_tools import format_dt
-from suite_trading.utils.decimal_tools import DecimalLike
+from suite_trading.utils.numeric_tools import DecimalLike
 
 
 class OrderFill:
