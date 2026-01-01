@@ -46,6 +46,7 @@ flowchart LR
 |---------|-------------|
 | **One codebase, multiple modes** | Same strategy code runs in backtesting and simulation today; paper/live require broker adapters (planned) |
 | **Shared timeline simulation** | Multiple strategies run together on one shared clock with predictable event ordering |
+| **Built-in Indicators** | Library of 20+ optimized technical indicators (SMA, EMA, RSI, MACD, BB, etc.) |
 | **Simple, intuitive API** | Domain model matches how traders think — `Order`, `Position`, `Bar`, `OrderBook` behave as expected |
 | **Smart components with clear jobs** | Each piece has one responsibility and they connect explicitly |
 | **Realistic simulation** | SimBroker supports MARKET, LIMIT, STOP, STOP_LIMIT orders plus margin, fees, slippage |
@@ -374,6 +375,38 @@ def on_start(self) -> None:
 
 > ⚠️ Both timestamps must be **timezone-aware UTC**. The framework will reject naive datetimes to catch data issues early.
 
+#### Technical Indicators
+
+**What it is:** A collection of mathematical calculations based on price, volume, or open interest.
+
+**Why it matters:** They help you identify trends, momentum, and volatility. SUITE Trading provides a built-in library of common indicators that are optimized for performance.
+
+```python
+from suite_trading.indicators.library.sma import SMA
+
+# Initialize with a period of 14
+sma = SMA(period=14)
+
+# In your strategy's on_bar
+def on_bar(self, bar: Bar) -> None:
+    # Update the indicator with the latest close price
+    sma.update(bar.close)
+
+    # Use indexing to compare latest (0) with previous (1) value
+    if sma.is_warmed_up and sma[0] > sma[1]:
+        # Trend is up
+        pass
+```
+
+**Key Features of Indicators:**
+- ✅ **Optimized for speed:** Uses float primitives and efficient algorithms (e.g., O(1) SMA).
+- ✅ **History tracking:** Access previous values easily via indexing: `sma[0]` is latest, `sma[1]` is previous.
+- ✅ **Warmup tracking:** Check `is_warmed_up` to know when the indicator has enough data.
+- ✅ **Extensible:** Create custom indicators by inheriting from `NumericIndicator` or `BarIndicator`.
+
+**Included Indicators:**
+SMA, EMA, RSI, MACD, Bollinger Bands, ATR, ADX, CCI, PSAR, ROC, Stochastic, and more.
+
 ---
 
 ## Going Deeper
@@ -640,10 +673,9 @@ uv run pytest
 
 ## Roadmap
 
-**Last updated:** 2025-12-29
+**Last updated:** 2026-01-01
 
-SUITE Trading is in active development. Core engine + SimBroker simulation are implemented.
-Live broker adapters and richer reporting/indicators are planned.
+SUITE Trading is in active development. Core engine, SimBroker simulation, and a comprehensive Technical Indicators library are implemented. Live broker adapters and richer reporting are planned.
 
 ### ✅ Completed
 
@@ -656,6 +688,7 @@ Live broker adapters and richer reporting/indicators are planned.
 | **Domain** | Domain models: Event, Bar, Order, Instrument, Money, Position, Account |
 | **Data** | EventFeed system with timeline filtering (skip/trim past events) |
 | **Data** | DataFrame-based historical bars feed (`BarsFromDataFrameEventFeed`) |
+| **Indicators** | Comprehensive indicators library (SMA, EMA, RSI, MACD, Bollinger Bands, etc.) |
 | **Simulation** | SimBroker order lifecycle (MARKET/LIMIT/STOP/STOP_LIMIT; cancel/update (`update_order`)) |
 | **Simulation** | Event → OrderBook conversion for order matching |
 | **Simulation** | Realism layer (margin, fees, slippage, liquidity models) |
@@ -669,7 +702,6 @@ Live broker adapters and richer reporting/indicators are planned.
 
 | Area | Feature | Timeline |
 |------|---------|----------|
-| **Indicators** | Indicators framework (SMA, EMA, RSI, MACD, ...) | TBD |
 | **Reporting** | Performance statistics per Strategy + backtest reports | TBD |
 | **UI** | Streamlit export (bars, order fills, equity curve, results) | TBD
 | **Live** | First live broker adapter: Interactive Brokers (IBKR) | TBD |
