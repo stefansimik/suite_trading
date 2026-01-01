@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
 from suite_trading.indicators.base import BarIndicator
 from suite_trading.indicators.library.sma import SMA
 
-if TYPE_CHECKING:
-    from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.market_data.bar.bar import Bar
 
 
 class DMI(BarIndicator):
@@ -29,7 +27,7 @@ class DMI(BarIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `DMI` because $period ({period}) < 1")
+            raise ValueError(f"Cannot call `__init__` because $period ({period}) < 1")
 
         super().__init__(max_history)
 
@@ -47,7 +45,6 @@ class DMI(BarIndicator):
     # region Protocol Indicator
 
     def reset(self) -> None:
-        """Implements: Indicator.reset"""
         super().reset()
         self._last_high = None
         self._last_low = None

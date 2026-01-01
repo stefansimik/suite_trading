@@ -23,7 +23,7 @@ class MIN(NumericIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `MIN` because $period ({period}) < 1")
+            raise ValueError(f"Cannot call `__init__` because $period ({period}) < 1")
 
         super().__init__(max_history)
 
@@ -35,7 +35,6 @@ class MIN(NumericIndicator):
     # region Protocol Indicator
 
     def reset(self) -> None:
-        """Implements: Indicator.reset"""
         super().reset()
         self._window.clear()
 

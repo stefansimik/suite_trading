@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import TYPE_CHECKING
 
 from suite_trading.indicators.base import BarIndicator
 
-if TYPE_CHECKING:
-    from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.market_data.bar.bar import Bar
 
 
 class PSAR(BarIndicator):
@@ -52,7 +50,6 @@ class PSAR(BarIndicator):
     # region Protocol Indicator
 
     def reset(self) -> None:
-        """Implements: Indicator.reset"""
         super().reset()
         self._af = 0.0
         self._xp = 0.0

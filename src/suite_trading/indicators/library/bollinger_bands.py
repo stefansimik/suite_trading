@@ -30,7 +30,7 @@ class BollingerBands(NumericIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `BollingerBands` because $period ({period}) < 1")
+            raise ValueError(f"Cannot call `__init__` because $period ({period}) < 1")
 
         super().__init__(max_history)
 
@@ -45,10 +45,6 @@ class BollingerBands(NumericIndicator):
     # region Protocol Indicator
 
     def reset(self) -> None:
-        """Implements: Indicator.reset
-
-        Resets the price history and base indicator state.
-        """
         super().reset()
         self._prices.clear()
         self._sum_x = 0.0

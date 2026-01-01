@@ -28,7 +28,7 @@ class RSS(NumericIndicator):
         """
         # Raise: periods must be positive
         if ema1_period < 1 or ema2_period < 1 or rsi_period < 1 or sma_period < 1:
-            raise ValueError("Cannot create `RSS` because all periods must be positive")
+            raise ValueError("Cannot call `__init__` because all periods must be positive")
 
         super().__init__(max_history)
 
@@ -47,7 +47,6 @@ class RSS(NumericIndicator):
     # region Protocol Indicator
 
     def reset(self) -> None:
-        """Implements: Indicator.reset"""
         super().reset()
         self._ema1.reset()
         self._ema2.reset()

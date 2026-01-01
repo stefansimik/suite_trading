@@ -56,7 +56,6 @@ class BaseIndicator(Indicator, ABC):
         return self._update_count >= self._compute_warmup_period()
 
     def reset(self) -> None:
-        """Implements: Indicator.reset"""
         self._values.clear()
         self._update_count = 0
         logger.info(f"Reset Indicator named '{self.name}'")
@@ -123,16 +122,12 @@ class BaseIndicator(Indicator, ABC):
     # endregion
 
 
-class NumericIndicator(BaseIndicator, ABC):
+class NumericIndicator(BaseIndicator):
     """Base class for indicators updated with a single numeric value."""
 
     # region Protocol Indicator
 
     def update(self, value: FloatLike) -> None:
-        """Implements: Indicator.update
-
-        Updates the indicator with a new numeric value.
-        """
         # Performance Boundary: Convert to primitive float once at the entry point
         val_as_float = float(value)
         result = self._calculate(val_as_float)
@@ -149,16 +144,12 @@ class NumericIndicator(BaseIndicator, ABC):
     # endregion
 
 
-class BarIndicator(BaseIndicator, ABC):
+class BarIndicator(BaseIndicator):
     """Base class for indicators updated with a full Bar object."""
 
     # region Protocol Indicator
 
     def update(self, bar: Bar) -> None:
-        """Implements: Indicator.update
-
-        Updates the indicator with a new Bar object.
-        """
         # Compute result and record it in history
         result = self._calculate(bar)
         self._record_result(result)

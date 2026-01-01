@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import NamedTuple, TYPE_CHECKING
+from typing import NamedTuple
 
 from suite_trading.indicators.base import BarIndicator
 from suite_trading.indicators.library.min import MIN
 from suite_trading.indicators.library.max import MAX
 from suite_trading.indicators.library.sma import SMA
 
-if TYPE_CHECKING:
-    from suite_trading.domain.market_data.bar.bar import Bar
+from suite_trading.domain.market_data.bar.bar import Bar
 
 
 class StochasticValues(NamedTuple):
@@ -39,7 +38,7 @@ class Stochastic(BarIndicator):
         """
         # Raise: periods must be positive
         if period_k < 1 or period_d < 1 or smooth < 1:
-            raise ValueError(f"Cannot create `Stochastic` because periods must be positive. Got period_k={period_k}, period_d={period_d}, smooth={smooth}")
+            raise ValueError(f"Cannot call `__init__` because periods must be positive. Got period_k={period_k}, period_d={period_d}, smooth={smooth}")
 
         super().__init__(max_history)
 
@@ -59,7 +58,6 @@ class Stochastic(BarIndicator):
     # region Protocol Indicator
 
     def reset(self) -> None:
-        """Implements: Indicator.reset"""
         super().reset()
         self._min.reset()
         self._max.reset()

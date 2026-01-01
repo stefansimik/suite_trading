@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import NamedTuple, TYPE_CHECKING
+from typing import NamedTuple
 
+from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.indicators.base import BarIndicator
-
-if TYPE_CHECKING:
-    from suite_trading.domain.market_data.bar.bar import Bar
 
 
 class PivotsValues(NamedTuple):

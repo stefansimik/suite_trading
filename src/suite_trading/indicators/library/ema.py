@@ -22,7 +22,7 @@ class EMA(NumericIndicator):
         """
         # Raise: period must be positive
         if period < 1:
-            raise ValueError(f"Cannot create `EMA` because $period ({period}) < 1")
+            raise ValueError(f"Cannot call `__init__` because $period ({period}) < 1")
 
         super().__init__(max_history)
 
@@ -35,10 +35,6 @@ class EMA(NumericIndicator):
     # region Protocol Indicator
 
     def reset(self) -> None:
-        """Implements: Indicator.reset
-
-        Resets the EMA internal state.
-        """
         super().reset()
         self._last_ema = None
 

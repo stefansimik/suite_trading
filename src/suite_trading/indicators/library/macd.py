@@ -35,11 +35,11 @@ class MACD(NumericIndicator):
         """
         # Raise: periods must be positive
         if fast_period < 1 or slow_period < 1 or signal_period < 1:
-            raise ValueError(f"Cannot create `MACD` because periods must be positive. Got fast={fast_period}, slow={slow_period}, signal={signal_period}")
+            raise ValueError(f"Cannot call `__init__` because periods must be positive. Got fast={fast_period}, slow={slow_period}, signal={signal_period}")
 
         # Raise: slow period must be greater than fast period
         if slow_period <= fast_period:
-            raise ValueError(f"Cannot create `MACD` because $slow_period ({slow_period}) must be greater than $fast_period ({fast_period})")
+            raise ValueError(f"Cannot call `__init__` because $slow_period ({slow_period}) must be greater than $fast_period ({fast_period})")
 
         super().__init__(max_history)
 
@@ -60,7 +60,6 @@ class MACD(NumericIndicator):
     # region Protocol Indicator
 
     def reset(self) -> None:
-        """Implements: Indicator.reset"""
         super().reset()
         self._fast_ema = None
         self._slow_ema = None
