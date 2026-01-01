@@ -144,9 +144,4 @@ class Stochastic(BarIndicator):
         result = f"Stochastic({self._period_k}, {self._period_d}, {self._smooth})"
         return result
 
-    def _compute_warmup_period(self) -> int:
-        # Justification: Stochastic needs all internal indicators to warm up
-        result = self._period_k + self._smooth + self._period_d - 2
-        return result
-
     # endregion

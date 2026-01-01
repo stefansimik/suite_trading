@@ -136,9 +136,4 @@ class MACD(NumericIndicator):
         result = f"MACD({self._fast_period}, {self._slow_period}, {self._signal_period})"
         return result
 
-    def _compute_warmup_period(self) -> int:
-        # Justification: MACD needs slow period + signal period to stabilize
-        result = self._slow_period + self._signal_period - 1
-        return result
-
     # endregion

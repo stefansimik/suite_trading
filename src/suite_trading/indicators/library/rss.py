@@ -110,11 +110,4 @@ class RSS(NumericIndicator):
         result = f"RSS({self._ema1_period}, {self._ema2_period}, {self._rsi_period})"
         return result
 
-    def _compute_warmup_period(self) -> int:
-        # Justification: RSS needs EMAs, RSI, and SMA to stabilize
-        # Use the maximum EMA period as the base
-        base_period = max(self._ema1_period, self._ema2_period)
-        result = base_period + self._rsi_period + self._sma_period - 2
-        return result
-
     # endregion

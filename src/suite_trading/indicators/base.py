@@ -51,10 +51,6 @@ class BaseIndicator(Indicator, ABC):
         result = self._values[0]
         return result
 
-    @property
-    def is_warmed_up(self) -> bool:
-        return self._update_count >= self._compute_warmup_period()
-
     def reset(self) -> None:
         self._values.clear()
         self._update_count = 0
@@ -88,6 +84,13 @@ class BaseIndicator(Indicator, ABC):
 
         raise TypeError(f"Cannot call `__getitem__` because $key must be int or str, got {type(key).__name__}")
 
+    def __len__(self) -> int:
+        """Implements: Indicator.__len__
+
+        Returns the number of calculated values currently stored in history.
+        """
+        return len(self._values)
+
     # endregion
 
     # region Utilities
@@ -104,17 +107,12 @@ class BaseIndicator(Indicator, ABC):
         result = self.__class__.__name__
         return result
 
-    def _compute_warmup_period(self) -> int:
-        # Justification: Most indicators use a 'period' attribute for warmup
-        result = int(getattr(self, "period", 1))
-        return result
-
     # endregion
 
     # region Magic
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}(name='{self.name}', warmed_up={self.is_warmed_up}, val={self.value})"
+        return f"{self.__class__.__name__}(name='{self.name}', len={len(self)}, val={self.value})"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name='{self.name}', val={self.value}, updates={self._update_count})"

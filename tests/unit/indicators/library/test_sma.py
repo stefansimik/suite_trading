@@ -14,16 +14,17 @@ def test_sma_calculation():
     # Update 1: [10] -> not ready
     sma.update(10.0)
     assert sma.value is None
-    assert not sma.is_warmed_up
+    assert len(sma) == 0
 
     # Update 2: [10, 20] -> not ready
     sma.update(Decimal("20"))
     assert sma.value is None
+    assert len(sma) == 0
 
     # Update 3: [10, 20, 30] -> ready, (10+20+30)/3 = 20
     sma.update(30)
     assert sma.value == 20.0
-    assert sma.is_warmed_up
+    assert len(sma) == 1
 
     # Update 4: [20, 30, 40] -> ready, (20+30+40)/3 = 30
     sma.update(Decimal("40"))

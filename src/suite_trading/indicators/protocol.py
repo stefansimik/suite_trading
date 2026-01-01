@@ -19,11 +19,6 @@ class Indicator(Protocol):
         """Return the latest calculated value, or None if not ready."""
         ...
 
-    @property
-    def is_warmed_up(self) -> bool:
-        """Return True if the indicator has processed enough data."""
-        ...
-
     def update(self, value: Any) -> None:
         """Update the indicator with new data.
 
@@ -37,4 +32,8 @@ class Indicator(Protocol):
 
     def __getitem__(self, key: int | str) -> Any | None:
         """Access previous values (int index) or components (str key)."""
+        ...
+
+    def __len__(self) -> int:
+        """Return the number of calculated values currently stored in history."""
         ...

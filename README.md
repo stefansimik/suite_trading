@@ -392,8 +392,8 @@ def on_bar(self, bar: Bar) -> None:
     # Update the indicator with the latest close price
     sma.update(bar.close)
 
-    # Use indexing to compare latest (0) with previous (1) value
-    if sma.is_warmed_up and sma[0] > sma[1]:
+    # Use len() to safely check if we have at least 2 values to compare
+    if len(sma) >= 2 and sma[0] > sma[1]:
         # Trend is up
         pass
 ```
@@ -401,7 +401,7 @@ def on_bar(self, bar: Bar) -> None:
 **Key Features of Indicators:**
 - ✅ **Optimized for speed:** Uses float primitives and efficient algorithms (e.g., O(1) SMA).
 - ✅ **History tracking:** Access previous values easily via indexing: `sma[0]` is latest, `sma[1]` is previous.
-- ✅ **Warmup tracking:** Check `is_warmed_up` to know when the indicator has enough data.
+- ✅ **History size:** Use `len(sma)` to check how many calculated values are available.
 - ✅ **Extensible:** Create custom indicators by inheriting from `NumericIndicator` or `BarIndicator`.
 
 **Included Indicators:**

@@ -152,8 +152,4 @@ class PSAR(BarIndicator):
         result = f"PSAR({self._accel_init}, {self._accel_step}, {self._accel_max})"
         return result
 
-    def _compute_warmup_period(self) -> int:
-        # Justification: Parabolic SAR needs 4 bars to initialize
-        return 4
-
     # endregion
