@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import BarIndicator
+
+if TYPE_CHECKING:
+    from suite_trading.domain.market_data.bar.bar import Bar
 
 
-class ADX(BaseIndicator):
+class ADX(BarIndicator):
     """Calculates the Average Directional Index (ADX).
 
     ADX measures the strength of a prevailing trend. It uses Wilder's
@@ -42,18 +45,34 @@ class ADX(BaseIndicator):
 
     # region Protocol Indicator
 
-    def update(self, value: Any) -> None:
-        """Updates the indicator.
+    def reset(self) -> None:
+        """Implements: Indicator.reset"""
+        super().reset()
+        self._last_high = None
+        self._last_low = None
+        self._last_close = None
+        self._sum_tr = 0.0
+        self._sum_dm_plus = 0.0
+        self._sum_dm_minus = 0.0
+        self._last_adx = 50.0
 
-        Note: ADX requires OHLC data. It is recommended to pass a `Bar` object.
-        """
-        # Check if the object looks like a Bar (has high, low, close)
-        if not (hasattr(value, "high") and hasattr(value, "low") and hasattr(value, "close")):
-            return
+    # endregion
 
-        high0 = float(value.high)
-        low0 = float(value.low)
-        close0 = float(value.close)
+    # region Properties
+
+    @property
+    def period(self) -> int:
+        return self._period
+
+    # endregion
+
+    # region Utilities
+
+    def _calculate(self, bar: Bar) -> float | None:
+        """Computes the latest ADX value."""
+        high0 = float(bar.high)
+        low0 = float(bar.low)
+        close0 = float(bar.close)
 
         # INITIAL BAR
         if self._last_high is None:
@@ -87,8 +106,7 @@ class ADX(BaseIndicator):
                 self._sum_dm_minus = self._sum_dm_minus - (self._sum_dm_minus / self._period) + dm_minus
 
         # Calculate ADX based on current sums
-        # Note: we use self._update_count (which hasn't been incremented by super().update yet)
-        # to match NT's OnBarUpdate logic.
+        # Note: we use self._update_count to match NT's logic.
         di_plus = 100.0 * (self._sum_dm_plus / self._sum_tr if self._sum_tr != 0 else 0.0)
         di_minus = 100.0 * (self._sum_dm_minus / self._sum_tr if self._sum_tr != 0 else 0.0)
 
@@ -105,38 +123,11 @@ class ADX(BaseIndicator):
         self._last_low = low0
         self._last_close = close0
 
-        # Store result and increment count
-        if self._update_count >= self._period - 1:
-            self._values.appendleft(self._last_adx)
+        # Skip: not enough values for strict warmup
+        if self._update_count < self._period - 1:
+            return None
 
-        self._update_count += 1
-
-    def reset(self) -> None:
-        """Implements: Indicator.reset"""
-        super().reset()
-        self._last_high = None
-        self._last_low = None
-        self._last_close = None
-        self._sum_tr = 0.0
-        self._sum_dm_plus = 0.0
-        self._sum_dm_minus = 0.0
-        self._last_adx = 50.0
-
-    # endregion
-
-    # region Properties
-
-    @property
-    def period(self) -> int:
-        return self._period
-
-    # endregion
-
-    # region Utilities
-
-    def _calculate(self, value: float) -> float | None:
-        """Not used as `update` is overridden for Bar support."""
-        return value
+        return self._last_adx
 
     def _build_name(self) -> str:
         result = f"ADX({self._period})"

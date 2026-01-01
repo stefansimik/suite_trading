@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 from suite_trading.indicators.library.ema import EMA
 from suite_trading.indicators.library.rsi import RSI
 from suite_trading.indicators.library.sma import SMA
 
 
-class RSS(BaseIndicator):
+class RSS(NumericIndicator):
     """Calculates the Relative Spread Strength (RSS).
 
     RSS is the Relative Strength Index (RSI) of the spread between two

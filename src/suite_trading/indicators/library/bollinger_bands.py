@@ -4,7 +4,7 @@ import math
 from collections import deque
 from typing import NamedTuple
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
 class BollingerBandsValues(NamedTuple):
@@ -15,7 +15,7 @@ class BollingerBandsValues(NamedTuple):
     lower: float
 
 
-class BollingerBands(BaseIndicator):
+class BollingerBands(NumericIndicator):
     """Calculates Bollinger Bands (Upper, Middle, Lower)."""
 
     # region Init

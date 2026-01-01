@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Any
+from typing import TYPE_CHECKING
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import BarIndicator
+
+if TYPE_CHECKING:
+    from suite_trading.domain.market_data.bar.bar import Bar
 
 
-class PSAR(BaseIndicator):
+class PSAR(BarIndicator):
     """Calculates the Parabolic Stop and Reverse (PSAR).
 
     Parabolic SAR is a trend-following indicator used to determine price
@@ -48,25 +51,32 @@ class PSAR(BaseIndicator):
 
     # region Protocol Indicator
 
-    def update(self, value: Any) -> None:
-        """Updates the indicator.
+    def reset(self) -> None:
+        """Implements: Indicator.reset"""
+        super().reset()
+        self._af = 0.0
+        self._xp = 0.0
+        self._long_position = True
+        self._af_increased = False
+        self._highs.clear()
+        self._lows.clear()
+        self._last_sar = 0.0
 
-        Note: Parabolic SAR requires OHLC data. It is recommended to pass a `Bar` object.
-        """
-        # Check if the object looks like a Bar (has high, low, close)
-        if not (hasattr(value, "high") and hasattr(value, "low")):
-            return
+    # endregion
 
-        high0 = float(value.high)
-        low0 = float(value.low)
+    # region Utilities
+
+    def _calculate(self, bar: Bar) -> float | None:
+        """Computes the latest PSAR value."""
+        high0 = float(bar.high)
+        low0 = float(bar.low)
 
         self._highs.appendleft(high0)
         self._lows.appendleft(low0)
 
         # WARMUP (Matches NT logic: needs 4 bars to start)
         if self._update_count < 3:
-            self._update_count += 1
-            return
+            return None
 
         if self._update_count == 3:
             # INITIAL POSITION DETERMINATION
@@ -133,34 +143,13 @@ class PSAR(BaseIndicator):
             else:
                 self._last_sar = today_sar
 
-        # Store result and increment count
-        self._values.appendleft(self._last_sar)
-        self._update_count += 1
-
-    def reset(self) -> None:
-        """Implements: Indicator.reset"""
-        super().reset()
-        self._af = 0.0
-        self._xp = 0.0
-        self._long_position = True
-        self._af_increased = False
-        self._highs.clear()
-        self._lows.clear()
-        self._last_sar = 0.0
-
-    # endregion
-
-    # region Utilities
+        return self._last_sar
 
     def _increase_af(self) -> None:
         """Increases the acceleration factor by the step up to the maximum."""
         if not self._af_increased:
             self._af = min(self._accel_max, self._af + self._accel_step)
             self._af_increased = True
-
-    def _calculate(self, value: float) -> Any:
-        """Not used as `update` is overridden for Bar support."""
-        return None
 
     def _build_name(self) -> str:
         result = f"PSAR({self._accel_init}, {self._accel_step}, {self._accel_max})"

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
-class RSI(BaseIndicator):
+class RSI(NumericIndicator):
     """Calculates the Relative Strength Index (RSI).
 
     RSI is a momentum oscillator that measures the speed and change of price movements.

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections import deque
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
-class ROC(BaseIndicator):
+class ROC(NumericIndicator):
     """Calculates the Rate of Change (ROC) indicator.
 
     ROC is the percentage change between the current price and the price $period bars ago.

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections import deque
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
-class MIN(BaseIndicator):
+class MIN(NumericIndicator):
     """Returns the minimum value (MIN) over a specified period.
 
     This implementation maintains a sliding window of values and computes

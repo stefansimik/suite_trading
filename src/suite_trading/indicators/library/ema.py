@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
-class EMA(BaseIndicator):
+class EMA(NumericIndicator):
     """Calculates the Exponential Moving Average (EMA).
 
     The EMA applies more weight to recent prices than the SMA.

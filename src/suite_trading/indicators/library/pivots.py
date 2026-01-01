@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, NamedTuple
+from typing import NamedTuple, TYPE_CHECKING
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import BarIndicator
+
+if TYPE_CHECKING:
+    from suite_trading.domain.market_data.bar.bar import Bar
 
 
 class PivotsValues(NamedTuple):
@@ -17,7 +20,7 @@ class PivotsValues(NamedTuple):
     s3: float
 
 
-class Pivots(BaseIndicator):
+class Pivots(BarIndicator):
     """Calculates Standard Pivot Points (Pivots).
 
     Pivot points are calculated based on the High, Low, and Close prices
@@ -34,39 +37,6 @@ class Pivots(BaseIndicator):
             max_history: Number of last calculated values stored.
         """
         super().__init__(max_history)
-
-    # endregion
-
-    # region Protocol Indicator
-
-    def update(self, value: Any) -> None:
-        """Updates the indicator with a Bar.
-
-        Args:
-            value: A `Bar` object containing high, low, and close prices.
-        """
-        # Skip: must have high, low, and close attributes (e.g., a Bar object)
-        if not (hasattr(value, "high") and hasattr(value, "low") and hasattr(value, "close")):
-            return
-
-        high = float(value.high)
-        low = float(value.low)
-        close = float(value.close)
-
-        # CORE PIVOT CALCULATION (Standard Method)
-        pp = (high + low + close) / 3.0
-        r1 = (2.0 * pp) - low
-        s1 = (2.0 * pp) - high
-        r2 = pp + (high - low)
-        s2 = pp - (high - low)
-        r3 = high + (2.0 * (pp - low))
-        s3 = low - (2.0 * (high - pp))
-
-        result = PivotsValues(pp=pp, r1=r1, s1=s1, r2=r2, s2=s2, r3=r3, s3=s3)
-
-        # Store result and increment count (manual implementation to bypass float(value) in base)
-        self._values.appendleft(result)
-        self._update_count += 1
 
     # endregion
 
@@ -111,9 +81,23 @@ class Pivots(BaseIndicator):
 
     # region Utilities
 
-    def _calculate(self, value: float) -> Any:
-        """Not used as `update` is overridden for Bar support."""
-        return None
+    def _calculate(self, bar: Bar) -> PivotsValues:
+        """Computes the latest Pivot Points."""
+        high = float(bar.high)
+        low = float(bar.low)
+        close = float(bar.close)
+
+        # CORE PIVOT CALCULATION (Standard Method)
+        pp = (high + low + close) / 3.0
+        r1 = (2.0 * pp) - low
+        s1 = (2.0 * pp) - high
+        r2 = pp + (high - low)
+        s2 = pp - (high - low)
+        r3 = high + (2.0 * (pp - low))
+        s3 = low - (2.0 * (high - pp))
+
+        result = PivotsValues(pp=pp, r1=r1, s1=s1, r2=r2, s2=s2, r3=r3, s3=s3)
+        return result
 
     def _build_name(self) -> str:
         return "Pivots"

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, NamedTuple
+from typing import NamedTuple, TYPE_CHECKING
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import BarIndicator
 from suite_trading.indicators.library.min import MIN
 from suite_trading.indicators.library.max import MAX
 from suite_trading.indicators.library.sma import SMA
+
+if TYPE_CHECKING:
+    from suite_trading.domain.market_data.bar.bar import Bar
 
 
 class StochasticValues(NamedTuple):
@@ -15,7 +18,7 @@ class StochasticValues(NamedTuple):
     d: float
 
 
-class Stochastic(BaseIndicator):
+class Stochastic(BarIndicator):
     """Calculates the Stochastic Oscillator (%K and %D).
 
     The Stochastic Oscillator measures the position of the price relative
@@ -54,51 +57,6 @@ class Stochastic(BaseIndicator):
     # endregion
 
     # region Protocol Indicator
-
-    def update(self, value: Any) -> None:
-        """Updates the indicator.
-
-        Note: Stochastic requires OHLC data. It is recommended to pass a `Bar` object.
-        """
-        # Check if the object looks like a Bar (has high, low, close)
-        if not (hasattr(value, "high") and hasattr(value, "low") and hasattr(value, "close")):
-            return
-
-        high = float(value.high)
-        low = float(value.low)
-        close = float(value.close)
-
-        # UPDATE MIN/MAX
-        self._min.update(low)
-        self._max.update(high)
-
-        min_val = self._min.value
-        max_val = self._max.value
-
-        if min_val is not None and max_val is not None:
-            nom = close - min_val
-            den = max_val - min_val
-
-            if den == 0:
-                fast_k = self._last_fast_k
-            else:
-                fast_k = min(100.0, max(0.0, 100.0 * nom / den))
-
-            self._last_fast_k = fast_k
-
-            # UPDATE SMAs
-            self._sma_fast_k.update(fast_k)
-            k = self._sma_fast_k.value
-
-            if k is not None:
-                self._sma_k.update(k)
-                d = self._sma_k.value
-
-                if d is not None:
-                    result = StochasticValues(k=k, d=d)
-                    self._values.appendleft(result)
-
-        self._update_count += 1
 
     def reset(self) -> None:
         """Implements: Indicator.reset"""
@@ -139,9 +97,50 @@ class Stochastic(BaseIndicator):
 
     # region Utilities
 
-    def _calculate(self, value: float) -> Any:
-        """Not used as `update` is overridden for Bar support."""
-        return None
+    def _calculate(self, bar: Bar) -> StochasticValues | None:
+        """Computes the latest Stochastic values."""
+        high = float(bar.high)
+        low = float(bar.low)
+        close = float(bar.close)
+
+        # UPDATE MIN/MAX
+        self._min.update(low)
+        self._max.update(high)
+
+        min_val = self._min.value
+        max_val = self._max.value
+
+        # Skip: not enough data for min/max
+        if min_val is None or max_val is None:
+            return None
+
+        nom = close - min_val
+        den = max_val - min_val
+
+        if den == 0:
+            fast_k = self._last_fast_k
+        else:
+            fast_k = min(100.0, max(0.0, 100.0 * nom / den))
+
+        self._last_fast_k = fast_k
+
+        # UPDATE SMAs
+        self._sma_fast_k.update(fast_k)
+        k = self._sma_fast_k.value
+
+        # Skip: not enough data for smoothed K
+        if k is None:
+            return None
+
+        self._sma_k.update(k)
+        d = self._sma_k.value
+
+        # Skip: not enough data for D
+        if d is None:
+            return None
+
+        result = StochasticValues(k=k, d=d)
+        return result
 
     def _build_name(self) -> str:
         result = f"Stochastic({self._period_k}, {self._period_d}, {self._smooth})"

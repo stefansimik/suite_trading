@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections import deque
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
-class SMA(BaseIndicator):
+class SMA(NumericIndicator):
     """Calculates the Simple Moving Average (SMA) of the last $period values.
 
     This implementation uses a running sum to maintain O(1) performance

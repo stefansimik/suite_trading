@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import BarIndicator
+
+if TYPE_CHECKING:
+    from suite_trading.domain.market_data.bar.bar import Bar
 
 
-class ATR(BaseIndicator):
+class ATR(BarIndicator):
     """Calculates the Average True Range (ATR).
 
     ATR is a measure of volatility. This implementation uses Wilder's
@@ -36,36 +39,6 @@ class ATR(BaseIndicator):
 
     # region Protocol Indicator
 
-    def update(self, value: Any) -> None:
-        """Updates the indicator.
-
-        Note: ATR requires OHLC data. It is recommended to pass a `Bar` object.
-        If a numeric value is passed, it is treated as the already calculated True Range.
-
-        Args:
-            value: Either a `Bar` object or a numeric True Range value.
-        """
-        # Check if the object looks like a Bar (has high, low, close)
-        if hasattr(value, "high") and hasattr(value, "low") and hasattr(value, "close"):
-            high = float(value.high)
-            low = float(value.low)
-            close = float(value.close)
-
-            # TRUE RANGE (TR) CALCULATION
-            if self._last_close is None:
-                # First bar: TR is simply High - Low
-                tr = high - low
-            else:
-                # TR = max(H-L, |H-C_prev|, |L-C_prev|)
-                tr = max(high - low, abs(high - self._last_close), abs(low - self._last_close))
-
-            self._last_close = close
-            # Pass calculated True Range to the base update logic
-            super().update(tr)
-        else:
-            # Treat as numeric True Range
-            super().update(value)
-
     def reset(self) -> None:
         """Implements: Indicator.reset"""
         super().reset()
@@ -84,22 +57,33 @@ class ATR(BaseIndicator):
 
     # region Utilities
 
-    def _calculate(self, value: float) -> float | None:
+    def _calculate(self, bar: Bar) -> float | None:
         """Computes the latest ATR value using Wilder's smoothing."""
-        # Note: 'value' here is the True Range (TR) from `update`
+        high = float(bar.high)
+        low = float(bar.low)
+        close = float(bar.close)
 
-        # ROLLING ATR STATE
+        # TRUE RANGE (TR) CALCULATION
+        if self._last_close is None:
+            # First bar: TR is simply High - Low
+            tr = high - low
+        else:
+            # TR = max(H-L, |H-C_prev|, |L-C_prev|)
+            tr = max(high - low, abs(high - self._last_close), abs(low - self._last_close))
+
+        self._last_close = close
+
+        # WILDER'S SMOOTHING
         if self._last_atr is None:
             # INITIALIZATION (Simple average for the first period)
             if self._update_count == 0:
-                self._last_atr = value
+                self._last_atr = tr
             else:
                 # Recursive approximation of SMA for initial values
-                self._last_atr = (self._last_atr * self._update_count + value) / (self._update_count + 1)
+                self._last_atr = (self._last_atr * self._update_count + tr) / (self._update_count + 1)
         else:
-            # WILDER'S SMOOTHING
             # Formula: ATR_t = ((period - 1) * ATR_prev + TR_t) / period
-            self._last_atr = ((self._period - 1) * self._last_atr + value) / self._period
+            self._last_atr = ((self._period - 1) * self._last_atr + tr) / self._period
 
         # Skip: not enough values for strict warmup
         if self._update_count < self._period - 1:

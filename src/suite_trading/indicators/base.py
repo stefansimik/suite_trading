@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from typing import Any
 
+from suite_trading.domain.market_data.bar.bar import Bar
 from suite_trading.indicators.protocol import Indicator
 from suite_trading.utils.numeric_tools import FloatLike
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseIndicator(Indicator, ABC):
-    """Abstract base class for numeric-based technical indicators.
+    """Abstract base class for technical indicators.
 
     Handles result history, warmup tracking, and naming.
     """
@@ -27,10 +28,10 @@ class BaseIndicator(Indicator, ABC):
         """
         # Raise: max_history must be positive
         if max_history < 1:
-            raise ValueError(f"Cannot create `{self.__class__.__name__}` with $max_history ({max_history}) < 1")
+            raise ValueError(f"Cannot call `__init__` because $max_history ({max_history}) < 1")
 
         self._max_history = max_history
-        self._values: deque[Any] = deque(maxlen=max_history)  # cache last calculated indicator values here
+        self._values: deque[Any] = deque(maxlen=max_history)
         self._update_count = 0
 
     # endregion
@@ -54,27 +55,8 @@ class BaseIndicator(Indicator, ABC):
     def is_warmed_up(self) -> bool:
         return self._update_count >= self._compute_warmup_period()
 
-    def update(self, value: FloatLike) -> None:
-        """Implements: Indicator.update
-
-        Updates the indicator with a new numeric value.
-        """
-        # Performance Boundary: Convert to primitive float once at the entry point
-        val_as_float = float(value)
-        result = self._calculate(val_as_float)
-
-        # Store result if ready; [0] is always the latest
-        if result is not None:
-            self._values.appendleft(result)
-
-        self._update_count += 1
-        logger.debug(f"Updated Indicator named '{self.name}' (count={self._update_count}, val={result})")
-
     def reset(self) -> None:
-        """Implements: Indicator.reset
-
-        Resets the indicator to its initial state.
-        """
+        """Implements: Indicator.reset"""
         self._values.clear()
         self._update_count = 0
         logger.info(f"Reset Indicator named '{self.name}'")
@@ -111,9 +93,13 @@ class BaseIndicator(Indicator, ABC):
 
     # region Utilities
 
-    @abstractmethod
-    def _calculate(self, value: float) -> Any | None:
-        """Computes the core indicator value from the latest numeric $value."""
+    def _record_result(self, result: Any) -> None:
+        """Helper to store calculation result and increment update count."""
+        if result is not None:
+            self._values.appendleft(result)
+
+        self._update_count += 1
+        logger.debug(f"Updated Indicator named '{self.name}' (count={self._update_count}, val={result})")
 
     def _build_name(self) -> str:
         result = self.__class__.__name__
@@ -133,5 +119,56 @@ class BaseIndicator(Indicator, ABC):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name='{self.name}', val={self.value}, updates={self._update_count})"
+
+    # endregion
+
+
+class NumericIndicator(BaseIndicator, ABC):
+    """Base class for indicators updated with a single numeric value."""
+
+    # region Protocol Indicator
+
+    def update(self, value: FloatLike) -> None:
+        """Implements: Indicator.update
+
+        Updates the indicator with a new numeric value.
+        """
+        # Performance Boundary: Convert to primitive float once at the entry point
+        val_as_float = float(value)
+        result = self._calculate(val_as_float)
+        self._record_result(result)
+
+    # endregion
+
+    # region Utilities
+
+    @abstractmethod
+    def _calculate(self, value: float) -> Any | None:
+        """Computes the core indicator value from the latest numeric $value."""
+
+    # endregion
+
+
+class BarIndicator(BaseIndicator, ABC):
+    """Base class for indicators updated with a full Bar object."""
+
+    # region Protocol Indicator
+
+    def update(self, bar: Bar) -> None:
+        """Implements: Indicator.update
+
+        Updates the indicator with a new Bar object.
+        """
+        # Compute result and record it in history
+        result = self._calculate(bar)
+        self._record_result(result)
+
+    # endregion
+
+    # region Utilities
+
+    @abstractmethod
+    def _calculate(self, bar: Bar) -> Any | None:
+        """Computes the core indicator value from the latest $bar."""
 
     # endregion

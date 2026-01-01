@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import BarIndicator
 from suite_trading.indicators.library.sma import SMA
 
+if TYPE_CHECKING:
+    from suite_trading.domain.market_data.bar.bar import Bar
 
-class DMI(BaseIndicator):
+
+class DMI(BarIndicator):
     """Calculates the Directional Movement Index (DMI).
 
     DMI measures the trend strength and direction. Unlike ADX which uses
@@ -43,18 +46,33 @@ class DMI(BaseIndicator):
 
     # region Protocol Indicator
 
-    def update(self, value: Any) -> None:
-        """Updates the indicator.
+    def reset(self) -> None:
+        """Implements: Indicator.reset"""
+        super().reset()
+        self._last_high = None
+        self._last_low = None
+        self._last_close = None
+        self._sma_tr.reset()
+        self._sma_dm_plus.reset()
+        self._sma_dm_minus.reset()
 
-        Note: DMI requires OHLC data. It is recommended to pass a `Bar` object.
-        """
-        # Check if the object looks like a Bar (has high, low, close)
-        if not (hasattr(value, "high") and hasattr(value, "low") and hasattr(value, "close")):
-            return
+    # endregion
 
-        high0 = float(value.high)
-        low0 = float(value.low)
-        close0 = float(value.close)
+    # region Properties
+
+    @property
+    def period(self) -> int:
+        return self._period
+
+    # endregion
+
+    # region Utilities
+
+    def _calculate(self, bar: Bar) -> float | None:
+        """Computes the latest DMI value."""
+        high0 = float(bar.high)
+        low0 = float(bar.low)
+        close0 = float(bar.close)
 
         # INITIAL BAR
         if self._last_high is None:
@@ -85,45 +103,16 @@ class DMI(BaseIndicator):
         sma_dm_plus = self._sma_dm_plus.value
         sma_dm_minus = self._sma_dm_minus.value
 
-        result = None
-        if sma_tr is not None and sma_dm_plus is not None and sma_dm_minus is not None:
-            di_plus = sma_dm_plus / sma_tr if sma_tr != 0 else 0.0
-            di_minus = sma_dm_minus / sma_tr if sma_tr != 0 else 0.0
+        # Skip: not enough data for SMAs
+        if sma_tr is None or sma_dm_plus is None or sma_dm_minus is None:
+            return None
 
-            denom = di_plus + di_minus
-            result = (di_plus - di_minus) / denom if denom != 0 else 0.0
+        di_plus = sma_dm_plus / sma_tr if sma_tr != 0 else 0.0
+        di_minus = sma_dm_minus / sma_tr if sma_tr != 0 else 0.0
 
-        # Store result and increment count
-        if result is not None:
-            self._values.appendleft(result)
-
-        self._update_count += 1
-
-    def reset(self) -> None:
-        """Implements: Indicator.reset"""
-        super().reset()
-        self._last_high = None
-        self._last_low = None
-        self._last_close = None
-        self._sma_tr.reset()
-        self._sma_dm_plus.reset()
-        self._sma_dm_minus.reset()
-
-    # endregion
-
-    # region Properties
-
-    @property
-    def period(self) -> int:
-        return self._period
-
-    # endregion
-
-    # region Utilities
-
-    def _calculate(self, value: float) -> Any:
-        """Not used as `update` is overridden for Bar support."""
-        return None
+        denom = di_plus + di_minus
+        result = (di_plus - di_minus) / denom if denom != 0 else 0.0
+        return result
 
     def _build_name(self) -> str:
         result = f"DMI({self._period})"

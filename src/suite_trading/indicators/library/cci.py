@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections import deque
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
-class CCI(BaseIndicator):
+class CCI(NumericIndicator):
     """Calculates the Commodity Channel Index (CCI).
 
     CCI measures the variation of a security's price from its statistical mean.

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from suite_trading.utils.numeric_tools import FloatLike
-
 
 @runtime_checkable
 class Indicator(Protocol):
@@ -14,9 +12,7 @@ class Indicator(Protocol):
     """
 
     @property
-    def name(self) -> str:
-        """Return the descriptive name of this indicator."""
-        ...
+    def name(self) -> str: ...
 
     @property
     def value(self) -> Any | None:
@@ -28,17 +24,16 @@ class Indicator(Protocol):
         """Return True if the indicator has processed enough data."""
         ...
 
-    def update(self, value: FloatLike) -> None:
-        """Update the indicator with a new numeric value.
+    def update(self, value: Any) -> None:
+        """Update the indicator with new data.
 
         Args:
-            value: The latest numeric value (price, volume, etc.).
+            value: The latest data point. Can be a numeric value (FloatLike)
+                   for simple indicators or a `Bar` object for complex ones.
         """
         ...
 
-    def reset(self) -> None:
-        """Reset the indicator to its initial state."""
-        ...
+    def reset(self) -> None: ...
 
     def __getitem__(self, key: int | str) -> Any | None:
         """Access previous values (int index) or components (str key)."""

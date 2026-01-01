@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections import deque
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
-class MAX(BaseIndicator):
+class MAX(NumericIndicator):
     """Returns the maximum value (MAX) over a specified period.
 
     This implementation maintains a sliding window of values and computes

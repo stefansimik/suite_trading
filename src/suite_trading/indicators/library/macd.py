@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
 class MACDValues(NamedTuple):
@@ -13,7 +13,7 @@ class MACDValues(NamedTuple):
     histogram: float
 
 
-class MACD(BaseIndicator):
+class MACD(NumericIndicator):
     """Calculates Moving Average Convergence/Divergence (MACD).
 
     MACD is calculated as the difference between a fast and a slow EMA.

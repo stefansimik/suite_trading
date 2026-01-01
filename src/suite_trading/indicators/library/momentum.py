@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections import deque
 
-from suite_trading.indicators.base import BaseIndicator
+from suite_trading.indicators.base import NumericIndicator
 
 
-class Momentum(BaseIndicator):
+class Momentum(NumericIndicator):
     """Calculates the Momentum indicator.
 
     Momentum is the difference between the current price and the price $period bars ago.
